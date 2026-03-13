@@ -13,6 +13,12 @@ jest.mock('@/lib/storage', () => ({
   }),
 }));
 
+const mockApplyCanonicalObservationLocation = jest.fn();
+
+jest.mock('@/lib/services/observation-location-controller', () => ({
+  applyCanonicalObservationLocation: (...args: unknown[]) => mockApplyCanonicalObservationLocation(...args),
+}));
+
 import { useMountStore } from '@/lib/stores/mount-store';
 import { useSettingsStore } from '@/lib/stores/settings-store';
 import { createDefaultSettingsDraft } from '../settings-draft';
@@ -40,14 +46,24 @@ describe('apply-settings-transaction', () => {
     });
   });
 
-  it('applies settings in deterministic order', () => {
+  it('applies settings in deterministic order', async () => {
     const draft = createDefaultSettingsDraft();
     draft.connection = { ip: '127.0.0.1', port: '9999' };
     draft.backendProtocol = 'https';
     draft.preferences.locale = 'zh';
     draft.location = { latitude: 20, longitude: 30, elevation: 50 };
 
-    const result = applySettingsTransaction(draft);
+    mockApplyCanonicalObservationLocation.mockResolvedValue({
+      id: 'loc-1',
+      name: 'Current Site',
+      latitude: 20,
+      longitude: 30,
+      altitude: 50,
+      is_current: true,
+      is_default: true,
+    });
+
+    const result = await applySettingsTransaction(draft);
 
     expect(result.success).toBe(true);
     expect(result.appliedDomains).toEqual([
@@ -63,14 +79,19 @@ describe('apply-settings-transaction', () => {
     expect(useSettingsStore.getState().backendProtocol).toBe('https');
     expect(useSettingsStore.getState().preferences.locale).toBe('zh');
     expect(useMountStore.getState().profileInfo.AstrometrySettings.Latitude).toBe(20);
+    expect(mockApplyCanonicalObservationLocation).toHaveBeenCalledWith({
+      latitude: 20,
+      longitude: 30,
+      altitude: 50,
+    });
   });
 
-  it('rolls back applied domains on failure', () => {
+  it('rolls back applied domains on failure', async () => {
     const draft = createDefaultSettingsDraft();
     draft.connection = { ip: '10.0.0.5', port: '1889' };
     draft.preferences.locale = 'zh';
 
-    const result = applySettingsTransaction(draft, {
+    const result = await applySettingsTransaction(draft, {
       domainOrder: ['connection', 'preferences'],
       domainWriters: {
         preferences: () => {
@@ -88,4 +109,3 @@ describe('apply-settings-transaction', () => {
     expect(useSettingsStore.getState().connection).toEqual({ ip: 'localhost', port: '1888' });
   });
 });
-

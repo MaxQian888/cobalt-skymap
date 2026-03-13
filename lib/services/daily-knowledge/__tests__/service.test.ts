@@ -23,13 +23,20 @@ jest.mock('../source-wikimedia', () => ({
   fetchWikimediaItem: jest.fn(),
 }));
 
+jest.mock('../source-registry', () => ({
+  fetchDailyKnowledgeRegistryItems: jest.fn(),
+}));
+
 import { fetchApodItem } from '../source-apod';
 import { getCuratedDailyItem, getCuratedItems } from '../source-curated';
+import { fetchDailyKnowledgeRegistryItems } from '../source-registry';
 import { fetchWikimediaItem } from '../source-wikimedia';
 
 const mockFetchApodItem = fetchApodItem as jest.MockedFunction<typeof fetchApodItem>;
 const mockGetCuratedDailyItem = getCuratedDailyItem as jest.MockedFunction<typeof getCuratedDailyItem>;
 const mockGetCuratedItems = getCuratedItems as jest.MockedFunction<typeof getCuratedItems>;
+const mockFetchDailyKnowledgeRegistryItems =
+  fetchDailyKnowledgeRegistryItems as jest.MockedFunction<typeof fetchDailyKnowledgeRegistryItems>;
 const mockFetchWikimediaItem = fetchWikimediaItem as jest.MockedFunction<typeof fetchWikimediaItem>;
 
 function makeItem(partial: Partial<DailyKnowledgeItem> & Pick<DailyKnowledgeItem, 'id' | 'source'>): DailyKnowledgeItem {
@@ -79,6 +86,10 @@ describe('daily-knowledge/service', () => {
     mockGetCuratedItems.mockReturnValue(curatedPool);
     mockFetchApodItem.mockResolvedValue(null);
     mockFetchWikimediaItem.mockResolvedValue(null);
+    mockFetchDailyKnowledgeRegistryItems.mockResolvedValue({
+      items: [],
+      sourceStatuses: [],
+    });
     Object.defineProperty(window.navigator, 'onLine', {
       configurable: true,
       value: true,
@@ -204,6 +215,63 @@ describe('daily-knowledge/service', () => {
       '2026-02-20',
       expect.any(String),
       expect.objectContaining({ signal, locale: 'en' })
+    );
+  });
+
+  it('includes registry items and source statuses in the aggregated result', async () => {
+    mockFetchDailyKnowledgeRegistryItems.mockResolvedValue({
+      items: [
+        makeItem({
+          id: 'nasa-lib-item',
+          source: 'nasa-image-library',
+          title: 'NASA Library Item',
+          externalUrl: 'https://images.nasa.gov/details-test',
+        }),
+      ],
+      sourceStatuses: [
+        {
+          source: 'nasa-image-library',
+          transport: 'api',
+          state: 'ready',
+          reason: 'success',
+          itemCount: 1,
+        },
+      ],
+    });
+
+    const result = await getDailyKnowledge('2026-02-20', 'en', { onlineEnhancement: true });
+
+    expect(result.items.some((item) => item.id === 'nasa-lib-item')).toBe(true);
+    expect(result.sourceStatuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: 'nasa-image-library', state: 'ready' }),
+        expect.objectContaining({ source: 'nasa-apod' }),
+        expect.objectContaining({ source: 'wikimedia' }),
+      ])
+    );
+  });
+
+  it('marks curated fallback when online sources fail or return nothing', async () => {
+    mockFetchApodItem.mockRejectedValue(new Error('apod failed'));
+    mockFetchDailyKnowledgeRegistryItems.mockResolvedValue({
+      items: [],
+      sourceStatuses: [
+        {
+          source: 'esa-science',
+          transport: 'rss',
+          state: 'failed',
+          reason: 'error',
+          itemCount: 0,
+        },
+      ],
+    });
+
+    const result = await getDailyKnowledge('2026-02-20', 'en', { onlineEnhancement: true });
+
+    expect(result.selected.id).toBe('curated-daily');
+    expect(result.usedCuratedFallback).toBe(true);
+    expect(result.sourceStatuses).toEqual(
+      expect.arrayContaining([expect.objectContaining({ source: 'esa-science', state: 'failed' })])
     );
   });
 

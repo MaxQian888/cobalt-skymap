@@ -28,7 +28,10 @@ function createOrientationEvent(
 describe('useDeviceOrientation', () => {
   let originalDeviceOrientationEvent: unknown;
   let originalScreenOrientation: ScreenOrientation | undefined;
+  let originalPermissions: Permissions | undefined;
   let requestPermissionMock: RequestPermissionFn;
+  let permissionsState: PermissionState;
+  let permissionsQueryMock: jest.Mock;
   let rafSpy: jest.SpyInstance;
   let cafSpy: jest.SpyInstance;
   let visibilityState: DocumentVisibilityState = 'visible';
@@ -43,6 +46,22 @@ describe('useDeviceOrientation', () => {
     (global as unknown as { DeviceOrientationEvent: unknown }).DeviceOrientationEvent = class {
       static requestPermission = requestPermissionMock;
     };
+
+    originalPermissions = navigator.permissions;
+    permissionsState = 'granted';
+    permissionsQueryMock = jest.fn().mockImplementation(async () => ({
+      state: permissionsState,
+      onchange: null,
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    }));
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: {
+        query: permissionsQueryMock,
+      },
+    });
 
     Object.defineProperty(window.screen, 'orientation', {
       configurable: true,
@@ -71,6 +90,10 @@ describe('useDeviceOrientation', () => {
     Object.defineProperty(window.screen, 'orientation', {
       configurable: true,
       value: originalScreenOrientation,
+    });
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: originalPermissions,
     });
     rafSpy.mockRestore();
     cafSpy.mockRestore();
@@ -105,6 +128,7 @@ describe('useDeviceOrientation', () => {
   });
 
   it('handles denied permission and reports status', async () => {
+    permissionsState = 'denied';
     requestPermissionMock.mockResolvedValueOnce('denied');
     requestPermissionMock.mockResolvedValueOnce('denied');
 
@@ -502,5 +526,61 @@ describe('useDeviceOrientation', () => {
       expect(result.current.status).toBe('active');
       expect(result.current.skyDirection).not.toBeNull();
     });
+  });
+
+  it('revalidates permission on visibility and reflects revoked permission', async () => {
+    const { result } = renderHook(() =>
+      useDeviceOrientation({
+        enabled: true,
+        calibration: {
+          azimuthOffsetDeg: 0,
+          altitudeOffsetDeg: 0,
+          required: false,
+          updatedAt: null,
+        },
+      })
+    );
+
+    await act(async () => {
+      await result.current.requestPermission();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPermissionGranted).toBe(true);
+    });
+
+    permissionsState = 'denied';
+    visibilityState = 'hidden';
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    visibilityState = 'visible';
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    await waitFor(() => {
+      expect(result.current.isPermissionGranted).toBe(false);
+      expect(result.current.status).toBe('permission-denied');
+      expect(result.current.error).toBe('Permission denied');
+    });
+  });
+
+  it('times out permission request and keeps sensor in permission-required state', async () => {
+    requestPermissionMock
+      .mockRejectedValueOnce(new Error('Permission request timed out'))
+      .mockRejectedValueOnce(new Error('Permission request timed out'));
+
+    const { result } = renderHook(() => useDeviceOrientation({ enabled: true }));
+
+    let granted = true;
+    await act(async () => {
+      granted = await result.current.requestPermission();
+    });
+
+    expect(granted).toBe(false);
+    expect(result.current.isPermissionGranted).toBe(false);
+    expect(result.current.status).toBe('permission-required');
+    expect(result.current.error).toBe('Permission request timed out');
   });
 });

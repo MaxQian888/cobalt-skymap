@@ -81,7 +81,9 @@ fn get_storage_dir(app: &AppHandle) -> Result<PathBuf, StorageError> {
             .app_data_dir()
             .map_err(|_| StorageError::AppDataDirNotFound)?;
         let d = app_data_dir.join("skymap");
-        if !d.exists() { fs::create_dir_all(&d)?; }
+        if !d.exists() {
+            fs::create_dir_all(&d)?;
+        }
         d
     };
 
@@ -490,7 +492,10 @@ mod tests {
     #[test]
     fn test_export_data_serialization() {
         let mut stores = HashMap::new();
-        stores.insert("test-store".to_string(), serde_json::json!({"key": "value"}));
+        stores.insert(
+            "test-store".to_string(),
+            serde_json::json!({"key": "value"}),
+        );
 
         let data = ExportData {
             metadata: ExportMetadata {
@@ -582,13 +587,11 @@ mod tests {
         let stats = StorageStats {
             total_size: 1024 * 1024,
             store_count: 5,
-            stores: vec![
-                StoreInfo {
-                    name: "store1".to_string(),
-                    size: 500000,
-                    modified: Some(Utc::now()),
-                },
-            ],
+            stores: vec![StoreInfo {
+                name: "store1".to_string(),
+                size: 500000,
+                modified: Some(Utc::now()),
+            }],
             directory: "/path/to/stores".to_string(),
         };
 
@@ -671,7 +674,7 @@ mod tests {
         assert!(KNOWN_STORES.contains(&"starmap-onboarding"));
         assert!(KNOWN_STORES.contains(&"starmap-locations"));
         assert!(KNOWN_STORES.contains(&"starmap-observation-log"));
-        
+
         // Skymap stores
         assert!(KNOWN_STORES.contains(&"skymap-offline"));
         assert!(KNOWN_STORES.contains(&"skymap-unified-cache"));
@@ -683,7 +686,12 @@ mod tests {
     #[test]
     fn test_known_stores_count() {
         // Should have exactly 13 known stores after the update
-        assert_eq!(KNOWN_STORES.len(), 13, "Should have exactly 13 known stores, got {}", KNOWN_STORES.len());
+        assert_eq!(
+            KNOWN_STORES.len(),
+            13,
+            "Should have exactly 13 known stores, got {}",
+            KNOWN_STORES.len()
+        );
     }
 
     #[test]
@@ -698,8 +706,11 @@ mod tests {
     fn test_known_stores_naming_convention() {
         // All stores should follow naming convention (lowercase with hyphens)
         for store in KNOWN_STORES {
-            assert!(store.chars().all(|c| c.is_ascii_lowercase() || c == '-'),
-                "Store '{}' should use lowercase and hyphens only", store);
+            assert!(
+                store.chars().all(|c| c.is_ascii_lowercase() || c == '-'),
+                "Store '{}' should use lowercase and hyphens only",
+                store
+            );
         }
     }
 }

@@ -5,6 +5,7 @@ import {
   createDefaultSettingsDraft,
 } from '../settings-draft';
 import {
+  getCategoryValidationStatus,
   validateSettingsDraft,
 } from '../settings-validation';
 
@@ -43,5 +44,51 @@ describe('settings-validation', () => {
     expect(result.isValid).toBe(false);
     expect(result.fieldErrors['preferences.dailyKnowledgeAutoShow']).toBeDefined();
   });
-});
 
+  it('reports invalid values across connection, preference, search, and location categories', () => {
+    const draft = createDefaultSettingsDraft();
+    draft.backendProtocol = 'ftp' as 'http';
+    draft.connection.ip = ' ';
+    draft.connection.port = '70000';
+    draft.preferences.timeFormat = '11h' as '24h';
+    draft.preferences.dateFormat = 'lunar' as 'iso';
+    draft.preferences.coordinateFormat = 'xyz' as 'dms';
+    draft.preferences.distanceUnit = 'miles' as 'metric';
+    draft.preferences.temperatureUnit = 'kelvin' as 'celsius';
+    draft.preferences.startupView = 'mars' as 'last';
+    draft.preferences.launchOnStartup = 'yes' as never;
+    draft.performance.renderQuality = 'extreme' as 'high';
+    draft.notifications.toastDuration = 250;
+    draft.search.autoSearchDelay = 50;
+    draft.search.maxSearchResults = 5;
+    draft.search.rememberSearchHistory = false;
+    draft.search.maxHistoryItems = 10;
+    draft.location.latitude = 120;
+    draft.location.longitude = 200;
+    draft.location.elevation = Number.NaN;
+
+    const result = validateSettingsDraft(draft);
+
+    expect(result.isValid).toBe(false);
+    expect(result.fieldErrors['backendProtocol']).toBeDefined();
+    expect(result.fieldErrors['connection.ip']).toBeDefined();
+    expect(result.fieldErrors['connection.port']).toBeDefined();
+    expect(result.fieldErrors['preferences.timeFormat']).toBeDefined();
+    expect(result.fieldErrors['preferences.dateFormat']).toBeDefined();
+    expect(result.fieldErrors['preferences.coordinateFormat']).toBeDefined();
+    expect(result.fieldErrors['preferences.distanceUnit']).toBeDefined();
+    expect(result.fieldErrors['preferences.temperatureUnit']).toBeDefined();
+    expect(result.fieldErrors['preferences.startupView']).toBeDefined();
+    expect(result.fieldErrors['preferences.launchOnStartup']).toBeDefined();
+    expect(result.fieldErrors['performance.renderQuality']).toBeDefined();
+    expect(result.fieldErrors['notifications.toastDuration']).toBeDefined();
+    expect(result.fieldErrors['search.autoSearchDelay']).toBeDefined();
+    expect(result.fieldErrors['search.maxSearchResults']).toBeDefined();
+    expect(result.fieldErrors['search.maxHistoryItems']).toBeDefined();
+    expect(result.fieldErrors['location.latitude']).toBeDefined();
+    expect(result.fieldErrors['location.longitude']).toBeDefined();
+    expect(result.fieldErrors['location.elevation']).toBeDefined();
+    expect(getCategoryValidationStatus(result, 'search')).toBe('invalid');
+    expect(getCategoryValidationStatus(result, 'accessibility')).toBe('valid');
+  });
+});

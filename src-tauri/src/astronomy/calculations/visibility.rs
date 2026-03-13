@@ -28,7 +28,8 @@ pub fn calculate_visibility(
         .unwrap_or_else(Utc::now);
 
     // Current position
-    let current = equatorial_to_horizontal(ra, dec, latitude, longitude, Some(dt.timestamp()), None);
+    let current =
+        equatorial_to_horizontal(ra, dec, latitude, longitude, Some(dt.timestamp()), None);
 
     // Transit altitude (when object crosses meridian)
     let transit_alt = 90.0 - (latitude - dec).abs();
@@ -136,7 +137,10 @@ mod tests {
     fn test_visibility_circumpolar() {
         // Polaris (Dec ~89°) from North pole (lat 90°) should be circumpolar
         let vis = calculate_visibility(0.0, 89.0, 80.0, 0.0, None, None);
-        assert!(vis.is_circumpolar, "High dec star from high latitude should be circumpolar");
+        assert!(
+            vis.is_circumpolar,
+            "High dec star from high latitude should be circumpolar"
+        );
         assert!(!vis.never_rises);
         assert!(approx_eq(vis.hours_visible, 24.0, 0.1));
     }
@@ -145,7 +149,10 @@ mod tests {
     fn test_visibility_never_rises() {
         // Southern star (Dec -80°) from Northern location (lat 60°) should never rise
         let vis = calculate_visibility(0.0, -80.0, 60.0, 0.0, None, None);
-        assert!(vis.never_rises, "Southern star should never rise from far north");
+        assert!(
+            vis.never_rises,
+            "Southern star should never rise from far north"
+        );
         assert!(!vis.is_circumpolar);
         assert!(approx_eq(vis.hours_visible, 0.0, 0.1));
     }
@@ -157,20 +164,30 @@ mod tests {
         let lat: f64 = 45.0;
         let dec: f64 = 30.0;
         let expected_transit = 90.0 - (lat - dec).abs(); // 75°
-        assert!(approx_eq(vis.transit_altitude, expected_transit, 0.1), 
-            "Transit altitude should be {}°, got {}", expected_transit, vis.transit_altitude);
+        assert!(
+            approx_eq(vis.transit_altitude, expected_transit, 0.1),
+            "Transit altitude should be {}°, got {}",
+            expected_transit,
+            vis.transit_altitude
+        );
     }
 
     #[test]
     fn test_visibility_rise_set_times() {
         // Normal visibility case: object that rises and sets
         let vis = calculate_visibility(0.0, 20.0, 45.0, 0.0, None, None);
-        
+
         // Should have rise and set times
-        assert!(vis.rise_time.is_some(), "Rise time should be present for normal object");
-        assert!(vis.set_time.is_some(), "Set time should be present for normal object");
+        assert!(
+            vis.rise_time.is_some(),
+            "Rise time should be present for normal object"
+        );
+        assert!(
+            vis.set_time.is_some(),
+            "Set time should be present for normal object"
+        );
         assert!(vis.transit_time.is_some(), "Transit time should be present");
-        
+
         // Rise should be before set
         if let (Some(rise), Some(set)) = (vis.rise_time, vis.set_time) {
             // Note: rise could be > set if the object rises late and sets early next day
@@ -183,22 +200,40 @@ mod tests {
     fn test_visibility_circumpolar_has_transit() {
         // Circumpolar objects should have transit time but no rise/set
         let vis = calculate_visibility(0.0, 85.0, 80.0, 0.0, None, None);
-        
+
         assert!(vis.is_circumpolar);
-        assert!(vis.transit_time.is_some(), "Circumpolar object should have transit time");
-        assert!(vis.rise_time.is_none(), "Circumpolar object should not have rise time");
-        assert!(vis.set_time.is_none(), "Circumpolar object should not have set time");
+        assert!(
+            vis.transit_time.is_some(),
+            "Circumpolar object should have transit time"
+        );
+        assert!(
+            vis.rise_time.is_none(),
+            "Circumpolar object should not have rise time"
+        );
+        assert!(
+            vis.set_time.is_none(),
+            "Circumpolar object should not have set time"
+        );
     }
 
     #[test]
     fn test_visibility_never_rises_no_times() {
         // Objects that never rise should have no times
         let vis = calculate_visibility(0.0, -85.0, 80.0, 0.0, None, None);
-        
+
         assert!(vis.never_rises);
-        assert!(vis.rise_time.is_none(), "Never-rises object should not have rise time");
-        assert!(vis.set_time.is_none(), "Never-rises object should not have set time");
-        assert!(vis.transit_time.is_none(), "Never-rises object should not have transit time");
+        assert!(
+            vis.rise_time.is_none(),
+            "Never-rises object should not have rise time"
+        );
+        assert!(
+            vis.set_time.is_none(),
+            "Never-rises object should not have set time"
+        );
+        assert!(
+            vis.transit_time.is_none(),
+            "Never-rises object should not have transit time"
+        );
     }
 
     #[test]
@@ -209,12 +244,17 @@ mod tests {
             (180.0, 45.0, 45.0), // Mid-declination
             (90.0, -30.0, 30.0), // Southern object from southern location
         ];
-        
+
         for (ra, dec, lat) in test_cases {
             let vis = calculate_visibility(ra, dec, lat, 0.0, None, None);
-            assert!(vis.hours_visible >= 0.0 && vis.hours_visible <= 24.0,
-                "Hours visible out of range: {} for ra={}, dec={}, lat={}", 
-                vis.hours_visible, ra, dec, lat);
+            assert!(
+                vis.hours_visible >= 0.0 && vis.hours_visible <= 24.0,
+                "Hours visible out of range: {} for ra={}, dec={}, lat={}",
+                vis.hours_visible,
+                ra,
+                dec,
+                lat
+            );
         }
     }
 }

@@ -72,6 +72,8 @@ const mockStore: {
   favorites: Array<{ itemId: string; createdAt: number }>;
   history: Array<{ itemId: string; shownAt: number; entry: string; dateKey: string }>;
   filters: { query: string; category: string; source: string; favoritesOnly: boolean };
+  sourceStatuses: Array<{ source: string; state: string; reason: string; itemCount: number; transport: string }>;
+  usedCuratedFallback: boolean;
   closeDialog: jest.Mock;
   loadDaily: jest.Mock;
   next: jest.Mock;
@@ -101,6 +103,16 @@ const mockStore: {
     source: 'all',
     favoritesOnly: false,
   },
+  sourceStatuses: [
+    {
+      source: 'nasa-image-library',
+      state: 'failed',
+      reason: 'error',
+      itemCount: 0,
+      transport: 'api',
+    },
+  ],
+  usedCuratedFallback: true,
   closeDialog: jest.fn(),
   loadDaily: jest.fn(),
   next: jest.fn(),
@@ -152,6 +164,16 @@ describe('daily-knowledge-dialog', () => {
       source: 'all',
       favoritesOnly: false,
     };
+    mockStore.sourceStatuses = [
+      {
+        source: 'nasa-image-library',
+        state: 'failed',
+        reason: 'error',
+        itemCount: 0,
+        transport: 'api',
+      },
+    ];
+    mockStore.usedCuratedFallback = true;
     mockStore.viewMode = 'pager';
     mockStore.wheelPagingEnabled = false;
     mockCopyTextWithFeedback.mockResolvedValue(true);
@@ -201,6 +223,8 @@ describe('daily-knowledge-dialog', () => {
     expect(screen.getByText('dailyKnowledge.practicalInsights')).toBeInTheDocument();
     expect(screen.getByText('dailyKnowledge.observationTips')).toBeInTheDocument();
     expect(screen.getByText('dailyKnowledge.difficultyBadge.intermediate')).toBeInTheDocument();
+    expect(screen.getByText('dailyKnowledge.curatedFallbackNotice')).toBeInTheDocument();
+    expect(screen.getByText('dailyKnowledge.sourceStatus.nasa-image-library.error')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /SEDS M31/ })).toHaveAttribute(
       'href',
       'https://messier.seds.org/m/m031.html'
@@ -506,6 +530,14 @@ describe('daily-knowledge-dialog', () => {
     mockStore.filters = { query: '', category: 'all', source: 'nasa-apod', favoritesOnly: false };
     render(<DailyKnowledgeDialog />);
     expect(screen.getByText('dailyKnowledge.noResults')).toBeInTheDocument();
+  });
+
+  it('renders new source filters for additional upstreams', () => {
+    render(<DailyKnowledgeDialog />);
+    fireEvent.click(screen.getAllByRole('combobox')[1]);
+    expect(screen.getByText('dailyKnowledge.sourceNasaImageLibrary')).toBeInTheDocument();
+    expect(screen.getByText('dailyKnowledge.sourceNasaPhotojournal')).toBeInTheDocument();
+    expect(screen.getByText('dailyKnowledge.sourceEsaScience')).toBeInTheDocument();
   });
 
   it('filters items by favoritesOnly', () => {

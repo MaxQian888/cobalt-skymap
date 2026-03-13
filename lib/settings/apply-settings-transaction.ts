@@ -1,6 +1,7 @@
 import { useMountStore } from '@/lib/stores/mount-store';
 import { useSettingsStore } from '@/lib/stores/settings-store';
 import type { SettingsDraft, SettingsDraftCategory } from './settings-draft';
+import { applyCanonicalObservationLocation } from '@/lib/services/observation-location-controller';
 
 export interface DomainApplyFailure {
   domain: SettingsDraftCategory;
@@ -16,7 +17,7 @@ export interface ApplySettingsTransactionResult {
 
 export interface ApplySettingsTransactionOptions {
   domainOrder?: SettingsDraftCategory[];
-  domainWriters?: Partial<Record<SettingsDraftCategory, (draft: SettingsDraft) => void>>;
+  domainWriters?: Partial<Record<SettingsDraftCategory, (draft: SettingsDraft) => void | Promise<void>>>;
 }
 
 const DEFAULT_DOMAIN_ORDER: SettingsDraftCategory[] = [
@@ -39,10 +40,10 @@ function toErrorMessage(error: unknown): string {
   return 'Unknown error.';
 }
 
-export function applySettingsTransaction(
+export async function applySettingsTransaction(
   draft: SettingsDraft,
   options: ApplySettingsTransactionOptions = {},
-): ApplySettingsTransactionResult {
+): Promise<ApplySettingsTransactionResult> {
   const settingsStore = useSettingsStore.getState();
   const mountStore = useMountStore.getState();
 
@@ -67,7 +68,7 @@ export function applySettingsTransaction(
     elevation: mountStore.profileInfo?.AstrometrySettings?.Elevation ?? 0,
   };
 
-  const defaultWriters: Record<SettingsDraftCategory, (currentDraft: SettingsDraft) => void> = {
+  const defaultWriters: Record<SettingsDraftCategory, (currentDraft: SettingsDraft) => void | Promise<void>> = {
     connection: (currentDraft) => {
       settingsStore.setConnection(currentDraft.connection);
       settingsStore.setBackendProtocol(currentDraft.backendProtocol);
@@ -87,7 +88,12 @@ export function applySettingsTransaction(
     search: (currentDraft) => {
       settingsStore.setSearchSettings(currentDraft.search);
     },
-    location: (currentDraft) => {
+    location: async (currentDraft) => {
+      await applyCanonicalObservationLocation({
+        latitude: currentDraft.location.latitude,
+        longitude: currentDraft.location.longitude,
+        altitude: currentDraft.location.elevation,
+      });
       const currentProfile = useMountStore.getState().profileInfo;
       mountStore.setProfileInfo({
         ...currentProfile,
@@ -138,7 +144,7 @@ export function applySettingsTransaction(
   try {
     for (const domain of order) {
       const writer = options.domainWriters?.[domain] ?? defaultWriters[domain];
-      writer(draft);
+      await writer(draft);
       appliedDomains.push(domain);
     }
   } catch (error) {
@@ -172,4 +178,3 @@ export function applySettingsTransaction(
     rolledBackDomains,
   };
 }
-

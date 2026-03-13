@@ -11,14 +11,15 @@
 //! - `markers`: Sky marker annotations
 //! - `observation_log`: Observation session logging
 
-pub mod storage;
 pub mod equipment;
 pub mod locations;
-pub mod targets;
-pub mod target_io;
-pub mod session_io;
 pub mod markers;
 pub mod observation_log;
+pub mod session_io;
+mod session_io_core;
+pub mod storage;
+pub mod target_io;
+pub mod targets;
 
 // Re-export storage error type
 pub use storage::StorageError;
@@ -31,36 +32,85 @@ pub use storage::{
 
 // Re-export equipment types and commands
 pub use equipment::{
-    // Types
-    BarlowReducer, Camera, CameraType, EquipmentData, Eyepiece, Filter, FilterType,
-    Telescope, TelescopeType,
     // Commands
-    add_barlow_reducer, add_camera, add_eyepiece, add_filter, add_telescope, delete_equipment,
-    get_default_camera, get_default_telescope, load_equipment, save_equipment, set_default_camera,
-    set_default_telescope, update_barlow_reducer, update_camera, update_eyepiece, update_filter,
+    add_barlow_reducer,
+    add_camera,
+    add_eyepiece,
+    add_filter,
+    add_telescope,
+    delete_equipment,
+    get_default_camera,
+    get_default_telescope,
+    load_equipment,
+    save_equipment,
+    set_default_camera,
+    set_default_telescope,
+    update_barlow_reducer,
+    update_camera,
+    update_eyepiece,
+    update_filter,
     update_telescope,
+    // Types
+    BarlowReducer,
+    Camera,
+    CameraType,
+    EquipmentData,
+    Eyepiece,
+    Filter,
+    FilterType,
+    Telescope,
+    TelescopeType,
 };
 
 // Re-export locations types and commands
 pub use locations::{
-    // Types
-    LocationsData, ObservationLocation,
     // Commands
-    add_location, delete_location, get_current_location, load_locations, save_locations,
-    set_current_location, set_default_location, update_location,
+    add_location,
+    delete_location,
+    get_current_location,
+    load_locations,
+    save_locations,
+    set_current_location,
+    set_default_location,
+    update_location,
+    // Types
+    LocationsData,
+    ObservationLocation,
 };
 
 // Re-export target list types and commands
 pub use targets::{
-    // Types
-    BatchTargetInput, ExposurePlan, MosaicSettings, ObservableWindow, TargetInput, TargetItem,
-    TargetListData, TargetPriority, TargetStats, TargetStatus,
     // Commands
-    add_tag_to_targets, add_target, add_targets_batch, archive_completed_targets,
-    clear_all_targets, clear_completed_targets, get_target_stats, load_target_list,
-    remove_tag_from_targets, remove_target, remove_targets_batch, save_target_list, search_targets,
-    set_active_target, set_targets_priority_batch, set_targets_status_batch, toggle_target_archive,
-    toggle_target_favorite, update_target,
+    add_tag_to_targets,
+    add_target,
+    add_targets_batch,
+    archive_completed_targets,
+    clear_all_targets,
+    clear_completed_targets,
+    get_target_stats,
+    load_target_list,
+    remove_tag_from_targets,
+    remove_target,
+    remove_targets_batch,
+    save_target_list,
+    search_targets,
+    set_active_target,
+    set_targets_priority_batch,
+    set_targets_status_batch,
+    toggle_target_archive,
+    toggle_target_favorite,
+    update_target,
+    // Types
+    BatchTargetInput,
+    ExposurePlan,
+    MosaicSettings,
+    ObservableWindow,
+    TargetInput,
+    TargetItem,
+    TargetListData,
+    TargetPriority,
+    TargetStats,
+    TargetStatus,
 };
 
 // Re-export target I/O
@@ -73,21 +123,54 @@ pub use session_io::{
 
 // Re-export markers types and commands
 pub use markers::{
-    // Types
-    MarkerIcon, MarkerInput, MarkerUpdateInput, MarkersData, SkyMarker,
     // Commands
-    add_marker, add_marker_group, clear_all_markers, get_visible_markers, load_markers,
-    remove_marker, remove_marker_group, remove_markers_by_group, rename_marker_group, save_markers,
-    set_all_markers_visible, set_show_markers, toggle_marker_visibility, update_marker,
+    add_marker,
+    add_marker_group,
+    clear_all_markers,
+    get_visible_markers,
+    load_markers,
+    remove_marker,
+    remove_marker_group,
+    remove_markers_by_group,
+    rename_marker_group,
+    save_markers,
+    set_all_markers_visible,
+    set_show_markers,
+    toggle_marker_visibility,
+    update_marker,
+    // Types
+    MarkerIcon,
+    MarkerInput,
+    MarkerUpdateInput,
+    MarkersData,
+    SkyMarker,
 };
 
 // Re-export observation log types and commands
 pub use observation_log::{
-    // Types
-    CreatePlannedSessionPayload, ExecutionSummary, ExecutionTarget, Observation, ObservationLogData,
-    ObservationQueryFilters, ObservationSearchHit, ObservationSession, ObservationStats, WeatherConditions,
     // Commands
-    add_observation, create_planned_session, create_session, delete_observation, delete_session, end_session,
-    get_observation_stats, load_observation_log, save_observation_log, search_observations,
-    export_observation_log, update_observation, update_session,
+    add_observation,
+    create_planned_session,
+    create_session,
+    delete_observation,
+    delete_session,
+    end_session,
+    export_observation_log,
+    get_observation_stats,
+    load_observation_log,
+    save_observation_log,
+    search_observations,
+    update_observation,
+    update_session,
+    // Types
+    CreatePlannedSessionPayload,
+    ExecutionSummary,
+    ExecutionTarget,
+    Observation,
+    ObservationLogData,
+    ObservationQueryFilters,
+    ObservationSearchHit,
+    ObservationSession,
+    ObservationStats,
+    WeatherConditions,
 };

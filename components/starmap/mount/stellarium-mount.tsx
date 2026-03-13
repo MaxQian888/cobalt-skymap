@@ -70,8 +70,22 @@ function MountPanel({ compact }: StellariumMountProps) {
   const parked = useMountStore((s) => s.mountInfo.Parked);
   const pierSide = useMountStore((s) => s.mountInfo.PierSide);
   const trackMode = useMountStore((s) => s.mountInfo.TrackMode);
-  const canPark = useMountStore((s) => s.capabilities.canPark);
-  const canSetTracking = useMountStore((s) => s.capabilities.canSetTracking);
+  const selectedDevice = useMountStore((s) => s.selectedDevice);
+  const parkActionExplicitlyUnavailable = useMountStore((s) => (
+    s.mountInfo.Parked
+      ? s.actionAvailability.unpark === false
+      : s.actionAvailability.park === false
+  ));
+  const trackingActionExplicitlyUnavailable = useMountStore((s) => s.actionAvailability.tracking === false);
+  const canTogglePark = useMountStore((s) => {
+    const availability = s.actionAvailability;
+    return s.mountInfo.Parked
+      ? (availability.unpark ?? (s.capabilities.canUnpark || s.capabilities.canPark))
+      : (availability.park ?? (s.capabilities.canPark || s.capabilities.canUnpark));
+  });
+  const canSetTracking = useMountStore((s) => s.actionAvailability.tracking ?? s.capabilities.canSetTracking);
+  const canChangeTrackingRate = useMountStore((s) => s.actionAvailability.trackingRate ?? Boolean(s.mountInfo.Tracking));
+  const canAbortSlew = useMountStore((s) => s.actionAvailability.abortSlew ?? Boolean(s.mountInfo.Slewing));
 
   const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
 
@@ -158,10 +172,13 @@ function MountPanel({ compact }: StellariumMountProps) {
     <div className="flex flex-col gap-1.5 p-2 w-full">
       {/* Header: status + settings */}
       <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-[10px] font-medium text-green-400">{t('mount')}</span>
-        </div>
+          <div className="flex items-center gap-1">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-[10px] font-medium text-green-400">{t('mount')}</span>
+            {selectedDevice?.name && (
+              <span className="text-[9px] text-muted-foreground">{selectedDevice.name}</span>
+            )}
+          </div>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -186,24 +203,30 @@ function MountPanel({ compact }: StellariumMountProps) {
       {/* Status badges */}
       <div className="flex flex-wrap items-center justify-center gap-0.5">
         {tracking && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 text-green-400 border-green-400/30 cursor-pointer hover:bg-green-400/10">
-                {trackMode === 'sidereal' ? '☆' : trackMode === 'lunar' ? '☽' : trackMode === 'solar' ? '☀' : '⏸'} {t(`rate.${trackMode ?? 'sidereal'}`)}
-              </Badge>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="min-w-[100px]">
-              {(['sidereal', 'lunar', 'solar'] as const).map((rate) => (
-                <DropdownMenuItem
-                  key={rate}
-                  className={cn('text-xs', trackMode === rate && 'font-bold')}
-                  onClick={() => handleTrackingRate(rate)}
-                >
-                  {rate === 'sidereal' ? '☆' : rate === 'lunar' ? '☽' : '☀'} {t(`rate.${rate}`)}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          canChangeTrackingRate ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 text-green-400 border-green-400/30 cursor-pointer hover:bg-green-400/10">
+                  {trackMode === 'sidereal' ? '☆' : trackMode === 'lunar' ? '☽' : trackMode === 'solar' ? '☀' : '⏸'} {t(`rate.${trackMode ?? 'sidereal'}`)}
+                </Badge>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="center" className="min-w-[100px]">
+                {(['sidereal', 'lunar', 'solar'] as const).map((rate) => (
+                  <DropdownMenuItem
+                    key={rate}
+                    className={cn('text-xs', trackMode === rate && 'font-bold')}
+                    onClick={() => handleTrackingRate(rate)}
+                  >
+                    {rate === 'sidereal' ? '☆' : rate === 'lunar' ? '☽' : '☀'} {t(`rate.${rate}`)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 text-green-400 border-green-400/30">
+              {trackMode === 'sidereal' ? '☆' : trackMode === 'lunar' ? '☽' : trackMode === 'solar' ? '☀' : '⏸'} {t(`rate.${trackMode ?? 'sidereal'}`)}
+            </Badge>
+          )
         )}
         {slewing && (
           <Badge variant="outline" className="text-[8px] px-1 py-0 h-4 text-blue-400 border-blue-400/30 animate-pulse">
@@ -284,7 +307,7 @@ function MountPanel({ compact }: StellariumMountProps) {
         )}
 
         {/* Park */}
-        {canPark && (
+        {canTogglePark && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Toggle
@@ -304,7 +327,7 @@ function MountPanel({ compact }: StellariumMountProps) {
         )}
 
         {/* Abort */}
-        {slewing && (
+        {slewing && canAbortSlew && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -320,6 +343,17 @@ function MountPanel({ compact }: StellariumMountProps) {
           </Tooltip>
         )}
       </div>
+
+      {connected && (
+        <div className="text-center">
+          {trackingActionExplicitlyUnavailable && (
+            <p className="text-[9px] text-muted-foreground">{t('trackingUnavailable')}</p>
+          )}
+          {parkActionExplicitlyUnavailable && (
+            <p className="text-[9px] text-muted-foreground">{t('actionUnavailable')}</p>
+          )}
+        </div>
+      )}
 
       {/* Direction pad */}
       <MountDirectionPad />

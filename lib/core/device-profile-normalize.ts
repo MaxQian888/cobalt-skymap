@@ -5,6 +5,17 @@ import type {
   DeviceMetadataByType,
   DeviceProfileMetadata,
 } from '@/lib/core/types/device';
+import type {
+  MountActionAvailability,
+  MountCapabilitySnapshot,
+  MountProtocol,
+  SupportedMountDevice,
+} from '@/lib/core/types';
+import {
+  buildSupportedMountDeviceId,
+  createSimulatorMountDevice,
+  normalizeSupportedMountSource,
+} from '@/lib/core/mount-support';
 import { validateDeviceProfile } from '@/lib/core/device-profile-validation';
 
 export interface DeviceProfileNormalizeReport {
@@ -50,18 +61,137 @@ function toNumberValue(value: unknown): number | undefined {
   return value;
 }
 
+function toBooleanValue(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
 function parseDeviceType(value: unknown): DeviceType | null {
   if (typeof value !== 'string') return null;
   return DEVICE_TYPE_SET[value as DeviceType] ? (value as DeviceType) : null;
 }
 
-function normalizeMountMetadata(raw: Record<string, unknown>): DeviceMetadataByType['mount'] {
+function parseMountProtocol(value: unknown): MountProtocol | undefined {
+  return value === 'alpaca' || value === 'simulator'
+    ? value
+    : undefined;
+}
+
+function normalizeSupportedMountDevice(
+  value: unknown,
+  fallback: {
+    protocol?: MountProtocol;
+    host?: string;
+    port?: number;
+    deviceId?: number;
+  } = {},
+): SupportedMountDevice | undefined {
+  const record = toRecord(value);
+  if (!record) return undefined;
+
+  const protocol = parseMountProtocol(record.protocol) ?? fallback.protocol;
+  const host = toStringValue(record.host) ?? fallback.host ?? 'localhost';
+  const port = toNumberValue(record.port) ?? fallback.port ?? 11111;
+  const deviceId = toNumberValue(record.deviceId) ?? fallback.deviceId ?? 0;
+  const name = toStringValue(record.name);
+  const deviceType = toStringValue(record.deviceType);
+  if (!protocol || !name || !deviceType) return undefined;
+
+  const uniqueId = toStringValue(record.uniqueId);
   return {
-    protocol: toStringValue(raw.protocol) as DeviceMetadataByType['mount']['protocol'],
-    host: toStringValue(raw.host),
-    port: toNumberValue(raw.port),
-    deviceId: toNumberValue(raw.deviceId),
+    id: toStringValue(record.id) ?? buildSupportedMountDeviceId({
+      protocol,
+      host,
+      port,
+      deviceId,
+      uniqueId,
+    }),
+    protocol,
+    host,
+    port,
+    deviceId,
+    name,
+    deviceType,
+    source: normalizeSupportedMountSource(record.source, protocol === 'simulator' ? 'simulator' : 'manual'),
+    uniqueId,
+    manufacturer: toStringValue(record.manufacturer),
+    model: toStringValue(record.model),
+    description: toStringValue(record.description),
+    driverInfo: toStringValue(record.driverInfo),
+    driverVersion: toStringValue(record.driverVersion),
+  };
+}
+
+function normalizeMountCapabilitySnapshot(value: unknown): Partial<MountCapabilitySnapshot> | undefined {
+  const record = toRecord(value);
+  if (!record) return undefined;
+
+  const snapshot: Partial<MountCapabilitySnapshot> = {
+    canSlew: toBooleanValue(record.canSlew),
+    canSlewAsync: toBooleanValue(record.canSlewAsync),
+    canSync: toBooleanValue(record.canSync),
+    canPark: toBooleanValue(record.canPark),
+    canUnpark: toBooleanValue(record.canUnpark),
+    canSetTracking: toBooleanValue(record.canSetTracking),
+    canMoveAxis: toBooleanValue(record.canMoveAxis),
+    canPulseGuide: toBooleanValue(record.canPulseGuide),
+    alignmentMode: toStringValue(record.alignmentMode),
+    equatorialSystem: toStringValue(record.equatorialSystem),
+    capturedAt: typeof record.capturedAt === 'string' ? record.capturedAt : undefined,
+  };
+
+  return Object.values(snapshot).some((entry) => entry !== undefined)
+    ? snapshot
+    : undefined;
+}
+
+function normalizeMountActionAvailability(value: unknown): Partial<MountActionAvailability> | undefined {
+  const record = toRecord(value);
+  if (!record) return undefined;
+
+  const availability: Partial<MountActionAvailability> = {
+    connect: toBooleanValue(record.connect),
+    discover: toBooleanValue(record.discover),
+    slew: toBooleanValue(record.slew),
+    sync: toBooleanValue(record.sync),
+    park: toBooleanValue(record.park),
+    unpark: toBooleanValue(record.unpark),
+    tracking: toBooleanValue(record.tracking),
+    trackingRate: toBooleanValue(record.trackingRate),
+    moveAxis: toBooleanValue(record.moveAxis),
+    abortSlew: toBooleanValue(record.abortSlew),
+  };
+
+  return Object.values(availability).some((entry) => entry !== undefined)
+    ? availability
+    : undefined;
+}
+
+function normalizeMountMetadata(raw: Record<string, unknown>): DeviceMetadataByType['mount'] {
+  const protocol = parseMountProtocol(raw.protocol);
+  const isSimulator = protocol === 'simulator';
+  const host = toStringValue(raw.host) ?? (isSimulator ? 'localhost' : undefined);
+  const port = toNumberValue(raw.port) ?? (isSimulator ? 11111 : undefined);
+  const deviceId = toNumberValue(raw.deviceId) ?? (isSimulator ? 0 : undefined);
+  const selectedDevice = normalizeSupportedMountDevice(raw.selectedDevice, {
+    protocol,
+    host,
+    port,
+    deviceId,
+  }) ?? (isSimulator ? createSimulatorMountDevice() : undefined);
+  const selectedDeviceId = toStringValue(raw.selectedDeviceId)
+    ?? selectedDevice?.id
+    ?? (protocol ? buildSupportedMountDeviceId({ protocol, host, port, deviceId }) : undefined);
+
+  return {
+    protocol,
+    host,
+    port,
+    deviceId,
     model: toStringValue(raw.model),
+    selectedDeviceId,
+    selectedDevice,
+    capabilitySnapshot: normalizeMountCapabilitySnapshot(raw.capabilitySnapshot),
+    actionAvailability: normalizeMountActionAvailability(raw.actionAvailability),
   };
 }
 

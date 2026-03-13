@@ -22,6 +22,9 @@ export interface FOVOverlayProps {
   onRotationChange?: (angle: number) => void;
   mosaic: MosaicSettings;
   pixelSize?: number; // Sensor pixel size in µm (needed for pixel-based overlap)
+  framePlacement?: { x: number; y: number };
+  onFramePlacementChange?: (placement: { x: number; y: number }) => void;
+  dragToPosition?: boolean;
   gridType?: GridType;
   frameColor?: string;
   frameStyle?: 'solid' | 'dashed' | 'dotted';

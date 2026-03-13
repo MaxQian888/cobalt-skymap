@@ -12,6 +12,9 @@ beforeEach(() => {
       sessionPlannerOpen: false,
       shotListOpen: false,
       tonightRecommendationsOpen: false,
+      messierMarathonGuideOpen: false,
+      plannerDraftSeed: null,
+      plannerDraftSeedRequestId: 0,
     });
   });
 });
@@ -22,6 +25,7 @@ describe('usePlanningUiStore', () => {
     expect(state.sessionPlannerOpen).toBe(false);
     expect(state.shotListOpen).toBe(false);
     expect(state.tonightRecommendationsOpen).toBe(false);
+    expect(state.messierMarathonGuideOpen).toBe(false);
   });
 
   it('should open session planner', () => {
@@ -74,5 +78,66 @@ describe('usePlanningUiStore', () => {
       usePlanningUiStore.getState().closeTonightRecommendations();
     });
     expect(usePlanningUiStore.getState().tonightRecommendationsOpen).toBe(false);
+  });
+
+  it('should open and close messier marathon guide', () => {
+    act(() => {
+      usePlanningUiStore.getState().openMessierMarathonGuide();
+    });
+    expect(usePlanningUiStore.getState().messierMarathonGuideOpen).toBe(true);
+
+    act(() => {
+      usePlanningUiStore.getState().closeMessierMarathonGuide();
+    });
+    expect(usePlanningUiStore.getState().messierMarathonGuideOpen).toBe(false);
+  });
+
+  it('should launch planner with a seeded draft', () => {
+    act(() => {
+      usePlanningUiStore.getState().launchPlannerWithDraftSeed({
+        planDate: '2026-03-21T12:00:00.000Z',
+        strategy: 'balanced',
+        constraints: {
+          minAltitude: 20,
+          minImagingTime: 30,
+        },
+        excludedTargetIds: [],
+        manualEdits: [],
+        guideContext: {
+          kind: 'messier-marathon',
+          sessionId: 'marathon-1',
+          readiness: 'recommended',
+          mode: 'full',
+          checkpointOrder: ['M74'],
+          criticalCheckpointIds: ['M74'],
+          stageByTargetId: { M74: 'dusk' },
+        },
+      });
+    });
+
+    const state = usePlanningUiStore.getState();
+    expect(state.sessionPlannerOpen).toBe(true);
+    expect(state.plannerDraftSeed?.guideContext?.sessionId).toBe('marathon-1');
+    expect(state.plannerDraftSeedRequestId).toBe(1);
+  });
+
+  it('should clear planner draft seed without closing the planner', () => {
+    act(() => {
+      usePlanningUiStore.getState().launchPlannerWithDraftSeed({
+        planDate: '2026-03-21T12:00:00.000Z',
+        strategy: 'balanced',
+        constraints: {
+          minAltitude: 20,
+          minImagingTime: 30,
+        },
+        excludedTargetIds: [],
+        manualEdits: [],
+      });
+      usePlanningUiStore.getState().clearPlannerDraftSeed();
+    });
+
+    const state = usePlanningUiStore.getState();
+    expect(state.sessionPlannerOpen).toBe(true);
+    expect(state.plannerDraftSeed).toBeNull();
   });
 });

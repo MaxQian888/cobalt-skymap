@@ -78,19 +78,37 @@ pub struct SlewRate {
 
 /// Common slew rate presets
 pub const SLEW_RATES: &[SlewRate] = &[
-    SlewRate { label: "1x", value: 1.0 },
-    SlewRate { label: "2x", value: 2.0 },
-    SlewRate { label: "8x", value: 8.0 },
-    SlewRate { label: "16x", value: 16.0 },
-    SlewRate { label: "64x", value: 64.0 },
-    SlewRate { label: "Max", value: 800.0 },
+    SlewRate {
+        label: "1x",
+        value: 1.0,
+    },
+    SlewRate {
+        label: "2x",
+        value: 2.0,
+    },
+    SlewRate {
+        label: "8x",
+        value: 8.0,
+    },
+    SlewRate {
+        label: "16x",
+        value: 16.0,
+    },
+    SlewRate {
+        label: "64x",
+        value: 64.0,
+    },
+    SlewRate {
+        label: "Max",
+        value: 800.0,
+    },
 ];
 
 /// Sidereal rate in degrees per second
 pub const SIDEREAL_RATE_DEG_PER_SEC: f64 = 15.0 / 3600.0;
 
 /// Full mount state snapshot returned to the frontend
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MountState {
     pub connected: bool,
@@ -167,11 +185,20 @@ impl Default for MountCapabilities {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscoveredDevice {
+    pub id: String,
+    pub protocol: MountProtocol,
     pub host: String,
     pub port: u16,
     pub device_id: u32,
-    pub device_name: String,
+    pub name: String,
     pub device_type: String,
+    pub source: String,
+    pub unique_id: Option<String>,
+    pub manufacturer: Option<String>,
+    pub model: Option<String>,
+    pub description: Option<String>,
+    pub driver_info: Option<String>,
+    pub driver_version: Option<String>,
 }
 
 // ============================================================================
@@ -244,5 +271,94 @@ impl Serialize for MountError {
         S: serde::Serializer,
     {
         serializer.serialize_str(&self.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn connection_config_defaults_to_local_simulator() {
+        let config = ConnectionConfig::default();
+
+        assert_eq!(config.protocol, MountProtocol::Simulator);
+        assert_eq!(config.host, "localhost");
+        assert_eq!(config.port, 11111);
+        assert_eq!(config.device_id, 0);
+    }
+
+    #[test]
+    fn mount_state_default_matches_parked_home_state() {
+        let state = MountState::default();
+
+        assert!(!state.connected);
+        assert_eq!(state.ra, 0.0);
+        assert_eq!(state.dec, 90.0);
+        assert!(!state.tracking);
+        assert_eq!(state.tracking_rate, TrackingRate::Sidereal);
+        assert!(!state.slewing);
+        assert!(state.parked);
+        assert!(state.at_home);
+        assert_eq!(state.pier_side, PierSide::Unknown);
+        assert_eq!(state.slew_rate_index, 3);
+    }
+
+    #[test]
+    fn mount_capabilities_default_matches_simulator_capabilities() {
+        let capabilities = MountCapabilities::default();
+
+        assert!(capabilities.can_slew);
+        assert!(capabilities.can_slew_async);
+        assert!(capabilities.can_sync);
+        assert!(capabilities.can_park);
+        assert!(capabilities.can_unpark);
+        assert!(capabilities.can_set_tracking);
+        assert!(capabilities.can_move_axis);
+        assert!(capabilities.can_pulse_guide);
+        assert_eq!(capabilities.alignment_mode, "GermanPolar");
+        assert_eq!(capabilities.equatorial_system, "J2000");
+    }
+
+    #[test]
+    fn serde_uses_expected_case_conventions() {
+        let state = MountState {
+            connected: true,
+            ra: 180.0,
+            dec: -12.5,
+            tracking: true,
+            tracking_rate: TrackingRate::Solar,
+            slewing: false,
+            parked: false,
+            at_home: false,
+            pier_side: PierSide::West,
+            slew_rate_index: 4,
+        };
+
+        let serialized_state = serde_json::to_value(&state).expect("state should serialize");
+        let serialized_protocol =
+            serde_json::to_value(MountProtocol::Alpaca).expect("protocol should serialize");
+        let serialized_axis =
+            serde_json::to_value(MountAxis::Secondary).expect("axis should serialize");
+
+        assert_eq!(serialized_state["trackingRate"], json!("solar"));
+        assert_eq!(serialized_state["pierSide"], json!("west"));
+        assert_eq!(serialized_state["slewRateIndex"], json!(4));
+        assert_eq!(serialized_protocol, json!("alpaca"));
+        assert_eq!(serialized_axis, json!("secondary"));
+    }
+
+    #[test]
+    fn mount_error_serializes_to_display_string() {
+        let error = MountError::AlpacaError {
+            code: 1031,
+            message: "Mount busy".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&error).expect("mount error should serialize");
+
+        assert_eq!(serialized, "\"Alpaca error (1031): Mount busy\"");
+        assert_eq!(MountError::Parked.to_string(), "Mount is parked");
     }
 }

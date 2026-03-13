@@ -44,7 +44,12 @@ pub struct CacheRegion {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum CacheStatus {
-    Pending, Downloading, Paused, Completed, Failed, Cancelled,
+    Pending,
+    Downloading,
+    Paused,
+    Completed,
+    Failed,
+    Cancelled,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,14 +101,21 @@ fn get_cache_dir(app: &AppHandle) -> Result<PathBuf, StorageError> {
 
     #[cfg(not(desktop))]
     let base = {
-        let app_data_dir = app.path().app_data_dir().map_err(|_| StorageError::AppDataDirNotFound)?;
+        let app_data_dir = app
+            .path()
+            .app_data_dir()
+            .map_err(|_| StorageError::AppDataDirNotFound)?;
         let d = app_data_dir.join("skymap");
-        if !d.exists() { fs::create_dir_all(&d)?; }
+        if !d.exists() {
+            fs::create_dir_all(&d)?;
+        }
         d
     };
 
     let cache_dir = base.join("cache");
-    if !cache_dir.exists() { fs::create_dir_all(&cache_dir)?; }
+    if !cache_dir.exists() {
+        fs::create_dir_all(&cache_dir)?;
+    }
     Ok(cache_dir)
 }
 
@@ -113,36 +125,53 @@ fn get_cache_meta_path(app: &AppHandle) -> Result<PathBuf, StorageError> {
 
 fn get_tiles_dir(app: &AppHandle, survey_id: &str) -> Result<PathBuf, StorageError> {
     let tiles_dir = get_cache_dir(app)?.join("tiles").join(survey_id);
-    if !tiles_dir.exists() { fs::create_dir_all(&tiles_dir)?; }
+    if !tiles_dir.exists() {
+        fs::create_dir_all(&tiles_dir)?;
+    }
     Ok(tiles_dir)
 }
 
-fn get_tile_path(app: &AppHandle, survey_id: &str, zoom: u8, x: u64, y: u64) -> Result<PathBuf, StorageError> {
+fn get_tile_path(
+    app: &AppHandle,
+    survey_id: &str,
+    zoom: u8,
+    x: u64,
+    y: u64,
+) -> Result<PathBuf, StorageError> {
     let zoom_dir = get_tiles_dir(app, survey_id)?.join(zoom.to_string());
-    if !zoom_dir.exists() { fs::create_dir_all(&zoom_dir)?; }
+    if !zoom_dir.exists() {
+        fs::create_dir_all(&zoom_dir)?;
+    }
     Ok(zoom_dir.join(format!("{}_{}.jpg", x, y)))
 }
 
 fn load_cache_data_from_disk(app: &AppHandle) -> Result<CacheData, StorageError> {
     let path = get_cache_meta_path(app)?;
-    if !path.exists() { return Ok(CacheData::default()); }
+    if !path.exists() {
+        return Ok(CacheData::default());
+    }
     Ok(serde_json::from_str(&fs::read_to_string(&path)?)?)
 }
 
 fn save_cache_data_to_disk(app: &AppHandle, data: &CacheData) -> Result<(), StorageError> {
-    fs::write(&get_cache_meta_path(app)?, serde_json::to_string_pretty(data)?)?;
+    fs::write(
+        &get_cache_meta_path(app)?,
+        serde_json::to_string_pretty(data)?,
+    )?;
     Ok(())
 }
 
 /// Get cache data from in-memory cache, loading from disk if needed
 fn get_cache_data(app: &AppHandle) -> Result<CacheData, StorageError> {
     let mutex = get_offline_cache_mutex();
-    let mut guard = mutex.lock().map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
-    
+    let mut guard = mutex
+        .lock()
+        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+
     if let Some(data) = &*guard {
         return Ok(data.clone());
     }
-    
+
     let data = load_cache_data_from_disk(app)?;
     *guard = Some(data.clone());
     Ok(data)
@@ -151,8 +180,10 @@ fn get_cache_data(app: &AppHandle) -> Result<CacheData, StorageError> {
 /// Update cache data in memory and persist to disk
 fn update_cache_data(app: &AppHandle, data: CacheData) -> Result<(), StorageError> {
     let mutex = get_offline_cache_mutex();
-    let mut guard = mutex.lock().map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
-    
+    let mut guard = mutex
+        .lock()
+        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+
     save_cache_data_to_disk(app, &data)?;
     *guard = Some(data);
     Ok(())
@@ -170,7 +201,11 @@ fn invalidate_offline_cache() {
 pub async fn get_cache_stats(app: AppHandle) -> Result<CacheStats, StorageError> {
     let data = get_cache_data(&app)?;
     let total_regions = data.regions.len();
-    let completed_regions = data.regions.iter().filter(|r| r.status == CacheStatus::Completed).count();
+    let completed_regions = data
+        .regions
+        .iter()
+        .filter(|r| r.status == CacheStatus::Completed)
+        .count();
     let total_tiles: u64 = data.regions.iter().map(|r| r.tile_count).sum();
     let total_size_bytes: u64 = data.regions.iter().map(|r| r.size_bytes).sum();
 
@@ -180,11 +215,22 @@ pub async fn get_cache_stats(app: AppHandle) -> Result<CacheStats, StorageError>
         entry.0 += region.tile_count;
         entry.1 += region.size_bytes;
     }
-    let surveys: Vec<SurveyCacheInfo> = survey_map.into_iter()
-        .map(|(survey_id, (tile_count, size_bytes))| SurveyCacheInfo { survey_id, tile_count, size_bytes })
+    let surveys: Vec<SurveyCacheInfo> = survey_map
+        .into_iter()
+        .map(|(survey_id, (tile_count, size_bytes))| SurveyCacheInfo {
+            survey_id,
+            tile_count,
+            size_bytes,
+        })
         .collect();
 
-    Ok(CacheStats { total_regions, total_tiles, total_size_bytes, completed_regions, surveys })
+    Ok(CacheStats {
+        total_regions,
+        total_tiles,
+        total_size_bytes,
+        completed_regions,
+        surveys,
+    })
 }
 
 #[tauri::command]
@@ -193,14 +239,27 @@ pub async fn list_cache_regions(app: AppHandle) -> Result<Vec<CacheRegion>, Stor
 }
 
 #[tauri::command]
-pub async fn create_cache_region(app: AppHandle, args: CreateRegionArgs) -> Result<CacheRegion, StorageError> {
+pub async fn create_cache_region(
+    app: AppHandle,
+    args: CreateRegionArgs,
+) -> Result<CacheRegion, StorageError> {
     let mut data = get_cache_data(&app)?;
     let tile_count = estimate_tile_count(args.radius_deg, args.min_zoom, args.max_zoom);
     let region = CacheRegion {
-        id: generate_id("region"), name: args.name, center_ra: args.center_ra, center_dec: args.center_dec,
-        radius_deg: args.radius_deg, min_zoom: args.min_zoom, max_zoom: args.max_zoom,
-        survey_id: args.survey_id, tile_count, size_bytes: 0, status: CacheStatus::Pending,
-        progress: 0.0, created_at: Utc::now(), updated_at: Utc::now(),
+        id: generate_id("region"),
+        name: args.name,
+        center_ra: args.center_ra,
+        center_dec: args.center_dec,
+        radius_deg: args.radius_deg,
+        min_zoom: args.min_zoom,
+        max_zoom: args.max_zoom,
+        survey_id: args.survey_id,
+        tile_count,
+        size_bytes: 0,
+        status: CacheStatus::Pending,
+        progress: 0.0,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     };
     data.regions.push(region.clone());
     update_cache_data(&app, data)?;
@@ -208,13 +267,28 @@ pub async fn create_cache_region(app: AppHandle, args: CreateRegionArgs) -> Resu
 }
 
 #[tauri::command]
-pub async fn update_cache_region(app: AppHandle, region_id: String, status: Option<CacheStatus>, progress: Option<f64>, size_bytes: Option<u64>) -> Result<CacheRegion, StorageError> {
+pub async fn update_cache_region(
+    app: AppHandle,
+    region_id: String,
+    status: Option<CacheStatus>,
+    progress: Option<f64>,
+    size_bytes: Option<u64>,
+) -> Result<CacheRegion, StorageError> {
     let mut data = get_cache_data(&app)?;
-    let region = data.regions.iter_mut().find(|r| r.id == region_id)
+    let region = data
+        .regions
+        .iter_mut()
+        .find(|r| r.id == region_id)
         .ok_or_else(|| StorageError::StoreNotFound(region_id.clone()))?;
-    if let Some(s) = status { region.status = s; }
-    if let Some(p) = progress { region.progress = p; }
-    if let Some(size) = size_bytes { region.size_bytes = size; }
+    if let Some(s) = status {
+        region.status = s;
+    }
+    if let Some(p) = progress {
+        region.progress = p;
+    }
+    if let Some(size) = size_bytes {
+        region.size_bytes = size;
+    }
     region.updated_at = Utc::now();
     let result = region.clone();
     update_cache_data(&app, data)?;
@@ -222,7 +296,11 @@ pub async fn update_cache_region(app: AppHandle, region_id: String, status: Opti
 }
 
 #[tauri::command]
-pub async fn delete_cache_region(app: AppHandle, region_id: String, delete_tiles: bool) -> Result<(), StorageError> {
+pub async fn delete_cache_region(
+    app: AppHandle,
+    region_id: String,
+    delete_tiles: bool,
+) -> Result<(), StorageError> {
     let mut data = get_cache_data(&app)?;
     if let Some(region) = data.regions.iter().find(|r| r.id == region_id).cloned() {
         data.regions.retain(|r| r.id != region_id);
@@ -236,46 +314,79 @@ pub async fn delete_cache_region(app: AppHandle, region_id: String, delete_tiles
 }
 
 #[tauri::command]
-pub async fn save_cached_tile(app: AppHandle, survey_id: String, zoom: u8, x: u64, y: u64, data: Vec<u8>) -> Result<(), StorageError> {
-    crate::network::security::validate_size(&data, limits::MAX_TILE_SIZE).map_err(|e| StorageError::Other(e.to_string()))?;
+pub async fn save_cached_tile(
+    app: AppHandle,
+    survey_id: String,
+    zoom: u8,
+    x: u64,
+    y: u64,
+    data: Vec<u8>,
+) -> Result<(), StorageError> {
+    crate::network::security::validate_size(&data, limits::MAX_TILE_SIZE)
+        .map_err(|e| StorageError::Other(e.to_string()))?;
     let mut cache_data = get_cache_data(&app)?;
     let current_total: u64 = cache_data.tiles.values().map(|t| t.size_bytes).sum();
     if current_total + data.len() as u64 > limits::MAX_CACHE_TOTAL_SIZE as u64 {
-        return Err(StorageError::Other(format!("Cache size limit reached ({} bytes)", limits::MAX_CACHE_TOTAL_SIZE)));
+        return Err(StorageError::Other(format!(
+            "Cache size limit reached ({} bytes)",
+            limits::MAX_CACHE_TOTAL_SIZE
+        )));
     }
 
     // Use atomic write: write to temp file then rename
     let tile_path = get_tile_path(&app, &survey_id, zoom, x, y)?;
     let temp_path = tile_path.with_extension("tmp");
-    
+
     // Ensure parent directory exists
     if let Some(parent) = tile_path.parent() {
         fs::create_dir_all(parent)?;
     }
-    
+
     // Write to temp file first
     fs::write(&temp_path, &data)?;
-    
+
     // Atomic rename (on most filesystems this is atomic)
     fs::rename(&temp_path, &tile_path)?;
-    
+
     // Update metadata in the same loaded instance (fixes race condition)
-    cache_data.tiles.insert(format!("{}_{}_{}_{}", survey_id, zoom, x, y), TileMetadata {
-        survey_id, zoom, x, y, size_bytes: data.len() as u64, cached_at: Utc::now(),
-    });
+    cache_data.tiles.insert(
+        format!("{}_{}_{}_{}", survey_id, zoom, x, y),
+        TileMetadata {
+            survey_id,
+            zoom,
+            x,
+            y,
+            size_bytes: data.len() as u64,
+            cached_at: Utc::now(),
+        },
+    );
     update_cache_data(&app, cache_data)?;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn load_cached_tile(app: AppHandle, survey_id: String, zoom: u8, x: u64, y: u64) -> Result<Option<Vec<u8>>, StorageError> {
+pub async fn load_cached_tile(
+    app: AppHandle,
+    survey_id: String,
+    zoom: u8,
+    x: u64,
+    y: u64,
+) -> Result<Option<Vec<u8>>, StorageError> {
     let tile_path = get_tile_path(&app, &survey_id, zoom, x, y)?;
-    if tile_path.exists() { return Ok(Some(fs::read(&tile_path)?)); }
+    if tile_path.exists() {
+        return Ok(Some(fs::read(&tile_path)?));
+    }
     Ok(None)
 }
 
 #[tauri::command]
-pub async fn is_tile_cached(app: AppHandle, survey_id: String, zoom: u8, x: u64, y: u64) -> Result<bool, StorageError> {
+pub async fn is_tile_cached(
+    app: AppHandle,
+    survey_id: String,
+    zoom: u8,
+    x: u64,
+    y: u64,
+) -> Result<bool, StorageError> {
     Ok(get_tile_path(&app, &survey_id, zoom, x, y)?.exists())
 }
 
@@ -326,8 +437,11 @@ fn count_files_recursive(dir: &PathBuf) -> Result<u64, StorageError> {
     if dir.is_dir() {
         for entry in fs::read_dir(dir)? {
             let path = entry?.path();
-            if path.is_dir() { count += count_files_recursive(&path)?; }
-            else { count += 1; }
+            if path.is_dir() {
+                count += count_files_recursive(&path)?;
+            } else {
+                count += 1;
+            }
         }
     }
     Ok(count)
@@ -340,6 +454,8 @@ fn count_files_recursive(dir: &PathBuf) -> Result<u64, StorageError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::test_support::{cache_test_lock, unique_temp_dir};
+    use std::fs;
 
     // ------------------------------------------------------------------------
     // estimate_tile_count Tests
@@ -357,7 +473,10 @@ mod tests {
         // Multiple zoom levels should have more tiles
         let count_single = estimate_tile_count(1.0, 5, 5);
         let count_multi = estimate_tile_count(1.0, 5, 7);
-        assert!(count_multi > count_single, "More zoom levels should mean more tiles");
+        assert!(
+            count_multi > count_single,
+            "More zoom levels should mean more tiles"
+        );
     }
 
     #[test]
@@ -365,7 +484,12 @@ mod tests {
         // Larger radius should have more tiles (use higher zoom where difference is visible)
         let count_small = estimate_tile_count(1.0, 8, 8);
         let count_large = estimate_tile_count(10.0, 8, 8);
-        assert!(count_large > count_small, "Larger radius should mean more tiles: small={}, large={}", count_small, count_large);
+        assert!(
+            count_large > count_small,
+            "Larger radius should mean more tiles: small={}, large={}",
+            count_small,
+            count_large
+        );
     }
 
     #[test]
@@ -380,7 +504,70 @@ mod tests {
         // Higher zoom levels have more tiles per degree
         let count_low = estimate_tile_count(1.0, 1, 1);
         let count_high = estimate_tile_count(1.0, 10, 10);
-        assert!(count_high > count_low, "Higher zoom should have more tiles per area");
+        assert!(
+            count_high > count_low,
+            "Higher zoom should have more tiles per area"
+        );
+    }
+
+    // ------------------------------------------------------------------------
+    // Cache File Behavior Tests
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_count_files_recursive_counts_nested_files() {
+        let _guard = cache_test_lock();
+        let root = unique_temp_dir("offline-count-files");
+        let nested = root.join("survey").join("8");
+
+        fs::create_dir_all(&nested).unwrap();
+        fs::write(root.join("root.txt"), b"root").unwrap();
+        fs::write(root.join("survey").join("tile-a.jpg"), b"a").unwrap();
+        fs::write(nested.join("tile-b.jpg"), b"b").unwrap();
+
+        assert_eq!(count_files_recursive(&root).unwrap(), 3);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_count_files_recursive_returns_zero_for_empty_directory() {
+        let _guard = cache_test_lock();
+        let root = unique_temp_dir("offline-count-empty");
+        fs::create_dir_all(&root).unwrap();
+
+        assert_eq!(count_files_recursive(&root).unwrap(), 0);
+
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_invalidate_offline_cache_clears_in_memory_state() {
+        let _guard = cache_test_lock();
+        let mut guard = get_offline_cache_mutex().lock().unwrap();
+        *guard = Some(CacheData {
+            regions: vec![],
+            tiles: HashMap::from([(
+                "DSS_1_2_3".to_string(),
+                TileMetadata {
+                    survey_id: "DSS".to_string(),
+                    zoom: 1,
+                    x: 2,
+                    y: 3,
+                    size_bytes: 42,
+                    cached_at: Utc::now(),
+                },
+            )]),
+        });
+        drop(guard);
+
+        invalidate_offline_cache();
+
+        let guard = get_offline_cache_mutex().lock().unwrap();
+        assert!(
+            guard.is_none(),
+            "invalidate should clear in-memory cache data"
+        );
     }
 
     // ------------------------------------------------------------------------
@@ -488,13 +675,11 @@ mod tests {
             total_tiles: 10000,
             total_size_bytes: 500000,
             completed_regions: 3,
-            surveys: vec![
-                SurveyCacheInfo {
-                    survey_id: "DSS".to_string(),
-                    tile_count: 5000,
-                    size_bytes: 250000,
-                },
-            ],
+            surveys: vec![SurveyCacheInfo {
+                survey_id: "DSS".to_string(),
+                tile_count: 5000,
+                size_bytes: 250000,
+            }],
         };
 
         let json = serde_json::to_string(&stats).unwrap();

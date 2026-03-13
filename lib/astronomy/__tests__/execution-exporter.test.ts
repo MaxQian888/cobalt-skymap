@@ -92,4 +92,80 @@ describe('execution-exporter', () => {
     expect(output).toContain('"M31",completed');
     expect(output).toContain('"M42",skipped');
   });
+
+  it('falls back to unknown metadata and handles missing targets in markdown', () => {
+    const session: ObservationSession = {
+      ...makeExecutionSession(),
+      source_plan_id: undefined,
+      source_plan_name: undefined,
+      execution_status: undefined,
+      execution_targets: undefined,
+    };
+
+    const output = exportExecutionSummary(session, {
+      format: 'markdown',
+    });
+
+    expect(output).toContain('- Plan: Unknown Plan');
+    expect(output).toContain('- Plan ID: unknown');
+    expect(output).toContain('- Status: unknown');
+    expect(output).toContain('## Targets');
+  });
+
+  it('escapes CSV fields and keeps populated actual times', () => {
+    const session: ObservationSession = {
+      ...makeExecutionSession(),
+      execution_targets: [
+        {
+          id: 'exec-target-1',
+          target_id: 'target-1',
+          target_name: 'M "31"',
+          scheduled_start: '2025-06-15T20:30:00.000Z',
+          scheduled_end: '2025-06-15T22:00:00.000Z',
+          scheduled_duration_minutes: 90,
+          order: 1,
+          status: 'completed',
+          observation_ids: ['obs-1'],
+          actual_start: '2025-06-15T20:35:00.000Z',
+          actual_end: '2025-06-15T21:55:00.000Z',
+        },
+      ],
+    };
+
+    const output = exportExecutionSummary(session, {
+      format: 'csv',
+    });
+
+    expect(output).toContain('"M ""31"""');
+    expect(output).toContain('2025-06-15T20:35:00.000Z');
+    expect(output).toContain('2025-06-15T21:55:00.000Z');
+  });
+
+  it('defaults to markdown when the format is unknown at runtime', () => {
+    const output = exportExecutionSummary(
+      makeExecutionSession(),
+      { format: 'yaml' as never },
+    );
+
+    expect(output).toContain('# Observation Execution Summary');
+    expect(output).toContain('Tonight Plan');
+  });
+
+  it('serializes empty target collections for json and csv exports', () => {
+    const session: ObservationSession = {
+      ...makeExecutionSession(),
+      execution_targets: undefined,
+    };
+
+    const jsonOutput = exportExecutionSummary(session, {
+      format: 'json',
+    });
+    const csvOutput = exportExecutionSummary(session, {
+      format: 'csv',
+    });
+
+    const parsed = JSON.parse(jsonOutput) as { targets: unknown[] };
+    expect(parsed.targets).toEqual([]);
+    expect(csvOutput.trim()).toBe('order,target_name,status,scheduled_start,scheduled_end,actual_start,actual_end,observation_count,skip_reason');
+  });
 });

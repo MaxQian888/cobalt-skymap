@@ -66,6 +66,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { useEquipmentStore } from '@/lib/stores';
+import { useFovEquipmentOptions } from '@/lib/hooks/use-equipment-fov-props';
 import {
   SENSOR_PRESETS,
   TELESCOPE_PRESETS,
@@ -127,6 +128,26 @@ export function FOVSimulator({
   const [localPixelSize, setLocalPixelSize] = useState(pixelSize);
   const [localRotation, setLocalRotation] = useState(rotationAngle);
   const [setupNameInput, setSetupNameInput] = useState('');
+
+  const {
+    sensorWidth: resolvedSensorWidth,
+    sensorHeight: resolvedSensorHeight,
+    pixelSize: resolvedPixelSize,
+    focalLength: resolvedBaseFocalLength,
+    effectiveFocalLength,
+    fovInputMode,
+    selectedBarlowReducerId,
+    activeCamera,
+    activeTelescope,
+    selectedBarlowReducer,
+    barlowReducers,
+    accessorySelectionAvailable,
+    hasCompleteActiveEquipment,
+    framePlacement,
+    setFovInputMode,
+    setSelectedBarlowReducerId,
+    resetFramePlacement,
+  } = useFovEquipmentOptions();
   
   // Display options from equipment store (persistent, shared with FOVOverlay)
   const fovDisplay = useEquipmentStore((s) => s.fovDisplay);
@@ -161,18 +182,18 @@ export function FOVSimulator({
 
   // Calculations — delegated to pure utility functions
   const { width: fovWidth, height: fovHeight } = useMemo(() =>
-    calculateCameraFov(sensorWidth, sensorHeight, focalLength),
-    [sensorWidth, sensorHeight, focalLength]
+    calculateCameraFov(resolvedSensorWidth, resolvedSensorHeight, effectiveFocalLength),
+    [resolvedSensorWidth, resolvedSensorHeight, effectiveFocalLength]
   );
 
   const imageScale = useMemo(() =>
-    calculateImageScale(localPixelSize, focalLength),
-    [localPixelSize, focalLength]
+    calculateImageScale(resolvedPixelSize, effectiveFocalLength),
+    [resolvedPixelSize, effectiveFocalLength]
   );
 
   const resolution = useMemo(() =>
-    calculateSensorResolution(sensorWidth, sensorHeight, localPixelSize),
-    [sensorWidth, sensorHeight, localPixelSize]
+    calculateSensorResolution(resolvedSensorWidth, resolvedSensorHeight, resolvedPixelSize),
+    [resolvedSensorWidth, resolvedSensorHeight, resolvedPixelSize]
   );
 
   const mosaicValidation = useMemo(() => validateMosaicSettings(mosaic), [mosaic]);
@@ -210,9 +231,9 @@ export function FOVSimulator({
   const suggestedRotation = useMemo(() => {
     if (!parsedTargetSize) return null;
     const targetLandscape = parsedTargetSize.widthArcmin >= parsedTargetSize.heightArcmin;
-    const sensorLandscape = sensorWidth >= sensorHeight;
+    const sensorLandscape = resolvedSensorWidth >= resolvedSensorHeight;
     return targetLandscape === sensorLandscape ? 0 : 90;
-  }, [parsedTargetSize, sensorWidth, sensorHeight]);
+  }, [parsedTargetSize, resolvedSensorWidth, resolvedSensorHeight]);
 
   const fitLabel = useMemo(() => {
     if (!fitEvaluation) return null;
@@ -229,6 +250,7 @@ export function FOVSimulator({
     if (fitEvaluation.status === 'good') return 'border-emerald-500/50 text-emerald-500';
     return 'border-blue-500/50 text-blue-500';
   }, [fitEvaluation]);
+  const rotateSkySupported = false;
 
   const updateMosaic = useCallback((next: typeof mosaic) => {
     const validated = validateMosaicSettings(next);
@@ -273,8 +295,11 @@ export function FOVSimulator({
 
   const handleCenterTarget = useCallback(() => {
     if (!selectedTarget || !onCenterTarget) return;
+    if (!preserveAlignment) {
+      resetFramePlacement();
+    }
     onCenterTarget(selectedTarget.raDeg, selectedTarget.decDeg);
-  }, [onCenterTarget, selectedTarget]);
+  }, [onCenterTarget, preserveAlignment, resetFramePlacement, selectedTarget]);
 
   const handleAutoAlign = useCallback(() => {
     if (suggestedRotation === null || !onRotationAngleChange) return;
@@ -285,10 +310,12 @@ export function FOVSimulator({
   const handleCopy = useCallback(async () => {
     const text = [
       `FOV: ${fovWidth.toFixed(2)}° × ${fovHeight.toFixed(2)}°`,
-      `Sensor: ${sensorWidth}mm × ${sensorHeight}mm`,
-      `Focal Length: ${focalLength}mm`,
+      `Sensor: ${resolvedSensorWidth}mm × ${resolvedSensorHeight}mm`,
+      `Base Focal Length: ${resolvedBaseFocalLength}mm`,
+      `Effective Focal Length: ${effectiveFocalLength.toFixed(1)}mm`,
       `Image Scale: ${imageScale.toFixed(2)}"/px`,
       `Resolution: ${resolution.width} × ${resolution.height}`,
+      selectedBarlowReducer ? `Accessory: ${selectedBarlowReducer.name}` : '',
       safeMosaic.enabled ? `Mosaic: ${safeMosaic.cols}×${safeMosaic.rows} (${mosaicCoverage?.width.toFixed(2)}° × ${mosaicCoverage?.height.toFixed(2)}°)` : '',
     ].filter(Boolean).join('\n');
 
@@ -299,7 +326,19 @@ export function FOVSimulator({
     } catch {
       // Ignore clipboard failures in quick action.
     }
-  }, [fovWidth, fovHeight, sensorWidth, sensorHeight, focalLength, imageScale, resolution, safeMosaic, mosaicCoverage]);
+  }, [
+    effectiveFocalLength,
+    fovWidth,
+    fovHeight,
+    imageScale,
+    mosaicCoverage,
+    resolution,
+    resolvedBaseFocalLength,
+    resolvedSensorHeight,
+    resolvedSensorWidth,
+    safeMosaic,
+    selectedBarlowReducer,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -428,6 +467,54 @@ export function FOVSimulator({
 
           {/* Camera Tab */}
           <TabsContent value="camera" className="space-y-4 pt-4">
+            <div className="space-y-3 rounded-md border border-border/60 p-3">
+              <Label className="text-sm font-medium">{t('fov.inputMode')}</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant={fovInputMode === 'manual' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8"
+                  onClick={() => setFovInputMode('manual')}
+                >
+                  {t('fov.inputModeManual')}
+                </Button>
+                <Button
+                  variant={fovInputMode === 'active-equipment' ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8"
+                  onClick={() => setFovInputMode('active-equipment')}
+                >
+                  {t('fov.inputModeActiveEquipment')}
+                </Button>
+              </div>
+
+              {fovInputMode === 'active-equipment' ? (
+                hasCompleteActiveEquipment && activeCamera && activeTelescope ? (
+                  <Card className="border-primary/30 bg-primary/5">
+                    <CardContent className="space-y-2 py-3 px-3 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">{t('fov.activeCamera')}</span>
+                        <span className="font-medium">{activeCamera.name}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">{t('fov.activeTelescope')}</span>
+                        <span className="font-medium">{activeTelescope.name}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Alert className="py-2">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                    <AlertDescription className="text-xs">
+                      {t('fov.activeEquipmentMissing')}
+                    </AlertDescription>
+                  </Alert>
+                )
+              ) : (
+                <p className="text-xs text-muted-foreground">{t('fov.manualInputModeHelp')}</p>
+              )}
+            </div>
+
             {/* Sensor Presets */}
             <div className="space-y-2">
               <Label>{t('fov.sensorPreset')}</Label>
@@ -454,6 +541,7 @@ export function FOVSimulator({
                                 ? 'bg-primary/20 border-primary text-primary'
                                 : ''
                             )}
+                            disabled={fovInputMode === 'active-equipment'}
                             onClick={() => applyPreset(preset)}
                           >
                             <span className="font-medium truncate w-full text-left">{preset.name}</span>
@@ -484,6 +572,7 @@ export function FOVSimulator({
                     onChange={(e) => onSensorWidthChange(parseFloat(e.target.value) || 0)}
                     className="h-8"
                     step="0.1"
+                    disabled={fovInputMode === 'active-equipment'}
                   />
                 </div>
                 <div className="space-y-1">
@@ -494,6 +583,7 @@ export function FOVSimulator({
                     onChange={(e) => onSensorHeightChange(parseFloat(e.target.value) || 0)}
                     className="h-8"
                     step="0.1"
+                    disabled={fovInputMode === 'active-equipment'}
                   />
                 </div>
                 <div className="space-y-1">
@@ -508,6 +598,7 @@ export function FOVSimulator({
                     }}
                     className="h-8"
                     step="0.01"
+                    disabled={fovInputMode === 'active-equipment'}
                   />
                 </div>
               </div>
@@ -565,6 +656,7 @@ export function FOVSimulator({
                         'text-xs h-auto py-1.5 px-2 justify-start flex-col items-start',
                         focalLength === preset.focalLength ? 'bg-primary/20 border-primary' : ''
                       )}
+                      disabled={fovInputMode === 'active-equipment'}
                       onClick={() => applyTelescopePreset(preset)}
                     >
                       <span className="font-medium truncate w-full text-left">{preset.name}</span>
@@ -575,6 +667,44 @@ export function FOVSimulator({
                   ))}
                 </div>
               </ScrollArea>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <Label className="text-sm">{t('fov.accessoryLabel')}</Label>
+              {accessorySelectionAvailable ? (
+                <>
+                  <Select
+                    value={selectedBarlowReducerId ?? '__none__'}
+                    onValueChange={(value) => setSelectedBarlowReducerId(value === '__none__' ? null : value)}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder={t('fov.accessoryPlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">{t('fov.noAccessory')}</SelectItem>
+                      {barlowReducers.map((accessory) => (
+                        <SelectItem key={accessory.id} value={accessory.id}>
+                          {accessory.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedBarlowReducer
+                      ? t('fov.accessorySelectedSummary', { name: selectedBarlowReducer.name, factor: selectedBarlowReducer.factor })
+                      : t('fov.accessoryNoneSummary')}
+                  </p>
+                </>
+              ) : (
+                <Alert className="py-2">
+                  <Info className="h-3.5 w-3.5" />
+                  <AlertDescription className="text-xs">
+                    {t('fov.accessoryUnavailable')}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
 
             <Separator />
@@ -592,6 +722,7 @@ export function FOVSimulator({
                   onChange={(e) => onFocalLengthChange(parseFloat(e.target.value) || 0)}
                   className="h-9"
                   step="1"
+                  disabled={fovInputMode === 'active-equipment'}
                 />
                 <div className="flex gap-1">
                   {[200, 400, 600, 1000, 2000].map((fl) => (
@@ -600,6 +731,7 @@ export function FOVSimulator({
                       variant={focalLength === fl ? 'default' : 'outline'}
                       size="sm"
                       className="h-9 px-2 text-xs"
+                      disabled={fovInputMode === 'active-equipment'}
                       onClick={() => onFocalLengthChange(fl)}
                     >
                       {fl}
@@ -638,6 +770,18 @@ export function FOVSimulator({
                   <div className="space-y-1">
                     <span className="text-xs text-muted-foreground">{t('fov.resolution')}</span>
                     <p className="font-mono font-medium">{resolution.width} × {resolution.height}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">{t('fov.effectiveFocalLength')}</span>
+                    <p className="font-mono font-medium">
+                      {effectiveFocalLength.toFixed(1)} mm
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">{t('fov.baseFocalLength')}</span>
+                    <p className="font-mono font-medium">
+                      {resolvedBaseFocalLength.toFixed(1)} mm
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -699,6 +843,15 @@ export function FOVSimulator({
                         {t('fov.autoAlign')}
                       </Button>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={resetFramePlacement}
+                      disabled={framePlacement.x === 0 && framePlacement.y === 0}
+                    >
+                      {t('fov.resetFramePlacement')}
+                    </Button>
                     {suggestedRotation !== null && (
                       <p className="text-[11px] text-muted-foreground">
                         {t('fov.suggestedRotationLabel', { angle: suggestedRotation })}
@@ -868,9 +1021,10 @@ export function FOVSimulator({
               <div className="space-y-2">
                 <SwitchItem
                   label={t('fov.rotateSky')}
-                  description={t('fov.rotateSkyDesc')}
+                  description={rotateSkySupported ? t('fov.rotateSkyDesc') : t('fov.rotateSkyUnavailable')}
                   checked={rotateSky}
-                  onCheckedChange={(v) => setFOVDisplay({ rotateSky: v })}
+                  onCheckedChange={(v) => rotateSkySupported && setFOVDisplay({ rotateSky: v })}
+                  switchProps={{ disabled: !rotateSkySupported }}
                 />
                 <SwitchItem
                   label={t('fov.preserveAlignment')}

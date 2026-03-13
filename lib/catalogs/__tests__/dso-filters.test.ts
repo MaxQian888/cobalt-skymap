@@ -138,6 +138,40 @@ describe('checkAltitudeDuration', () => {
     const resultFail = checkAltitudeDuration(altitudeData, [], 52, Infinity, null, null, false);
     expect(resultFail).toBe(false);
   });
+
+  describe('checkAltitudeDuration with custom horizon', () => {
+    it('uses horizon data as threshold when useCustomHorizon is true', () => {
+      const altData = [
+        { x: 0, y: 15 },
+        { x: 0.05, y: 20 },
+        { x: 0.1, y: 8 },
+      ];
+      const horizonData = [
+        { x: 0, y: 10 },
+        { x: 0.05, y: 10 },
+        { x: 0.1, y: 25 },
+      ];
+
+      const result = checkAltitudeDuration(altData, horizonData, 0, Infinity, null, null, true);
+      expect(result).toBe(false);
+    });
+
+    it('passes when all points above custom horizon', () => {
+      const altData = [
+        { x: 0, y: 30 },
+        { x: 0.05, y: 35 },
+        { x: 0.1, y: 40 },
+      ];
+      const horizonData = [
+        { x: 0, y: 10 },
+        { x: 0.05, y: 10 },
+        { x: 0.1, y: 10 },
+      ];
+
+      const result = checkAltitudeDuration(altData, horizonData, 0, Infinity, null, null, true);
+      expect(result).toBe(true);
+    });
+  });
 });
 
 describe('applyDSOFilters', () => {
@@ -268,6 +302,262 @@ describe('applyDSOFilters', () => {
     });
   });
 
+  describe('RA range filter', () => {
+    it('should filter by RA from-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', ra: 30 }),
+        createMockDSO({ id: 'B', ra: 150 }),
+        createMockDSO({ id: 'C', ra: 300 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        raRange: { from: 8, through: null },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(2);
+    });
+
+    it('should filter by RA through-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', ra: 30 }),
+        createMockDSO({ id: 'B', ra: 150 }),
+        createMockDSO({ id: 'C', ra: 300 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        raRange: { from: null, through: 12 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(2);
+    });
+
+    it('should filter by RA from and through', () => {
+      const objects = [
+        createMockDSO({ id: 'A', ra: 30 }),
+        createMockDSO({ id: 'B', ra: 150 }),
+        createMockDSO({ id: 'C', ra: 300 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        raRange: { from: 5, through: 15 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+  });
+
+  describe('Dec range filter', () => {
+    it('should filter by dec range', () => {
+      const objects = [
+        createMockDSO({ id: 'A', dec: -30 }),
+        createMockDSO({ id: 'B', dec: 20 }),
+        createMockDSO({ id: 'C', dec: 60 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        decRange: { from: -10, through: 50 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+
+    it('should handle reversed dec range (from > through)', () => {
+      const objects = [
+        createMockDSO({ id: 'A', dec: -30 }),
+        createMockDSO({ id: 'B', dec: 20 }),
+        createMockDSO({ id: 'C', dec: 60 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        decRange: { from: 50, through: -10 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+
+    it('should filter by dec from-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', dec: -30 }),
+        createMockDSO({ id: 'B', dec: 20 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        decRange: { from: 0, through: null },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+
+    it('should filter by dec through-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', dec: -30 }),
+        createMockDSO({ id: 'B', dec: 20 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        decRange: { from: null, through: 0 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+  });
+
+  describe('magnitude filter edge cases', () => {
+    it('should include objects with null magnitude', () => {
+      const objects = [
+        createMockDSO({ id: 'A', magnitude: null }),
+        createMockDSO({ id: 'B', magnitude: 5.0 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        magnitudeRange: { from: 3, through: 6 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(2);
+    });
+
+    it('should filter by magnitude from-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', magnitude: 2.0 }),
+        createMockDSO({ id: 'B', magnitude: 5.0 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        magnitudeRange: { from: 3, through: null },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+  });
+
+  describe('size filter', () => {
+    it('should include objects with null sizeMax', () => {
+      const objects = [
+        createMockDSO({ id: 'A', sizeMax: null }),
+        createMockDSO({ id: 'B', sizeMax: 50 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        sizeRange: { from: 10, through: 100 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(2);
+    });
+
+    it('should filter by size from-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', sizeMax: 5 }),
+        createMockDSO({ id: 'B', sizeMax: 50 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        sizeRange: { from: 10, through: null },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+
+    it('should filter by size through-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', sizeMax: 5 }),
+        createMockDSO({ id: 'B', sizeMax: 50 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        sizeRange: { from: null, through: 20 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+  });
+
+  describe('surface brightness filter', () => {
+    it('should include objects with null surfaceBrightness', () => {
+      const objects = [
+        createMockDSO({ id: 'A', surfaceBrightness: null }),
+        createMockDSO({ id: 'B', surfaceBrightness: 13.0 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        brightnessRange: { from: 12, through: 14 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(2);
+    });
+
+    it('should filter by brightness from-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', surfaceBrightness: 10.0 }),
+        createMockDSO({ id: 'B', surfaceBrightness: 14.0 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        brightnessRange: { from: 12, through: null },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+
+    it('should filter by brightness through-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', surfaceBrightness: 10.0 }),
+        createMockDSO({ id: 'B', surfaceBrightness: 14.0 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        brightnessRange: { from: null, through: 12 },
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+  });
+
+  describe('altitude duration with custom horizon', () => {
+    it('should use ALTITUDE_ABOVE_HORIZON_FILTER with useCustomHorizon', () => {
+      const altData = [
+        { x: 0, y: 15 },
+        { x: 0.05, y: 20 },
+        { x: 0.1, y: 25 },
+        { x: 0.15, y: 30 },
+        { x: 0.2, y: 35 },
+      ];
+      const horizonData = [
+        { x: 0, y: 10 },
+        { x: 0.05, y: 10 },
+        { x: 0.1, y: 10 },
+        { x: 0.15, y: 10 },
+        { x: 0.2, y: 10 },
+      ];
+      const objects = [
+        createMockDSO({ id: 'A', altitudeData: altData, horizonData }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        minimumAltitude: ALTITUDE_ABOVE_HORIZON_FILTER,
+        altitudeDuration: 1,
+        useCustomHorizon: true,
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+  });
+
   describe('moon distance filter', () => {
     it('should filter by minimum moon distance', () => {
       const objects = [
@@ -328,6 +618,53 @@ describe('applyDSOFilters', () => {
     });
   });
 
+  describe('transit time filter edge cases', () => {
+    it('should exclude objects with null transitTime', () => {
+      const objects = [
+        createMockDSO({ id: 'A', transitTime: null }),
+        createMockDSO({ id: 'B', transitTime: new Date('2024-06-15T23:00:00') }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        transitTimeFrom: new Date('2024-06-15T20:00:00'),
+        transitTimeThrough: new Date('2024-06-16T02:00:00'),
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+
+    it('should filter by transitTimeFrom-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', transitTime: new Date('2024-06-15T18:00:00') }),
+        createMockDSO({ id: 'B', transitTime: new Date('2024-06-15T23:00:00') }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        transitTimeFrom: new Date('2024-06-15T20:00:00'),
+        transitTimeThrough: null,
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+
+    it('should filter by transitTimeThrough-only', () => {
+      const objects = [
+        createMockDSO({ id: 'A', transitTime: new Date('2024-06-15T18:00:00') }),
+        createMockDSO({ id: 'B', transitTime: new Date('2024-06-15T23:00:00') }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        transitTimeFrom: null,
+        transitTimeThrough: new Date('2024-06-15T20:00:00'),
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result.length).toBe(1);
+    });
+  });
+
   describe('sorting', () => {
     it('should sort by name ascending', () => {
       const filters: DSOSearchFilters = {
@@ -369,6 +706,89 @@ describe('applyDSOFilters', () => {
       expect(result[0].id).toBe('B');
       expect(result[1].id).toBe('C');
       expect(result[2].id).toBe('A');
+    });
+  });
+
+  describe('additional sort fields', () => {
+    it('should sort by ra', () => {
+      const objects = [
+        createMockDSO({ id: 'A', ra: 200 }),
+        createMockDSO({ id: 'B', ra: 50 }),
+        createMockDSO({ id: 'C', ra: 300 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        orderByField: 'ra',
+        orderByDirection: 'asc',
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result[0].id).toBe('B');
+      expect(result[2].id).toBe('C');
+    });
+
+    it('should sort by dec', () => {
+      const objects = [
+        createMockDSO({ id: 'A', dec: 60 }),
+        createMockDSO({ id: 'B', dec: -10 }),
+        createMockDSO({ id: 'C', dec: 30 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        orderByField: 'dec',
+        orderByDirection: 'asc',
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result[0].id).toBe('B');
+    });
+
+    it('should sort by altitude', () => {
+      const objects = [
+        createMockDSO({ id: 'A', altitude: 30 }),
+        createMockDSO({ id: 'B', altitude: 70 }),
+        createMockDSO({ id: 'C', altitude: 50 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        orderByField: 'altitude',
+        orderByDirection: 'desc',
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result[0].id).toBe('B');
+    });
+
+    it('should sort by transitTime', () => {
+      const objects = [
+        createMockDSO({ id: 'A', transitTime: new Date('2024-06-16T02:00:00') }),
+        createMockDSO({ id: 'B', transitTime: new Date('2024-06-15T20:00:00') }),
+        createMockDSO({ id: 'C', transitTime: null }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        orderByField: 'transitTime',
+        orderByDirection: 'asc',
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result[0].id).toBe('C');
+      expect(result[1].id).toBe('B');
+    });
+
+    it('should sort by moonDistance', () => {
+      const objects = [
+        createMockDSO({ id: 'A', moonDistance: 90 }),
+        createMockDSO({ id: 'B', moonDistance: 30 }),
+      ];
+      const filters: DSOSearchFilters = {
+        ...DEFAULT_DSO_FILTERS,
+        orderByField: 'moonDistance',
+        orderByDirection: 'asc',
+      };
+
+      const result = applyDSOFilters(objects, filters, 45, -75, new Date('2024-06-15T12:00:00'));
+      expect(result[0].id).toBe('B');
     });
   });
 

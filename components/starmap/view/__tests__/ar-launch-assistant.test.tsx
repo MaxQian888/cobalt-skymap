@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import type { ARRecoveryAction } from '@/lib/core/ar-session';
 import { ARLaunchAssistant } from '../ar-launch-assistant';
@@ -75,12 +75,16 @@ describe('ARLaunchAssistant', () => {
     expect(useARRuntimeStore.getState().launchAssistant.visible).toBe(false);
   });
 
-  it('dispatches shared recovery actions from launch assistant', () => {
+  it('dispatches shared recovery actions from launch assistant', async () => {
     render(<ARLaunchAssistant />);
 
     fireEvent.click(screen.getByTestId('ar-launch-action-request-sensor-permission'));
 
-    expect(useARRuntimeStore.getState().recoveryRequestVersion['request-sensor-permission']).toBe(1);
+    await waitFor(() => {
+      expect(useARRuntimeStore.getState().recoveryRequestVersion['request-sensor-permission']).toBe(1);
+      expect(useARRuntimeStore.getState().recoveryNoticeKey).toBe('settings.arRecoveryNoticeSensorPermissionRequested');
+    });
+    expect(screen.getByTestId('ar-launch-recovery-notice')).toBeInTheDocument();
   });
 
   it('updates preferred device and requests retry when selecting a camera', () => {

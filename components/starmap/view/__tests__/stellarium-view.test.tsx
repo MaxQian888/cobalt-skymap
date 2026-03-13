@@ -43,6 +43,7 @@ jest.mock('@/components/starmap/view/bottom-status-bar', () => ({ BottomStatusBa
 jest.mock('@/components/starmap/management/updater/update-banner', () => ({ UpdateBanner: createDivComponent('update-banner') }));
 jest.mock('@/components/starmap/management/updater/update-dialog', () => ({ UpdateDialog: createDivComponent('update-dialog') }));
 jest.mock('@/components/starmap/planning/session-planner', () => ({ SessionPlanner: createDivComponent('session-planner') }));
+jest.mock('@/components/starmap/planning/messier-marathon-guide', () => ({ MessierMarathonGuideDialog: createDivComponent('messier-marathon-guide') }));
 jest.mock('@/components/starmap/overlays/ar-camera-background', () => ({ ARCameraBackground: createDivComponent('ar-camera-background') }));
 jest.mock('@/components/starmap/overlays/ar-compass-overlay', () => ({ ARCompassOverlay: createDivComponent('ar-compass-overlay') }));
 jest.mock('@/components/starmap/view/ar-launch-assistant', () => ({ ARLaunchAssistant: createDivComponent('ar-launch-assistant') }));

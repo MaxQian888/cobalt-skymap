@@ -30,11 +30,18 @@ let mountState: {
     alignmentMode: string;
     equatorialSystem: string;
   };
+  actionAvailability?: {
+    park?: boolean;
+    tracking?: boolean;
+    trackingRate?: boolean;
+    abortSlew?: boolean;
+  };
   connectionConfig: {
     protocol: string;
     host: string;
     port: number;
     deviceId: number;
+    selectedDeviceId?: string | null;
   };
 } = {
   mountInfo: {
@@ -63,11 +70,13 @@ let mountState: {
     alignmentMode: '',
     equatorialSystem: '',
   },
+  actionAvailability: {},
   connectionConfig: {
     protocol: 'simulator',
     host: 'localhost',
     port: 11111,
     deviceId: 0,
+    selectedDeviceId: 'simulator://builtin',
   },
 };
 
@@ -267,11 +276,13 @@ describe('StellariumMount', () => {
         alignmentMode: '',
         equatorialSystem: '',
       },
+      actionAvailability: {},
       connectionConfig: {
         protocol: 'simulator',
         host: 'localhost',
         port: 11111,
         deviceId: 0,
+        selectedDeviceId: 'simulator://builtin',
       },
     };
 
@@ -415,6 +426,17 @@ describe('StellariumMount', () => {
     // Should not have park/unpark text (except in other areas like parked badge)
     const text = container.textContent || '';
     expect(text).not.toContain('unpark');
+  });
+
+  it('hides park control when action availability blocks parking', () => {
+    mountState.mountInfo.Connected = true;
+    mountState.capabilities.canPark = true;
+    mountState.actionAvailability = { park: false };
+    mountOverlayReturn.connected = true;
+
+    const { container } = render(<StellariumMount />);
+    expect(container.textContent).not.toContain('park');
+    expect(container.textContent).not.toContain('unpark');
   });
 
   it('shows abort button when slewing', () => {

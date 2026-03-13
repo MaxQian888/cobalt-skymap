@@ -54,5 +54,6 @@ describe('DEFAULT_CONNECTION_CONFIG', () => {
     expect(DEFAULT_CONNECTION_CONFIG.host).toBe('localhost');
     expect(typeof DEFAULT_CONNECTION_CONFIG.port).toBe('number');
     expect(typeof DEFAULT_CONNECTION_CONFIG.deviceId).toBe('number');
+    expect((DEFAULT_CONNECTION_CONFIG as typeof DEFAULT_CONNECTION_CONFIG & { selectedDeviceId?: string | null }).selectedDeviceId).toBe('simulator://builtin');
   });
 });

@@ -17,10 +17,12 @@ jest.mock('@/lib/stores', () => ({
   }),
   useEquipmentStore: jest.fn((selector) => {
     const state = {
-      fovDisplay: { enabled: false, frameColor: '#fff', frameStyle: 'solid', overlayOpacity: 0.5 },
+      fovDisplay: { enabled: false, frameColor: '#fff', frameStyle: 'solid', overlayOpacity: 0.5, dragToPosition: true },
       ocularDisplay: { enabled: false, appliedFov: 1, opacity: 0.5, showCrosshair: false },
       rotationAngle: 0,
       pixelSize: 3.76, sensorWidth: 23.5, sensorHeight: 15.6, focalLength: 400, aperture: 80,
+      framePlacement: { x: 0, y: 0 },
+      setFramePlacement: jest.fn(),
     };
     return selector(state);
   }),
@@ -32,10 +34,15 @@ jest.mock('@/lib/stores/settings-store', () => ({
   }),
 }));
 jest.mock('@/lib/hooks/use-equipment-fov-props', () => ({
-  useEquipmentFOVRead: jest.fn(() => ({
+  useFovEquipmentOptions: jest.fn(() => ({
     fovSimEnabled: false, sensorWidth: 23.5, sensorHeight: 15.6, focalLength: 400,
+    pixelSize: 3.76,
     mosaic: { enabled: false, rows: 1, cols: 1, overlap: 10 },
     gridType: 'none',
+    framePlacement: { x: 0, y: 0 },
+    effectiveFocalLength: 400,
+    dragToPosition: true,
+    setFramePlacement: jest.fn(),
   })),
 }));
 const mockFOVOverlay = jest.fn((_props?: Record<string, unknown>) => null);
@@ -116,6 +123,25 @@ describe('OverlaysContainer', () => {
     );
     expect(mockFOVOverlay).toHaveBeenCalledWith(
       expect.objectContaining({ currentFov: 30 })
+    );
+  });
+
+  it('passes frame placement and drag state to FOVOverlay', () => {
+    render(
+      <OverlaysContainer
+        currentFov={45}
+        containerBounds={{ width: 800, height: 600 }}
+        onRotationChange={jest.fn()}
+        onMarkerDoubleClick={jest.fn()}
+        onMarkerEdit={jest.fn()}
+        onMarkerNavigate={jest.fn()}
+      />
+    );
+    expect(mockFOVOverlay).toHaveBeenCalledWith(
+      expect.objectContaining({
+        framePlacement: { x: 0, y: 0 },
+        dragToPosition: true,
+      })
     );
   });
 });

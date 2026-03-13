@@ -10,27 +10,14 @@
 //! - `alpaca_client`: ASCOM Alpaca REST client
 //! - `commands`: Tauri commands
 
-pub mod types;
-pub mod simulator;
 pub mod alpaca_client;
 pub mod commands;
+pub mod simulator;
+pub mod types;
 
 pub use commands::{
-    mount_connect,
-    mount_disconnect,
-    mount_get_state,
-    mount_get_capabilities,
-    mount_slew_to,
-    mount_sync_to,
-    mount_abort_slew,
-    mount_park,
-    mount_unpark,
-    mount_set_tracking,
-    mount_set_tracking_rate,
-    mount_move_axis,
-    mount_stop_axis,
-    mount_set_slew_rate,
-    mount_discover,
-    mount_get_observing_conditions,
-    mount_get_safety_state,
+    mount_abort_slew, mount_connect, mount_disconnect, mount_discover, mount_get_capabilities,
+    mount_get_observing_conditions, mount_get_safety_state, mount_get_state, mount_move_axis,
+    mount_park, mount_set_slew_rate, mount_set_tracking, mount_set_tracking_rate, mount_slew_to,
+    mount_stop_axis, mount_sync_to, mount_unpark,
 };

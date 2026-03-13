@@ -5,6 +5,7 @@ export { AstroSessionPanel } from './astro-session-panel';
 export { ExposureCalculator } from './exposure-calculator';
 export { ObservationLog } from './observation-log';
 export { SessionPlanner } from './session-planner';
+export { MessierMarathonGuideDialog } from './messier-marathon-guide';
 export { ShotList } from './shot-list';
 export { SkyAtlasPanel } from './sky-atlas-panel';
 export { TonightRecommendations } from './tonight-recommendations';

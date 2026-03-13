@@ -25,6 +25,44 @@ interface MockSettingsDraft {
   location: { latitude: number; longitude: number; elevation: number };
 }
 
+type CustomCameraFixture = {
+  id?: string;
+  name?: string;
+  sensorWidth?: number;
+  sensorHeight?: number;
+  pixelSize?: number;
+};
+
+type CustomTelescopeFixture = {
+  id?: string;
+  name?: string;
+  focalLength?: number;
+  aperture?: number;
+  type?: string;
+};
+
+type CustomEyepieceFixture = {
+  id?: string;
+  name?: string;
+  focalLength?: number;
+  afov?: number;
+  fieldStop?: number;
+};
+
+type CustomBarlowFixture = {
+  id?: string;
+  name?: string;
+  magnification?: number;
+};
+
+type CustomOcularTelescopeFixture = {
+  id?: string;
+  name?: string;
+  focalLength?: number;
+  aperture?: number;
+  type?: string;
+};
+
 const mockApplySettingsTransaction = jest.fn((draft: MockSettingsDraft, options: { domainOrder?: string[] } = {}) => {
   const domainOrder = options.domainOrder ?? [];
   if (domainOrder.includes('connection')) {
@@ -139,11 +177,11 @@ const equipmentStoreState = {
   fovDisplay: { showGrid: true },
   ocularDisplay: { enabled: false, opacity: 70, showCrosshair: true, appliedFov: null },
   exposureDefaults: { exposureTime: 60 },
-  customCameras: [],
-  customTelescopes: [],
-  customEyepieces: [],
-  customBarlows: [],
-  customOcularTelescopes: [],
+  customCameras: [] as CustomCameraFixture[],
+  customTelescopes: [] as CustomTelescopeFixture[],
+  customEyepieces: [] as CustomEyepieceFixture[],
+  customBarlows: [] as CustomBarlowFixture[],
+  customOcularTelescopes: [] as CustomOcularTelescopeFixture[],
   selectedOcularTelescopeId: 't1',
   selectedEyepieceId: 'e1',
   selectedBarlowId: 'b0',
@@ -250,8 +288,29 @@ describe('settings-profile-transaction', () => {
     jest.clearAllMocks();
     useSettingsImportRestoreStore.getState().clearRestorePoint();
     settingsStoreState.connection = { ip: 'localhost', port: '1888' };
+    settingsStoreState.backendProtocol = 'http';
+    settingsStoreState.skyEngine = 'stellarium-web-engine';
+    settingsStoreState.stellarium = { nightMode: false };
+    settingsStoreState.preferences = { locale: 'en' };
+    settingsStoreState.performance = { reducedMotion: false };
+    settingsStoreState.accessibility = { highContrast: false };
+    settingsStoreState.notifications = { enableToasts: true };
+    settingsStoreState.search = { maxSearchResults: 20 };
+    settingsStoreState.aladinDisplay = { showGrid: false };
+    mountStoreState.profileInfo = { AstrometrySettings: { Latitude: 0, Longitude: 0, Elevation: 0 } };
     themeStoreState.customization.radius = 0.5;
     themeStoreState.userPresets = [];
+    keybindingStoreState.customBindings = {};
+    globalShortcutStoreState.enabled = false;
+    globalShortcutStoreState.customBindings = {};
+    equipmentStoreState.customCameras = [];
+    equipmentStoreState.customTelescopes = [];
+    equipmentStoreState.customEyepieces = [];
+    equipmentStoreState.customBarlows = [];
+    equipmentStoreState.customOcularTelescopes = [];
+    equipmentStoreState.selectedOcularTelescopeId = 't1';
+    equipmentStoreState.selectedEyepieceId = 'e1';
+    equipmentStoreState.selectedBarlowId = 'b0';
     eventSourcesStoreState.sources = [{
       id: 'astronomyapi',
       name: 'Astronomy API',
@@ -264,8 +323,8 @@ describe('settings-profile-transaction', () => {
     }];
   });
 
-  it('stores a restore point and applies only selected domains', () => {
-    const result = applySettingsProfileImport({
+  it('stores a restore point and applies only selected domains', async () => {
+    const result = await applySettingsProfileImport({
       version: 6,
       exportedAt: '2026-01-01T00:00:00.000Z',
       metadata: { schemaVersion: 6, domains: ['settings', 'theme'] },
@@ -299,8 +358,8 @@ describe('settings-profile-transaction', () => {
     );
   });
 
-  it('rolls back earlier domain changes when a later domain apply fails', () => {
-    const result = applySettingsProfileImport({
+  it('rolls back earlier domain changes when a later domain apply fails', async () => {
+    const result = await applySettingsProfileImport({
       version: 6,
       exportedAt: '2026-01-01T00:00:00.000Z',
       metadata: { schemaVersion: 6, domains: ['settings', 'theme'] },
@@ -333,8 +392,8 @@ describe('settings-profile-transaction', () => {
     expect(useSettingsImportRestoreStore.getState().restorePoint).toBeNull();
   });
 
-  it('restores the last successful import snapshot', () => {
-    applySettingsProfileImport({
+  it('restores the last successful import snapshot', async () => {
+    await applySettingsProfileImport({
       version: 6,
       exportedAt: '2026-01-01T00:00:00.000Z',
       metadata: { schemaVersion: 6, domains: ['theme', 'eventSources'] },
@@ -355,12 +414,247 @@ describe('settings-profile-transaction', () => {
       applyThemeMode: mockApplyThemeMode,
     });
 
-    const restoreResult = restoreLastSettingsImport({
+    const restoreResult = await restoreLastSettingsImport({
       applyThemeMode: mockApplyThemeMode,
     });
 
     expect(restoreResult.success).toBe(true);
     expect(themeStoreState.customization.radius).toBe(0.5);
     expect(eventSourcesStoreState.sources[0].apiKey).toBe('previous-secret');
+  });
+
+  it('applies keybindings, shortcuts, equipment, event sources, and daily knowledge without persisting a restore point', async () => {
+    equipmentStoreState.customCameras = [{ id: 'old-cam' }];
+    equipmentStoreState.customTelescopes = [{ id: 'old-scope' }];
+    equipmentStoreState.customEyepieces = [{ id: 'old-eye' }];
+    equipmentStoreState.customBarlows = [{ id: 'old-barlow' }];
+    equipmentStoreState.customOcularTelescopes = [{ id: 'old-ocular' }];
+
+    const result = await applySettingsProfileImport({
+      version: 6,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      metadata: {
+        schemaVersion: 6,
+        domains: ['keybindings', 'globalShortcuts', 'equipment', 'eventSources', 'dailyKnowledge'],
+      },
+      keybindings: {
+        centerView: { key: 'KeyZ', altKey: true },
+      },
+      globalShortcuts: {
+        enabled: true,
+        customBindings: {
+          openSettings: 'CommandOrControl+Shift+S',
+          invalid: 123 as never,
+        },
+      },
+      equipment: {
+        sensorWidth: 26,
+        sensorHeight: 17,
+        focalLength: 600,
+        pixelSize: 4.2,
+        aperture: 102,
+        rotationAngle: 45,
+        mosaic: { enabled: true, rows: 2, cols: 2, overlap: 15, overlapUnit: 'percent' },
+        fovDisplay: { showGrid: false },
+        ocularDisplay: { enabled: true, opacity: 80, showCrosshair: false, appliedFov: null },
+        exposureDefaults: { exposureTime: 180 },
+        customCameras: [{ name: 'Imported Camera', sensorWidth: 13.2, sensorHeight: 8.8, pixelSize: 2.4 }],
+        customTelescopes: [{ name: 'Imported Scope', focalLength: 650, aperture: 130, type: 'reflector' }],
+        customEyepieces: [{ name: 'Imported Eyepiece', focalLength: 20, afov: 68, fieldStop: 24 }],
+        customBarlows: [{ name: 'Imported Barlow', magnification: 2 }],
+        customOcularTelescopes: [{ name: 'Imported Ocular Scope', focalLength: 900, aperture: 150, type: 'catadioptric' }],
+        selectedOcularTelescopeId: 'missing-telescope',
+        selectedEyepieceId: 'missing-eyepiece',
+        selectedBarlowId: 'missing-barlow',
+      },
+      eventSources: [{
+        id: 'custom-source',
+        name: 'Custom Source',
+        apiUrl: 'https://example.com',
+        apiKey: '',
+        hasStoredSecret: false,
+        enabled: true,
+        priority: 2,
+        cacheMinutes: 30,
+      }],
+      dailyKnowledge: {
+        favorites: [{ itemId: 'fav-2', createdAt: 2 }],
+        history: [{ itemId: 'hist-2', entry: 'random', dateKey: '2026-01-02', shownAt: 3 }],
+        startupState: {
+          lastShownDate: '2026-01-02',
+          snoozedDate: '2026-01-03',
+          lastSeenItemId: 'hist-2',
+        },
+      },
+    } as unknown as SettingsProfileData, {
+      persistRestorePoint: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.appliedDomains).toEqual([
+      'keybindings',
+      'globalShortcuts',
+      'equipment',
+      'eventSources',
+      'dailyKnowledge',
+    ]);
+    expect(useSettingsImportRestoreStore.getState().restorePoint).toBeNull();
+    expect(keybindingStoreState.resetAllBindings).toHaveBeenCalledTimes(1);
+    expect(keybindingStoreState.setBinding).toHaveBeenCalledWith('centerView', { key: 'KeyZ', altKey: true });
+    expect(globalShortcutStoreState.resetAllBindings).toHaveBeenCalledTimes(1);
+    expect(globalShortcutStoreState.setEnabled).toHaveBeenCalledWith(true);
+    expect(globalShortcutStoreState.setBinding).toHaveBeenCalledTimes(1);
+    expect(globalShortcutStoreState.setBinding).toHaveBeenCalledWith(
+      'openSettings',
+      'CommandOrControl+Shift+S',
+    );
+    expect(equipmentStoreState.setSensorWidth).toHaveBeenCalledWith(26);
+    expect(equipmentStoreState.setSensorHeight).toHaveBeenCalledWith(17);
+    expect(equipmentStoreState.setFocalLength).toHaveBeenCalledWith(600);
+    expect(equipmentStoreState.setPixelSize).toHaveBeenCalledWith(4.2);
+    expect(equipmentStoreState.setAperture).toHaveBeenCalledWith(102);
+    expect(equipmentStoreState.setRotationAngle).toHaveBeenCalledWith(45);
+    expect(equipmentStoreState.setMosaic).toHaveBeenCalledWith({
+      enabled: true,
+      rows: 2,
+      cols: 2,
+      overlap: 15,
+      overlapUnit: 'percent',
+    });
+    expect(equipmentStoreState.setFOVDisplay).toHaveBeenCalledWith({ showGrid: false });
+    expect(equipmentStoreState.setOcularDisplay).toHaveBeenCalledWith({
+      enabled: true,
+      opacity: 80,
+      showCrosshair: false,
+      appliedFov: null,
+    });
+    expect(equipmentStoreState.setExposureDefaults).toHaveBeenCalledWith({ exposureTime: 180 });
+    expect(equipmentStoreState.removeCustomCamera).toHaveBeenCalledWith('old-cam');
+    expect(equipmentStoreState.removeCustomTelescope).toHaveBeenCalledWith('old-scope');
+    expect(equipmentStoreState.removeCustomEyepiece).toHaveBeenCalledWith('old-eye');
+    expect(equipmentStoreState.removeCustomBarlow).toHaveBeenCalledWith('old-barlow');
+    expect(equipmentStoreState.removeCustomOcularTelescope).toHaveBeenCalledWith('old-ocular');
+    expect(equipmentStoreState.addCustomCamera).toHaveBeenCalledWith({
+      name: 'Imported Camera',
+      sensorWidth: 13.2,
+      sensorHeight: 8.8,
+      pixelSize: 2.4,
+    });
+    expect(equipmentStoreState.addCustomTelescope).toHaveBeenCalledWith({
+      name: 'Imported Scope',
+      focalLength: 650,
+      aperture: 130,
+      type: 'reflector',
+    });
+    expect(equipmentStoreState.addCustomEyepiece).toHaveBeenCalledWith({
+      name: 'Imported Eyepiece',
+      focalLength: 20,
+      afov: 68,
+      fieldStop: 24,
+    });
+    expect(equipmentStoreState.addCustomBarlow).toHaveBeenCalledWith({
+      name: 'Imported Barlow',
+      magnification: 2,
+    });
+    expect(equipmentStoreState.addCustomOcularTelescope).toHaveBeenCalledWith({
+      name: 'Imported Ocular Scope',
+      focalLength: 900,
+      aperture: 150,
+      type: 'catadioptric',
+    });
+    expect(equipmentStoreState.setSelectedOcularTelescopeId).toHaveBeenCalledWith('t1');
+    expect(equipmentStoreState.setSelectedEyepieceId).toHaveBeenCalledWith('e1');
+    expect(equipmentStoreState.setSelectedBarlowId).toHaveBeenCalledWith('b0');
+    expect(eventSourcesStoreState.resetToDefaults).toHaveBeenCalledTimes(1);
+    expect(eventSourcesStoreState.updateSource).toHaveBeenCalledWith(
+      'custom-source',
+      expect.objectContaining({
+        id: 'custom-source',
+      }),
+    );
+    expect(dailyKnowledgeStoreState.hydrateFromImport).toHaveBeenCalledWith({
+      favorites: [{ itemId: 'fav-2', createdAt: 2 }],
+      history: [{ itemId: 'hist-2', entry: 'random', dateKey: '2026-01-02', shownAt: 3 }],
+      lastShownDate: '2026-01-02',
+      snoozedDate: '2026-01-03',
+      lastSeenItemId: 'hist-2',
+    });
+  });
+
+  it('rolls back applied settings and extras when locale synchronization fails', async () => {
+    mockSetLocale.mockImplementationOnce(() => {
+      throw new Error('locale failed');
+    });
+
+    const result = await applySettingsProfileImport({
+      version: 6,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      metadata: { schemaVersion: 6, domains: ['settings', 'location'] },
+      settings: {
+        connection: { ip: '10.0.0.5', port: '1889' },
+        backendProtocol: 'https',
+        skyEngine: 'aladin',
+        stellarium: { nightMode: true },
+        preferences: { locale: 'zh' },
+        performance: { reducedMotion: true },
+        accessibility: { highContrast: true },
+        notifications: { enableToasts: false },
+        search: { maxSearchResults: 15 },
+        aladinDisplay: { showGrid: true },
+      },
+      location: {
+        latitude: 20,
+        longitude: 30,
+        elevation: 40,
+      },
+    } as unknown as SettingsProfileData, {
+      domains: ['settings', 'location'],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.failedDomain).toBe('settings');
+    expect(result.error).toBe('locale failed');
+    expect(mockApplySettingsTransaction).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        connection: { ip: '10.0.0.5', port: '1889' },
+        backendProtocol: 'https',
+        location: { latitude: 20, longitude: 30, elevation: 40 },
+      }),
+      { domainOrder: ['connection', 'preferences', 'performance', 'accessibility', 'notifications', 'search', 'location'] },
+    );
+    expect(mockApplySettingsTransaction).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        connection: { ip: 'localhost', port: '1888' },
+        backendProtocol: 'http',
+        location: { latitude: 0, longitude: 0, elevation: 0 },
+      }),
+      { domainOrder: ['connection', 'preferences', 'performance', 'accessibility', 'notifications', 'search', 'location'] },
+    );
+    expect(settingsStoreState.connection).toEqual({ ip: 'localhost', port: '1888' });
+    expect(settingsStoreState.skyEngine).toBe('stellarium-web-engine');
+    expect(settingsStoreState.stellarium).toEqual({ nightMode: false });
+    expect(settingsStoreState.aladinDisplay).toEqual({ showGrid: false });
+    expect(mountStoreState.profileInfo.AstrometrySettings).toEqual({
+      Latitude: 0,
+      Longitude: 0,
+      Elevation: 0,
+    });
+    expect(useSettingsImportRestoreStore.getState().restorePoint).toBeNull();
+  });
+
+  it('reports when no restore point is available', async () => {
+    useSettingsImportRestoreStore.getState().clearRestorePoint();
+
+    const result = await restoreLastSettingsImport({
+      applyThemeMode: mockApplyThemeMode,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      appliedDomains: [],
+      error: 'No restore point available',
+    });
   });
 });

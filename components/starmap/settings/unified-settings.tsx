@@ -149,8 +149,8 @@ export function UnifiedSettings() {
     setPendingGlobalReset(false);
   }, [cancelSession, clearLastApplyResult]);
 
-  const handleApplyChanges = useCallback(() => {
-    const result = applyDraft();
+  const handleApplyChanges = useCallback(async () => {
+    const result = await applyDraft();
     if (result.success) {
       if (pendingGlobalReset) {
         useEquipmentStore.getState().resetToDefaults();

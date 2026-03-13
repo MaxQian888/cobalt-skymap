@@ -64,6 +64,7 @@ export interface SavedSessionPlan {
   notes?: string;
   weatherSnapshot?: SessionWeatherSnapshot;
   manualEdits?: SessionDraftV2['manualEdits'];
+  guideContext?: SessionDraftV2['guideContext'];
 }
 
 export interface SavedSessionTemplate {
@@ -239,6 +240,7 @@ function normalizePlanDraftShape(
     manualEdits: plan.manualEdits ?? [],
     notes: plan.notes,
     weatherSnapshot: plan.weatherSnapshot,
+    guideContext: plan.guideContext,
   }, {
     fallbackDate: Number.isFinite(parsedPlanDate.getTime()) ? parsedPlanDate : new Date(),
   });
@@ -254,6 +256,7 @@ function normalizePlanDraftShape(
     notes: report.draft.notes,
     weatherSnapshot: report.draft.weatherSnapshot,
     manualEdits: report.draft.manualEdits,
+    guideContext: report.draft.guideContext,
   };
 }
 
@@ -446,6 +449,7 @@ export const useSessionPlanStore = create<SessionPlanState>()(
           notes: normalizedDraft.notes,
           weatherSnapshot: normalizedDraft.weatherSnapshot,
           manualEdits: normalizedDraft.manualEdits,
+          guideContext: normalizedDraft.guideContext,
         });
       },
 
@@ -501,6 +505,7 @@ export const useSessionPlanStore = create<SessionPlanState>()(
           notes: plan.notes,
           weatherSnapshot: plan.weatherSnapshot,
           manualEdits: plan.manualEdits,
+          guideContext: plan.guideContext,
         });
         const execution: PlannedSessionExecution = {
           id: generateExecutionId(),
@@ -512,6 +517,7 @@ export const useSessionPlanStore = create<SessionPlanState>()(
           locationName: context.locationName,
           notes: normalizedPlan.notes,
           weatherSnapshot: normalizedPlan.weatherSnapshot,
+          guideContext: normalizedPlan.guideContext,
           createdAt: now,
           updatedAt: now,
           targets: createExecutionTargets(plan),
@@ -545,6 +551,9 @@ export const useSessionPlanStore = create<SessionPlanState>()(
 
       syncExecutionFromObservationSession: (session) => {
         if (!session.source_plan_id) return null;
+        const sourceGuideContext = get().savedPlans.find(
+          (plan) => plan.id === session.source_plan_id,
+        )?.guideContext;
 
         const rawExecution: PlannedSessionExecution = {
           id: session.id,
@@ -568,6 +577,7 @@ export const useSessionPlanStore = create<SessionPlanState>()(
               }
             : undefined,
           targets: (session.execution_targets ?? []).map(mapSnapshotTarget),
+          guideContext: sourceGuideContext,
         };
         const execution = normalizeExecutionStatuses(rawExecution);
 

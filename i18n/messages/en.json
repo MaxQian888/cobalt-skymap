@@ -266,18 +266,33 @@
     "opticsTab": "Optics",
     "mosaicTab": "Mosaic",
     "displayTab": "Display",
+    "inputMode": "Input Mode",
+    "inputModeManual": "Manual",
+    "inputModeActiveEquipment": "Active Equipment",
+    "manualInputModeHelp": "Use manual values and saved framing snapshots for standalone planning.",
     "sensorPreset": "Sensor Preset",
     "telescopePreset": "Telescope Preset",
     "manualInput": "Manual Input",
+    "activeCamera": "Active Camera",
+    "activeTelescope": "Active Telescope",
+    "activeEquipmentMissing": "Active equipment mode needs both a camera and a telescope profile before it can drive framing values.",
     "sensorWidth": "Width",
     "sensorHeight": "Height",
     "pixelSize": "Pixel Size",
     "rotation": "Rotation",
     "focalLength": "Focal Length",
+    "baseFocalLength": "Base Focal Length",
+    "effectiveFocalLength": "Effective Focal Length",
     "mosaic": "Mosaic",
     "columns": "Columns",
     "rows": "Rows",
     "overlap": "Overlap",
+    "accessoryLabel": "Optical Accessory",
+    "accessoryPlaceholder": "Select reducer or barlow",
+    "noAccessory": "No accessory",
+    "accessorySelectedSummary": "{name} applied ({factor}x).",
+    "accessoryNoneSummary": "No reducer or barlow is applied to the current optical train.",
+    "accessoryUnavailable": "No reducer or barlow data source is available in the current runtime.",
     "compositionGrid": "Composition Grid",
     "calculatedFOV": "Calculated FOV",
     "fieldWidth": "Field Width",
@@ -312,10 +327,12 @@
     "framingOptions": "Framing Options",
     "rotateSky": "Rotate Sky",
     "rotateSkyDesc": "Rotate sky background instead of FOV rectangle",
+    "rotateSkyUnavailable": "Background sky rotation is not available in the current sky engine.",
     "preserveAlignment": "Preserve Alignment",
     "preserveAlignmentDesc": "Compensate for field curvature when rotating",
     "dragToPosition": "Drag to Position",
     "dragToPositionDesc": "Enable dragging to reposition the FOV",
+    "resetFramePlacement": "Reset Frame Position",
     "label": "FOV",
     "sensorWidthPlaceholder": "23.5",
     "sensorHeightPlaceholder": "15.6",
@@ -524,6 +541,8 @@
     "resetAllDescription": "This will reset all settings (display, equipment, preferences, theme) to their default values. This action cannot be undone.",
     "instantEffectHint": "Changes take effect immediately",
     "locationInstantHint": "Location changes take effect immediately",
+    "currentSiteSyncHint": "Saving these coordinates updates the active observation site: {name}.",
+    "createFirstSiteHint": "Saving these coordinates will create your first saved observation site.",
     "milkyWay": "Milky Way",
     "fog": "Fog",
     "rendering": "Rendering",
@@ -602,7 +621,17 @@
     "arAdaptiveDismiss": "Dismiss",
     "arAdaptiveAutoApplyOn": "Auto-apply on",
     "arAdaptiveAutoApplyOff": "Auto-apply off",
-    "arStatusStabilizing": "Stabilizing…"
+    "arStatusStabilizing": "Stabilizing…",
+    "arRecoveryNoticeRetryCameraRequested": "Camera retry requested.",
+    "arRecoveryNoticeSwitchCameraRequested": "Camera switch requested.",
+    "arRecoveryNoticeSensorPermissionRequested": "Sensor permission request triggered.",
+    "arRecoveryNoticeCalibrationRequested": "Sensor calibration requested.",
+    "arRecoveryNoticeOpenCameraSettingsRequested": "Camera settings opened.",
+    "arRecoveryNoticeRevertProfileRequested": "Known-good profile restore requested.",
+    "arRecoveryNoticeDisableArRequested": "AR disable requested.",
+    "arRecoveryNoticeSensorPermissionFailed": "Unable to request sensor permission.",
+    "arRecoveryNoticeCalibrationFailed": "Unable to start sensor calibration.",
+    "arRecoveryNoticeActionFailed": "Recovery action failed. Please try again."
   },
   "session": {
     "sessionInfo": "Session Info",
@@ -848,9 +877,18 @@
     "exportSuccess": "Export completed",
     "exportFailed": "Export failed",
     "executionWorkspace": "Execution Workspace",
+    "executionSummaryCompleted": "{count} completed",
+    "executionSummarySkipped": "{count} skipped",
+    "executionSummaryFailed": "{count} failed",
+    "executionSummaryRemaining": "{count} remaining",
+    "currentTargetLabel": "Current target",
+    "nextTargetLabel": "Next target",
     "startTarget": "Start Target",
     "completeTarget": "Complete Target",
+    "skipTarget": "Skip Target",
+    "failTarget": "Fail Target",
     "addTargetObservation": "Add Target Observation",
+    "openLinkedPlanner": "Open Linked Planner",
     "executionExportSuccess": "Execution summary exported",
     "updateFailed": "Failed to update execution state",
     "allTime": "All"
@@ -1100,6 +1138,10 @@
     "port": "Port",
     "deviceId": "Device ID",
     "discoverDevices": "Discover Devices",
+    "selectedDevice": "Selected Device",
+    "discoveryNoDevices": "No supported mount devices were found",
+    "manualConnectionFallback": "You can still enter host, port, and device ID manually.",
+    "actionUnavailable": "This action is unavailable for the active mount",
     "cancel": "Cancel",
     "notDesktop": "Mount control requires the desktop app",
     "notConnectedWarning": "Mount is not connected",
@@ -1142,7 +1184,10 @@
       "slew_through_pole": "Slew path crosses celestial pole"
     },
     "operationFailed": "Mount operation failed",
-    "connectionLost": "Mount connection lost"
+    "connectionLost": "Mount connection lost",
+    "trackingUnavailable": "Tracking control is unavailable for the active mount",
+    "parkUnavailable": "Park or unpark is unavailable for the active mount",
+    "axisMotionUnavailable": "Axis motion is unavailable for the active mount"
   },
   "cache": {
     "offlineCache": "Offline Cache",
@@ -2015,7 +2060,12 @@
       "restart": "Restart Module",
       "completed": "Completed",
       "progress": "{current} / {total}",
-      "finishLater": "Finish Later"
+      "finishLater": "Finish Later",
+      "messierMarathonDescription": "Open a seasonal observing challenge built around the classic Messier Marathon run.",
+      "messierMarathonResumeDescription": "Resume your in-progress Messier Marathon guide and keep tonight's checkpoint flow intact.",
+      "seasonalGuide": "Seasonal Guide",
+      "startMarathon": "Start Marathon",
+      "resumeMarathon": "Resume Marathon"
     },
     "skipReasons": {
       "unavailable": "This feature is unavailable in your current environment and was skipped.",
@@ -2206,6 +2256,8 @@
         "setLocation": "Set Location",
         "locationSet": "Location Set",
         "skipNote": "You can skip this step and configure location later in Settings.",
+        "currentSiteHint": "Applying coordinates will update the active observation site: {name}.",
+        "createFirstSiteHint": "Applying coordinates will create your first saved observation site.",
         "gpsNotSupported": "GPS is not supported by your browser",
         "permissionDenied": "Location permission denied. Please allow in browser settings.",
         "positionUnavailable": "Unable to get position information",
@@ -3092,7 +3144,21 @@
     "executionStartFailed": "Failed to start execution",
     "executionResumed": "Execution resumed",
     "replanApplied": "Replan applied for remaining targets",
+    "noRemainingTargetsToReplan": "No remaining targets are available for replanning",
     "executionStatusLabel": "Execution Status",
+    "executionOverview": "Execution Overview",
+    "executionSummaryCompleted": "{count} completed",
+    "executionSummarySkipped": "{count} skipped",
+    "executionSummaryFailed": "{count} failed",
+    "executionSummaryRemaining": "{count} remaining",
+    "currentTargetLabel": "Current target",
+    "nextTargetLabel": "Next target",
+    "executionCompletedTitle": "Execution complete",
+    "executionCompletedHint": "Review the finished session or archive it to clear the live workflow.",
+    "archiveExecution": "Archive Execution",
+    "executionArchived": "Execution archived",
+    "executionArchiveFailed": "Failed to archive execution",
+    "replanSummary": "{preserved} preserved, {remaining} remaining for replanning",
     "executionStatus": {
       "draft": "Draft",
       "ready": "Ready",
@@ -3124,6 +3190,8 @@
     "weatherWindSpeed": "Wind (km/h)",
     "weatherDewPoint": "Dew Point (°C)",
     "refreshWeather": "Refresh",
+    "messierMarathonGuide": "Messier Marathon Guide",
+    "messierMarathonGuideDescription": "Seed the planner from a stage-based Messier Marathon guide and keep checkpoint metadata attached.",
     "safetySafe": "Safety: Safe",
     "safetyUnsafe": "Safety: Unsafe",
     "safetyWarning": "Safety monitor reports unsafe conditions. Scheduler keeps astronomical plan but flags weather/safety violations.",
@@ -3140,6 +3208,54 @@
       "nina-xml": "NINA Sequence XML",
       "csv": "CSV",
       "sgp-csv": "SGP CSV"
+    }
+  },
+  "messierMarathon": {
+    "title": "Messier Marathon",
+    "description": "Track readiness, critical catches, and planner handoff for a focused Messier Marathon session.",
+    "readiness": {
+      "recommended": "Recommended Night",
+      "limited": "Limited Night",
+      "not_recommended": "Not Recommended"
+    },
+    "mode": {
+      "full": "Full Run",
+      "best_effort": "Best Effort"
+    },
+    "fields": {
+      "date": "Observing Date",
+      "location": "Observer Location",
+      "progress": "Visible Targets",
+      "mode": "Run Mode"
+    },
+    "actions": {
+      "refresh": "Refresh Assessment",
+      "markCompleted": "Mark Complete",
+      "skipCheckpoint": "Skip Checkpoint",
+      "resetGuide": "Reset Guide",
+      "openPlanner": "Open Planner"
+    },
+    "labels": {
+      "critical": "Critical"
+    },
+    "status": {
+      "pending": "Pending",
+      "completed": "Completed",
+      "skipped": "Skipped",
+      "missed": "Missed"
+    },
+    "stages": {
+      "dusk": "Dusk Sprint",
+      "early-evening": "Early Evening",
+      "prime-night": "Prime Night",
+      "pre-dawn": "Pre-Dawn Push",
+      "final-window": "Final Window"
+    },
+    "limitingFactors": {
+      "no-astronomical-night": "Astronomical darkness is unavailable for this date and latitude.",
+      "short-darkness": "The dark window is shorter than a typical full-marathon run.",
+      "low-visible-count": "Too few Messier targets have usable dark-sky windows for a complete run.",
+      "critical-checkpoint-missed": "A critical checkpoint was missed, so the guide has shifted into best-effort recovery."
     }
   },
   "mountSafety": {
@@ -3766,11 +3882,14 @@
     "categoryMission": "Mission",
     "categoryTechnique": "Technique",
     "categoryCulture": "Culture",
-    "sourceAll": "All sources",
-    "sourceCurated": "Curated",
-    "sourceApod": "NASA APOD",
-    "sourceWikimedia": "Wikimedia",
-    "favorites": "Favorites",
+      "sourceAll": "All sources",
+      "sourceCurated": "Curated",
+      "sourceApod": "NASA APOD",
+      "sourceWikimedia": "Wikimedia",
+      "sourceNasaImageLibrary": "NASA Image Library",
+      "sourceNasaPhotojournal": "NASA Photojournal",
+      "sourceEsaScience": "ESA Space Science",
+      "favorites": "Favorites",
     "viewModePager": "Pager",
     "viewModeFeed": "Feed",
     "wheelPaging": "Wheel paging",
@@ -3795,18 +3914,40 @@
     "loadFailed": "Failed to load daily knowledge.",
     "videoEntry": "Video entry. Use Open Source to view the original video.",
     "eventOfToday": "Today in astronomy",
-    "factSources": "Fact sources",
-    "noFactSources": "No external fact source listed.",
-    "fallbackNotice": "This entry is shown in fallback language for accuracy.",
-    "languageStatus": {
-      "native": "Native language",
-      "fallback": "Fallback language"
-    },
-    "sourceBadge": {
-      "curated": "Curated",
-      "nasa-apod": "NASA APOD",
-      "wikimedia": "Wikimedia"
-    },
+      "factSources": "Fact sources",
+      "noFactSources": "No external fact source listed.",
+      "fallbackNotice": "This entry is shown in fallback language for accuracy.",
+      "curatedFallbackNotice": "Curated fallback is being shown because one or more online sources were unavailable or did not return a valid astronomy item.",
+      "sourceReference": "Source reference",
+      "languageStatus": {
+        "native": "Native language",
+        "fallback": "Fallback language"
+      },
+      "sourceStatus": {
+        "nasa-apod": {
+          "error": "NASA APOD is temporarily unavailable."
+        },
+        "wikimedia": {
+          "error": "Wikimedia enrichment is temporarily unavailable."
+        },
+        "nasa-image-library": {
+          "error": "NASA Image Library returned no usable item right now."
+        },
+        "nasa-photojournal": {
+          "error": "NASA Photojournal feed is currently unavailable."
+        },
+        "esa-science": {
+          "error": "ESA Space Science feed is currently unavailable."
+        }
+      },
+      "sourceBadge": {
+        "curated": "Curated",
+        "nasa-apod": "NASA APOD",
+        "wikimedia": "Wikimedia",
+        "nasa-image-library": "NASA Image Library",
+        "nasa-photojournal": "NASA Photojournal",
+        "esa-science": "ESA Space Science"
+      },
     "categoryBadge": {
       "object": "Object",
       "event": "Event",

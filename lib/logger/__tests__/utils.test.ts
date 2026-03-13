@@ -12,6 +12,11 @@ import {
   sanitizeUnknownData,
   sanitizeLogEntry,
   extractErrorInfo,
+  formatLogLine,
+  formatLogJson,
+  exportLogsAsText,
+  exportLogsAsJson,
+  formatLogEntryToText,
   filterLogs,
   getUniqueModules,
   getLogStats,
@@ -29,10 +34,14 @@ function makeEntry(overrides: Partial<LogEntry> = {}): LogEntry {
     message: overrides.message ?? 'test message',
     data: overrides.data,
     stack: overrides.stack,
+    errorName: overrides.errorName,
+    eventCode: overrides.eventCode,
+    operationId: overrides.operationId,
+    sessionId: overrides.sessionId,
+    tags: overrides.tags,
     occurrenceCount: overrides.occurrenceCount,
     firstTimestamp: overrides.firstTimestamp,
     lastTimestamp: overrides.lastTimestamp,
-    eventCode: overrides.eventCode,
   };
 }
 
@@ -52,7 +61,6 @@ describe('formatTimestamp', () => {
   it('formats HH:MM:SS.mmm', () => {
     const date = new Date('2025-01-15T08:05:09.007Z');
     const result = formatTimestamp(date);
-    // Result depends on local timezone, so just check format
     expect(result).toMatch(/^\d{2}:\d{2}:\d{2}\.\d{3}$/);
   });
 });
@@ -116,6 +124,18 @@ describe('serializeData', () => {
     expect(result).not.toContain('abc123');
     expect(result).not.toContain('secret');
   });
+
+  it('can skip sanitization for raw exports', () => {
+    const result = serializeData({ token: 'abc123' }, { sanitize: false });
+    expect(result).toContain('abc123');
+  });
+
+  it('falls back to String() when JSON serialization fails', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    expect(serializeData(circular, { sanitize: false })).toBe('[object Object]');
+  });
 });
 
 describe('redaction helpers', () => {
@@ -136,6 +156,27 @@ describe('redaction helpers', () => {
     expect(sanitized.authToken).toBe('[REDACTED]');
     expect((sanitized.profile as Record<string, unknown>).password).toBe('[REDACTED]');
     expect((sanitized.profile as Record<string, unknown>).city).toBe('Shanghai');
+  });
+
+  it('sanitizes special values and circular references', () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    circular.createdAt = new Date('2025-01-15T10:30:00.000Z');
+    circular.big = BigInt(10);
+    circular.handler = () => 'secret';
+    circular.marker = Symbol('secret');
+    circular.failure = new Error('token=abc');
+
+    const sanitized = sanitizeUnknownData(circular) as Record<string, unknown>;
+
+    expect(sanitized.self).toBe('[Circular]');
+    expect(sanitized.createdAt).toEqual(new Date('2025-01-15T10:30:00.000Z'));
+    expect(sanitized.big).toBe('10');
+    expect(typeof sanitized.handler).toBe('string');
+    expect(typeof sanitized.marker).toBe('string');
+    expect(sanitized.failure).toEqual(expect.objectContaining({
+      message: 'token=[REDACTED]',
+    }));
   });
 
   it('sanitizes log entries', () => {
@@ -169,6 +210,75 @@ describe('extractErrorInfo', () => {
     const info = extractErrorInfo(42);
     expect(info.message).toBeDefined();
   });
+
+  it('extracts message, stack, and name from plain objects', () => {
+    const info = extractErrorInfo({
+      name: 'BackendError',
+      message: 'authorization=abc',
+      stack: 'token=xyz',
+    });
+
+    expect(info).toEqual({
+      message: 'authorization=[REDACTED]',
+      stack: 'token=[REDACTED]',
+      name: 'BackendError',
+    });
+  });
+});
+
+describe('format helpers', () => {
+  it('formats a log entry as a single line', () => {
+    const line = formatLogLine(makeEntry({
+      message: 'token=abc',
+      data: { password: 'secret' },
+      occurrenceCount: 3,
+    }));
+
+    expect(line).toContain('[INFO ]');
+    expect(line).toContain('[test]');
+    expect(line).toContain('token=[REDACTED]');
+    expect(line).toContain('[REDACTED]');
+    expect(line).toContain('(x3)');
+  });
+
+  it('omits optional prefixes when disabled', () => {
+    const line = formatLogLine(makeEntry({ message: 'minimal' }), false, false);
+
+    expect(line).toBe('[INFO ] minimal');
+  });
+
+  it('formats a log entry as JSON', () => {
+    const json = JSON.parse(formatLogJson(makeEntry({
+      message: 'password=secret',
+      eventCode: 'JSON_EVENT',
+      occurrenceCount: 2,
+    })));
+
+    expect(json.level).toBe('info');
+    expect(json.message).toContain('[REDACTED]');
+    expect(json.eventCode).toBe('JSON_EVENT');
+    expect(json.occurrenceCount).toBe(2);
+  });
+
+  it('formats a log entry as copyable text', () => {
+    const text = formatLogEntryToText(makeEntry({
+      message: 'copied log',
+      eventCode: 'COPY_EVENT',
+      operationId: 'op-1',
+      sessionId: 'sess-1',
+      occurrenceCount: 2,
+      firstTimestamp: new Date('2025-01-15T10:30:00.000Z'),
+      lastTimestamp: new Date('2025-01-15T10:31:00.000Z'),
+      data: { foo: 'bar' },
+      stack: 'line 1\nline 2',
+    }));
+
+    expect(text).toContain('COPY_EVENT');
+    expect(text).toContain('Correlation: operationId=op-1, sessionId=sess-1');
+    expect(text).toContain('Occurrences: 2');
+    expect(text).toContain('Data:');
+    expect(text).toContain('Stack: line 1');
+  });
 });
 
 describe('filterLogs', () => {
@@ -182,13 +292,13 @@ describe('filterLogs', () => {
   it('filters by level', () => {
     const result = filterLogs(logs, { level: LogLevel.WARN });
     expect(result.length).toBe(2);
-    expect(result.every(e => e.level >= LogLevel.WARN)).toBe(true);
+    expect(result.every((entry) => entry.level >= LogLevel.WARN)).toBe(true);
   });
 
   it('filters by module', () => {
     const result = filterLogs(logs, { module: 'auth' });
     expect(result.length).toBe(2);
-    expect(result.every(e => e.module === 'auth')).toBe(true);
+    expect(result.every((entry) => entry.module === 'auth')).toBe(true);
   });
 
   it('filters by search text', () => {
@@ -197,9 +307,19 @@ describe('filterLogs', () => {
     expect(result[0].message).toBe('warn msg');
   });
 
+  it('matches search text against event codes and serialized data', () => {
+    const result = filterLogs([
+      makeEntry({ message: 'plain', eventCode: 'LOGIN_OK', data: { note: 'deep sky' } }),
+      makeEntry({ message: 'other', module: 'api' }),
+    ], { search: 'deep sky' });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].eventCode).toBe('LOGIN_OK');
+  });
+
   it('combines filters', () => {
     const result = filterLogs(logs, { level: LogLevel.INFO, module: 'api' });
-    expect(result.length).toBe(2); // WARN and ERROR from api
+    expect(result.length).toBe(2);
   });
 
   it('returns all with empty filter', () => {
@@ -271,11 +391,13 @@ describe('getLogStats', () => {
     const logs = [
       makeEntry({ module: 'a', occurrenceCount: 3 }),
       makeEntry({ module: 'b', occurrenceCount: 2 }),
+      makeEntry({ level: LogLevel.NONE, module: 'silent' }),
     ];
     const stats = getLogStats(logs);
-    expect(stats.total).toBe(5);
+    expect(stats.total).toBe(6);
     expect(stats.byModule['a']).toBe(3);
     expect(stats.byModule['b']).toBe(2);
+    expect(stats.byLevel.error).toBe(0);
   });
 });
 
@@ -351,5 +473,72 @@ describe('buildLogDiagnosticsBundle', () => {
     expect(bundle.summary.suppressedDuplicates).toBe(2);
     expect(bundle.filters).toEqual({ level: 'info' });
     expect(bundle.logs).toHaveLength(2);
+  });
+
+  it('detects the tauri runtime when the window flag is present', () => {
+    const originalTauri = (window as typeof window & { __TAURI__?: unknown }).__TAURI__;
+    Object.defineProperty(window, '__TAURI__', {
+      configurable: true,
+      value: {},
+    });
+
+    const bundle = buildLogDiagnosticsBundle([makeEntry()], { app: { version: '1.0.0' } });
+    expect(bundle.runtime.environment).toBe('tauri');
+    expect(bundle.app).toEqual({ version: '1.0.0' });
+
+    if (originalTauri === undefined) {
+      delete (window as typeof window & { __TAURI__?: unknown }).__TAURI__;
+    } else {
+      Object.defineProperty(window, '__TAURI__', {
+        configurable: true,
+        value: originalTauri,
+      });
+    }
+  });
+});
+
+describe('export helpers', () => {
+  const exportedLogs = [
+    makeEntry({
+      level: LogLevel.ERROR,
+      module: 'api',
+      message: 'request failed',
+      data: { token: 'abc123' },
+      stack: 'line 1\nline 2',
+      eventCode: 'REQ_FAIL',
+      operationId: 'op-9',
+      sessionId: 'sess-9',
+      occurrenceCount: 2,
+      firstTimestamp: new Date('2025-01-15T10:30:00.000Z'),
+      lastTimestamp: new Date('2025-01-15T10:31:00.000Z'),
+    }),
+  ];
+
+  it('exports logs as readable text', () => {
+    const text = exportLogsAsText(exportedLogs, {
+      app: { build: 'test' },
+      filters: { module: 'api' },
+    });
+
+    expect(text).toContain('SkyMap Application Logs');
+    expect(text).toContain('Runtime:');
+    expect(text).toContain('Event: REQ_FAIL');
+    expect(text).toContain('Correlation: operationId=op-9, sessionId=sess-9');
+    expect(text).toContain('Occurrences: 2');
+    expect(text).toContain('[REDACTED]');
+    expect(text).toContain('Stack:');
+  });
+
+  it('exports logs as structured JSON', () => {
+    const json = JSON.parse(exportLogsAsJson(exportedLogs, {
+      app: { build: 'test' },
+      filters: { module: 'api' },
+    }));
+
+    expect(json.bundleVersion).toBe('2.0');
+    expect(json.filters).toEqual({ module: 'api' });
+    expect(json.app).toEqual({ build: 'test' });
+    expect(json.logs[0].message).toBe('request failed');
+    expect(json.logs[0].data.token).toBe('[REDACTED]');
   });
 });

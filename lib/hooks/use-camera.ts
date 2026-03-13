@@ -25,6 +25,8 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('use-camera');
 export type FacingMode = CoreFacingMode;
 
+const VISIBILITY_RESUME_DEBOUNCE_MS = 180;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -269,6 +271,8 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
 
   const streamRef = useRef<MediaStream | null>(null);
   const shouldResumeOnVisibleRef = useRef(false);
+  const visibilityResumeTimerRef = useRef<number | null>(null);
+  const resumeInFlightRef = useRef(false);
   const lastStartOverridesRef = useRef<Partial<UseCameraOptions>>({});
   const profileLayersRef = useRef<UseCameraOptions['profileLayers']>(initialProfileLayers);
   const preferredDeviceRef = useRef<ARCameraPreferredDevice | null>(initialPreferredDevice);
@@ -320,6 +324,11 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
   }, [initialLastKnownGoodAcquisition]);
 
   const clearStream = useCallback((preserveResume = false) => {
+    if (visibilityResumeTimerRef.current !== null) {
+      window.clearTimeout(visibilityResumeTimerRef.current);
+      visibilityResumeTimerRef.current = null;
+    }
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -761,6 +770,7 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
+        resumeInFlightRef.current = false;
         if (streamRef.current) {
           clearStream(true);
         }
@@ -770,12 +780,33 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraReturn {
       if (!shouldResumeOnVisibleRef.current || streamRef.current || isLoading) {
         return;
       }
-      void start(lastStartOverridesRef.current);
+
+      if (visibilityResumeTimerRef.current !== null) {
+        window.clearTimeout(visibilityResumeTimerRef.current);
+      }
+
+      visibilityResumeTimerRef.current = window.setTimeout(() => {
+        visibilityResumeTimerRef.current = null;
+
+        if (resumeInFlightRef.current || streamRef.current || isLoading || !shouldResumeOnVisibleRef.current) {
+          return;
+        }
+
+        resumeInFlightRef.current = true;
+        void start(lastStartOverridesRef.current).finally(() => {
+          resumeInFlightRef.current = false;
+        });
+      }, VISIBILITY_RESUME_DEBOUNCE_MS);
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (visibilityResumeTimerRef.current !== null) {
+        window.clearTimeout(visibilityResumeTimerRef.current);
+        visibilityResumeTimerRef.current = null;
+      }
+      resumeInFlightRef.current = false;
     };
   }, [clearStream, isLoading, start]);
 

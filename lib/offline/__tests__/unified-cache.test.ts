@@ -82,6 +82,7 @@ const mockCaches = {
 Object.defineProperty(global, 'caches', {
   value: mockCaches,
   writable: true,
+  configurable: true,
 });
 
 // Mock navigator.storage
@@ -431,6 +432,135 @@ describe('UnifiedCacheManager', () => {
     });
   });
 
+  describe('fetch with networkFetcher option', () => {
+    it('uses custom networkFetcher instead of global fetch', async () => {
+      mockCache.match.mockResolvedValue(null);
+      const customFetcher = jest.fn().mockResolvedValue(new MockResponse('custom data', { status: 200 }));
+
+      await unifiedCache.fetch('/stellarium-data/test.json', { networkFetcher: customFetcher }, 'network-only');
+
+      expect(customFetcher).toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('fetch with cacheable option', () => {
+    it('caches non-matching URL when cacheable is true', async () => {
+      mockCache.match.mockResolvedValue(null);
+      mockFetch.mockResolvedValue(new MockResponse('data', { status: 200 }));
+
+      await unifiedCache.fetch('/random/non-matching.json', { cacheable: true }, 'cache-first');
+
+      // Even though URL doesn't match patterns, cacheable=true forces caching
+      expect(mockCache.put).toHaveBeenCalled();
+    });
+  });
+
+  describe('cache expiration handling', () => {
+    it('returns null and deletes expired cache entry', async () => {
+      const expiredResponse = new MockResponse('old data', {
+        status: 200,
+        headers: {
+          'x-cached-at': (Date.now() - 200000).toString(),  // 200s ago
+          'x-cache-ttl': '1000',  // 1s TTL — long expired
+        },
+      });
+      mockCache.match.mockResolvedValue(expiredResponse);
+      mockCache.delete.mockResolvedValue(true);
+      mockFetch.mockResolvedValue(new MockResponse('fresh data', { status: 200 }));
+
+      // cache-first: will check cache first, find expired, delete, then fetch from network
+      const response = await unifiedCache.fetch('/stellarium-data/test.json', {}, 'cache-first');
+      expect(response).toBeDefined();
+      // The expired entry should have been deleted
+      expect(mockCache.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('WebCacheProvider cleanup expired entries', () => {
+    it('deletes expired entries during cleanup', async () => {
+      const expiredRequest = { url: '/stellarium-data/expired.json' };
+      const validRequest = { url: '/stellarium-data/valid.json' };
+
+      mockCache.keys.mockResolvedValue([expiredRequest, validRequest] as unknown as Request[]);
+
+      const expiredResponse = new MockResponse('old', {
+        status: 200,
+        headers: {
+          'x-cached-at': (Date.now() - 200000).toString(),
+          'x-cache-ttl': '1000',
+        },
+      });
+      // Need headers.get to work
+      expiredResponse.headers = new Map([
+        ['x-cached-at', (Date.now() - 200000).toString()],
+        ['x-cache-ttl', '1000'],
+      ]);
+
+      const validResponse = new MockResponse('fresh', {
+        status: 200,
+        headers: {
+          'x-cached-at': Date.now().toString(),
+          'x-cache-ttl': '86400000',
+        },
+      });
+      validResponse.headers = new Map([
+        ['x-cached-at', Date.now().toString()],
+        ['x-cache-ttl', '86400000'],
+      ]);
+
+      mockCache.match
+        .mockResolvedValueOnce(expiredResponse)
+        .mockResolvedValueOnce(validResponse);
+      mockCache.delete.mockResolvedValue(true);
+
+      const deleted = await unifiedCache.cleanupExpired();
+      expect(deleted).toBe(1);
+      expect(mockCache.delete).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getProviderDiagnostics', () => {
+    it('returns unavailable when no caches API and not Tauri', () => {
+      // The test environment already mocks isTauri to false
+      // Remove caches to trigger unavailable
+      const originalCaches = global.caches;
+      const hadCaches = 'caches' in globalThis;
+      if (hadCaches) {
+        Reflect.deleteProperty(globalThis, 'caches');
+      }
+
+      expect('caches' in globalThis).toBe(false);
+
+      const diagnostics = unifiedCache.getProviderDiagnostics();
+      expect(diagnostics.providerId).toBe('unavailable');
+      expect(diagnostics.available).toBe(false);
+      expect(diagnostics.supportsPersistent).toBe(false);
+
+      // Restore
+      Object.defineProperty(global, 'caches', {
+        value: originalCaches,
+        writable: true,
+        configurable: true,
+      });
+    });
+  });
+
+  describe('cleanupExpired', () => {
+    it('delegates to provider cleanup', async () => {
+      // With web provider (non-Tauri), cleanup iterates cache entries
+      mockCache.keys.mockResolvedValue([]);
+      const deleted = await unifiedCache.cleanupExpired();
+      expect(typeof deleted).toBe('number');
+    });
+  });
+
+  describe('flush', () => {
+    it('delegates to provider flush (no-op for web)', async () => {
+      await expect(unifiedCache.flush()).resolves.toBeUndefined();
+    });
+  });
+
   describe('getCacheStats and resetCacheStats', () => {
     it('tracks cache hits and misses', async () => {
       // Reset stats first
@@ -670,6 +800,33 @@ describe('installFetchInterceptor caching behavior', () => {
 
     await global.fetch('/stellarium-data/test.json', { method: 'POST' });
     // POST should not be cached
+    expect(mockCache.put).not.toHaveBeenCalled();
+  });
+});
+
+describe('installFetchInterceptor .wasm bypass', () => {
+  const savedFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = savedFetch;
+  });
+
+  it('passes .wasm URLs through without caching', async () => {
+    const origFn = jest.fn().mockResolvedValue(new MockResponse('wasm-data', { status: 200 }));
+    global.fetch = origFn;
+    let isolatedInstallFetchInterceptor!: typeof installFetchInterceptor;
+
+    jest.isolateModules(() => {
+      const isolatedModule = jest.requireActual('../unified-cache') as typeof import('../unified-cache');
+      isolatedInstallFetchInterceptor = isolatedModule.installFetchInterceptor;
+    });
+
+    isolatedInstallFetchInterceptor('cache-first');
+
+    const response = await global.fetch('/stellarium-js/engine.wasm');
+    expect(response).toBeDefined();
+    // .wasm should use original fetch directly, not go through cache
+    expect(origFn).toHaveBeenCalledWith('/stellarium-js/engine.wasm', undefined);
     expect(mockCache.put).not.toHaveBeenCalled();
   });
 });

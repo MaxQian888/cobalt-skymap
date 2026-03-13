@@ -6,17 +6,26 @@ import type {
   ProfileInfo,
   MountConnectionConfig,
   MountCapabilities,
+  MountActionAvailability,
+  MountCapabilitySnapshot,
+  SupportedMountDevice,
 } from '@/lib/core/types';
 import {
   type MountSafetyConfig,
   DEFAULT_MOUNT_SAFETY_CONFIG,
 } from '@/lib/astronomy/mount-safety';
+import {
+  BUILT_IN_SIMULATOR_MOUNT_ID,
+  createMountActionAvailability,
+  createSimulatorMountDevice,
+} from '@/lib/core/mount-support';
 
 export const DEFAULT_CONNECTION_CONFIG: MountConnectionConfig = {
   protocol: 'simulator',
   host: 'localhost',
   port: 11111,
   deviceId: 0,
+  selectedDeviceId: BUILT_IN_SIMULATOR_MOUNT_ID,
 };
 
 const DEFAULT_CAPABILITIES: MountCapabilities = {
@@ -38,6 +47,9 @@ interface MountStoreState {
   sequenceRunning: boolean;
   currentTab: string;
   safetyConfig: MountSafetyConfig;
+  selectedDevice: SupportedMountDevice | null;
+  capabilitySnapshot: MountCapabilitySnapshot | null;
+  actionAvailability: MountActionAvailability;
 
   // Connection & capabilities
   connectionConfig: MountConnectionConfig;
@@ -56,6 +68,8 @@ interface MountStoreState {
   // New actions
   setConnectionConfig: (config: Partial<MountConnectionConfig>) => void;
   setCapabilities: (caps: MountCapabilities) => void;
+  setSelectedDevice: (device: SupportedMountDevice | null) => void;
+  setCapabilitySnapshot: (snapshot: MountCapabilitySnapshot | null) => void;
 
   /** Batch-update mount info from a polling state snapshot */
   applyMountState: (state: {
@@ -95,6 +109,12 @@ export const useMountStore = create<MountStoreState>()(
       sequenceRunning: false,
       currentTab: 'showSlew',
       safetyConfig: { ...DEFAULT_MOUNT_SAFETY_CONFIG },
+      selectedDevice: createSimulatorMountDevice(),
+      capabilitySnapshot: null,
+      actionAvailability: createMountActionAvailability({
+        connected: false,
+        capabilities: DEFAULT_CAPABILITIES,
+      }),
       connectionConfig: { ...DEFAULT_CONNECTION_CONFIG },
       capabilities: { ...DEFAULT_CAPABILITIES },
       
@@ -139,9 +159,31 @@ export const useMountStore = create<MountStoreState>()(
         connectionConfig: { ...state.connectionConfig, ...config },
       })),
 
-      setCapabilities: (caps) => set({ capabilities: caps }),
+      setCapabilities: (caps) => set((state) => ({
+        capabilities: caps,
+        capabilitySnapshot: {
+          ...caps,
+          capturedAt: new Date().toISOString(),
+        },
+        actionAvailability: createMountActionAvailability({
+          connected: state.mountInfo.Connected,
+          capabilities: caps,
+          parked: state.mountInfo.Parked,
+          slewing: state.mountInfo.Slewing,
+        }),
+      })),
 
-      applyMountState: (s) => set({
+      setSelectedDevice: (selectedDevice) => set((state) => ({
+        selectedDevice,
+        connectionConfig: {
+          ...state.connectionConfig,
+          selectedDeviceId: selectedDevice?.id ?? null,
+        },
+      })),
+
+      setCapabilitySnapshot: (capabilitySnapshot) => set({ capabilitySnapshot }),
+
+      applyMountState: (s) => set((state) => ({
         mountInfo: {
           Connected: s.connected,
           Coordinates: { RADegrees: s.ra, Dec: s.dec },
@@ -153,20 +195,32 @@ export const useMountStore = create<MountStoreState>()(
           PierSide: s.pierSide,
           SlewRateIndex: s.slewRateIndex,
         },
-      }),
+        actionAvailability: createMountActionAvailability({
+          connected: s.connected,
+          capabilities: state.capabilities,
+          parked: s.parked,
+          slewing: s.slewing,
+        }),
+      })),
 
-      resetMountInfo: () => set({
+      resetMountInfo: () => set((state) => ({
         mountInfo: {
           Connected: false,
           Coordinates: { RADegrees: 0, Dec: 0 },
         },
         capabilities: { ...DEFAULT_CAPABILITIES },
-      }),
+        actionAvailability: createMountActionAvailability({
+          connected: false,
+          capabilities: DEFAULT_CAPABILITIES,
+        }),
+        selectedDevice: state.selectedDevice,
+        capabilitySnapshot: state.capabilitySnapshot,
+      })),
     }),
     {
       name: 'starmap-mount',
       storage: getZustandStorage(),
-      version: 1, // v1: persist profileInfo
+      version: 2, // v1: persist profileInfo, v2: persist supported mount metadata
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<MountStoreState>;
         if (version < 1) {
@@ -174,12 +228,31 @@ export const useMountStore = create<MountStoreState>()(
           // (or defaults) so the bootstrap in useObserverSync can handle migration.
           return { ...state };
         }
+        if (version < 2) {
+          return {
+            ...state,
+            connectionConfig: {
+              ...DEFAULT_CONNECTION_CONFIG,
+              ...state.connectionConfig,
+              selectedDeviceId: state.connectionConfig?.selectedDeviceId ?? BUILT_IN_SIMULATOR_MOUNT_ID,
+            },
+            selectedDevice: state.selectedDevice ?? createSimulatorMountDevice(),
+            capabilitySnapshot: state.capabilitySnapshot ?? null,
+            actionAvailability: state.actionAvailability ?? createMountActionAvailability({
+              connected: false,
+              capabilities: DEFAULT_CAPABILITIES,
+            }),
+          } as MountStoreState;
+        }
         return state as MountStoreState;
       },
       partialize: (state) => ({
         profileInfo: state.profileInfo,
         safetyConfig: state.safetyConfig,
         connectionConfig: state.connectionConfig,
+        selectedDevice: state.selectedDevice,
+        capabilitySnapshot: state.capabilitySnapshot,
+        actionAvailability: state.actionAvailability,
       }),
     }
   )

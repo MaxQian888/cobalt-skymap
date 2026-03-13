@@ -52,10 +52,9 @@ pub fn initialize_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     state.set_initialized(false);
     state.set_positioning_ready(false);
 
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .ok_or_else(|| "Default window icon is not available for tray initialization".to_string())?;
+    let icon = app.default_window_icon().cloned().ok_or_else(|| {
+        "Default window icon is not available for tray initialization".to_string()
+    })?;
 
     let menu = Menu::new(app).map_err(|error| format!("Failed to create tray menu: {error}"))?;
 
@@ -125,7 +124,9 @@ pub fn quit_app<R: Runtime>(app: AppHandle<R>, exit_code: Option<i32>) {
 pub async fn reload_webview<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     log::info!("Reloading webview...");
     if let Some(window) = app.get_webview_window("main") {
-        window.eval("window.location.reload()").map_err(|e| format!("Failed to reload: {}", e))?;
+        window
+            .eval("window.location.reload()")
+            .map_err(|e| format!("Failed to reload: {}", e))?;
         Ok(())
     } else {
         Err("Main window not found".to_string())

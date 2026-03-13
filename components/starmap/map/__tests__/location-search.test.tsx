@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import * as nextIntl from 'next-intl';
 
 // Mock geocoding service
 jest.mock('@/lib/services/geocoding-service', () => ({
@@ -167,6 +168,32 @@ describe('LocationSearch', () => {
       render(<LocationSearch onLocationSelect={mockOnLocationSelect} disabled />);
       expect(screen.getByTestId('search-input')).toBeDisabled();
     });
+
+    it('renders fallback labels when translations return empty strings', async () => {
+      const nextIntlMock = jest.requireMock('next-intl') as typeof nextIntl;
+      const originalUseTranslations = nextIntlMock.useTranslations;
+      Object.defineProperty(nextIntlMock, 'useTranslations', {
+        configurable: true,
+        value: () => (((_key: string) => '') as ReturnType<typeof nextIntl.useTranslations>),
+      });
+
+      try {
+        render(<LocationSearch onLocationSelect={mockOnLocationSelect} />);
+
+        expect(screen.getByPlaceholderText('Search for a location...')).toBeInTheDocument();
+
+        fireEvent.focus(screen.getByTestId('search-input'));
+
+        await waitFor(() => {
+          expect(screen.getByText('Current Location')).toBeInTheDocument();
+        });
+      } finally {
+        Object.defineProperty(nextIntlMock, 'useTranslations', {
+          configurable: true,
+          value: originalUseTranslations,
+        });
+      }
+    });
   });
 
   describe('Search Functionality', () => {
@@ -285,6 +312,27 @@ describe('LocationSearch', () => {
       await waitFor(() => {
         expect(mockGeocode).toHaveBeenCalled();
       });
+    });
+
+    it('ignores aborted searches without logging an error', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      mockGeocode.mockRejectedValue(abortError);
+
+      render(<LocationSearch onLocationSelect={mockOnLocationSelect} />);
+
+      const input = screen.getByTestId('search-input');
+      fireEvent.change(input, { target: { value: 'Tokyo' } });
+
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(mockGeocode).toHaveBeenCalled();
+      });
+
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -816,6 +864,53 @@ describe('LocationSearch', () => {
             coordinates: { latitude: 35.6762, longitude: 139.6503 },
           })
         );
+      });
+    });
+
+    it('shows timeout message when current location request times out', async () => {
+      mockAcquireCurrentLocation.mockResolvedValue({
+        status: 'timeout',
+        source: 'browser',
+        message: 'Timed out',
+      });
+
+      render(<LocationSearch onLocationSelect={mockOnLocationSelect} showCurrentLocation />);
+
+      fireEvent.focus(screen.getByTestId('search-input'));
+      fireEvent.click(screen.getByText(/map\.currentLocation|Current Location/));
+
+      await waitFor(() => {
+        expect(screen.getByText(/map\.locationTimedOut|Location request timed out/)).toBeInTheDocument();
+      });
+    });
+
+    it('shows unavailable message when geolocation is unavailable', async () => {
+      mockAcquireCurrentLocation.mockResolvedValue({
+        status: 'unavailable',
+        source: 'browser',
+        message: 'Unavailable',
+      });
+
+      render(<LocationSearch onLocationSelect={mockOnLocationSelect} showCurrentLocation />);
+
+      fireEvent.focus(screen.getByTestId('search-input'));
+      fireEvent.click(screen.getByText(/map\.currentLocation|Current Location/));
+
+      await waitFor(() => {
+        expect(screen.getByText(/map\.geolocationNotSupported|Geolocation not supported/)).toBeInTheDocument();
+      });
+    });
+
+    it('shows failed message when current location processing rejects', async () => {
+      mockAcquireCurrentLocation.mockRejectedValue(new Error('Acquisition failed'));
+
+      render(<LocationSearch onLocationSelect={mockOnLocationSelect} showCurrentLocation />);
+
+      fireEvent.focus(screen.getByTestId('search-input'));
+      fireEvent.click(screen.getByText(/map\.currentLocation|Current Location/));
+
+      await waitFor(() => {
+        expect(screen.getByText(/map\.locationRequestFailed|Failed to get current location/)).toBeInTheDocument();
       });
     });
   });

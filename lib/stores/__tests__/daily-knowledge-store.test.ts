@@ -69,6 +69,17 @@ const baseResult = {
     languageStatus: 'native' as const,
     fetchedAt: Date.now(),
   },
+  sourceStatuses: [
+    {
+      source: 'nasa-image-library' as const,
+      transport: 'api' as const,
+      state: 'ready' as const,
+      reason: 'success' as const,
+      itemCount: 1,
+    },
+  ],
+  usedCuratedFallback: false,
+  fallbackReason: null,
 };
 
 function resetDailyStore() {
@@ -85,6 +96,9 @@ function resetDailyStore() {
     error: null,
     currentItem: null,
     items: [],
+    sourceStatuses: [],
+    usedCuratedFallback: false,
+    fallbackReason: null,
     filters: {
       query: '',
       category: 'all',
@@ -183,6 +197,7 @@ describe('daily-knowledge-store', () => {
     expect(state.currentItem?.id).toBe('curated-andromeda-distance');
     expect(state.lastShownDate).toBe(getLocalDateKey());
     expect(state.history[0].entry).toBe('auto');
+    expect(state.sourceStatuses).toEqual(baseResult.sourceStatuses);
   });
 
   it('passes recent history IDs for repeat-avoidance selection', async () => {

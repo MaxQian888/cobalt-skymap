@@ -4,16 +4,17 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ThemeToggle } from '../theme-toggle';
+import { ThemeIconToggle, ThemeToggle } from '../theme-toggle';
 import { NextIntlClientProvider } from 'next-intl';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Mock next-themes
 const mockSetTheme = jest.fn();
+let mockTheme = 'light';
 let mockResolvedTheme = 'light';
 jest.mock('next-themes', () => ({
   useTheme: () => ({
-    theme: 'light',
+    theme: mockTheme,
     setTheme: mockSetTheme,
     resolvedTheme: mockResolvedTheme,
   }),
@@ -45,6 +46,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe('ThemeToggle', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTheme = 'light';
     mockResolvedTheme = 'light';
   });
 
@@ -57,6 +59,12 @@ describe('ThemeToggle', () => {
     renderWithProviders(<ThemeToggle variant="icon" />);
     const button = screen.getByRole('button');
     expect(button).toBeInTheDocument();
+  });
+
+  it('renders ThemeIconToggle as an icon button wrapper', () => {
+    renderWithProviders(<ThemeIconToggle className="custom-toggle" />);
+
+    expect(screen.getByRole('button')).toHaveClass('custom-toggle');
   });
 
   it('toggles theme when icon variant is clicked', () => {
@@ -95,6 +103,38 @@ describe('ThemeToggle', () => {
     const items = screen.getAllByRole('menuitem');
     await user.click(items[0]); // Light mode
     expect(mockSetTheme).toHaveBeenCalledWith('light');
+  });
+
+  it('calls the dark and system menu actions and reflects the active state', async () => {
+    const user = userEvent.setup();
+    mockTheme = 'system';
+
+    const { rerender } = renderWithProviders(<ThemeToggle variant="dropdown" />);
+    await user.click(screen.getByRole('button'));
+
+    let items = screen.getAllByRole('menuitem');
+    expect(items[2]).toHaveClass('bg-accent');
+
+    await user.click(items[1]);
+    expect(mockSetTheme).toHaveBeenCalledWith('dark');
+
+    await user.click(screen.getByRole('button'));
+    items = screen.getAllByRole('menuitem');
+    await user.click(items[2]);
+    expect(mockSetTheme).toHaveBeenCalledWith('system');
+
+    mockTheme = 'dark';
+    rerender(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <TooltipProvider>
+          <ThemeToggle variant="dropdown" />
+        </TooltipProvider>
+      </NextIntlClientProvider>
+    );
+
+    await user.click(screen.getByRole('button'));
+    items = screen.getAllByRole('menuitem');
+    expect(items[1]).toHaveClass('bg-accent');
   });
 
   it('dropdown shows exactly 3 theme options', async () => {

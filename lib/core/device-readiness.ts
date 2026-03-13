@@ -23,6 +23,8 @@ export const DEFAULT_CONNECTION_REQUIRED_DEVICE_TYPES: DeviceType[] = [
   'mount',
 ];
 
+const OPTIONAL_MOUNT_ACTION_KEYS = ['sync', 'park', 'trackingRate', 'moveAxis'] as const;
+
 function createIssue(
   issue: Omit<DeviceReadinessIssue, 'level'> & { level: 'blocked' | 'warning' },
 ): DeviceReadinessIssue {
@@ -125,6 +127,23 @@ export function evaluateDeviceReadiness({
           ?? `${primaryProfile.name} is in degraded state.`,
         remediation: 'Continue with caution or reconnect for full functionality.',
       }));
+    }
+
+    if (type === 'mount' && primaryProfile.type === 'mount') {
+      const unavailableOptionalActions = OPTIONAL_MOUNT_ACTION_KEYS.filter((key) => (
+        primaryProfile.metadata.actionAvailability?.[key] === false
+      ));
+
+      if (unavailableOptionalActions.length > 0) {
+        issues.push(createIssue({
+          code: 'mount-capability-limited',
+          level: 'warning',
+          type,
+          profileId: primaryProfile.id,
+          message: `${primaryProfile.name} has limited optional controls: ${unavailableOptionalActions.join(', ')}.`,
+          remediation: 'Continue with caution or reconnect to refresh supported mount capabilities.',
+        }));
+      }
     }
   }
 

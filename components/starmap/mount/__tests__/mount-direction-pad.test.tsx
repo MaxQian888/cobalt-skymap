@@ -14,6 +14,9 @@ let mountState = {
   capabilities: {
     canMoveAxis: true,
   },
+  actionAvailability: {
+    moveAxis: true,
+  },
 };
 
 const mockSetMountInfo = jest.fn();
@@ -88,6 +91,7 @@ describe('MountDirectionPad', () => {
     mountState = {
       mountInfo: { Connected: true, SlewRateIndex: 1, Parked: false },
       capabilities: { canMoveAxis: true },
+      actionAvailability: { moveAxis: true },
     };
   });
 
@@ -252,6 +256,17 @@ describe('MountDirectionPad', () => {
 
   it('does not call moveAxis when canMoveAxis is false', async () => {
     mountState.capabilities.canMoveAxis = false;
+    const { getByLabelText } = render(<MountDirectionPad />);
+    const northBtn = getByLabelText('north');
+
+    await act(async () => {
+      fireEvent.pointerDown(northBtn);
+    });
+    expect(mockMoveAxis).not.toHaveBeenCalled();
+  });
+
+  it('does not call moveAxis when shared action availability disables axis motion', async () => {
+    mountState.actionAvailability.moveAxis = false;
     const { getByLabelText } = render(<MountDirectionPad />);
     const northBtn = getByLabelText('north');
 

@@ -136,21 +136,33 @@ mod tests {
     fn test_format_ra_hms() {
         // 0° = 00h 00m 00s
         assert!(format_ra_hms(0.0).starts_with("00h 00m"));
-        
+
         // 180° = 12h
         let ra_12h = format_ra_hms(180.0);
-        assert!(ra_12h.starts_with("12h 00m"), "180° should be 12h, got {}", ra_12h);
+        assert!(
+            ra_12h.starts_with("12h 00m"),
+            "180° should be 12h, got {}",
+            ra_12h
+        );
     }
 
     #[test]
     fn test_format_dec_dms() {
         // 0° = +0°
         let dec_0 = format_dec_dms(0.0);
-        assert!(dec_0.starts_with("+0°"), "0° should start with +0°, got {}", dec_0);
-        
+        assert!(
+            dec_0.starts_with("+0°"),
+            "0° should start with +0°, got {}",
+            dec_0
+        );
+
         // -45° should have negative sign
         let dec_neg = format_dec_dms(-45.0);
-        assert!(dec_neg.starts_with("-45°"), "-45° should start with -45°, got {}", dec_neg);
+        assert!(
+            dec_neg.starts_with("-45°"),
+            "-45° should start with -45°, got {}",
+            dec_neg
+        );
     }
 
     #[test]
@@ -159,7 +171,11 @@ mod tests {
         assert!(result.is_ok());
         let ra = result.unwrap();
         // 12h 30m 45s = (12 + 30/60 + 45/3600) * 15 ≈ 187.6875°
-        assert!(approx_eq(ra, 187.6875, 0.01), "Parsed RA should be ~187.69°, got {}", ra);
+        assert!(
+            approx_eq(ra, 187.6875, 0.01),
+            "Parsed RA should be ~187.69°, got {}",
+            ra
+        );
     }
 
     #[test]
@@ -174,7 +190,11 @@ mod tests {
         let result = parse_dec_dms("+45° 30' 00\"".to_string());
         assert!(result.is_ok());
         let dec = result.unwrap();
-        assert!(approx_eq(dec, 45.5, 0.01), "Parsed Dec should be ~45.5°, got {}", dec);
+        assert!(
+            approx_eq(dec, 45.5, 0.01),
+            "Parsed Dec should be ~45.5°, got {}",
+            dec
+        );
     }
 
     #[test]
@@ -183,6 +203,10 @@ mod tests {
         assert!(result.is_ok());
         let dec = result.unwrap();
         // -30° 15' 30" = -(30 + 15/60 + 30/3600) ≈ -30.2583°
-        assert!(approx_eq(dec, -30.2583, 0.01), "Parsed Dec should be ~-30.26°, got {}", dec);
+        assert!(
+            approx_eq(dec, -30.2583, 0.01),
+            "Parsed Dec should be ~-30.26°, got {}",
+            dec
+        );
     }
 }

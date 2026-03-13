@@ -63,6 +63,24 @@ function makeDraft(overrides?: Partial<SessionDraftV2>): SessionDraftV2 {
   };
 }
 
+function makeGuideContext() {
+  return {
+    kind: 'messier-marathon' as const,
+    sessionId: 'marathon-1',
+    readiness: 'recommended' as const,
+    mode: 'full' as const,
+    checkpointOrder: ['m74', 'm42'],
+    criticalCheckpointIds: ['m74'],
+    stageByTargetId: {
+      m74: 'dusk' as const,
+      m42: 'early-evening' as const,
+    },
+    sourceListId: 'list-1',
+    sourcePlanId: 'plan-1',
+    sourceExecutionId: 'execution-1',
+  };
+}
+
 function makeExecutionPlanInput(name = 'Execution Plan') {
   return {
     ...makePlanInput(name),
@@ -312,6 +330,17 @@ describe('useSessionPlanStore', () => {
       expect(plan.weatherSnapshot?.cloudCover).toBe(20);
       expect(plan.notes).toBe('Test notes');
     });
+
+    it('should persist guide metadata for guide-seeded drafts', () => {
+      const guideContext = makeGuideContext();
+      const draft = makeDraft({
+        guideContext,
+      });
+
+      act(() => { useSessionPlanStore.getState().importPlanV2(draft, 'Guide Plan'); });
+
+      expect(useSessionPlanStore.getState().savedPlans[0].guideContext).toEqual(guideContext);
+    });
   });
 
   describe('execution workflow', () => {
@@ -338,6 +367,29 @@ describe('useSessionPlanStore', () => {
       expect(state.executions[0].sourcePlanId).toBe(planId);
       expect(state.executions[0].targets[0].status).toBe('planned');
       expect(state.executions[0].targets[0].scheduledDurationMinutes).toBe(90);
+    });
+
+    it('should carry guide metadata into execution state', () => {
+      const planInput = {
+        ...makeExecutionPlanInput(),
+        guideContext: makeGuideContext(),
+      };
+      let planId = '';
+      act(() => {
+        planId = useSessionPlanStore.getState().savePlan(planInput);
+      });
+
+      const saved = useSessionPlanStore.getState().getPlanById(planId);
+      let executionId = '';
+      act(() => {
+        executionId = useSessionPlanStore.getState().createExecutionFromPlan(saved!, {
+          locationId: 'loc-1',
+          locationName: 'Backyard',
+        });
+      });
+
+      const execution = useSessionPlanStore.getState().getExecutionById(executionId);
+      expect(execution?.guideContext).toEqual(planInput.guideContext);
     });
 
     it('should attach an observation id to the matching execution target', () => {
@@ -460,6 +512,20 @@ describe('useSessionPlanStore', () => {
       expect(savedDraft.manualEdits).toHaveLength(1);
     });
 
+    it('should preserve guide metadata in template round-trips', () => {
+      const guideContext = makeGuideContext();
+      const draft = makeDraft({
+        guideContext,
+      });
+
+      let templateId = '';
+      act(() => {
+        templateId = useSessionPlanStore.getState().saveTemplate({ name: 'Guide Template', draft });
+      });
+
+      expect(useSessionPlanStore.getState().loadTemplate(templateId)?.draft.guideContext).toEqual(guideContext);
+    });
+
     it('should enforce MAX_SAVED_TEMPLATES (50)', () => {
       const draft = makeDraft();
       act(() => {
@@ -530,6 +596,7 @@ describe('useSessionPlanStore', () => {
           totalImagingTime: 0,
           nightCoverage: 0,
           efficiency: 0,
+          guideContext: makeGuideContext(),
         }],
         templates: [{
           id: 'tpl-legacy',
@@ -545,6 +612,7 @@ describe('useSessionPlanStore', () => {
             },
             excludedTargetIds: [],
             manualEdits: [],
+            guideContext: makeGuideContext(),
           },
         }],
         executions: [],
@@ -555,7 +623,9 @@ describe('useSessionPlanStore', () => {
       const next = migrated as Partial<SessionPlanState>;
       expect(next.savedPlans?.[0].constraints).toBeDefined();
       expect(next.savedPlans?.[0].minImagingTime).toBeGreaterThanOrEqual(1);
+      expect(next.savedPlans?.[0].guideContext).toEqual(makeGuideContext());
       expect(next.templates?.[0].draft.planDate).toContain('T');
+      expect(next.templates?.[0].draft.guideContext).toEqual(makeGuideContext());
     });
   });
 });

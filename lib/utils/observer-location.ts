@@ -1,8 +1,8 @@
 /**
- * Observer Location Utilities
+ * Legacy observer-location utilities
  *
- * Pure functions for loading, saving, and validating observer location data
- * used by the setup wizard's location step.
+ * Legacy localStorage helpers used for migration of older setup/onboarding
+ * location data into the canonical observation-site workflow.
  */
 
 import type { ObserverLocation } from '@/types/starmap/setup-wizard';
@@ -28,6 +28,18 @@ export function saveLocation(location: ObserverLocation): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(location));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Clear legacy observer location storage after migration.
+ */
+export function clearStoredLocation(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(LOCATION_STORAGE_KEY);
   } catch {
     // Ignore storage errors
   }

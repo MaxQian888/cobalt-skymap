@@ -1,4 +1,7 @@
 export const DAILY_KNOWLEDGE_APOD_URL = 'https://api.nasa.gov/planetary/apod';
+export const NASA_IMAGE_LIBRARY_SEARCH_URL = 'https://images-api.nasa.gov/search';
+export const NASA_PHOTOJOURNAL_FEED_URL = 'https://science.nasa.gov/feed/photojournal/gallery/universe/';
+export const ESA_SCIENCE_FEED_URL = 'https://www.esa.int/rssfeed/Our_Activities/Space_Science';
 export const DAILY_KNOWLEDGE_WIKI_BASE_URLS = {
   en: 'https://en.wikipedia.org',
   zh: 'https://zh.wikipedia.org',
@@ -8,6 +11,9 @@ export const DAILY_KNOWLEDGE_WIKI_PAGE_PATH = '/w/rest.php/v1/page';
 
 export const APOD_TTL_MS = 24 * 60 * 60 * 1000;
 export const WIKIMEDIA_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const NASA_IMAGE_LIBRARY_TTL_MS = 12 * 60 * 60 * 1000;
+export const NASA_PHOTOJOURNAL_TTL_MS = 6 * 60 * 60 * 1000;
+export const ESA_SCIENCE_TTL_MS = 6 * 60 * 60 * 1000;
 export const DAILY_KNOWLEDGE_AGGREGATED_TTL_FALLBACK_MS = 24 * 60 * 60 * 1000;
 export const HISTORY_LIMIT = 120;
 export const DAILY_KNOWLEDGE_REPEAT_WINDOW_DAYS = 7;
@@ -24,3 +30,9 @@ export const WIKIMEDIA_MIN_REQUEST_INTERVAL_MS = 250;
 export const DAILY_KNOWLEDGE_USER_AGENT = 'SkyMap/0.1.0 (daily-knowledge; contact: skymap-app)';
 export const APOD_REQUEST_TIMEOUT_MS = 10_000;
 export const WIKIMEDIA_REQUEST_TIMEOUT_MS = 10_000;
+export const NASA_IMAGE_LIBRARY_REQUEST_TIMEOUT_MS = 10_000;
+export const NASA_PHOTOJOURNAL_REQUEST_TIMEOUT_MS = 10_000;
+export const ESA_SCIENCE_REQUEST_TIMEOUT_MS = 10_000;
+export const NASA_PHOTOJOURNAL_FRESHNESS_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
+export const ESA_SCIENCE_FRESHNESS_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
+export const DAILY_KNOWLEDGE_SOURCE_FETCH_CONCURRENCY = 2;

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getZustandStorage } from '@/lib/storage';
 import { type GridType, type EyepiecePreset, type BarlowPreset, type OcularTelescopePreset } from '@/lib/constants/equipment-presets';
+import { clampFramePlacement, type FramePlacement } from '@/lib/astronomy/fov-calculations';
 
 // Re-export GridType for backward compatibility
 export type { GridType } from '@/lib/constants/equipment-presets';
@@ -93,6 +94,7 @@ export interface OcularDisplaySettings {
 }
 
 export type FOVSimulatorTab = 'camera' | 'optics' | 'mosaic' | 'display';
+export type FOVInputMode = 'manual' | 'active-equipment';
 
 export interface FOVSetup {
   id: string;
@@ -148,6 +150,9 @@ interface EquipmentState {
   fovSetups: FOVSetup[];
   selectedFovSetupId: string | null;
   fovSimulatorLastTab: FOVSimulatorTab;
+  fovInputMode: FOVInputMode;
+  selectedBarlowReducerId: string | null;
+  framePlacement: FramePlacement;
   
   // Actions - Equipment selection
   setActiveCamera: (id: string | null) => void;
@@ -191,6 +196,10 @@ interface EquipmentState {
   removeFovSetup: (id: string) => void;
   setSelectedFovSetupId: (id: string | null) => void;
   setFovSimulatorLastTab: (tab: FOVSimulatorTab) => void;
+  setFovInputMode: (mode: FOVInputMode) => void;
+  setSelectedBarlowReducerId: (id: string | null) => void;
+  setFramePlacement: (placement: FramePlacement) => void;
+  resetFramePlacement: () => void;
   
   // Actions - Exposure Defaults
   setExposureDefaults: (defaults: Partial<ExposureDefaults>) => void;
@@ -274,6 +283,8 @@ const DEFAULT_OCULAR_DISPLAY: OcularDisplaySettings = {
 };
 
 const DEFAULT_FOV_SIMULATOR_TAB: FOVSimulatorTab = 'camera';
+const DEFAULT_FOV_INPUT_MODE: FOVInputMode = 'manual';
+const DEFAULT_FRAME_PLACEMENT: FramePlacement = { x: 0, y: 0 };
 
 const DEFAULT_EXPOSURE: ExposureDefaults = {
   exposureTime: 120,
@@ -332,6 +343,9 @@ export const useEquipmentStore = create<EquipmentState>()(
       fovSetups: [],
       selectedFovSetupId: null,
       fovSimulatorLastTab: DEFAULT_FOV_SIMULATOR_TAB,
+      fovInputMode: DEFAULT_FOV_INPUT_MODE,
+      selectedBarlowReducerId: null,
+      framePlacement: DEFAULT_FRAME_PLACEMENT,
       
       // Ocular simulator selection (persisted)
       selectedOcularTelescopeId: 't1',
@@ -346,11 +360,11 @@ export const useEquipmentStore = create<EquipmentState>()(
       setActiveTelescope: (id) => set({ activeTelescopeId: id }),
       
       // Manual settings
-      setSensorWidth: (sensorWidth) => set({ sensorWidth, activeCameraId: null }),
-      setSensorHeight: (sensorHeight) => set({ sensorHeight, activeCameraId: null }),
-      setFocalLength: (focalLength) => set({ focalLength, activeTelescopeId: null }),
-      setPixelSize: (pixelSize) => set({ pixelSize, activeCameraId: null }),
-      setAperture: (aperture) => set({ aperture, activeTelescopeId: null }),
+      setSensorWidth: (sensorWidth) => set({ sensorWidth, activeCameraId: null, fovInputMode: DEFAULT_FOV_INPUT_MODE }),
+      setSensorHeight: (sensorHeight) => set({ sensorHeight, activeCameraId: null, fovInputMode: DEFAULT_FOV_INPUT_MODE }),
+      setFocalLength: (focalLength) => set({ focalLength, activeTelescopeId: null, fovInputMode: DEFAULT_FOV_INPUT_MODE }),
+      setPixelSize: (pixelSize) => set({ pixelSize, activeCameraId: null, fovInputMode: DEFAULT_FOV_INPUT_MODE }),
+      setAperture: (aperture) => set({ aperture, activeTelescopeId: null, fovInputMode: DEFAULT_FOV_INPUT_MODE }),
       setRotationAngle: (rotationAngle) => set({ rotationAngle }),
       
       // Batch update
@@ -359,12 +373,14 @@ export const useEquipmentStore = create<EquipmentState>()(
         sensorHeight: settings.sensorHeight ?? state.sensorHeight,
         pixelSize: settings.pixelSize ?? state.pixelSize,
         activeCameraId: null,
+        fovInputMode: DEFAULT_FOV_INPUT_MODE,
       })),
       
       setTelescopeSettings: (settings) => set((state) => ({
         focalLength: settings.focalLength ?? state.focalLength,
         aperture: settings.aperture ?? state.aperture,
         activeTelescopeId: null,
+        fovInputMode: DEFAULT_FOV_INPUT_MODE,
       })),
       
       // Mosaic
@@ -439,6 +455,8 @@ export const useEquipmentStore = create<EquipmentState>()(
           rotationAngle: setup.rotationAngle,
           mosaic: { ...setup.mosaic },
           fovDisplay: { ...setup.fovDisplay },
+          fovInputMode: DEFAULT_FOV_INPUT_MODE,
+          selectedBarlowReducerId: null,
         };
       }),
       renameFovSetup: (id, name) => {
@@ -459,6 +477,10 @@ export const useEquipmentStore = create<EquipmentState>()(
       })),
       setSelectedFovSetupId: (id) => set({ selectedFovSetupId: id }),
       setFovSimulatorLastTab: (fovSimulatorLastTab) => set({ fovSimulatorLastTab }),
+      setFovInputMode: (fovInputMode) => set({ fovInputMode }),
+      setSelectedBarlowReducerId: (selectedBarlowReducerId) => set({ selectedBarlowReducerId }),
+      setFramePlacement: (framePlacement) => set({ framePlacement: clampFramePlacement(framePlacement) }),
+      resetFramePlacement: () => set({ framePlacement: DEFAULT_FRAME_PLACEMENT }),
       
       // Exposure Defaults
       setExposureDefaults: (defaults) => set((state) => ({
@@ -580,6 +602,9 @@ export const useEquipmentStore = create<EquipmentState>()(
         exposureDefaults: DEFAULT_EXPOSURE,
         selectedFovSetupId: null,
         fovSimulatorLastTab: DEFAULT_FOV_SIMULATOR_TAB,
+        fovInputMode: DEFAULT_FOV_INPUT_MODE,
+        selectedBarlowReducerId: null,
+        framePlacement: DEFAULT_FRAME_PLACEMENT,
       }),
       
       // Computed values
@@ -633,7 +658,7 @@ export const useEquipmentStore = create<EquipmentState>()(
     {
       name: 'starmap-equipment',
       storage: getZustandStorage(),
-      version: 4,
+      version: 5,
       migrate: (persistedState) => {
         if (!persistedState || typeof persistedState !== 'object') {
           return persistedState;
@@ -656,6 +681,19 @@ export const useEquipmentStore = create<EquipmentState>()(
         )
           ? state.fovSimulatorLastTab
           : DEFAULT_FOV_SIMULATOR_TAB;
+        const fovInputMode = state.fovInputMode === 'active-equipment'
+          ? 'active-equipment'
+          : DEFAULT_FOV_INPUT_MODE;
+        const selectedBarlowReducerId = typeof state.selectedBarlowReducerId === 'string'
+          ? state.selectedBarlowReducerId
+          : null;
+        const rawFramePlacement = (state.framePlacement && typeof state.framePlacement === 'object')
+          ? (state.framePlacement as Partial<FramePlacement>)
+          : DEFAULT_FRAME_PLACEMENT;
+        const framePlacement = clampFramePlacement({
+          x: typeof rawFramePlacement.x === 'number' ? rawFramePlacement.x : DEFAULT_FRAME_PLACEMENT.x,
+          y: typeof rawFramePlacement.y === 'number' ? rawFramePlacement.y : DEFAULT_FRAME_PLACEMENT.y,
+        });
 
         const normalizedFovSetups: FOVSetup[] = persistedFovSetups
           .filter((item): item is Record<string, unknown> =>
@@ -709,6 +747,9 @@ export const useEquipmentStore = create<EquipmentState>()(
           fovSetups: normalizedFovSetups,
           selectedFovSetupId: hasSelectedSetup ? selectedFovSetupId : null,
           fovSimulatorLastTab,
+          fovInputMode,
+          selectedBarlowReducerId,
+          framePlacement,
         };
       },
       partialize: (state) => ({
@@ -732,6 +773,9 @@ export const useEquipmentStore = create<EquipmentState>()(
         fovSetups: state.fovSetups,
         selectedFovSetupId: state.selectedFovSetupId,
         fovSimulatorLastTab: state.fovSimulatorLastTab,
+        fovInputMode: state.fovInputMode,
+        selectedBarlowReducerId: state.selectedBarlowReducerId,
+        framePlacement: state.framePlacement,
         selectedOcularTelescopeId: state.selectedOcularTelescopeId,
         selectedEyepieceId: state.selectedEyepieceId,
         selectedBarlowId: state.selectedBarlowId,

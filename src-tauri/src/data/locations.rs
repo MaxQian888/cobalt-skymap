@@ -34,7 +34,10 @@ pub struct LocationsData {
     pub current_location_id: Option<String>,
 }
 
-fn pick_index_by_id(locations: &[ObservationLocation], preferred_id: Option<&str>) -> Option<usize> {
+fn pick_index_by_id(
+    locations: &[ObservationLocation],
+    preferred_id: Option<&str>,
+) -> Option<usize> {
     preferred_id.and_then(|id| locations.iter().position(|loc| loc.id == id))
 }
 
@@ -305,7 +308,12 @@ pub async fn get_current_location(
 mod tests {
     use super::*;
 
-    fn test_location(id: &str, name: &str, is_default: bool, is_current: bool) -> ObservationLocation {
+    fn test_location(
+        id: &str,
+        name: &str,
+        is_default: bool,
+        is_current: bool,
+    ) -> ObservationLocation {
         ObservationLocation {
             id: id.to_string(),
             name: name.to_string(),
@@ -587,7 +595,14 @@ mod tests {
         assert_eq!(data.locations.iter().filter(|l| l.is_default).count(), 1);
         assert_eq!(
             data.current_location_id,
-            Some(data.locations.iter().find(|l| l.is_current).unwrap().id.clone())
+            Some(
+                data.locations
+                    .iter()
+                    .find(|l| l.is_current)
+                    .unwrap()
+                    .id
+                    .clone()
+            )
         );
     }
 
@@ -604,10 +619,29 @@ mod tests {
         let changed = normalize_locations(&mut data, None, Some("l2"));
         assert!(changed);
 
-        assert!(data.locations.iter().find(|l| l.id == "l2").unwrap().is_default);
-        assert!(!data.locations.iter().find(|l| l.id == "l1").unwrap().is_default);
+        assert!(
+            data.locations
+                .iter()
+                .find(|l| l.id == "l2")
+                .unwrap()
+                .is_default
+        );
+        assert!(
+            !data
+                .locations
+                .iter()
+                .find(|l| l.id == "l1")
+                .unwrap()
+                .is_default
+        );
         // current stays on l1 because no preferred current was requested
-        assert!(data.locations.iter().find(|l| l.id == "l1").unwrap().is_current);
+        assert!(
+            data.locations
+                .iter()
+                .find(|l| l.id == "l1")
+                .unwrap()
+                .is_current
+        );
     }
 
     #[test]

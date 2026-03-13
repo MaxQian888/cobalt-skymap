@@ -45,14 +45,12 @@ pub const _AZIMUTH_NORTH_ZERO_EAST_NINETY: bool = true;
 // ============================================================================
 
 /// Static compiled regex for RA parsing (HMS format)
-pub static RA_HMS_REGEX: Lazy<regex_lite::Regex> = Lazy::new(|| {
-    regex_lite::Regex::new(r"(\d+)[h:\s]+(\d+)[m:\s]+(\d+\.?\d*)s?").unwrap()
-});
+pub static RA_HMS_REGEX: Lazy<regex_lite::Regex> =
+    Lazy::new(|| regex_lite::Regex::new(r"(\d+)[h:\s]+(\d+)[m:\s]+(\d+\.?\d*)s?").unwrap());
 
 /// Static compiled regex for Dec parsing (DMS format)
-pub static DEC_DMS_REGEX: Lazy<regex_lite::Regex> = Lazy::new(|| {
-    regex_lite::Regex::new(r#"([+-]?\d+)[°:\s]+(\d+)[':\s]+(\d+\.?\d*)"?"#).unwrap()
-});
+pub static DEC_DMS_REGEX: Lazy<regex_lite::Regex> =
+    Lazy::new(|| regex_lite::Regex::new(r#"([+-]?\d+)[°:\s]+(\d+)[':\s]+(\d+\.?\d*)"?"#).unwrap());
 
 // ============================================================================
 // Helper Functions
@@ -123,7 +121,11 @@ mod tests {
     fn test_calculate_obliquity() {
         // At J2000.0, obliquity ≈ 23.439°
         let obliquity = calculate_obliquity(2451545.0);
-        assert!(approx_eq(obliquity, 23.439, 0.01), "Obliquity at J2000 should be ~23.439°, got {}", obliquity);
+        assert!(
+            approx_eq(obliquity, 23.439, 0.01),
+            "Obliquity at J2000 should be ~23.439°, got {}",
+            obliquity
+        );
     }
 
     // ------------------------------------------------------------------------
@@ -134,8 +136,11 @@ mod tests {
     fn test_atmospheric_refraction_horizon() {
         // At the horizon (0°), refraction ≈ 0.58° (about 34 arcmin)
         let r = atmospheric_refraction(0.0);
-        assert!(r > 0.5 && r < 0.7,
-            "Refraction at horizon should be ~0.58°, got {}", r);
+        assert!(
+            r > 0.5 && r < 0.7,
+            "Refraction at horizon should be ~0.58°, got {}",
+            r
+        );
     }
 
     #[test]
@@ -151,7 +156,12 @@ mod tests {
         // Allow tiny negative at 90° due to Bennett's formula floating-point limit
         for alt in [0.0, 5.0, 10.0, 20.0, 45.0, 60.0, 80.0, 90.0] {
             let r = atmospheric_refraction(alt);
-            assert!(r >= -1e-4, "Refraction should be non-negative at {}°, got {}", alt, r);
+            assert!(
+                r >= -1e-4,
+                "Refraction should be non-negative at {}°, got {}",
+                alt,
+                r
+            );
         }
     }
 
@@ -161,7 +171,13 @@ mod tests {
         let mut prev = atmospheric_refraction(0.0);
         for alt in [5.0, 10.0, 20.0, 45.0, 60.0, 80.0, 90.0] {
             let r = atmospheric_refraction(alt);
-            assert!(r <= prev, "Refraction should decrease: at {}° got {} > prev {}", alt, r, prev);
+            assert!(
+                r <= prev,
+                "Refraction should decrease: at {}° got {} > prev {}",
+                alt,
+                r,
+                prev
+            );
             prev = r;
         }
     }
@@ -184,13 +200,18 @@ mod tests {
     fn test_atmospheric_refraction_known_values() {
         // At 10°, Bennett's formula gives ≈ 5.3 arcmin ≈ 0.089°
         let r10 = atmospheric_refraction(10.0);
-        assert!(r10 > 0.07 && r10 < 0.12,
-            "Refraction at 10° should be ~0.09°, got {}", r10);
+        assert!(
+            r10 > 0.07 && r10 < 0.12,
+            "Refraction at 10° should be ~0.09°, got {}",
+            r10
+        );
 
         // At 45°, refraction ≈ 1.0 arcmin ≈ 0.017°
         let r45 = atmospheric_refraction(45.0);
-        assert!(r45 > 0.01 && r45 < 0.03,
-            "Refraction at 45° should be ~0.017°, got {}", r45);
+        assert!(
+            r45 > 0.01 && r45 < 0.03,
+            "Refraction at 45° should be ~0.017°, got {}",
+            r45
+        );
     }
-
 }

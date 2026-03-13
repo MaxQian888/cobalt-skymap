@@ -66,10 +66,14 @@ pub fn calculate_twilight(
     let solar_noon_ts = calculate_solar_noon(jd_noon, longitude);
 
     // Calculate times for each twilight type
-    let (sunrise, sunset) = calculate_sun_rise_set_times(jd_noon, latitude, longitude, SUNRISE_SUNSET_ALT);
-    let (civil_dawn, civil_dusk) = calculate_sun_rise_set_times(jd_noon, latitude, longitude, CIVIL_TWILIGHT_ALT);
-    let (nautical_dawn, nautical_dusk) = calculate_sun_rise_set_times(jd_noon, latitude, longitude, NAUTICAL_TWILIGHT_ALT);
-    let (astronomical_dawn, astronomical_dusk) = calculate_sun_rise_set_times(jd_noon, latitude, longitude, ASTRONOMICAL_TWILIGHT_ALT);
+    let (sunrise, sunset) =
+        calculate_sun_rise_set_times(jd_noon, latitude, longitude, SUNRISE_SUNSET_ALT);
+    let (civil_dawn, civil_dusk) =
+        calculate_sun_rise_set_times(jd_noon, latitude, longitude, CIVIL_TWILIGHT_ALT);
+    let (nautical_dawn, nautical_dusk) =
+        calculate_sun_rise_set_times(jd_noon, latitude, longitude, NAUTICAL_TWILIGHT_ALT);
+    let (astronomical_dawn, astronomical_dusk) =
+        calculate_sun_rise_set_times(jd_noon, latitude, longitude, ASTRONOMICAL_TWILIGHT_ALT);
 
     Ok(TwilightTimes {
         date,
@@ -128,7 +132,7 @@ fn calculate_sun_rise_set_times(
 
     // Iterative calculation for better accuracy
     let mut jd_rise = jd_noon - 0.25; // Start from 6 AM
-    let mut jd_set = jd_noon + 0.25;  // Start from 6 PM
+    let mut jd_set = jd_noon + 0.25; // Start from 6 PM
 
     let mut final_rise_ts = None;
     let mut final_set_ts = None;
@@ -234,21 +238,35 @@ mod tests {
         let result = calculate_twilight("2024-03-20".to_string(), 40.0, -74.0);
         assert!(result.is_ok());
         let twilight = result.unwrap();
-        
+
         // Should not be polar day/night at mid-latitude
         assert!(!twilight.is_polar_day, "Should not be polar day");
         assert!(!twilight.is_polar_night, "Should not be polar night");
-        
+
         // All twilight times should be present
         assert!(twilight.sunrise.is_some(), "Sunrise should be present");
         assert!(twilight.sunset.is_some(), "Sunset should be present");
-        assert!(twilight.civil_dawn.is_some(), "Civil dawn should be present");
-        assert!(twilight.civil_dusk.is_some(), "Civil dusk should be present");
-        assert!(twilight.solar_noon.is_some(), "Solar noon should be present");
-        
+        assert!(
+            twilight.civil_dawn.is_some(),
+            "Civil dawn should be present"
+        );
+        assert!(
+            twilight.civil_dusk.is_some(),
+            "Civil dusk should be present"
+        );
+        assert!(
+            twilight.solar_noon.is_some(),
+            "Solar noon should be present"
+        );
+
         // Verify time ordering: dawn < sunrise < noon < sunset < dusk
-        if let (Some(dawn), Some(sunrise), Some(noon), Some(sunset), Some(dusk)) = 
-            (twilight.civil_dawn, twilight.sunrise, twilight.solar_noon, twilight.sunset, twilight.civil_dusk) {
+        if let (Some(dawn), Some(sunrise), Some(noon), Some(sunset), Some(dusk)) = (
+            twilight.civil_dawn,
+            twilight.sunrise,
+            twilight.solar_noon,
+            twilight.sunset,
+            twilight.civil_dusk,
+        ) {
             assert!(dawn < sunrise, "Civil dawn should be before sunrise");
             assert!(sunrise < noon, "Sunrise should be before solar noon");
             assert!(noon < sunset, "Solar noon should be before sunset");
@@ -262,11 +280,21 @@ mod tests {
         let result = calculate_twilight("2024-06-15".to_string(), 45.0, 0.0);
         assert!(result.is_ok());
         let twilight = result.unwrap();
-        
-        if let (Some(astro_dawn), Some(naut_dawn), Some(naut_dusk), Some(astro_dusk)) = 
-            (twilight.astronomical_dawn, twilight.nautical_dawn, twilight.nautical_dusk, twilight.astronomical_dusk) {
-            assert!(astro_dawn < naut_dawn, "Astronomical dawn should be before nautical dawn");
-            assert!(naut_dusk < astro_dusk, "Nautical dusk should be before astronomical dusk");
+
+        if let (Some(astro_dawn), Some(naut_dawn), Some(naut_dusk), Some(astro_dusk)) = (
+            twilight.astronomical_dawn,
+            twilight.nautical_dawn,
+            twilight.nautical_dusk,
+            twilight.astronomical_dusk,
+        ) {
+            assert!(
+                astro_dawn < naut_dawn,
+                "Astronomical dawn should be before nautical dawn"
+            );
+            assert!(
+                naut_dusk < astro_dusk,
+                "Nautical dusk should be before astronomical dusk"
+            );
         }
     }
 
@@ -275,11 +303,19 @@ mod tests {
         // Test sun declination at various dates
         let jd_summer = 2460479.0; // ~June 21, 2024
         let jd_winter = 2460661.0; // ~Dec 21, 2024
-        
+
         let dec_summer = calculate_sun_declination(jd_summer);
         let dec_winter = calculate_sun_declination(jd_winter);
-        
-        assert!(dec_summer > 20.0, "Summer sun dec should be > 20°, got {}", dec_summer);
-        assert!(dec_winter < -20.0, "Winter sun dec should be < -20°, got {}", dec_winter);
+
+        assert!(
+            dec_summer > 20.0,
+            "Summer sun dec should be > 20°, got {}",
+            dec_summer
+        );
+        assert!(
+            dec_winter < -20.0,
+            "Winter sun dec should be < -20°, got {}",
+            dec_winter
+        );
     }
 }

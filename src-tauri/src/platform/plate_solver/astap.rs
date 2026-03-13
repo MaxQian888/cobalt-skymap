@@ -12,8 +12,8 @@ use super::helpers::{
 };
 use super::types::{
     AstapDatabaseInfo, AstrometryIndex, ImageAnalysisResult, IndexInfo, LocalInvocationDiagnostics,
-    LocalSolverProfileId, PlateSolveResult, PlateSolverConfig, PlateSolverError,
-    PlateSolverType, ScaleRange, SolverConfig, SolverInfo, StarDetection,
+    LocalSolverProfileId, PlateSolveResult, PlateSolverConfig, PlateSolverError, PlateSolverType,
+    ScaleRange, SolverConfig, SolverInfo, StarDetection,
 };
 use super::ACTIVE_SOLVE_PID;
 

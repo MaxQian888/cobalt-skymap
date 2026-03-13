@@ -1,4 +1,9 @@
-import type { MountProtocol } from './stellarium';
+import type {
+  MountActionAvailability,
+  MountCapabilitySnapshot,
+  MountProtocol,
+  SupportedMountDevice,
+} from './stellarium';
 
 export type DeviceType = 'mount' | 'camera' | 'telescope' | 'guider' | 'focuser';
 
@@ -29,6 +34,10 @@ export interface MountDeviceMetadata {
   port?: number;
   deviceId?: number;
   model?: string;
+  selectedDeviceId?: string | null;
+  selectedDevice?: SupportedMountDevice;
+  capabilitySnapshot?: Partial<MountCapabilitySnapshot>;
+  actionAvailability?: Partial<MountActionAvailability>;
 }
 
 export interface CameraDeviceMetadata {
@@ -68,7 +77,7 @@ export interface DeviceMetadataByType {
 
 export type DeviceProfileMetadata = DeviceMetadataByType[DeviceType];
 
-export interface DeviceProfile<T extends DeviceType = DeviceType> {
+interface DeviceProfileShape<T extends DeviceType> {
   id: string;
   name: string;
   type: T;
@@ -81,6 +90,10 @@ export interface DeviceProfile<T extends DeviceType = DeviceType> {
   lastValidatedAt?: string;
   validationIssues?: string[];
 }
+
+export type DeviceProfile<T extends DeviceType = DeviceType> = T extends DeviceType
+  ? DeviceProfileShape<T>
+  : never;
 
 export interface DeviceConnectionError {
   code: string;

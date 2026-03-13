@@ -32,9 +32,19 @@ describe('useStellariumLayerApi', () => {
 
   it('should delegate to stel.createLayer when engine available', () => {
     const mockLayer = { id: 'test', z: 1 };
+    const mockGeoJsonObject = { setData: jest.fn() };
+    const mockGeoJsonSurvey = { queryRenderedFeatures: jest.fn() };
     const mockStel = {
       createLayer: jest.fn(() => mockLayer),
-      createObj: jest.fn(() => ({})),
+      createObj: jest.fn((type: string) => {
+        if (type === 'geojson') {
+          return mockGeoJsonObject;
+        }
+        if (type === 'geojson-survey') {
+          return mockGeoJsonSurvey;
+        }
+        return { type };
+      }),
     };
 
     const { result } = renderHook(() => {
@@ -43,7 +53,24 @@ describe('useStellariumLayerApi', () => {
     });
 
     const layer = result.current.createLayer({ id: 'test', z: 1, visible: true });
+    const object = result.current.createObject('circle', { r: 1 });
+    const geoJsonObject = result.current.createGeoJsonObject({
+      type: 'FeatureCollection',
+      features: [],
+    });
+    const geoJsonSurvey = result.current.createGeoJsonSurvey({ url: 'https://example.test' });
+
     expect(layer).toBe(mockLayer);
-    expect(mockStel.createLayer).toHaveBeenCalled();
+    expect(object).toEqual({ type: 'circle' });
+    expect(geoJsonObject).toBe(mockGeoJsonObject);
+    expect(geoJsonSurvey).toBe(mockGeoJsonSurvey);
+    expect(mockStel.createLayer).toHaveBeenCalledWith({ id: 'test', z: 1, visible: true });
+    expect(mockStel.createObj).toHaveBeenCalledWith('circle', { r: 1 });
+    expect(mockStel.createObj).toHaveBeenCalledWith('geojson', {});
+    expect(mockStel.createObj).toHaveBeenCalledWith('geojson-survey', { url: 'https://example.test' });
+    expect(mockGeoJsonObject.setData).toHaveBeenCalledWith({
+      type: 'FeatureCollection',
+      features: [],
+    });
   });
 });

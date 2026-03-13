@@ -41,10 +41,11 @@ export const MountDirectionPad = memo(function MountDirectionPad() {
   const parked = useMountStore((s) => s.mountInfo.Parked);
   const connected = useMountStore((s) => s.mountInfo.Connected);
   const canMoveAxis = useMountStore((s) => s.capabilities.canMoveAxis);
+  const moveAxisAvailable = useMountStore((s) => s.actionAvailability.moveAxis);
 
   const movingRef = useRef<{ axis: 'primary' | 'secondary'; direction: number } | null>(null);
 
-  const disabled = !connected || !canMoveAxis || !!parked;
+  const disabled = !connected || !canMoveAxis || moveAxisAvailable === false || !!parked;
 
   const startMove = useCallback(async (axis: 'primary' | 'secondary', direction: number) => {
     if (disabled || !isTauri()) return;
@@ -141,6 +142,9 @@ export const MountDirectionPad = memo(function MountDirectionPad() {
       </Select>
 
       {/* Direction grid */}
+      {moveAxisAvailable === false && (
+        <p className="text-[9px] text-muted-foreground">{t('axisMotionUnavailable')}</p>
+      )}
       <div className="grid grid-cols-3 gap-0.5 w-fit">
         {/* Row 1: empty / N / empty */}
         <div />

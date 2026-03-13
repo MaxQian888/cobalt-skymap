@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLocationDraftModel } from '@/lib/hooks/use-settings-draft';
+import { useCanonicalObservationLocationState } from '@/lib/hooks/use-canonical-observation-location';
 import { cn } from '@/lib/utils';
 import { SettingsSection } from './settings-shared';
 
@@ -179,6 +180,11 @@ function LocationPermissionStatus() {
 export function LocationSettings() {
   const t = useTranslations();
   const { location, setLocation } = useLocationDraftModel();
+  const {
+    currentLocation,
+    hasSavedLocation,
+    loading: canonicalLocationLoading,
+  } = useCanonicalObservationLocationState();
 
   const commitLocation = useCallback((field: 'Latitude' | 'Longitude' | 'Elevation', rawValue: string) => {
     const val = parseFloat(rawValue) || 0;
@@ -210,6 +216,22 @@ export function LocationSettings() {
         <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 rounded">
           {t('settings.locationInstantHint')}
         </p>
+
+        {!canonicalLocationLoading && (
+          <p className="text-xs text-muted-foreground">
+            {hasSavedLocation
+              ? (
+                t('settings.currentSiteSyncHint', {
+                  name: currentLocation?.name ?? (t('locations.title') || 'Current site'),
+                })
+                || `Saving these coordinates updates the active observation site: ${currentLocation?.name ?? 'Current site'}.`
+              )
+              : (
+                t('settings.createFirstSiteHint')
+                || 'Saving these coordinates will create your first saved observation site.'
+              )}
+          </p>
+        )}
         
         <LocationPermissionStatus />
         

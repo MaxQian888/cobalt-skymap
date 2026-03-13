@@ -1,5 +1,5 @@
-﻿//! SkyMap Tauri Backend
-//! 
+//! SkyMap Tauri Backend
+//!
 //! Organized into the following modules:
 //! - `astronomy`: Astronomical calculations and events
 //! - `data`: Data storage, equipment, locations, targets, markers, observation logs
@@ -9,117 +9,261 @@
 //! - `utils`: Common utilities
 
 pub mod astronomy;
-pub mod data;
 pub mod cache;
-pub mod network;
+pub mod data;
 pub mod mount;
+pub mod network;
 pub mod utils;
 
 #[cfg(desktop)]
 pub mod platform;
 
 // Re-export for backward compatibility and ease of use
+#[cfg(not(test))]
 use data::{
-    // Storage
-    clear_all_data, delete_store_data, export_all_data, get_data_directory, get_storage_stats,
-    import_all_data, list_stores, load_store_data, save_store_data,
     // Equipment
-    add_barlow_reducer, add_camera, add_eyepiece, add_filter, add_telescope, delete_equipment,
-    get_default_camera, get_default_telescope, load_equipment, save_equipment, set_default_camera,
-    set_default_telescope, update_barlow_reducer, update_camera, update_eyepiece, update_filter,
-    update_telescope,
+    add_barlow_reducer,
+    add_camera,
+    add_eyepiece,
+    add_filter,
     // Locations
-    add_location, delete_location, get_current_location, load_locations, save_locations,
-    set_current_location, set_default_location, update_location,
-    // Observation log
-    add_observation, create_planned_session, create_session, delete_observation, delete_session, end_session,
-    get_observation_stats, load_observation_log, save_observation_log, search_observations,
-    export_observation_log, update_observation, update_session,
-    // Target I/O
-    export_targets, import_targets,
-    // Session I/O
-    export_session_plan, import_session_plan, load_session_templates, save_session_template,
-    // Target list
-    add_tag_to_targets, add_target, add_targets_batch, archive_completed_targets,
-    clear_all_targets, clear_completed_targets, get_target_stats, load_target_list,
-    remove_tag_from_targets, remove_target, remove_targets_batch, save_target_list, search_targets,
-    set_active_target, set_targets_priority_batch, set_targets_status_batch, toggle_target_archive,
-    toggle_target_favorite, update_target,
+    add_location,
     // Markers
-    add_marker, add_marker_group, clear_all_markers, get_visible_markers, load_markers,
-    remove_marker, remove_marker_group, remove_markers_by_group, rename_marker_group, save_markers,
-    set_all_markers_visible, set_show_markers, toggle_marker_visibility, update_marker,
+    add_marker,
+    add_marker_group,
+    // Observation log
+    add_observation,
+    // Target list
+    add_tag_to_targets,
+    add_target,
+    add_targets_batch,
+    add_telescope,
+    archive_completed_targets,
+    // Storage
+    clear_all_data,
+    clear_all_markers,
+    clear_all_targets,
+    clear_completed_targets,
+    create_planned_session,
+    create_session,
+    delete_equipment,
+    delete_location,
+    delete_observation,
+    delete_session,
+    delete_store_data,
+    end_session,
+    export_all_data,
+    export_observation_log,
+    // Session I/O
+    export_session_plan,
+    // Target I/O
+    export_targets,
+    get_current_location,
+    get_data_directory,
+    get_default_camera,
+    get_default_telescope,
+    get_observation_stats,
+    get_storage_stats,
+    get_target_stats,
+    get_visible_markers,
+    import_all_data,
+    import_session_plan,
+    import_targets,
+    list_stores,
+    load_equipment,
+    load_locations,
+    load_markers,
+    load_observation_log,
+    load_session_templates,
+    load_store_data,
+    load_target_list,
+    remove_marker,
+    remove_marker_group,
+    remove_markers_by_group,
+    remove_tag_from_targets,
+    remove_target,
+    remove_targets_batch,
+    rename_marker_group,
+    save_equipment,
+    save_locations,
+    save_markers,
+    save_observation_log,
+    save_session_template,
+    save_store_data,
+    save_target_list,
+    search_observations,
+    search_targets,
+    set_active_target,
+    set_all_markers_visible,
+    set_current_location,
+    set_default_camera,
+    set_default_location,
+    set_default_telescope,
+    set_show_markers,
+    set_targets_priority_batch,
+    set_targets_status_batch,
+    toggle_marker_visibility,
+    toggle_target_archive,
+    toggle_target_favorite,
+    update_barlow_reducer,
+    update_camera,
+    update_eyepiece,
+    update_filter,
+    update_location,
+    update_marker,
+    update_observation,
+    update_session,
+    update_target,
+    update_telescope,
 };
 
+#[cfg(not(test))]
 use astronomy::{
     // Calculations
-    angular_separation, calculate_fov, calculate_moon_phase, calculate_moon_position,
-    calculate_mosaic_coverage, calculate_sun_position, calculate_twilight, calculate_visibility,
-    ecliptic_to_equatorial, equatorial_to_ecliptic, equatorial_to_galactic,
-    equatorial_to_horizontal, format_dec_dms, format_ra_hms, galactic_to_equatorial,
-    horizontal_to_equatorial, parse_dec_dms, parse_ra_hms,
+    angular_separation,
+    calculate_fov,
+    calculate_moon_phase,
+    calculate_moon_position,
+    calculate_mosaic_coverage,
+    calculate_sun_position,
+    calculate_twilight,
+    calculate_visibility,
+    ecliptic_to_equatorial,
+    equatorial_to_ecliptic,
+    equatorial_to_galactic,
+    equatorial_to_horizontal,
+    format_dec_dms,
+    format_ra_hms,
+    galactic_to_equatorial,
     // Events
-    get_astro_events, get_daily_astro_events, get_meteor_showers, get_moon_phases_for_month,
-    get_seasonal_events, get_tonight_highlights,
+    get_astro_events,
+    get_daily_astro_events,
+    get_meteor_showers,
+    get_moon_phases_for_month,
+    get_seasonal_events,
+    get_tonight_highlights,
+    horizontal_to_equatorial,
+    parse_dec_dms,
+    parse_ra_hms,
 };
 
+#[cfg(not(test))]
 use cache::{
-    // Offline cache
-    clear_all_cache, clear_survey_cache, create_cache_region, delete_cache_region,
-    get_cache_directory, get_cache_stats, is_tile_cached, list_cache_regions, load_cached_tile,
-    save_cached_tile, update_cache_region,
     // Unified cache
-    cleanup_unified_cache, clear_unified_cache, delete_unified_cache_entry,
-    flush_unified_cache, get_unified_cache_entry, get_unified_cache_size,
-    get_unified_cache_stats, list_unified_cache_keys, prefetch_url, prefetch_urls,
+    cleanup_unified_cache,
+    // Offline cache
+    clear_all_cache,
+    clear_survey_cache,
+    clear_unified_cache,
+    create_cache_region,
+    delete_cache_region,
+    delete_unified_cache_entry,
+    flush_unified_cache,
+    get_cache_directory,
+    get_cache_stats,
+    get_unified_cache_entry,
+    get_unified_cache_size,
+    get_unified_cache_stats,
+    is_tile_cached,
+    list_cache_regions,
+    list_unified_cache_keys,
+    load_cached_tile,
+    prefetch_url,
+    prefetch_urls,
     put_unified_cache_entry,
+    save_cached_tile,
+    update_cache_region,
 };
 
+#[cfg(not(test))]
 use network::{
     cancel_request, get_active_requests, get_http_config, http_batch_download,
-    http_cancel_all_requests, http_cancel_request, http_check_url, http_download,
-    http_get, http_head, http_post, http_request, set_http_config,
+    http_cancel_all_requests, http_cancel_request, http_check_url, http_download, http_get,
+    http_head, http_post, http_request, set_http_config,
 };
 
+#[cfg(not(test))]
 use mount::{
-    mount_connect, mount_disconnect, mount_get_state, mount_get_capabilities,
-    mount_slew_to, mount_sync_to, mount_abort_slew,
-    mount_park, mount_unpark,
-    mount_set_tracking, mount_set_tracking_rate,
-    mount_move_axis, mount_stop_axis, mount_set_slew_rate,
-    mount_discover, mount_get_observing_conditions, mount_get_safety_state,
+    mount_abort_slew, mount_connect, mount_disconnect, mount_discover, mount_get_capabilities,
+    mount_get_observing_conditions, mount_get_safety_state, mount_get_state, mount_move_axis,
+    mount_park, mount_set_slew_rate, mount_set_tracking, mount_set_tracking_rate, mount_slew_to,
+    mount_stop_axis, mount_sync_to, mount_unpark,
 };
 
-#[cfg(desktop)]
+#[cfg(all(desktop, not(test)))]
 use platform::{
     // App settings
-    add_recent_file, clear_recent_files, get_system_info, load_app_settings, open_path,
-    restore_window_state, reveal_in_file_manager, save_app_settings, save_window_state,
-    // App control
-    handle_tray_icon_event, initialize_tray, is_dev_mode, is_tray_positioning_ready,
-    quit_app, reload_webview, restart_app, TrayRuntimeState,
-    // CLI bridge
-    handle_forwarded_cli_invocation, parse_cli_matches_from_args,
+    add_recent_file,
+    // Plate solver
+    analyse_image,
+    cancel_online_solve,
+    cancel_plate_solve,
     // Updater
-    check_for_update, clear_pending_update, download_and_install_update, download_update,
-    get_current_version, has_pending_update, install_update,
-    // Path config
-    get_path_config, set_custom_data_dir, set_custom_cache_dir,
-    migrate_data_dir, migrate_cache_dir, reset_paths_to_default, validate_directory,
-    // Secure map API keys
-    save_map_api_key, list_map_api_keys_meta, get_map_api_key, delete_map_api_key, set_active_map_api_key,
+    check_for_update,
+    clear_pending_update,
+    clear_recent_files,
+    delete_index,
+    delete_map_api_key,
+    detect_plate_solvers,
+    download_and_install_update,
+    download_index,
+    download_update,
+    extract_stars,
+    get_astap_databases,
+    get_available_indexes,
+    get_current_version,
+    get_default_index_path,
+    get_downloadable_indexes,
+    get_installed_indexes,
+    get_map_api_key,
     // Secret vault bootstrap
     get_or_create_secret_vault_bootstrap,
-    // Plate solver
-    analyse_image, delete_index, detect_plate_solvers, download_index,
-    extract_stars, get_astap_databases, get_available_indexes,
-    get_default_index_path, get_downloadable_indexes, get_installed_indexes,
-    get_recommended_indexes, get_solver_indexes, get_solver_info, load_solver_config,
-    cancel_online_solve, cancel_plate_solve, plate_solve, recommend_astap_database, save_solver_config,
-    solve_image_local, solve_online, validate_solver_path,
+    // Path config
+    get_path_config,
+    get_recommended_indexes,
+    get_solver_indexes,
+    get_solver_info,
+    get_system_info,
+    // CLI bridge
+    handle_forwarded_cli_invocation,
+    // App control
+    handle_tray_icon_event,
+    has_pending_update,
+    initialize_tray,
+    install_update,
+    is_dev_mode,
+    is_tray_positioning_ready,
+    list_map_api_keys_meta,
+    load_app_settings,
+    load_solver_config,
+    migrate_cache_dir,
+    migrate_data_dir,
+    open_path,
+    parse_cli_matches_from_args,
+    plate_solve,
+    quit_app,
+    recommend_astap_database,
+    reload_webview,
+    reset_paths_to_default,
+    restart_app,
+    restore_window_state,
+    reveal_in_file_manager,
+    save_app_settings,
+    // Secure map API keys
+    save_map_api_key,
+    save_solver_config,
+    save_window_state,
+    set_active_map_api_key,
+    set_custom_cache_dir,
+    set_custom_data_dir,
+    solve_image_local,
+    solve_online,
+    validate_directory,
+    validate_solver_path,
+    TrayRuntimeState,
 };
 
-#[cfg(desktop)]
+#[cfg(all(desktop, not(test)))]
 use tauri::Manager;
 
 const fn desktop_debug_tooling_enabled(is_desktop: bool, is_debug: bool) -> bool {
@@ -130,15 +274,15 @@ const fn persistent_logging_enabled(is_desktop: bool, is_debug: bool) -> bool {
     !desktop_debug_tooling_enabled(is_desktop, is_debug)
 }
 
+#[cfg(not(test))]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Single instance plugin must be registered FIRST (desktop only)
     #[cfg(desktop)]
-    let builder = tauri::Builder::default().plugin(tauri_plugin_single_instance::init(
-        |app, args, cwd| {
+    let builder =
+        tauri::Builder::default().plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             handle_forwarded_cli_invocation(app, args, cwd);
-        },
-    ));
+        }));
 
     #[cfg(all(desktop, debug_assertions))]
     let builder = builder.plugin(tauri_plugin_devtools::init());
@@ -167,7 +311,8 @@ pub fn run() {
                 app.manage(TrayRuntimeState::default());
                 app.handle().plugin(tauri_plugin_cli::init())?;
                 app.handle().plugin(tauri_plugin_positioner::init())?;
-                app.handle().plugin(tauri_plugin_clipboard_manager::init())?;
+                app.handle()
+                    .plugin(tauri_plugin_clipboard_manager::init())?;
                 app.handle().plugin(tauri_plugin_autostart::init(
                     tauri_plugin_autostart::MacosLauncher::LaunchAgent,
                     None::<Vec<&str>>,
@@ -175,9 +320,12 @@ pub fn run() {
                 let salt_path = app
                     .path()
                     .app_local_data_dir()
-                    .map_err(|error| format!("failed to resolve app local data directory: {error}"))?
+                    .map_err(|error| {
+                        format!("failed to resolve app local data directory: {error}")
+                    })?
                     .join("stronghold-salt.txt");
-                app.handle().plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
+                app.handle()
+                    .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
                 app.handle()
                     .plugin(tauri_plugin_global_shortcut::Builder::new().build())?;
                 app.handle()
@@ -512,6 +660,9 @@ pub fn run() {
 }
 
 #[cfg(test)]
+pub fn run() {}
+
+#[cfg(test)]
 mod tests {
     use super::{desktop_debug_tooling_enabled, persistent_logging_enabled};
 
@@ -530,5 +681,3 @@ mod tests {
         assert!(persistent_logging_enabled(false, false));
     }
 }
-
-

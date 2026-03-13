@@ -3,7 +3,7 @@
  * Engine value change observation
  */
 
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { useStellariumValueWatch } from '../use-stellarium-value-watch';
 import { useRef } from 'react';
 
@@ -39,5 +39,44 @@ describe('useStellariumValueWatch', () => {
     const unsub = result.current.watchValue(callback);
     expect(onValueChangedMock).toHaveBeenCalled();
     expect(typeof unsub).toBe('function');
+  });
+
+  it('should bridge value changes and support unsubscribe per watcher', () => {
+    let bridgeCallback: ((path: string, value: unknown) => void) | undefined;
+    const onValueChangedMock = jest.fn((callback: (path: string, value: unknown) => void) => {
+      bridgeCallback = callback;
+    });
+    const mockStel = { onValueChanged: onValueChangedMock };
+
+    const { result } = renderHook(() => {
+      const ref = useRef(mockStel);
+      return useStellariumValueWatch(ref as never);
+    });
+
+    const watcherA = jest.fn();
+    const watcherB = jest.fn();
+
+    const unsubscribeA = result.current.watchValue(watcherA);
+    const unsubscribeB = result.current.watchValue(watcherB);
+
+    expect(onValueChangedMock).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      bridgeCallback?.('projection', 1);
+    });
+
+    expect(watcherA).toHaveBeenCalledWith('projection', 1);
+    expect(watcherB).toHaveBeenCalledWith('projection', 1);
+
+    unsubscribeA();
+
+    act(() => {
+      bridgeCallback?.('projection', 2);
+    });
+
+    expect(watcherA).toHaveBeenCalledTimes(1);
+    expect(watcherB).toHaveBeenLastCalledWith('projection', 2);
+
+    unsubscribeB();
   });
 });

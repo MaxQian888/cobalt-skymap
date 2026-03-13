@@ -20,7 +20,14 @@ pub struct WindowState {
 
 impl Default for WindowState {
     fn default() -> Self {
-        Self { width: 1280, height: 800, x: 100, y: 100, maximized: false, fullscreen: false }
+        Self {
+            width: 1280,
+            height: 800,
+            x: 100,
+            y: 100,
+            maximized: false,
+            fullscreen: false,
+        }
     }
 }
 
@@ -50,10 +57,17 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
-            window_state: WindowState::default(), recent_files: Vec::new(),
-            last_export_dir: None, last_import_dir: None, auto_save_interval: 300,
-            check_updates: true, telemetry_enabled: false, theme: "system".to_string(),
-            sidebar_collapsed: false, show_welcome: true, language: "en".to_string(),
+            window_state: WindowState::default(),
+            recent_files: Vec::new(),
+            last_export_dir: None,
+            last_import_dir: None,
+            auto_save_interval: 300,
+            check_updates: true,
+            telemetry_enabled: false,
+            theme: "system".to_string(),
+            sidebar_collapsed: false,
+            show_welcome: true,
+            language: "en".to_string(),
         }
     }
 }
@@ -82,7 +96,9 @@ pub struct SystemInfo {
 
 fn get_settings_path(app: &AppHandle) -> Result<PathBuf, StorageError> {
     let dir = super::path_config::resolve_data_dir(app)?;
-    if !dir.exists() { fs::create_dir_all(&dir)?; }
+    if !dir.exists() {
+        fs::create_dir_all(&dir)?;
+    }
     Ok(dir.join("app_settings.json"))
 }
 
@@ -113,20 +129,29 @@ fn derive_host_id(hostname: &str) -> Option<String> {
 #[tauri::command]
 pub async fn load_app_settings(app: AppHandle) -> Result<AppSettings, StorageError> {
     let path = get_settings_path(&app)?;
-    if !path.exists() { return Ok(AppSettings::default()); }
+    if !path.exists() {
+        return Ok(AppSettings::default());
+    }
     Ok(serde_json::from_str(&fs::read_to_string(&path)?)?)
 }
 
 #[tauri::command]
 pub async fn save_app_settings(app: AppHandle, settings: AppSettings) -> Result<(), StorageError> {
-    fs::write(&get_settings_path(&app)?, serde_json::to_string_pretty(&settings)?)?;
+    fs::write(
+        &get_settings_path(&app)?,
+        serde_json::to_string_pretty(&settings)?,
+    )?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn save_window_state(app: AppHandle) -> Result<(), StorageError> {
-    let window = app.get_webview_window("main")
-        .ok_or_else(|| StorageError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "Main window not found")))?;
+    let window = app.get_webview_window("main").ok_or_else(|| {
+        StorageError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Main window not found",
+        ))
+    })?;
 
     let mut settings = load_app_settings(app.clone()).await?;
     if let Ok(size) = window.outer_size() {
@@ -137,8 +162,12 @@ pub async fn save_window_state(app: AppHandle) -> Result<(), StorageError> {
         settings.window_state.x = pos.x;
         settings.window_state.y = pos.y;
     }
-    if let Ok(maximized) = window.is_maximized() { settings.window_state.maximized = maximized; }
-    if let Ok(fullscreen) = window.is_fullscreen() { settings.window_state.fullscreen = fullscreen; }
+    if let Ok(maximized) = window.is_maximized() {
+        settings.window_state.maximized = maximized;
+    }
+    if let Ok(fullscreen) = window.is_fullscreen() {
+        settings.window_state.fullscreen = fullscreen;
+    }
     save_app_settings(app, settings).await
 }
 
@@ -147,24 +176,45 @@ pub async fn restore_window_state(app: AppHandle) -> Result<(), StorageError> {
     let settings = load_app_settings(app.clone()).await?;
     let state = settings.window_state;
 
-    let window = app.get_webview_window("main")
-        .ok_or_else(|| StorageError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, "Main window not found")))?;
+    let window = app.get_webview_window("main").ok_or_else(|| {
+        StorageError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Main window not found",
+        ))
+    })?;
 
     let _ = window.set_size(PhysicalSize::new(state.width, state.height));
     let _ = window.set_position(PhysicalPosition::new(state.x, state.y));
-    if state.fullscreen { let _ = window.set_fullscreen(true); }
-    else if state.maximized { let _ = window.maximize(); }
+    if state.fullscreen {
+        let _ = window.set_fullscreen(true);
+    } else if state.maximized {
+        let _ = window.maximize();
+    }
     Ok(())
 }
 
 #[tauri::command]
-pub async fn add_recent_file(app: AppHandle, path: String, file_type: String) -> Result<(), StorageError> {
+pub async fn add_recent_file(
+    app: AppHandle,
+    path: String,
+    file_type: String,
+) -> Result<(), StorageError> {
     let mut settings = load_app_settings(app.clone()).await?;
-    let name = std::path::Path::new(&path).file_name()
-        .map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.clone());
+    let name = std::path::Path::new(&path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.clone());
 
     settings.recent_files.retain(|f| f.path != path);
-    settings.recent_files.insert(0, RecentFile { path, name, file_type, accessed_at: chrono::Utc::now().timestamp() });
+    settings.recent_files.insert(
+        0,
+        RecentFile {
+            path,
+            name,
+            file_type,
+            accessed_at: chrono::Utc::now().timestamp(),
+        },
+    );
     settings.recent_files.truncate(20);
     save_app_settings(app, settings).await
 }
@@ -209,16 +259,31 @@ pub async fn open_path(path: String) -> Result<(), StorageError> {
 #[tauri::command]
 pub async fn reveal_in_file_manager(path: String) -> Result<(), StorageError> {
     #[cfg(target_os = "windows")]
-    { std::process::Command::new("explorer").args(["/select,", &path]).spawn().map_err(StorageError::Io)?; }
+    {
+        std::process::Command::new("explorer")
+            .args(["/select,", &path])
+            .spawn()
+            .map_err(StorageError::Io)?;
+    }
 
     #[cfg(target_os = "macos")]
-    { std::process::Command::new("open").args(["-R", &path]).spawn().map_err(StorageError::Io)?; }
+    {
+        std::process::Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(StorageError::Io)?;
+    }
 
     #[cfg(target_os = "linux")]
     {
-        let parent = std::path::Path::new(&path).parent()
-            .map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| path.clone());
-        std::process::Command::new("xdg-open").arg(&parent).spawn().map_err(StorageError::Io)?;
+        let parent = std::path::Path::new(&path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.clone());
+        std::process::Command::new("xdg-open")
+            .arg(&parent)
+            .spawn()
+            .map_err(StorageError::Io)?;
     }
     Ok(())
 }
@@ -521,7 +586,7 @@ mod tests {
     #[test]
     fn test_window_state_extreme_values() {
         let state = WindowState {
-            width: 7680,   // 8K width
+            width: 7680,  // 8K width
             height: 4320, // 8K height
             x: -100,      // Negative position (multi-monitor)
             y: -50,
@@ -538,13 +603,13 @@ mod tests {
     #[test]
     fn test_all_themes() {
         let themes = vec!["system", "light", "dark"];
-        
+
         for theme in themes {
             let settings = AppSettings {
                 theme: theme.to_string(),
                 ..AppSettings::default()
             };
-            
+
             let json = serde_json::to_string(&settings).unwrap();
             let back: AppSettings = serde_json::from_str(&json).unwrap();
             assert_eq!(back.theme, theme);
@@ -554,13 +619,13 @@ mod tests {
     #[test]
     fn test_language_options() {
         let languages = vec!["en", "zh", "ja", "de", "fr"];
-        
+
         for lang in languages {
             let settings = AppSettings {
                 language: lang.to_string(),
                 ..AppSettings::default()
             };
-            
+
             let json = serde_json::to_string(&settings).unwrap();
             let back: AppSettings = serde_json::from_str(&json).unwrap();
             assert_eq!(back.language, lang);

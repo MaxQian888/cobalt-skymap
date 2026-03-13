@@ -190,6 +190,7 @@ export {
 
 // Planning UI bridge store
 export { usePlanningUiStore } from './planning-ui-store';
+export { useMessierMarathonStore } from './messier-marathon-store';
 export {
   useStarmapMobileUiStore,
   type StarmapMobilePanelId,

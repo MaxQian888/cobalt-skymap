@@ -67,6 +67,12 @@ const config: Config = {
       lines: 60,
       statements: 60,
     },
+    "./lib/cache/": {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
   },
 
   // An object that configures minimum threshold enforcement for coverage results

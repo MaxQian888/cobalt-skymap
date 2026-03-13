@@ -3,14 +3,74 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import * as nextIntl from 'next-intl';
+
+type MockLeafletProps = {
+  tileLayer?: string;
+  showLightPollution?: boolean;
+  onLocationChange?: (location: { latitude: number; longitude: number }) => void;
+  onClick?: (location: { latitude: number; longitude: number }) => void;
+  onTileLayerFallback?: (event: { failedLayer: string; fallbackLayer: string; errorCount: number }) => void;
+  onZoomChange?: (zoom: number) => void;
+};
+
+const mockLeafletState: { latestProps: MockLeafletProps | null } = {
+  latestProps: null,
+};
+
+const mockRenderLeafletMap = (props: MockLeafletProps) => {
+  mockLeafletState.latestProps = props;
+  return (
+    <div
+      data-testid="leaflet-map"
+      data-tile-layer={props.tileLayer}
+      data-light-pollution={String(Boolean(props.showLightPollution))}
+    >
+      <button
+        type="button"
+        data-testid="leaflet-location-change"
+        onClick={() => props.onLocationChange?.({ latitude: 51.5074, longitude: -0.1278 })}
+      >
+        change
+      </button>
+      <button
+        type="button"
+        data-testid="leaflet-map-click"
+        onClick={() => props.onClick?.({ latitude: 34.0522, longitude: -118.2437 })}
+      >
+        click
+      </button>
+      <button
+        type="button"
+        data-testid="leaflet-tile-fallback"
+        onClick={() =>
+          props.onTileLayerFallback?.({
+            failedLayer: 'esri_topo',
+            fallbackLayer: 'openstreetmap',
+            errorCount: 2,
+          })
+        }
+      >
+        fallback
+      </button>
+      <button
+        type="button"
+        data-testid="leaflet-zoom-change"
+        onClick={() => props.onZoomChange?.(13)}
+      >
+        zoom
+      </button>
+    </div>
+  );
+};
 
 jest.mock('next/dynamic', () => ({
   __esModule: true,
-  default: () => () => <div data-testid="leaflet-map" />,
+  default: () => (props: MockLeafletProps) => mockRenderLeafletMap(props),
 }));
 
 jest.mock('../leaflet-map', () => ({
-  LeafletMap: () => <div data-testid="leaflet-map" />,
+  LeafletMap: (props: MockLeafletProps) => mockRenderLeafletMap(props),
 }));
 
 // Mock geocoding service
@@ -130,6 +190,11 @@ describe('MapLocationPicker', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLeafletState.latestProps = null;
+    Object.defineProperty(window.navigator, 'onLine', {
+      configurable: true,
+      value: true,
+    });
     mockGetUiPreferences.mockReturnValue({
       tileLayer: 'openstreetmap',
       zoom: 10,
@@ -200,6 +265,27 @@ describe('MapLocationPicker', () => {
       inputs.forEach(input => {
         expect(input).toBeDisabled();
       });
+    });
+
+    it('renders fallback labels when translations return empty strings', () => {
+      const nextIntlMock = jest.requireMock('next-intl') as typeof nextIntl;
+      const originalUseTranslations = nextIntlMock.useTranslations;
+      Object.defineProperty(nextIntlMock, 'useTranslations', {
+        configurable: true,
+        value: () => (((_key: string) => '') as ReturnType<typeof nextIntl.useTranslations>),
+      });
+
+      try {
+        render(<MapLocationPicker onLocationChange={mockOnLocationChange} />);
+
+        expect(screen.getByText('Location Picker')).toBeInTheDocument();
+        expect(screen.getByLabelText('Light Pollution')).toBeInTheDocument();
+      } finally {
+        Object.defineProperty(nextIntlMock, 'useTranslations', {
+          configurable: true,
+          value: originalUseTranslations,
+        });
+      }
     });
   });
 
@@ -459,6 +545,86 @@ describe('MapLocationPicker', () => {
       render(<MapLocationPicker onLocationChange={mockOnLocationChange} height={500} />);
 
       expect(screen.getByTestId('card')).toBeInTheDocument();
+    });
+
+    it('updates location and zoom from map callbacks in immediate mode', async () => {
+      render(<MapLocationPicker onLocationChange={mockOnLocationChange} />);
+
+      fireEvent.click(screen.getByTestId('leaflet-location-change'));
+      fireEvent.click(screen.getByTestId('leaflet-map-click'));
+
+      await waitFor(() => {
+        expect(mockOnLocationChange).toHaveBeenCalledWith({
+          latitude: 51.5074,
+          longitude: -0.1278,
+        });
+        expect(mockOnLocationChange).toHaveBeenCalledWith({
+          latitude: 34.0522,
+          longitude: -118.2437,
+        });
+      });
+
+      fireEvent.click(screen.getByTestId('leaflet-zoom-change'));
+
+      await waitFor(() => {
+        expect(mockSetUiPreferences).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            zoom: 13,
+          })
+        );
+      });
+    });
+  });
+
+  describe('Capability and fallback status', () => {
+    it('reacts to browser offline and online events', async () => {
+      render(<MapLocationPicker onLocationChange={mockOnLocationChange} />);
+
+      expect(screen.getByTestId('map-capability-status')).toHaveTextContent(
+        /map\.autocompleteAvailable|Autocomplete search is available\./
+      );
+
+      act(() => {
+        window.dispatchEvent(new Event('offline'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('map-capability-status')).toHaveTextContent(
+          /map\.offlineSearchRestricted|Offline mode: online search disabled/
+        );
+      });
+
+      act(() => {
+        window.dispatchEvent(new Event('online'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('map-capability-status')).toHaveTextContent(
+          /map\.autocompleteAvailable|Autocomplete search is available\./
+        );
+      });
+    });
+
+    it('falls back to openstreetmap when a tile layer becomes unavailable', async () => {
+      render(<MapLocationPicker onLocationChange={mockOnLocationChange} showControls />);
+
+      const menuItems = screen.getAllByTestId('dropdown-menu-item');
+      fireEvent.click(menuItems[4]);
+
+      expect(screen.getByTestId('leaflet-map')).toHaveAttribute('data-tile-layer', 'esri_topo');
+
+      fireEvent.click(screen.getByTestId('leaflet-tile-fallback'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('leaflet-map')).toHaveAttribute('data-tile-layer', 'openstreetmap');
+        expect(screen.getByTestId('map-capability-status')).toHaveTextContent(/map\.layerFallback|Layer /);
+      });
+
+      fireEvent.click(menuItems[4]);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('leaflet-map')).toHaveAttribute('data-tile-layer', 'openstreetmap');
+      });
     });
   });
 

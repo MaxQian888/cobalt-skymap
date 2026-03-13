@@ -3,15 +3,31 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import * as nextIntl from 'next-intl';
 
 // Mock map config
 jest.mock('@/lib/services/map-config', () => ({
   mapConfig: {
     getConfiguration: jest.fn(() => ({
       providers: [
-        { provider: 'openstreetmap', enabled: true, priority: 1 },
-        { provider: 'google', enabled: false, priority: 2 },
-        { provider: 'mapbox', enabled: false, priority: 3 },
+        {
+          provider: 'openstreetmap',
+          enabled: true,
+          priority: 1,
+          config: { attribution: '© OpenStreetMap contributors', maxZoom: 19, minZoom: 0, rateLimit: 1000 },
+        },
+        {
+          provider: 'google',
+          enabled: false,
+          priority: 2,
+          config: { attribution: '© Google', maxZoom: 21, minZoom: 0, rateLimit: 50 },
+        },
+        {
+          provider: 'mapbox',
+          enabled: false,
+          priority: 3,
+          config: { attribution: '© Mapbox © OpenStreetMap contributors', maxZoom: 22, minZoom: 0, rateLimit: 600 },
+        },
       ],
       defaultProvider: 'openstreetmap',
       fallbackStrategy: 'priority',
@@ -203,6 +219,27 @@ describe('MapProviderSettings', () => {
       const sliders = screen.getAllByTestId('slider');
       expect(sliders.length).toBe(2);
     });
+
+    it('renders fallback labels when translations return empty strings', () => {
+      const nextIntlMock = jest.requireMock('next-intl') as typeof nextIntl;
+      const originalUseTranslations = nextIntlMock.useTranslations;
+      Object.defineProperty(nextIntlMock, 'useTranslations', {
+        configurable: true,
+        value: () => (((_key: string) => '') as ReturnType<typeof nextIntl.useTranslations>),
+      });
+
+      try {
+        render(<MapProviderSettings />);
+
+        expect(screen.getByText('Map Settings')).toBeInTheDocument();
+        expect(screen.getByText('Providers')).toBeInTheDocument();
+      } finally {
+        Object.defineProperty(nextIntlMock, 'useTranslations', {
+          configurable: true,
+          value: originalUseTranslations,
+        });
+      }
+    });
   });
 
   describe('Provider Toggle', () => {
@@ -275,9 +312,24 @@ describe('MapProviderSettings', () => {
       // Need google to be enabled for it to appear as option
       mockMapConfig.getConfiguration.mockReturnValue({
         providers: [
-          { provider: 'openstreetmap', enabled: true, priority: 1 },
-          { provider: 'google', enabled: true, priority: 2 },
-          { provider: 'mapbox', enabled: false, priority: 3 },
+          {
+            provider: 'openstreetmap',
+            enabled: true,
+            priority: 1,
+            config: { attribution: '© OpenStreetMap contributors', maxZoom: 19, minZoom: 0, rateLimit: 1000 },
+          },
+          {
+            provider: 'google',
+            enabled: true,
+            priority: 2,
+            config: { attribution: '© Google', maxZoom: 21, minZoom: 0, rateLimit: 50 },
+          },
+          {
+            provider: 'mapbox',
+            enabled: false,
+            priority: 3,
+            config: { attribution: '© Mapbox © OpenStreetMap contributors', maxZoom: 22, minZoom: 0, rateLimit: 600 },
+          },
         ],
         defaultProvider: 'openstreetmap',
         fallbackStrategy: 'priority',
@@ -666,9 +718,24 @@ describe('MapProviderSettings', () => {
 
       mockMapConfig.getConfiguration.mockReturnValue({
         providers: [
-          { provider: 'openstreetmap', enabled: true, priority: 1 },
-          { provider: 'google', enabled: true, priority: 2 },
-          { provider: 'mapbox', enabled: false, priority: 3 },
+          {
+            provider: 'openstreetmap',
+            enabled: true,
+            priority: 1,
+            config: { attribution: '© OpenStreetMap contributors', maxZoom: 19, minZoom: 0, rateLimit: 1000 },
+          },
+          {
+            provider: 'google',
+            enabled: true,
+            priority: 2,
+            config: { attribution: '© Google', maxZoom: 21, minZoom: 0, rateLimit: 50 },
+          },
+          {
+            provider: 'mapbox',
+            enabled: false,
+            priority: 3,
+            config: { attribution: '© Mapbox © OpenStreetMap contributors', maxZoom: 22, minZoom: 0, rateLimit: 600 },
+          },
         ],
         defaultProvider: 'openstreetmap',
         fallbackStrategy: 'priority',
@@ -693,9 +760,24 @@ describe('MapProviderSettings', () => {
 
       mockMapConfig.getConfiguration.mockReturnValue({
         providers: [
-          { provider: 'openstreetmap', enabled: true, priority: 1 },
-          { provider: 'google', enabled: false, priority: 2 },
-          { provider: 'mapbox', enabled: false, priority: 3 },
+          {
+            provider: 'openstreetmap',
+            enabled: true,
+            priority: 1,
+            config: { attribution: '© OpenStreetMap contributors', maxZoom: 19, minZoom: 0, rateLimit: 1000 },
+          },
+          {
+            provider: 'google',
+            enabled: false,
+            priority: 2,
+            config: { attribution: '© Google', maxZoom: 21, minZoom: 0, rateLimit: 50 },
+          },
+          {
+            provider: 'mapbox',
+            enabled: false,
+            priority: 3,
+            config: { attribution: '© Mapbox © OpenStreetMap contributors', maxZoom: 22, minZoom: 0, rateLimit: 600 },
+          },
         ],
         defaultProvider: 'openstreetmap',
         fallbackStrategy: 'priority',
@@ -722,9 +804,24 @@ describe('MapProviderSettings', () => {
 
       mockMapConfig.getConfiguration.mockReturnValue({
         providers: [
-          { provider: 'openstreetmap', enabled: true, priority: 1 },
-          { provider: 'google', enabled: true, priority: 2 },
-          { provider: 'mapbox', enabled: false, priority: 3 },
+          {
+            provider: 'openstreetmap',
+            enabled: true,
+            priority: 1,
+            config: { attribution: '© OpenStreetMap contributors', maxZoom: 19, minZoom: 0, rateLimit: 1000 },
+          },
+          {
+            provider: 'google',
+            enabled: true,
+            priority: 2,
+            config: { attribution: '© Google', maxZoom: 21, minZoom: 0, rateLimit: 50 },
+          },
+          {
+            provider: 'mapbox',
+            enabled: false,
+            priority: 3,
+            config: { attribution: '© Mapbox © OpenStreetMap contributors', maxZoom: 22, minZoom: 0, rateLimit: 600 },
+          },
         ],
         defaultProvider: 'openstreetmap',
         fallbackStrategy: 'priority',
@@ -758,6 +855,57 @@ describe('MapProviderSettings', () => {
       unmount();
 
       expect(unsubscribe).toHaveBeenCalled();
+    });
+
+    it('updates rendered configuration when the listener pushes a new config', () => {
+      render(<MapProviderSettings />);
+
+      const listener = mockMapConfig.addConfigurationListener.mock.calls[0]?.[0];
+      expect(listener).toBeDefined();
+
+      act(() => {
+        listener?.({
+          providers: [
+            {
+              provider: 'openstreetmap',
+              enabled: true,
+              priority: 1,
+              config: { attribution: '© OpenStreetMap contributors', maxZoom: 19, minZoom: 0, rateLimit: 1000 },
+            },
+            {
+              provider: 'google',
+              enabled: true,
+              priority: 2,
+              config: { attribution: '© Google', maxZoom: 21, minZoom: 0, rateLimit: 50 },
+            },
+            {
+              provider: 'mapbox',
+              enabled: false,
+              priority: 3,
+              config: { attribution: '© Mapbox © OpenStreetMap contributors', maxZoom: 22, minZoom: 0, rateLimit: 600 },
+            },
+          ],
+          defaultProvider: 'google',
+          apiKeys: [],
+          fallbackStrategy: 'priority',
+          enableAutoFallback: true,
+          cacheResponses: true,
+          cacheDuration: 3600000,
+          enableOfflineMode: false,
+          healthCheckInterval: 300000,
+          policyMode: 'strict',
+          searchBehaviorWhenNoAutocomplete: 'submit-only',
+          uiPreferences: {
+            tileLayer: 'openstreetmap',
+            zoom: 10,
+            showLightPollution: false,
+          },
+          configVersion: 2,
+        });
+      });
+
+      const switches = screen.getAllByTestId('switch');
+      expect(switches[1]).toBeChecked();
     });
   });
 });

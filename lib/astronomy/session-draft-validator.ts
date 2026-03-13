@@ -1,9 +1,10 @@
 import type {
   ManualScheduleItem,
-  SessionConstraintSet,
   SessionDraftV2,
+  SessionConstraintSet,
   SessionWeatherSnapshot,
 } from '@/types/starmap/session-planner-v2';
+import type { MessierMarathonPlannerContext, MessierMarathonStageId } from '@/lib/messier-marathon';
 import type { OptimizationStrategy } from '@/types/starmap/planning';
 
 export const DEFAULT_SESSION_CONSTRAINTS: SessionConstraintSet = {
@@ -185,6 +186,65 @@ function normalizeWeatherSnapshot(snapshot: unknown): SessionWeatherSnapshot | u
   };
 }
 
+function normalizeGuideContext(value: unknown): MessierMarathonPlannerContext | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const raw = value as Partial<MessierMarathonPlannerContext>;
+  if (raw.kind !== 'messier-marathon' || typeof raw.sessionId !== 'string') {
+    return undefined;
+  }
+
+  const checkpointOrder = Array.isArray(raw.checkpointOrder)
+    ? raw.checkpointOrder.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+  const criticalCheckpointIds = Array.isArray(raw.criticalCheckpointIds)
+    ? raw.criticalCheckpointIds.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : [];
+  const stageByTargetId = raw.stageByTargetId && typeof raw.stageByTargetId === 'object'
+    ? Object.entries(raw.stageByTargetId).reduce<Record<string, MessierMarathonStageId>>((accumulator, [targetId, stageId]) => {
+      if (
+        typeof targetId === 'string'
+        && typeof stageId === 'string'
+        && ['dusk', 'early-evening', 'prime-night', 'pre-dawn', 'final-window'].includes(stageId)
+      ) {
+        accumulator[targetId] = stageId as MessierMarathonStageId;
+      }
+      return accumulator;
+    }, {})
+    : {};
+  const normalizeStringRecord = (input: unknown): Record<string, string> | undefined => {
+    if (!input || typeof input !== 'object') return undefined;
+    const entries = Object.entries(input).filter(
+      ([key, nestedValue]) =>
+        typeof key === 'string'
+        && key.trim().length > 0
+        && typeof nestedValue === 'string'
+        && nestedValue.trim().length > 0,
+    );
+    if (entries.length === 0) return undefined;
+    return Object.fromEntries(entries);
+  };
+
+  return {
+    kind: 'messier-marathon',
+    sessionId: raw.sessionId,
+    readiness:
+      raw.readiness === 'recommended'
+      || raw.readiness === 'limited'
+      || raw.readiness === 'not_recommended'
+        ? raw.readiness
+        : 'limited',
+    mode: raw.mode === 'full' || raw.mode === 'best_effort' ? raw.mode : 'best_effort',
+    checkpointOrder,
+    criticalCheckpointIds,
+    stageByTargetId,
+    plannerTargetIdByCatalogId: normalizeStringRecord(raw.plannerTargetIdByCatalogId),
+    catalogIdByPlannerTargetId: normalizeStringRecord(raw.catalogIdByPlannerTargetId),
+    sourceListId: typeof raw.sourceListId === 'string' ? raw.sourceListId : undefined,
+    sourcePlanId: typeof raw.sourcePlanId === 'string' ? raw.sourcePlanId : undefined,
+    sourceExecutionId: typeof raw.sourceExecutionId === 'string' ? raw.sourceExecutionId : undefined,
+  };
+}
+
 function normalizeManualEdit(
   value: unknown,
   knownTargetIds: Set<string> | undefined,
@@ -348,6 +408,7 @@ export function validateSessionDraft(
   const notes = typeof raw.notes === 'string' ? raw.notes : undefined;
 
   const weatherSnapshot = normalizeWeatherSnapshot(raw.weatherSnapshot);
+  const guideContext = normalizeGuideContext(raw.guideContext);
 
   const draft: SessionDraftV2 = {
     planDate,
@@ -357,6 +418,7 @@ export function validateSessionDraft(
     manualEdits,
     notes,
     weatherSnapshot,
+    guideContext,
     exportMeta: raw.exportMeta && typeof raw.exportMeta === 'object'
       ? {
         lastFormat: raw.exportMeta.lastFormat,

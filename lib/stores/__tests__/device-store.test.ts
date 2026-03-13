@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { useDeviceStore, PRIMARY_MOUNT_DEVICE_PROFILE_ID } from '@/lib/stores/device-store';
+import type { DeviceProfile } from '@/lib/core/types/device';
 
 function resetDeviceStore(): void {
   useDeviceStore.setState({
@@ -19,6 +20,10 @@ function resetDeviceStore(): void {
 }
 
 describe('useDeviceStore', () => {
+  function isMountProfile(profile: DeviceProfile | undefined): profile is DeviceProfile<'mount'> {
+    return profile?.type === 'mount';
+  }
+
   beforeEach(() => {
     resetDeviceStore();
   });
@@ -151,6 +156,42 @@ describe('useDeviceStore', () => {
         host: 'localhost',
         port: 11111,
         deviceId: 0,
+        selectedDeviceId: 'alpaca://localhost:11111/telescope/0',
+        selectedDevice: {
+          id: 'alpaca://localhost:11111/telescope/0',
+          protocol: 'alpaca',
+          host: 'localhost',
+          port: 11111,
+          deviceId: 0,
+          name: 'Primary Alpaca Mount',
+          deviceType: 'telescope',
+          source: 'alpaca-discovery',
+        },
+        capabilitySnapshot: {
+          canSlew: true,
+          canSlewAsync: true,
+          canSync: true,
+          canPark: true,
+          canUnpark: true,
+          canSetTracking: true,
+          canMoveAxis: true,
+          canPulseGuide: false,
+          alignmentMode: 'GermanPolar',
+          equatorialSystem: 'J2000',
+          capturedAt: '2026-03-13T00:00:00.000Z',
+        },
+        actionAvailability: {
+          connect: true,
+          discover: true,
+          slew: true,
+          sync: true,
+          park: true,
+          unpark: true,
+          tracking: true,
+          trackingRate: true,
+          moveAxis: true,
+          abortSlew: false,
+        },
       });
     });
 
@@ -158,6 +199,15 @@ describe('useDeviceStore', () => {
     expect(result.current.profiles.some((profile) => profile.type === 'telescope')).toBe(true);
     expect(result.current.profiles.some((profile) => profile.type === 'mount')).toBe(true);
     expect(result.current.connections[PRIMARY_MOUNT_DEVICE_PROFILE_ID]?.state).toBe('connected');
+    const mountProfile = result.current.profiles.find((profile) => profile.id === PRIMARY_MOUNT_DEVICE_PROFILE_ID);
+    expect(isMountProfile(mountProfile)).toBe(true);
+    if (!isMountProfile(mountProfile)) {
+      throw new Error('Expected synchronized mount profile to be present.');
+    }
+    expect(mountProfile.metadata.selectedDeviceId).toBe('alpaca://localhost:11111/telescope/0');
+    expect(mountProfile.metadata.selectedDevice?.name).toBe('Primary Alpaca Mount');
+    expect(mountProfile.metadata.capabilitySnapshot?.canPark).toBe(true);
+    expect(mountProfile.metadata.actionAvailability?.trackingRate).toBe(true);
   });
 
   it('returns blocked readiness when required mount is disconnected', () => {

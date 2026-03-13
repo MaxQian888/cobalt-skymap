@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import * as nextIntl from 'next-intl';
 
 // Mock connectivity checker
 jest.mock('@/lib/services/connectivity-checker', () => ({
@@ -149,6 +150,27 @@ describe('MapHealthMonitor', () => {
       render(<MapHealthMonitor className="custom-class" />);
       expect(screen.getByTestId('card')).toHaveAttribute('class', 'custom-class');
     });
+
+    it('renders fallback labels when translations return empty strings', () => {
+      const nextIntlMock = jest.requireMock('next-intl') as typeof nextIntl;
+      const originalUseTranslations = nextIntlMock.useTranslations;
+      Object.defineProperty(nextIntlMock, 'useTranslations', {
+        configurable: true,
+        value: () => (((_key: string) => '') as ReturnType<typeof nextIntl.useTranslations>),
+      });
+
+      try {
+        render(<MapHealthMonitor />);
+
+        expect(screen.getByText('Provider Health')).toBeInTheDocument();
+        expect(screen.getByText('Refresh')).toBeInTheDocument();
+      } finally {
+        Object.defineProperty(nextIntlMock, 'useTranslations', {
+          configurable: true,
+          value: originalUseTranslations,
+        });
+      }
+    });
   });
 
   describe('Compact Mode', () => {
@@ -257,6 +279,25 @@ describe('MapHealthMonitor', () => {
 
       render(<MapHealthMonitor />);
       expect(screen.getByText('openstreetmap')).toBeInTheDocument();
+    });
+
+    it('renders an indeterminate provider status when health is undefined', () => {
+      mockConnectivityChecker.getAllProviderHealth.mockReturnValue([
+        {
+          provider: 'openstreetmap',
+          isHealthy: undefined as unknown as boolean,
+          successRate: 0.6,
+          responseTime: 250,
+          errorCount: 1,
+          lastChecked: Date.now(),
+          status: { isConnected: true, lastChecked: Date.now() },
+        },
+      ]);
+
+      render(<MapHealthMonitor />);
+
+      expect(screen.getByText('openstreetmap')).toBeInTheDocument();
+      expect(screen.getByText(/map\.degraded|Degraded/)).toBeInTheDocument();
     });
 
     it('shows healthy badge for healthy provider', () => {

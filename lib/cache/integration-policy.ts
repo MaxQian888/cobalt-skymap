@@ -93,6 +93,33 @@ const CACHE_POLICIES = {
     ttl: daysToMs(7),
     allowStaleFallback: true,
   },
+  'daily-knowledge-nasa-library': {
+    id: 'daily-knowledge-nasa-library',
+    title: 'NASA image library',
+    description: 'NASA Image and Video Library astronomy searches.',
+    mode: 'persistent-shared',
+    strategy: 'network-first',
+    ttl: hoursToMs(12),
+    allowStaleFallback: true,
+  },
+  'daily-knowledge-nasa-photojournal': {
+    id: 'daily-knowledge-nasa-photojournal',
+    title: 'NASA photojournal feed',
+    description: 'NASA Science Photojournal RSS feed entries.',
+    mode: 'persistent-shared',
+    strategy: 'network-first',
+    ttl: hoursToMs(6),
+    allowStaleFallback: true,
+  },
+  'daily-knowledge-esa-science': {
+    id: 'daily-knowledge-esa-science',
+    title: 'ESA space science feed',
+    description: 'ESA Space Science RSS feed entries.',
+    mode: 'persistent-shared',
+    strategy: 'network-first',
+    ttl: hoursToMs(6),
+    allowStaleFallback: true,
+  },
   'nighttime-calculations': {
     id: 'nighttime-calculations',
     title: 'Nighttime calculations',
@@ -166,6 +193,24 @@ const CACHE_INTEGRATIONS: CacheIntegrationDefinition[] = [
     title: 'Daily Knowledge Wikimedia',
     modulePath: 'lib/services/daily-knowledge/source-wikimedia.ts',
     policyId: 'daily-knowledge-wikimedia',
+  },
+  {
+    id: 'daily-knowledge-nasa-library',
+    title: 'Daily Knowledge NASA image library',
+    modulePath: 'lib/services/daily-knowledge/source-nasa-image-library.ts',
+    policyId: 'daily-knowledge-nasa-library',
+  },
+  {
+    id: 'daily-knowledge-nasa-photojournal',
+    title: 'Daily Knowledge NASA photojournal',
+    modulePath: 'lib/services/daily-knowledge/source-nasa-photojournal.ts',
+    policyId: 'daily-knowledge-nasa-photojournal',
+  },
+  {
+    id: 'daily-knowledge-esa-science',
+    title: 'Daily Knowledge ESA science',
+    modulePath: 'lib/services/daily-knowledge/source-esa-science.ts',
+    policyId: 'daily-knowledge-esa-science',
   },
   {
     id: 'astro-gsfc-catalog',
@@ -289,4 +334,3 @@ export function getCacheDiagnosticsSummary() {
     degraded: integrations.filter((item) => item.status === 'degraded').length,
   };
 }
-

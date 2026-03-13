@@ -81,25 +81,17 @@ pub fn calculate_moon_position(
 
     // Fundamental arguments (in degrees)
     // Mean longitude of the Moon
-    let l_prime = normalize_degrees(
-        218.3164477 + 481267.88123421 * t - 0.0015786 * t2 + t3 / 538841.0
-    );
+    let l_prime =
+        normalize_degrees(218.3164477 + 481267.88123421 * t - 0.0015786 * t2 + t3 / 538841.0);
     // Mean anomaly of the Moon
-    let m_prime = normalize_degrees(
-        134.9633964 + 477198.8675055 * t + 0.0087414 * t2 + t3 / 69699.0
-    );
+    let m_prime =
+        normalize_degrees(134.9633964 + 477198.8675055 * t + 0.0087414 * t2 + t3 / 69699.0);
     // Mean anomaly of the Sun
-    let m = normalize_degrees(
-        357.5291092 + 35999.0502909 * t - 0.0001536 * t2
-    );
+    let m = normalize_degrees(357.5291092 + 35999.0502909 * t - 0.0001536 * t2);
     // Mean elongation of the Moon
-    let d = normalize_degrees(
-        297.8501921 + 445267.1114034 * t - 0.0018819 * t2 + t3 / 545868.0
-    );
+    let d = normalize_degrees(297.8501921 + 445267.1114034 * t - 0.0018819 * t2 + t3 / 545868.0);
     // Mean distance of Moon from ascending node
-    let f = normalize_degrees(
-        93.2720950 + 483202.0175233 * t - 0.0036539 * t2
-    );
+    let f = normalize_degrees(93.2720950 + 483202.0175233 * t - 0.0036539 * t2);
 
     // Convert to radians for calculations
     let _l_prime_rad = l_prime * DEG_TO_RAD; // Reserved for future use
@@ -156,7 +148,14 @@ pub fn calculate_moon_position(
     let eq = ecliptic_to_equatorial(lon, lat, Some(dt.timestamp()));
 
     // Convert to horizontal
-    let hor = equatorial_to_horizontal(eq.ra, eq.dec, latitude, longitude, Some(dt.timestamp()), None);
+    let hor = equatorial_to_horizontal(
+        eq.ra,
+        eq.dec,
+        latitude,
+        longitude,
+        Some(dt.timestamp()),
+        None,
+    );
 
     MoonPosition {
         ra: eq.ra,
@@ -181,33 +180,73 @@ mod tests {
         // Jan 6, 2000 was a known new moon
         let dt = Utc.with_ymd_and_hms(2000, 1, 6, 18, 0, 0).unwrap();
         let phase = calculate_moon_phase(Some(dt.timestamp()));
-        assert!(phase.phase < 0.1 || phase.phase > 0.9, "Should be near new moon, got phase {}", phase.phase);
-        assert!(phase.illumination < 10.0, "New moon illumination should be low, got {}", phase.illumination);
+        assert!(
+            phase.phase < 0.1 || phase.phase > 0.9,
+            "Should be near new moon, got phase {}",
+            phase.phase
+        );
+        assert!(
+            phase.illumination < 10.0,
+            "New moon illumination should be low, got {}",
+            phase.illumination
+        );
     }
 
     #[test]
     fn test_moon_phase_range() {
         let phase = calculate_moon_phase(None);
-        assert!(phase.phase >= 0.0 && phase.phase <= 1.0, "Phase should be 0-1");
-        assert!(phase.illumination >= 0.0 && phase.illumination <= 100.0, "Illumination should be 0-100%");
-        assert!(phase.age >= 0.0 && phase.age <= 30.0, "Age should be 0-30 days");
+        assert!(
+            phase.phase >= 0.0 && phase.phase <= 1.0,
+            "Phase should be 0-1"
+        );
+        assert!(
+            phase.illumination >= 0.0 && phase.illumination <= 100.0,
+            "Illumination should be 0-100%"
+        );
+        assert!(
+            phase.age >= 0.0 && phase.age <= 30.0,
+            "Age should be 0-30 days"
+        );
     }
 
     #[test]
     fn test_moon_phase_names() {
-        let valid_names = ["New Moon", "Waxing Crescent", "First Quarter", "Waxing Gibbous", 
-                          "Full Moon", "Waning Gibbous", "Last Quarter", "Waning Crescent"];
+        let valid_names = [
+            "New Moon",
+            "Waxing Crescent",
+            "First Quarter",
+            "Waxing Gibbous",
+            "Full Moon",
+            "Waning Gibbous",
+            "Last Quarter",
+            "Waning Crescent",
+        ];
         let phase = calculate_moon_phase(None);
-        assert!(valid_names.contains(&phase.phase_name.as_str()), "Invalid phase name: {}", phase.phase_name);
+        assert!(
+            valid_names.contains(&phase.phase_name.as_str()),
+            "Invalid phase name: {}",
+            phase.phase_name
+        );
     }
 
     #[test]
     fn test_moon_position_range() {
         let moon = calculate_moon_position(45.0, 0.0, None);
-        assert!(moon.ra >= 0.0 && moon.ra < 360.0, "Moon RA out of range: {}", moon.ra);
-        assert!(moon.dec >= -90.0 && moon.dec <= 90.0, "Moon Dec out of range: {}", moon.dec);
-        assert!(moon.distance > 350000.0 && moon.distance < 410000.0, 
-            "Moon distance out of range: {} km", moon.distance);
+        assert!(
+            moon.ra >= 0.0 && moon.ra < 360.0,
+            "Moon RA out of range: {}",
+            moon.ra
+        );
+        assert!(
+            moon.dec >= -90.0 && moon.dec <= 90.0,
+            "Moon Dec out of range: {}",
+            moon.dec
+        );
+        assert!(
+            moon.distance > 350000.0 && moon.distance < 410000.0,
+            "Moon distance out of range: {} km",
+            moon.distance
+        );
     }
 
     #[test]
@@ -215,16 +254,34 @@ mod tests {
         // Moon distance varies between ~356,500 km (perigee) and ~406,700 km (apogee)
         // Test multiple timestamps to verify distance stays in range
         let test_timestamps = vec![
-            Utc.with_ymd_and_hms(2024, 1, 15, 12, 0, 0).unwrap().timestamp(),
-            Utc.with_ymd_and_hms(2024, 4, 15, 12, 0, 0).unwrap().timestamp(),
-            Utc.with_ymd_and_hms(2024, 7, 15, 12, 0, 0).unwrap().timestamp(),
-            Utc.with_ymd_and_hms(2024, 10, 15, 12, 0, 0).unwrap().timestamp(),
+            Utc.with_ymd_and_hms(2024, 1, 15, 12, 0, 0)
+                .unwrap()
+                .timestamp(),
+            Utc.with_ymd_and_hms(2024, 4, 15, 12, 0, 0)
+                .unwrap()
+                .timestamp(),
+            Utc.with_ymd_and_hms(2024, 7, 15, 12, 0, 0)
+                .unwrap()
+                .timestamp(),
+            Utc.with_ymd_and_hms(2024, 10, 15, 12, 0, 0)
+                .unwrap()
+                .timestamp(),
         ];
-        
+
         for ts in test_timestamps {
             let moon = calculate_moon_position(0.0, 0.0, Some(ts));
-            assert!(moon.distance >= 350000.0, "Moon too close: {} km at ts {}", moon.distance, ts);
-            assert!(moon.distance <= 410000.0, "Moon too far: {} km at ts {}", moon.distance, ts);
+            assert!(
+                moon.distance >= 350000.0,
+                "Moon too close: {} km at ts {}",
+                moon.distance,
+                ts
+            );
+            assert!(
+                moon.distance <= 410000.0,
+                "Moon too far: {} km at ts {}",
+                moon.distance,
+                ts
+            );
         }
     }
 
@@ -233,21 +290,34 @@ mod tests {
         // Moon declination varies roughly between -28.5° and +28.5° over 18.6-year cycle
         // In any given month, it should stay within ±30°
         let moon = calculate_moon_position(45.0, 0.0, None);
-        assert!(moon.dec >= -30.0 && moon.dec <= 30.0, 
-            "Moon Dec should be within ±30°, got {}", moon.dec);
+        assert!(
+            moon.dec >= -30.0 && moon.dec <= 30.0,
+            "Moon Dec should be within ±30°, got {}",
+            moon.dec
+        );
     }
 
     #[test]
     fn test_moon_position_consistency() {
         // Test that moon position changes smoothly over time
-        let base_ts = Utc.with_ymd_and_hms(2024, 6, 15, 12, 0, 0).unwrap().timestamp();
+        let base_ts = Utc
+            .with_ymd_and_hms(2024, 6, 15, 12, 0, 0)
+            .unwrap()
+            .timestamp();
         let moon1 = calculate_moon_position(0.0, 0.0, Some(base_ts));
         let moon2 = calculate_moon_position(0.0, 0.0, Some(base_ts + 3600)); // 1 hour later
-        
+
         // Moon moves about 0.5° per hour in RA
         let ra_diff = (moon2.ra - moon1.ra).abs();
-        let ra_diff_normalized = if ra_diff > 180.0 { 360.0 - ra_diff } else { ra_diff };
-        assert!(ra_diff_normalized < 2.0, 
-            "Moon RA should change smoothly over 1 hour, got {} degree change", ra_diff_normalized);
+        let ra_diff_normalized = if ra_diff > 180.0 {
+            360.0 - ra_diff
+        } else {
+            ra_diff
+        };
+        assert!(
+            ra_diff_normalized < 2.0,
+            "Moon RA should change smoothly over 1 hour, got {} degree change",
+            ra_diff_normalized
+        );
     }
 }

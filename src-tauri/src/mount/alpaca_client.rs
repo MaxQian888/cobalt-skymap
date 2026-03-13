@@ -65,6 +65,71 @@ impl AlpacaVoidResponse {
     }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+struct ConfiguredDevice {
+    device_name: String,
+    device_type: String,
+    device_number: u32,
+    #[serde(rename = "UniqueID")]
+    unique_id: Option<String>,
+}
+
+fn build_discovered_device_id(
+    host: &str,
+    port: u16,
+    device_id: u32,
+    unique_id: Option<&str>,
+) -> String {
+    let base = format!("alpaca://{}:{}/telescope/{}", host, port, device_id);
+    match unique_id {
+        Some(unique_id) if !unique_id.trim().is_empty() => {
+            format!("{}?uid={}", base, unique_id.trim())
+        }
+        _ => base,
+    }
+}
+
+fn parse_configured_telescope_devices(
+    host: &str,
+    port: u16,
+    body: &str,
+) -> Result<Vec<DiscoveredDevice>, MountError> {
+    let devices: Vec<ConfiguredDevice> = serde_json::from_str(body).map_err(|e| {
+        MountError::Other(format!("Invalid Alpaca configureddevices response: {}", e))
+    })?;
+
+    Ok(devices
+        .into_iter()
+        .filter(|device| device.device_type.eq_ignore_ascii_case("telescope"))
+        .map(|device| {
+            let unique_id = device.unique_id.clone();
+            let normalized_type = device.device_type.to_ascii_lowercase();
+            DiscoveredDevice {
+                id: build_discovered_device_id(
+                    host,
+                    port,
+                    device.device_number,
+                    unique_id.as_deref(),
+                ),
+                protocol: MountProtocol::Alpaca,
+                host: host.to_string(),
+                port,
+                device_id: device.device_number,
+                name: device.device_name,
+                device_type: normalized_type,
+                source: "alpaca-discovery".to_string(),
+                unique_id,
+                manufacturer: None,
+                model: None,
+                description: Some(format!("Alpaca telescope @ {}:{}", host, port)),
+                driver_info: None,
+                driver_version: None,
+            }
+        })
+        .collect())
+}
+
 /// ASCOM Alpaca telescope client
 pub struct AlpacaClient {
     client: Client,
@@ -95,22 +160,37 @@ impl AlpacaClient {
     // ========================================================================
 
     async fn get_bool(&self, property: &str) -> Result<bool, MountError> {
-        let url = format!("{}/{}?ClientID={}&ClientTransactionID={}",
-            self.base_url, property, CLIENT_ID, next_transaction_id());
+        let url = format!(
+            "{}/{}?ClientID={}&ClientTransactionID={}",
+            self.base_url,
+            property,
+            CLIENT_ID,
+            next_transaction_id()
+        );
         let resp: AlpacaResponse<bool> = self.client.get(&url).send().await?.json().await?;
         resp.into_result()
     }
 
     async fn get_f64(&self, property: &str) -> Result<f64, MountError> {
-        let url = format!("{}/{}?ClientID={}&ClientTransactionID={}",
-            self.base_url, property, CLIENT_ID, next_transaction_id());
+        let url = format!(
+            "{}/{}?ClientID={}&ClientTransactionID={}",
+            self.base_url,
+            property,
+            CLIENT_ID,
+            next_transaction_id()
+        );
         let resp: AlpacaResponse<f64> = self.client.get(&url).send().await?.json().await?;
         resp.into_result()
     }
 
     async fn get_i32(&self, property: &str) -> Result<i32, MountError> {
-        let url = format!("{}/{}?ClientID={}&ClientTransactionID={}",
-            self.base_url, property, CLIENT_ID, next_transaction_id());
+        let url = format!(
+            "{}/{}?ClientID={}&ClientTransactionID={}",
+            self.base_url,
+            property,
+            CLIENT_ID,
+            next_transaction_id()
+        );
         let resp: AlpacaResponse<i32> = self.client.get(&url).send().await?.json().await?;
         resp.into_result()
     }
@@ -147,8 +227,13 @@ impl AlpacaClient {
 
     #[allow(dead_code)]
     async fn get_string(&self, property: &str) -> Result<String, MountError> {
-        let url = format!("{}/{}?ClientID={}&ClientTransactionID={}",
-            self.base_url, property, CLIENT_ID, next_transaction_id());
+        let url = format!(
+            "{}/{}?ClientID={}&ClientTransactionID={}",
+            self.base_url,
+            property,
+            CLIENT_ID,
+            next_transaction_id()
+        );
         let resp: AlpacaResponse<String> = self.client.get(&url).send().await?.json().await?;
         resp.into_result()
     }
@@ -164,7 +249,14 @@ impl AlpacaClient {
             ("ClientTransactionID", next_transaction_id().to_string()),
         ];
         form.extend(params.iter().map(|(k, v)| (*k, v.clone())));
-        let resp: AlpacaVoidResponse = self.client.put(&url).form(&form).send().await?.json().await?;
+        let resp: AlpacaVoidResponse = self
+            .client
+            .put(&url)
+            .form(&form)
+            .send()
+            .await?
+            .json()
+            .await?;
         resp.into_result()
     }
 
@@ -173,13 +265,15 @@ impl AlpacaClient {
     // ========================================================================
 
     pub async fn connect(&self) -> Result<(), MountError> {
-        self.put_void("connected", &[("Connected", "true".to_string())]).await?;
+        self.put_void("connected", &[("Connected", "true".to_string())])
+            .await?;
         log::info!("Alpaca mount connected (device {})", self.device_id);
         Ok(())
     }
 
     pub async fn disconnect(&self) -> Result<(), MountError> {
-        self.put_void("connected", &[("Connected", "false".to_string())]).await?;
+        self.put_void("connected", &[("Connected", "false".to_string())])
+            .await?;
         log::info!("Alpaca mount disconnected");
         Ok(())
     }
@@ -287,19 +381,31 @@ impl AlpacaClient {
     // ========================================================================
 
     /// Async slew to RA (hours) and Dec (degrees)
-    pub async fn slew_to_coordinates_async(&self, ra_hours: f64, dec: f64) -> Result<(), MountError> {
-        self.put_void("slewtocoordinatesasync", &[
-            ("RightAscension", ra_hours.to_string()),
-            ("Declination", dec.to_string()),
-        ]).await
+    pub async fn slew_to_coordinates_async(
+        &self,
+        ra_hours: f64,
+        dec: f64,
+    ) -> Result<(), MountError> {
+        self.put_void(
+            "slewtocoordinatesasync",
+            &[
+                ("RightAscension", ra_hours.to_string()),
+                ("Declination", dec.to_string()),
+            ],
+        )
+        .await
     }
 
     /// Sync mount to RA (hours) and Dec (degrees)
     pub async fn sync_to_coordinates(&self, ra_hours: f64, dec: f64) -> Result<(), MountError> {
-        self.put_void("synctocoordinates", &[
-            ("RightAscension", ra_hours.to_string()),
-            ("Declination", dec.to_string()),
-        ]).await
+        self.put_void(
+            "synctocoordinates",
+            &[
+                ("RightAscension", ra_hours.to_string()),
+                ("Declination", dec.to_string()),
+            ],
+        )
+        .await
     }
 
     pub async fn abort_slew(&self) -> Result<(), MountError> {
@@ -315,7 +421,8 @@ impl AlpacaClient {
     }
 
     pub async fn set_tracking(&self, enabled: bool) -> Result<(), MountError> {
-        self.put_void("tracking", &[("Tracking", enabled.to_string())]).await
+        self.put_void("tracking", &[("Tracking", enabled.to_string())])
+            .await
     }
 
     pub async fn set_tracking_rate(&self, rate: TrackingRate) -> Result<(), MountError> {
@@ -325,14 +432,27 @@ impl AlpacaClient {
             TrackingRate::Solar => 2,
             TrackingRate::Stopped => 0, // Stopped is handled via tracking=false
         };
-        self.put_void("trackingrate", &[("TrackingRate", val.to_string())]).await
+        self.put_void("trackingrate", &[("TrackingRate", val.to_string())])
+            .await
     }
 
     pub async fn get_observing_conditions(&self) -> Result<ObservingConditions, MountError> {
-        let cloud_cover = self.get_f64_device("observingconditions", "cloudcover").await.ok();
-        let humidity = self.get_f64_device("observingconditions", "humidity").await.ok();
-        let wind_speed = self.get_f64_device("observingconditions", "windspeed").await.ok();
-        let dew_point = self.get_f64_device("observingconditions", "dewpoint").await.ok();
+        let cloud_cover = self
+            .get_f64_device("observingconditions", "cloudcover")
+            .await
+            .ok();
+        let humidity = self
+            .get_f64_device("observingconditions", "humidity")
+            .await
+            .ok();
+        let wind_speed = self
+            .get_f64_device("observingconditions", "windspeed")
+            .await
+            .ok();
+        let dew_point = self
+            .get_f64_device("observingconditions", "dewpoint")
+            .await
+            .ok();
 
         Ok(ObservingConditions {
             cloud_cover,
@@ -356,10 +476,11 @@ impl AlpacaClient {
             MountAxis::Primary => 0,
             MountAxis::Secondary => 1,
         };
-        self.put_void("moveaxis", &[
-            ("Axis", axis_num.to_string()),
-            ("Rate", rate.to_string()),
-        ]).await
+        self.put_void(
+            "moveaxis",
+            &[("Axis", axis_num.to_string()), ("Rate", rate.to_string())],
+        )
+        .await
     }
 
     /// Stop axis motion (move at rate 0)
@@ -409,6 +530,7 @@ impl AlpacaClient {
 
     /// Discover Alpaca devices on the network via UDP broadcast
     pub async fn discover(timeout_ms: u64) -> Result<Vec<DiscoveredDevice>, MountError> {
+        use std::collections::HashSet;
         use tokio::net::UdpSocket;
         use tokio::time::{timeout, Duration};
 
@@ -427,7 +549,13 @@ impl AlpacaClient {
             .await
             .map_err(|e| MountError::Other(format!("UDP send failed: {}", e)))?;
 
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .map_err(|e| MountError::Other(format!("HTTP client init failed: {}", e)))?;
+
         let mut devices = Vec::new();
+        let mut servers = HashSet::<(String, u16)>::new();
         let mut buf = [0u8; 1024];
 
         let deadline = Duration::from_millis(timeout_ms);
@@ -438,13 +566,7 @@ impl AlpacaClient {
                         // Parse Alpaca discovery response: {"AlpacaPort": 11111}
                         if let Ok(val) = serde_json::from_str::<serde_json::Value>(text) {
                             if let Some(port) = val.get("AlpacaPort").and_then(|v| v.as_u64()) {
-                                devices.push(DiscoveredDevice {
-                                    host: addr.ip().to_string(),
-                                    port: port as u16,
-                                    device_id: 0,
-                                    device_name: format!("Alpaca Server @ {}", addr.ip()),
-                                    device_type: "Telescope".to_string(),
-                                });
+                                servers.insert((addr.ip().to_string(), port as u16));
                             }
                         }
                     }
@@ -453,7 +575,101 @@ impl AlpacaClient {
             }
         }
 
+        for (host, port) in servers {
+            let url = format!("http://{}:{}/management/v1/configureddevices", host, port);
+            match client.get(&url).send().await {
+                Ok(response) => match response.text().await {
+                    Ok(body) => match parse_configured_telescope_devices(&host, port, &body) {
+                        Ok(mut discovered) => devices.append(&mut discovered),
+                        Err(error) => log::warn!(
+                            "Failed to parse Alpaca configureddevices for {}:{}: {}",
+                            host,
+                            port,
+                            error
+                        ),
+                    },
+                    Err(error) => log::warn!(
+                        "Failed to read Alpaca configureddevices response for {}:{}: {}",
+                        host,
+                        port,
+                        error
+                    ),
+                },
+                Err(error) => log::warn!(
+                    "Failed to query Alpaca configureddevices for {}:{}: {}",
+                    host,
+                    port,
+                    error
+                ),
+            }
+        }
+
         log::info!("Alpaca discovery found {} devices", devices.len());
         Ok(devices)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_discovered_device_id, parse_configured_telescope_devices};
+
+    #[test]
+    fn discovered_device_id_uses_unique_id_only_when_present() {
+        let with_uid = build_discovered_device_id("10.0.0.5", 11111, 2, Some(" mount-uid-2 "));
+        let without_uid = build_discovered_device_id("10.0.0.5", 11111, 2, Some("   "));
+
+        assert_eq!(
+            with_uid,
+            "alpaca://10.0.0.5:11111/telescope/2?uid=mount-uid-2"
+        );
+        assert_eq!(without_uid, "alpaca://10.0.0.5:11111/telescope/2");
+    }
+
+    #[test]
+    fn parses_management_configured_devices_into_telescope_entries() {
+        let body = r#"[
+            {
+                "DeviceName": "EQ6-R Pro",
+                "DeviceType": "Telescope",
+                "DeviceNumber": 2,
+                "UniqueID": "mount-uid-2"
+            },
+            {
+                "DeviceName": "Main Camera",
+                "DeviceType": "Camera",
+                "DeviceNumber": 1,
+                "UniqueID": "camera-uid-1"
+            }
+        ]"#;
+
+        let devices = parse_configured_telescope_devices("10.0.0.5", 11111, body)
+            .expect("configureddevices response should parse");
+
+        assert_eq!(devices.len(), 1);
+        assert_eq!(
+            devices[0].id,
+            "alpaca://10.0.0.5:11111/telescope/2?uid=mount-uid-2"
+        );
+        assert_eq!(devices[0].host, "10.0.0.5");
+        assert_eq!(devices[0].port, 11111);
+        assert_eq!(devices[0].device_id, 2);
+        assert_eq!(devices[0].name, "EQ6-R Pro");
+        assert_eq!(devices[0].device_type, "telescope");
+        assert_eq!(devices[0].source, "alpaca-discovery");
+        assert_eq!(devices[0].unique_id.as_deref(), Some("mount-uid-2"));
+    }
+
+    #[test]
+    fn invalid_configured_devices_payload_returns_descriptive_error() {
+        let error = parse_configured_telescope_devices("10.0.0.5", 11111, "{not-json")
+            .expect_err("invalid payload should fail to parse");
+
+        assert!(matches!(error, crate::mount::types::MountError::Other(_)));
+        assert!(
+            error
+                .to_string()
+                .contains("Invalid Alpaca configureddevices response"),
+            "error should mention configureddevices parsing failure"
+        );
     }
 }

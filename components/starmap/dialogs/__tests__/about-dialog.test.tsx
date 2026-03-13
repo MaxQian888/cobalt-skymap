@@ -4,6 +4,10 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { getVisibleDependencies } from '@/lib/constants/about-data';
+import {
+  getDialogMobileRequirement,
+  STARMAP_DIALOG_ROLLOUT_ORDER,
+} from '../mobile-dialog-inventory';
 
 // Mock UI components
 jest.mock('@/components/ui/dialog', () => ({
@@ -196,5 +200,30 @@ describe('AboutDialog', () => {
     render(<AboutDialog />);
 
     expect(screen.getAllByTestId('dependency-row')).toHaveLength(getVisibleDependencies(false).length);
+  });
+
+  it('registers the about dialog in the mobile dialog inventory', () => {
+    const requirement = getDialogMobileRequirement('about-dialog');
+
+    expect(requirement).toMatchObject({
+      id: 'about-dialog',
+      area: 'dialogs',
+      tier: 'complex-editor',
+      mobileMode: 'full-screen',
+      stickyFooter: false,
+      closeBehavior: 'deterministic-close',
+    });
+  });
+
+  it('keeps dialog rollout order sorted by priority and returns null for unknown ids', () => {
+    const priorityOrder = { P0: 0, P1: 1, P2: 2 } as const;
+    const priorities = STARMAP_DIALOG_ROLLOUT_ORDER.map((id) => {
+      const requirement = getDialogMobileRequirement(id);
+      expect(requirement).not.toBeNull();
+      return priorityOrder[requirement!.rolloutPriority];
+    });
+
+    expect(priorities).toEqual([...priorities].sort((left, right) => left - right));
+    expect(getDialogMobileRequirement('missing-dialog')).toBeNull();
   });
 });

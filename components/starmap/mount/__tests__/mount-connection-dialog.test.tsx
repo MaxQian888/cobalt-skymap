@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, fireEvent, act, waitFor, screen } from '@testing-library/react';
 
 // ---- Mount store mock ----
 let mountState = {
@@ -12,6 +12,7 @@ let mountState = {
     host: 'localhost',
     port: 11111,
     deviceId: 0,
+    selectedDeviceId: 'simulator://builtin',
   },
   capabilities: {
     canSlew: false,
@@ -31,6 +32,8 @@ const mockSetConnectionConfig = jest.fn();
 const mockSetCapabilities = jest.fn();
 const mockApplyMountState = jest.fn();
 const mockResetMountInfo = jest.fn();
+const mockSetSelectedDevice = jest.fn();
+const mockSetCapabilitySnapshot = jest.fn();
 
 const mockUseMountStore = jest.fn((selector: (s: typeof mountState) => unknown) => {
   const state = {
@@ -39,6 +42,8 @@ const mockUseMountStore = jest.fn((selector: (s: typeof mountState) => unknown) 
     setCapabilities: mockSetCapabilities,
     applyMountState: mockApplyMountState,
     resetMountInfo: mockResetMountInfo,
+    setSelectedDevice: mockSetSelectedDevice,
+    setCapabilitySnapshot: mockSetCapabilitySnapshot,
   };
   return selector(state as unknown as typeof mountState);
 });
@@ -127,6 +132,7 @@ describe('MountConnectionDialog', () => {
         host: 'localhost',
         port: 11111,
         deviceId: 0,
+        selectedDeviceId: 'simulator://builtin',
       },
       capabilities: {
         canSlew: false,
@@ -370,7 +376,16 @@ describe('MountConnectionDialog', () => {
     mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
     mountState.connectionConfig.host = 'localhost';
     const mockDevices = [
-      { host: '192.168.1.10', port: 11111, deviceId: 0, deviceName: 'Sim Telescope', deviceType: 'telescope' },
+      {
+        id: 'alpaca://192.168.1.10:11111/telescope/0',
+        protocol: 'alpaca',
+        host: '192.168.1.10',
+        port: 11111,
+        deviceId: 0,
+        name: 'Sim Telescope',
+        deviceType: 'telescope',
+        source: 'alpaca-discovery',
+      },
     ];
     mockDiscover.mockResolvedValueOnce(mockDevices);
 
@@ -438,7 +453,17 @@ describe('MountConnectionDialog', () => {
     mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
     mountState.connectionConfig.host = 'localhost';
     const mockDevices = [
-      { host: '10.0.0.5', port: 22222, deviceId: 1, deviceName: 'Remote Mount', deviceType: 'telescope' },
+      {
+        id: 'alpaca://10.0.0.5:22222/telescope/1',
+        protocol: 'alpaca',
+        host: '10.0.0.5',
+        port: 22222,
+        deviceId: 1,
+        name: 'Remote Mount',
+        deviceType: 'telescope',
+        source: 'alpaca-discovery',
+        uniqueId: 'remote-mount-1',
+      },
     ];
     mockDiscover.mockResolvedValueOnce(mockDevices);
 
@@ -459,19 +484,106 @@ describe('MountConnectionDialog', () => {
 
     // After discovery, a device button should appear with the device name
     await waitFor(() => {
-      const deviceBtns = dialog.querySelectorAll('button');
+      const deviceBtns = document.querySelectorAll('button');
       const deviceBtn = Array.from(deviceBtns).find((b) => b.textContent?.includes('Remote Mount'));
       expect(deviceBtn).toBeTruthy();
     });
 
     // Click the device button
-    const deviceBtns = dialog.querySelectorAll('button');
+    const deviceBtns = document.querySelectorAll('button');
     const deviceBtn = Array.from(deviceBtns).find((b) => b.textContent?.includes('Remote Mount'));
     if (deviceBtn) {
       await act(async () => {
         fireEvent.click(deviceBtn);
       });
     }
+  });
+
+  it('successful connect persists the selected supported device identity', async () => {
+    mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
+    mountState.connectionConfig.host = '10.0.0.5';
+    mountState.connectionConfig.port = 22222;
+    mountState.connectionConfig.deviceId = 1;
+    const mockDevices = [
+      {
+        id: 'alpaca://10.0.0.5:22222/telescope/1',
+        protocol: 'alpaca',
+        host: '10.0.0.5',
+        port: 22222,
+        deviceId: 1,
+        name: 'Remote Mount',
+        deviceType: 'telescope',
+        source: 'alpaca-discovery',
+        uniqueId: 'remote-mount-1',
+      },
+    ];
+    mockDiscover.mockResolvedValueOnce(mockDevices);
+    mockConnect.mockResolvedValueOnce({
+      canSlew: true,
+      canSlewAsync: true,
+      canSync: true,
+      canPark: true,
+      canUnpark: true,
+      canSetTracking: true,
+      canMoveAxis: true,
+      canPulseGuide: false,
+      alignmentMode: 'GermanPolar',
+      equatorialSystem: 'J2000',
+    });
+    mockGetState.mockResolvedValueOnce({
+      connected: true,
+      ra: 10,
+      dec: 20,
+      tracking: true,
+      trackingRate: 'sidereal',
+      slewing: false,
+      parked: false,
+      atHome: false,
+      pierSide: 'west',
+      slewRateIndex: 3,
+    });
+
+    const { getByTestId } = render(
+      <MountConnectionDialog open={true} onOpenChange={mockOnOpenChange} />
+    );
+    const dialog = getByTestId('dialog');
+    const buttons = dialog.querySelectorAll('button');
+    const discoverBtn = Array.from(buttons).find((b) => b.textContent?.includes('discoverDevices'));
+
+    await act(async () => {
+      fireEvent.click(discoverBtn!);
+    });
+
+    await waitFor(() => {
+      const deviceBtns = document.querySelectorAll('button');
+      const deviceBtn = Array.from(deviceBtns).find((b) => b.textContent?.includes('Remote Mount'));
+      expect(deviceBtn).toBeTruthy();
+    });
+
+    const deviceBtns = document.querySelectorAll('button');
+    const deviceBtn = Array.from(deviceBtns).find((b) => b.textContent?.includes('Remote Mount'));
+    await act(async () => {
+      fireEvent.click(deviceBtn!);
+    });
+
+    const footer = getByTestId('dialog-footer');
+    const connectBtn = footer.querySelectorAll('button')[1];
+
+    await act(async () => {
+      fireEvent.click(connectBtn);
+    });
+
+    await waitFor(() => {
+      expect(mockSetConnectionConfig).toHaveBeenCalledWith(expect.objectContaining({
+        selectedDeviceId: 'alpaca://10.0.0.5:22222/telescope/1',
+      }));
+      expect(mockSetSelectedDevice).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'Remote Mount',
+        uniqueId: 'remote-mount-1',
+      }));
+      expect(mockSetCapabilitySnapshot).toHaveBeenCalled();
+    });
+    expect(screen.getByText(/selectedDevice|当前设备/)).toBeTruthy();
   });
 
   it('shows connected host:port label for alpaca', () => {

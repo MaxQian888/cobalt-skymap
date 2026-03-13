@@ -7,6 +7,7 @@ import {
 } from '../index';
 import { WebStorageAdapter } from '../web-storage';
 import { TauriStorageAdapter } from '../tauri-storage';
+import type { ImportResult } from '../types';
 
 // Mock Tauri APIs (needed when tauriStorageAdapter is loaded)
 jest.mock('@tauri-apps/api/core', () => ({
@@ -195,6 +196,38 @@ describe('Storage Module', () => {
     it('listStores delegates to adapter', async () => {
       const stores = await storage.listStores();
       expect(Array.isArray(stores)).toBe(true);
+    });
+
+    it('exportAllData delegates path to the adapter', async () => {
+      const exportSpy = jest
+        .spyOn(WebStorageAdapter.prototype, 'exportAllData')
+        .mockResolvedValue(undefined);
+
+      await storage.exportAllData('/tmp/skymap-backup.json');
+
+      expect(exportSpy).toHaveBeenCalledWith('/tmp/skymap-backup.json');
+    });
+
+    it('importAllData delegates payload to the adapter', async () => {
+      const importResult: ImportResult = {
+        imported_count: 1,
+        skipped_count: 0,
+        errors: [],
+        metadata: {
+          version: '1.0',
+          exported_at: '2026-03-13T00:00:00.000Z',
+          app_version: '0.1.0',
+          store_count: 1,
+        },
+      };
+      const importSpy = jest
+        .spyOn(WebStorageAdapter.prototype, 'importAllData')
+        .mockResolvedValue(importResult);
+
+      const result = await storage.importAllData('{"stores":{}}');
+
+      expect(importSpy).toHaveBeenCalledWith('{"stores":{}}');
+      expect(result).toEqual(importResult);
     });
 
     it('getStorageStats delegates to adapter', async () => {

@@ -24,6 +24,7 @@ import { useStellariumViewState } from './use-stellarium-view-state';
 import { UpdateBanner } from '../management/updater/update-banner';
 import { UpdateDialog } from '../management/updater/update-dialog';
 import { SessionPlanner } from '../planning/session-planner';
+import { MessierMarathonGuideDialog } from '../planning/messier-marathon-guide';
 import { PlateSolverUnified } from '../plate-solving/plate-solver-unified';
 import { isTauri } from '@/lib/tauri/app-control-api';
 import { useSettingsStore } from '@/lib/stores/settings-store';
@@ -441,6 +442,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
 
         {/* Session Planner Dialog (mounted once; triggered via store) */}
         <SessionPlanner showTrigger={false} />
+        <MessierMarathonGuideDialog />
         <PlateSolverUnified
           trigger={<span className="hidden" aria-hidden="true" />}
           autoOpenRequestId={cliPlateSolverRequestId}
@@ -596,7 +598,6 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
     </TooltipProvider>
   );
 }
-
 
 
 

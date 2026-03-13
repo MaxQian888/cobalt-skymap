@@ -27,6 +27,11 @@ import type {
   DeviceReadiness,
   DeviceProfileSource,
 } from '@/lib/core/types/device';
+import type {
+  MountActionAvailability,
+  MountCapabilitySnapshot,
+  SupportedMountDevice,
+} from '@/lib/core/types';
 import {
   getAllCameras,
   getAllTelescopes,
@@ -75,6 +80,10 @@ export interface DeviceMountSnapshot {
   host: string;
   port: number;
   deviceId: number;
+  selectedDeviceId?: string | null;
+  selectedDevice?: SupportedMountDevice;
+  capabilitySnapshot?: Partial<MountCapabilitySnapshot>;
+  actionAvailability?: Partial<MountActionAvailability>;
 }
 
 export interface DeviceProfileDraftInput {
@@ -770,6 +779,10 @@ export const useDeviceStore = create<DeviceStoreState>()(
             host: resolved.host,
             port: resolved.port,
             deviceId: resolved.deviceId,
+            selectedDeviceId: resolved.selectedDeviceId,
+            selectedDevice: resolved.selectedDevice,
+            capabilitySnapshot: resolved.capabilitySnapshot,
+            actionAvailability: resolved.actionAvailability,
           },
           createdAt: timestamp,
           updatedAt: timestamp,

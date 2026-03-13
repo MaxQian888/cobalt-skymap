@@ -56,6 +56,56 @@ describe('device-profile-validation', () => {
     expect(result.issues.some((issue) => issue.field === 'metadata.deviceId')).toBe(true);
   });
 
+  it('accepts simulator mount profile with supported-device defaults', () => {
+    const result = validateDeviceProfile(createBaseProfile({
+      id: 'mount-sim',
+      name: 'Simulator Mount',
+      type: 'mount',
+      metadata: {
+        protocol: 'simulator',
+        selectedDeviceId: 'simulator://builtin',
+        selectedDevice: {
+          id: 'simulator://builtin',
+          protocol: 'simulator',
+          host: 'localhost',
+          port: 11111,
+          deviceId: 0,
+          name: 'Built-in Simulator',
+          deviceType: 'simulator',
+          source: 'simulator',
+        },
+        capabilitySnapshot: {
+          canSlew: true,
+          canSlewAsync: true,
+          canSync: true,
+          canPark: true,
+          canUnpark: true,
+          canSetTracking: true,
+          canMoveAxis: true,
+          canPulseGuide: true,
+          alignmentMode: 'GermanPolar',
+          equatorialSystem: 'J2000',
+          capturedAt: '2026-03-13T00:00:00.000Z',
+        },
+        actionAvailability: {
+          connect: true,
+          discover: false,
+          slew: true,
+          sync: true,
+          park: true,
+          unpark: true,
+          tracking: true,
+          trackingRate: true,
+          moveAxis: true,
+          abortSlew: false,
+        },
+      },
+    }));
+
+    expect(result.valid).toBe(true);
+    expect(result.issues).toHaveLength(0);
+  });
+
   it('rejects telescope profile with invalid optical metadata', () => {
     const result = validateDeviceProfile(createBaseProfile({
       id: 'scope-1',

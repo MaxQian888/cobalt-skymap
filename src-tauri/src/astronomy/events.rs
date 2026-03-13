@@ -166,11 +166,11 @@ fn check_supermoon(timestamp: i64) -> bool {
     // Apogee range: ~404,000 km to ~406,700 km
     // A supermoon is typically defined as a full moon within 90% of its closest approach
     const PERIGEE_DISTANCE: f64 = 356500.0;
-    
+
     // Threshold: within 5% above minimum perigee distance
     // This is more selective than the previous 360000 km threshold
     let threshold = PERIGEE_DISTANCE * 1.05; // ~374,325 km
-    
+
     let moon_pos = calculate_moon_position(0.0, 0.0, Some(timestamp));
     moon_pos.distance < threshold
 }
@@ -364,14 +364,17 @@ pub fn get_seasonal_events(year: i32) -> Vec<AstroEvent> {
 
 /// Find the timestamp when the sun reaches a specific ecliptic longitude
 /// Uses binary search for precise calculation
-fn find_solar_longitude_event(year: i32, month: u32, target_longitude: f64) -> Option<(i64, String, String)> {
-
+fn find_solar_longitude_event(
+    year: i32,
+    month: u32,
+    target_longitude: f64,
+) -> Option<(i64, String, String)> {
     // Start search around the expected date
     let start_day = match month {
-        3 => 18,   // Vernal equinox around March 20
-        6 => 19,   // Summer solstice around June 21
-        9 => 21,   // Autumnal equinox around September 23
-        12 => 19,  // Winter solstice around December 21
+        3 => 18,  // Vernal equinox around March 20
+        6 => 19,  // Summer solstice around June 21
+        9 => 21,  // Autumnal equinox around September 23
+        12 => 19, // Winter solstice around December 21
         _ => 15,
     };
 
@@ -379,7 +382,7 @@ fn find_solar_longitude_event(year: i32, month: u32, target_longitude: f64) -> O
     let start_jd = date_to_jd(&start_date);
 
     // Binary search for the exact time (within a few seconds)
-    let mut jd_low = start_jd - 3.0;  // Search window: 3 days before
+    let mut jd_low = start_jd - 3.0; // Search window: 3 days before
     let mut jd_high = start_jd + 3.0; // Search window: 3 days after
 
     for _ in 0..50 {
@@ -626,8 +629,8 @@ pub fn get_daily_astro_events(
     timezone: String,
     include_ongoing: bool,
 ) -> Result<Vec<AstroEvent>, String> {
-    let selected_date = NaiveDate::parse_from_str(&date, "%Y-%m-%d")
-        .map_err(|e| format!("Invalid date: {}", e))?;
+    let selected_date =
+        NaiveDate::parse_from_str(&date, "%Y-%m-%d").map_err(|e| format!("Invalid date: {}", e))?;
 
     // Timezone is currently consumed by frontend/day-key classification.
     // Keep parameter for API compatibility and future zoned-day expansion.
@@ -636,7 +639,8 @@ pub fn get_daily_astro_events(
     let mut events = get_astro_events(date.clone(), date.clone())?;
 
     if include_ongoing {
-        let selected_timestamp = selected_date.and_hms_opt(0, 0, 0)
+        let selected_timestamp = selected_date
+            .and_hms_opt(0, 0, 0)
             .ok_or_else(|| "Failed to build selected date timestamp".to_string())?
             .and_utc()
             .timestamp();
@@ -688,8 +692,10 @@ pub fn get_daily_astro_events(
     for event in events.iter_mut() {
         let details = event.details.get_or_insert_with(|| serde_json::json!({}));
         if let Some(obj) = details.as_object_mut() {
-            obj.entry("occurrence_mode").or_insert_with(|| serde_json::json!("instant"));
-            obj.entry("starts_at").or_insert_with(|| serde_json::json!(event.date.clone()));
+            obj.entry("occurrence_mode")
+                .or_insert_with(|| serde_json::json!("instant"));
+            obj.entry("starts_at")
+                .or_insert_with(|| serde_json::json!(event.date.clone()));
         }
     }
 
@@ -777,8 +783,11 @@ mod tests {
             let phases = get_moon_phases_for_month(2024, month);
             for phase in &phases {
                 let valid_types = ["New Moon", "First Quarter", "Full Moon", "Last Quarter"];
-                assert!(valid_types.contains(&phase.phase_type.as_str()), 
-                    "Invalid phase type: {}", phase.phase_type);
+                assert!(
+                    valid_types.contains(&phase.phase_type.as_str()),
+                    "Invalid phase type: {}",
+                    phase.phase_type
+                );
             }
         }
     }
@@ -800,7 +809,7 @@ mod tests {
     fn test_get_meteor_showers_returns_showers() {
         let showers = get_meteor_showers(2024);
         assert!(!showers.is_empty(), "Should return meteor showers");
-        
+
         // Verify major showers are present
         let names: Vec<&str> = showers.iter().map(|s| s.name.as_str()).collect();
         assert!(names.contains(&"Perseids"), "Should include Perseids");
@@ -811,20 +820,29 @@ mod tests {
     #[test]
     fn test_meteor_shower_data_validity() {
         let showers = get_meteor_showers(2024);
-        
+
         for shower in &showers {
             // ZHR should be positive
             assert!(shower.zhr > 0, "ZHR should be positive for {}", shower.name);
-            
+
             // Radiant coordinates should be valid
-            assert!(shower.radiant_ra >= 0.0 && shower.radiant_ra < 360.0,
-                "Radiant RA out of range for {}", shower.name);
-            assert!(shower.radiant_dec >= -90.0 && shower.radiant_dec <= 90.0,
-                "Radiant Dec out of range for {}", shower.name);
-            
+            assert!(
+                shower.radiant_ra >= 0.0 && shower.radiant_ra < 360.0,
+                "Radiant RA out of range for {}",
+                shower.name
+            );
+            assert!(
+                shower.radiant_dec >= -90.0 && shower.radiant_dec <= 90.0,
+                "Radiant Dec out of range for {}",
+                shower.name
+            );
+
             // Dates should be formatted correctly
-            assert!(shower.peak_date.starts_with("2024-"), 
-                "Peak date should be in 2024 for {}", shower.name);
+            assert!(
+                shower.peak_date.starts_with("2024-"),
+                "Peak date should be in 2024 for {}",
+                shower.name
+            );
         }
     }
 
@@ -832,10 +850,10 @@ mod tests {
     fn test_meteor_showers_different_years() {
         let showers_2024 = get_meteor_showers(2024);
         let showers_2025 = get_meteor_showers(2025);
-        
+
         // Same number of showers
         assert_eq!(showers_2024.len(), showers_2025.len());
-        
+
         // Dates should be different years
         assert!(showers_2024[0].peak_date.starts_with("2024-"));
         assert!(showers_2025[0].peak_date.starts_with("2025-"));
@@ -854,14 +872,16 @@ mod tests {
     #[test]
     fn test_seasonal_events_types() {
         let events = get_seasonal_events(2024);
-        
-        let equinoxes: Vec<_> = events.iter()
+
+        let equinoxes: Vec<_> = events
+            .iter()
             .filter(|e| matches!(e.event_type, AstroEventType::Equinox))
             .collect();
-        let solstices: Vec<_> = events.iter()
+        let solstices: Vec<_> = events
+            .iter()
             .filter(|e| matches!(e.event_type, AstroEventType::Solstice))
             .collect();
-        
+
         assert_eq!(equinoxes.len(), 2, "Should have 2 equinoxes");
         assert_eq!(solstices.len(), 2, "Should have 2 solstices");
     }
@@ -869,23 +889,39 @@ mod tests {
     #[test]
     fn test_seasonal_events_dates() {
         let events = get_seasonal_events(2024);
-        
+
         // Check approximate dates
         let dates: Vec<&str> = events.iter().map(|e| e.date.as_str()).collect();
-        
-        assert!(dates.iter().any(|d| d.contains("-03-")), "Should have March equinox");
-        assert!(dates.iter().any(|d| d.contains("-06-")), "Should have June solstice");
-        assert!(dates.iter().any(|d| d.contains("-09-")), "Should have September equinox");
-        assert!(dates.iter().any(|d| d.contains("-12-")), "Should have December solstice");
+
+        assert!(
+            dates.iter().any(|d| d.contains("-03-")),
+            "Should have March equinox"
+        );
+        assert!(
+            dates.iter().any(|d| d.contains("-06-")),
+            "Should have June solstice"
+        );
+        assert!(
+            dates.iter().any(|d| d.contains("-09-")),
+            "Should have September equinox"
+        );
+        assert!(
+            dates.iter().any(|d| d.contains("-12-")),
+            "Should have December solstice"
+        );
     }
 
     #[test]
     fn test_seasonal_events_have_times() {
         // Dynamic calculation should provide precise times
         let events = get_seasonal_events(2024);
-        
+
         for event in &events {
-            assert!(event.time.is_some(), "Event {} should have time", event.name);
+            assert!(
+                event.time.is_some(),
+                "Event {} should have time",
+                event.name
+            );
             // Time should be in HH:MM format
             let time = event.time.as_ref().unwrap();
             assert!(time.contains(':'), "Time should contain colon: {}", time);
@@ -896,34 +932,62 @@ mod tests {
     fn test_seasonal_events_accurate_dates() {
         // Verify dynamically calculated dates are within expected ranges
         let events = get_seasonal_events(2024);
-        
+
         for event in &events {
             let date = &event.date;
-            
+
             match event.name.as_str() {
                 "Vernal Equinox" => {
                     // Should be around March 19-21
-                    assert!(date.starts_with("2024-03-"), "Vernal equinox should be in March");
+                    assert!(
+                        date.starts_with("2024-03-"),
+                        "Vernal equinox should be in March"
+                    );
                     let day: u32 = date[8..10].parse().unwrap_or(0);
-                    assert!(day >= 19 && day <= 21, "Vernal equinox day should be 19-21, got {}", day);
+                    assert!(
+                        day >= 19 && day <= 21,
+                        "Vernal equinox day should be 19-21, got {}",
+                        day
+                    );
                 }
                 "Summer Solstice" => {
                     // Should be around June 20-22
-                    assert!(date.starts_with("2024-06-"), "Summer solstice should be in June");
+                    assert!(
+                        date.starts_with("2024-06-"),
+                        "Summer solstice should be in June"
+                    );
                     let day: u32 = date[8..10].parse().unwrap_or(0);
-                    assert!(day >= 20 && day <= 22, "Summer solstice day should be 20-22, got {}", day);
+                    assert!(
+                        day >= 20 && day <= 22,
+                        "Summer solstice day should be 20-22, got {}",
+                        day
+                    );
                 }
                 "Autumnal Equinox" => {
                     // Should be around September 22-24
-                    assert!(date.starts_with("2024-09-"), "Autumnal equinox should be in September");
+                    assert!(
+                        date.starts_with("2024-09-"),
+                        "Autumnal equinox should be in September"
+                    );
                     let day: u32 = date[8..10].parse().unwrap_or(0);
-                    assert!(day >= 22 && day <= 24, "Autumnal equinox day should be 22-24, got {}", day);
+                    assert!(
+                        day >= 22 && day <= 24,
+                        "Autumnal equinox day should be 22-24, got {}",
+                        day
+                    );
                 }
                 "Winter Solstice" => {
                     // Should be around December 20-22
-                    assert!(date.starts_with("2024-12-"), "Winter solstice should be in December");
+                    assert!(
+                        date.starts_with("2024-12-"),
+                        "Winter solstice should be in December"
+                    );
                     let day: u32 = date[8..10].parse().unwrap_or(0);
-                    assert!(day >= 20 && day <= 23, "Winter solstice day should be 20-23, got {}", day);
+                    assert!(
+                        day >= 20 && day <= 23,
+                        "Winter solstice day should be 20-23, got {}",
+                        day
+                    );
                 }
                 _ => {}
             }
@@ -933,13 +997,15 @@ mod tests {
     #[test]
     fn test_seasonal_events_ordered_chronologically() {
         let events = get_seasonal_events(2024);
-        
+
         // Should be in order: vernal, summer, autumnal, winter
         assert!(events.len() == 4);
-        
+
         for i in 1..events.len() {
-            assert!(events[i].timestamp > events[i-1].timestamp,
-                "Events should be chronologically ordered");
+            assert!(
+                events[i].timestamp > events[i - 1].timestamp,
+                "Events should be chronologically ordered"
+            );
         }
     }
 
@@ -947,11 +1013,11 @@ mod tests {
     fn test_seasonal_events_different_years() {
         let events_2024 = get_seasonal_events(2024);
         let events_2025 = get_seasonal_events(2025);
-        
+
         // Both years should have 4 events
         assert_eq!(events_2024.len(), 4);
         assert_eq!(events_2025.len(), 4);
-        
+
         // 2025 events should all be after 2024 events
         let last_2024 = events_2024.last().unwrap().timestamp;
         let first_2025 = events_2025.first().unwrap().timestamp;
@@ -967,12 +1033,15 @@ mod tests {
         // Supermoon threshold is PERIGEE_DISTANCE * 1.05 = ~374,325 km
         // This is a unit test that the logic is working correctly
         let phases = get_moon_phases_for_month(2024, 1);
-        
+
         for phase in &phases {
             if phase.phase_type == "Full Moon" {
                 // Just verify the supermoon detection runs without panic
                 // The actual detection depends on real moon distance
-                assert!(phase.illumination > 90.0, "Full moon should have high illumination");
+                assert!(
+                    phase.illumination > 90.0,
+                    "Full moon should have high illumination"
+                );
             }
         }
     }
@@ -1003,7 +1072,11 @@ mod tests {
         // J2000.0 epoch: January 1, 2000 at 0h UT = JD 2451544.5
         let date = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         let jd = date_to_jd(&date);
-        assert!((jd - 2451544.5).abs() < 0.5, "J2000 JD should be ~2451544.5, got {}", jd);
+        assert!(
+            (jd - 2451544.5).abs() < 0.5,
+            "J2000 JD should be ~2451544.5, got {}",
+            jd
+        );
     }
 
     #[test]
@@ -1021,7 +1094,7 @@ mod tests {
     fn test_get_astro_events_valid_range() {
         let result = get_astro_events("2024-01-01".to_string(), "2024-01-31".to_string());
         assert!(result.is_ok());
-        
+
         let events = result.unwrap();
         // January should have some events (meteor showers, moon phases)
         // Just verify it doesn't panic and returns events
@@ -1047,12 +1120,14 @@ mod tests {
     fn test_get_astro_events_sorted_by_date() {
         let result = get_astro_events("2024-01-01".to_string(), "2024-12-31".to_string());
         assert!(result.is_ok());
-        
+
         let events = result.unwrap();
         // Verify events are sorted by timestamp
         for i in 1..events.len() {
-            assert!(events[i].timestamp >= events[i-1].timestamp,
-                "Events should be sorted by timestamp");
+            assert!(
+                events[i].timestamp >= events[i - 1].timestamp,
+                "Events should be sorted by timestamp"
+            );
         }
     }
 
@@ -1060,9 +1135,11 @@ mod tests {
     fn test_get_astro_events_includes_meteor_showers() {
         let result = get_astro_events("2024-08-01".to_string(), "2024-08-31".to_string());
         assert!(result.is_ok());
-        
+
         let events = result.unwrap();
-        let has_meteor = events.iter().any(|e| matches!(e.event_type, AstroEventType::MeteorShower));
+        let has_meteor = events
+            .iter()
+            .any(|e| matches!(e.event_type, AstroEventType::MeteorShower));
         assert!(has_meteor, "August should include Perseids meteor shower");
     }
 
@@ -1071,7 +1148,7 @@ mod tests {
         // Test spanning year boundary
         let result = get_astro_events("2024-12-15".to_string(), "2025-01-15".to_string());
         assert!(result.is_ok());
-        
+
         let events = result.unwrap();
         let has_2024 = events.iter().any(|e| e.date.starts_with("2024"));
         let has_2025 = events.iter().any(|e| e.date.starts_with("2025"));
@@ -1080,11 +1157,7 @@ mod tests {
 
     #[test]
     fn test_get_daily_astro_events_valid_date() {
-        let result = get_daily_astro_events(
-            "2026-08-12".to_string(),
-            "Etc/UTC".to_string(),
-            true,
-        );
+        let result = get_daily_astro_events("2026-08-12".to_string(), "Etc/UTC".to_string(), true);
         assert!(result.is_ok());
         let events = result.unwrap();
         for event in events {
@@ -1095,15 +1168,12 @@ mod tests {
 
     #[test]
     fn test_get_daily_astro_events_includes_window_event_when_enabled() {
-        let result = get_daily_astro_events(
-            "2024-08-10".to_string(),
-            "Etc/UTC".to_string(),
-            true,
-        );
+        let result = get_daily_astro_events("2024-08-10".to_string(), "Etc/UTC".to_string(), true);
         assert!(result.is_ok());
         let events = result.unwrap();
         let has_window = events.iter().any(|event| {
-            event.details
+            event
+                .details
                 .as_ref()
                 .and_then(|value| value.get("occurrence_mode"))
                 .and_then(|value| value.as_str())
@@ -1127,10 +1197,16 @@ mod tests {
     #[test]
     fn test_get_tonight_highlights_moon_info() {
         let highlights = get_tonight_highlights(45.0, 0.0, None);
-        
+
         // First highlight should be moon phase
-        assert!(highlights[0].contains("Moon:"), "First highlight should be moon info");
-        assert!(highlights[0].contains("illuminated"), "Should include illumination");
+        assert!(
+            highlights[0].contains("Moon:"),
+            "First highlight should be moon info"
+        );
+        assert!(
+            highlights[0].contains("illuminated"),
+            "Should include illumination"
+        );
     }
 
     #[test]
@@ -1138,7 +1214,7 @@ mod tests {
         // Use a specific timestamp
         let timestamp = 1704067200i64; // Jan 1, 2024 00:00:00 UTC
         let highlights = get_tonight_highlights(45.0, 0.0, Some(timestamp));
-        
+
         assert!(!highlights.is_empty());
     }
 
@@ -1147,7 +1223,7 @@ mod tests {
         // Compare highlights at different latitudes
         let highlights_north = get_tonight_highlights(60.0, 0.0, Some(1704067200));
         let highlights_south = get_tonight_highlights(-60.0, 0.0, Some(1704067200));
-        
+
         // Both should return valid highlights
         assert!(!highlights_north.is_empty());
         assert!(!highlights_south.is_empty());
@@ -1163,7 +1239,7 @@ mod tests {
         let event_type = AstroEventType::FullMoon;
         let json = serde_json::to_string(&event_type).unwrap();
         assert_eq!(json, "\"full_moon\"");
-        
+
         let event_type = AstroEventType::MeteorShower;
         let json = serde_json::to_string(&event_type).unwrap();
         assert_eq!(json, "\"meteor_shower\"");
@@ -1178,7 +1254,7 @@ mod tests {
             illumination: 99.5,
             is_supermoon: true,
         };
-        
+
         // Test serialization
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("Full Moon"));
@@ -1198,7 +1274,7 @@ mod tests {
             parent_body: Some("Test Comet".to_string()),
             description: "A test shower".to_string(),
         };
-        
+
         let json = serde_json::to_string(&info).unwrap();
         assert!(json.contains("Test Shower"));
         assert!(json.contains("parent_body"));

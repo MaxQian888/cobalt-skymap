@@ -127,6 +127,7 @@ describe('useMountStore', () => {
       expect(result.current.connectionConfig.host).toBe('localhost');
       expect(result.current.connectionConfig.port).toBe(11111);
       expect(result.current.connectionConfig.deviceId).toBe(0);
+      expect((result.current.connectionConfig as typeof result.current.connectionConfig & { selectedDeviceId?: string | null }).selectedDeviceId).toBe('simulator://builtin');
     });
 
     it('should update connection config partially', () => {
@@ -160,6 +161,18 @@ describe('useMountStore', () => {
     it('should update capabilities', () => {
       const { result } = renderHook(() => useMountStore());
       act(() => {
+        result.current.applyMountState({
+          connected: true,
+          ra: 120.5,
+          dec: 45.3,
+          tracking: true,
+          trackingRate: 'sidereal',
+          slewing: true,
+          parked: false,
+          atHome: false,
+          pierSide: 'west',
+          slewRateIndex: 3,
+        });
         result.current.setCapabilities({
           canSlew: true,
           canSlewAsync: true,
@@ -176,6 +189,10 @@ describe('useMountStore', () => {
       expect(result.current.capabilities.canSlew).toBe(true);
       expect(result.current.capabilities.canPark).toBe(true);
       expect(result.current.capabilities.alignmentMode).toBe('GermanPolar');
+      expect((result.current as typeof result.current & { capabilitySnapshot?: { canPark?: boolean }; actionAvailability?: { park?: boolean; trackingRate?: boolean; abortSlew?: boolean } }).capabilitySnapshot?.canPark).toBe(true);
+      expect((result.current as typeof result.current & { actionAvailability?: { park?: boolean; trackingRate?: boolean; abortSlew?: boolean } }).actionAvailability?.park).toBe(true);
+      expect((result.current as typeof result.current & { actionAvailability?: { park?: boolean; trackingRate?: boolean; abortSlew?: boolean } }).actionAvailability?.trackingRate).toBe(true);
+      expect((result.current as typeof result.current & { actionAvailability?: { park?: boolean; trackingRate?: boolean; abortSlew?: boolean } }).actionAvailability?.abortSlew).toBe(true);
     });
   });
 

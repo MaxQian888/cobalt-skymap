@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, RefObject } from 'react';
 import { useMountStore } from '@/lib/stores';
-import { useWebLocationStore } from '@/lib/stores/web-location-store';
 import type { StellariumEngine } from '@/lib/core/types';
+import {
+  migrateLegacyObserverLocation,
+  resolveCanonicalObservationLocation,
+} from '@/lib/services/observation-location-controller';
 
 /**
  * Hook for syncing observer location from profile to Stellarium engine
@@ -25,22 +28,30 @@ export function useObserverSync(stelRef: RefObject<StellariumEngine | null>) {
       if (bootstrapped.current) return;
       bootstrapped.current = true;
 
-      const hydrated = useMountStore.getState().profileInfo;
-      const { Latitude, Longitude } = hydrated.AstrometrySettings;
-      if (Latitude !== 0 || Longitude !== 0) return;
+      void (async () => {
+        await migrateLegacyObserverLocation();
+        const canonicalLocation = await resolveCanonicalObservationLocation();
+        if (!canonicalLocation) return;
 
-      const webLocations = useWebLocationStore.getState().locations;
-      const current = webLocations.find((l) => l.is_current);
-      if (current) {
+        const hydrated = useMountStore.getState().profileInfo;
+        const { Latitude, Longitude, Elevation } = hydrated.AstrometrySettings;
+        if (
+          Latitude === canonicalLocation.latitude
+          && Longitude === canonicalLocation.longitude
+          && Elevation === canonicalLocation.altitude
+        ) {
+          return;
+        }
+
         setProfileInfo({
           AstrometrySettings: {
             ...hydrated.AstrometrySettings,
-            Latitude: current.latitude,
-            Longitude: current.longitude,
-            Elevation: current.altitude,
+            Latitude: canonicalLocation.latitude,
+            Longitude: canonicalLocation.longitude,
+            Elevation: canonicalLocation.altitude,
           },
         });
-      }
+      })();
     };
 
     const persistApi = (

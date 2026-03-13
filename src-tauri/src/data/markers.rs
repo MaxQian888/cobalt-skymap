@@ -14,7 +14,14 @@ use crate::utils::generate_id;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MarkerIcon {
-    Star, Circle, Crosshair, Pin, Diamond, Triangle, Square, Flag,
+    Star,
+    Circle,
+    Crosshair,
+    Pin,
+    Diamond,
+    Triangle,
+    Square,
+    Flag,
 }
 
 /// Sky marker for annotating positions
@@ -85,9 +92,14 @@ pub struct MarkersData {
 }
 
 fn get_markers_path(app: &AppHandle) -> Result<PathBuf, StorageError> {
-    let app_data_dir = app.path().app_data_dir().map_err(|_| StorageError::AppDataDirNotFound)?;
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| StorageError::AppDataDirNotFound)?;
     let dir = app_data_dir.join("skymap").join("markers");
-    if !dir.exists() { fs::create_dir_all(&dir)?; }
+    if !dir.exists() {
+        fs::create_dir_all(&dir)?;
+    }
     Ok(dir.join("markers.json"))
 }
 
@@ -119,19 +131,35 @@ pub async fn add_marker(app: AppHandle, marker: MarkerInput) -> Result<MarkersDa
     let mut data = load_markers(app.clone()).await?;
     let now = Utc::now().timestamp_millis();
     let id = match marker.id {
-        Some(existing_id) if !existing_id.trim().is_empty() && !data.markers.iter().any(|m| m.id == existing_id) => existing_id,
+        Some(existing_id)
+            if !existing_id.trim().is_empty()
+                && !data.markers.iter().any(|m| m.id == existing_id) =>
+        {
+            existing_id
+        }
         _ => generate_id("marker"),
     };
     let created_at = marker.created_at.unwrap_or(now);
     let updated_at = marker.updated_at.unwrap_or(now);
     let new_marker = SkyMarker {
-        id, name: marker.name, description: marker.description,
-        ra: marker.ra, dec: marker.dec, ra_string: marker.ra_string, dec_string: marker.dec_string,
-        color: marker.color, icon: marker.icon, created_at, updated_at,
-        group: marker.group.clone(), visible: marker.visible.unwrap_or(true),
+        id,
+        name: marker.name,
+        description: marker.description,
+        ra: marker.ra,
+        dec: marker.dec,
+        ra_string: marker.ra_string,
+        dec_string: marker.dec_string,
+        color: marker.color,
+        icon: marker.icon,
+        created_at,
+        updated_at,
+        group: marker.group.clone(),
+        visible: marker.visible.unwrap_or(true),
     };
     if let Some(ref group) = new_marker.group {
-        if !data.groups.contains(group) { data.groups.push(group.clone()); }
+        if !data.groups.contains(group) {
+            data.groups.push(group.clone());
+        }
     }
     data.markers.push(new_marker);
     save_markers(app, data.clone()).await?;
@@ -139,24 +167,48 @@ pub async fn add_marker(app: AppHandle, marker: MarkerInput) -> Result<MarkersDa
 }
 
 #[tauri::command]
-pub async fn update_marker(app: AppHandle, marker_id: String, updates: MarkerUpdateInput) -> Result<MarkersData, StorageError> {
+pub async fn update_marker(
+    app: AppHandle,
+    marker_id: String,
+    updates: MarkerUpdateInput,
+) -> Result<MarkersData, StorageError> {
     let mut data = load_markers(app.clone()).await?;
     if let Some(marker) = data.markers.iter_mut().find(|m| m.id == marker_id) {
-        if let Some(name) = updates.name { marker.name = name; }
-        if let Some(desc) = updates.description { marker.description = desc; }
-        if let Some(ra) = updates.ra { marker.ra = ra; }
-        if let Some(dec) = updates.dec { marker.dec = dec; }
-        if let Some(ra_string) = updates.ra_string { marker.ra_string = ra_string; }
-        if let Some(dec_string) = updates.dec_string { marker.dec_string = dec_string; }
-        if let Some(color) = updates.color { marker.color = color; }
-        if let Some(icon) = updates.icon { marker.icon = icon; }
+        if let Some(name) = updates.name {
+            marker.name = name;
+        }
+        if let Some(desc) = updates.description {
+            marker.description = desc;
+        }
+        if let Some(ra) = updates.ra {
+            marker.ra = ra;
+        }
+        if let Some(dec) = updates.dec {
+            marker.dec = dec;
+        }
+        if let Some(ra_string) = updates.ra_string {
+            marker.ra_string = ra_string;
+        }
+        if let Some(dec_string) = updates.dec_string {
+            marker.dec_string = dec_string;
+        }
+        if let Some(color) = updates.color {
+            marker.color = color;
+        }
+        if let Some(icon) = updates.icon {
+            marker.icon = icon;
+        }
         if let Some(group_update) = updates.group {
             marker.group = group_update.clone();
             if let Some(group) = group_update {
-                if !data.groups.contains(&group) { data.groups.push(group); }
+                if !data.groups.contains(&group) {
+                    data.groups.push(group);
+                }
             }
         }
-        if let Some(visible) = updates.visible { marker.visible = visible; }
+        if let Some(visible) = updates.visible {
+            marker.visible = visible;
+        }
         marker.updated_at = Utc::now().timestamp_millis();
     }
     save_markers(app, data.clone()).await?;
@@ -172,7 +224,10 @@ pub async fn remove_marker(app: AppHandle, marker_id: String) -> Result<MarkersD
 }
 
 #[tauri::command]
-pub async fn remove_markers_by_group(app: AppHandle, group: String) -> Result<MarkersData, StorageError> {
+pub async fn remove_markers_by_group(
+    app: AppHandle,
+    group: String,
+) -> Result<MarkersData, StorageError> {
     let mut data = load_markers(app.clone()).await?;
     data.markers.retain(|m| m.group.as_ref() != Some(&group));
     save_markers(app, data.clone()).await?;
@@ -188,17 +243,27 @@ pub async fn clear_all_markers(app: AppHandle) -> Result<MarkersData, StorageErr
 }
 
 #[tauri::command]
-pub async fn toggle_marker_visibility(app: AppHandle, marker_id: String) -> Result<MarkersData, StorageError> {
+pub async fn toggle_marker_visibility(
+    app: AppHandle,
+    marker_id: String,
+) -> Result<MarkersData, StorageError> {
     let mut data = load_markers(app.clone()).await?;
-    if let Some(marker) = data.markers.iter_mut().find(|m| m.id == marker_id) { marker.visible = !marker.visible; }
+    if let Some(marker) = data.markers.iter_mut().find(|m| m.id == marker_id) {
+        marker.visible = !marker.visible;
+    }
     save_markers(app, data.clone()).await?;
     Ok(data)
 }
 
 #[tauri::command]
-pub async fn set_all_markers_visible(app: AppHandle, visible: bool) -> Result<MarkersData, StorageError> {
+pub async fn set_all_markers_visible(
+    app: AppHandle,
+    visible: bool,
+) -> Result<MarkersData, StorageError> {
     let mut data = load_markers(app.clone()).await?;
-    for marker in &mut data.markers { marker.visible = visible; }
+    for marker in &mut data.markers {
+        marker.visible = visible;
+    }
     save_markers(app, data.clone()).await?;
     Ok(data)
 }
@@ -215,28 +280,43 @@ pub async fn set_show_markers(app: AppHandle, show: bool) -> Result<MarkersData,
 #[tauri::command]
 pub async fn add_marker_group(app: AppHandle, group: String) -> Result<MarkersData, StorageError> {
     let mut data = load_markers(app.clone()).await?;
-    if !data.groups.contains(&group) { data.groups.push(group); }
-    save_markers(app, data.clone()).await?;
-    Ok(data)
-}
-
-#[tauri::command]
-pub async fn remove_marker_group(app: AppHandle, group: String) -> Result<MarkersData, StorageError> {
-    let mut data = load_markers(app.clone()).await?;
-    data.groups.retain(|g| g != &group);
-    for marker in &mut data.markers {
-        if marker.group.as_ref() == Some(&group) { marker.group = Some("Default".to_string()); }
+    if !data.groups.contains(&group) {
+        data.groups.push(group);
     }
     save_markers(app, data.clone()).await?;
     Ok(data)
 }
 
 #[tauri::command]
-pub async fn rename_marker_group(app: AppHandle, old_name: String, new_name: String) -> Result<MarkersData, StorageError> {
+pub async fn remove_marker_group(
+    app: AppHandle,
+    group: String,
+) -> Result<MarkersData, StorageError> {
     let mut data = load_markers(app.clone()).await?;
-    if let Some(group) = data.groups.iter_mut().find(|g| *g == &old_name) { *group = new_name.clone(); }
+    data.groups.retain(|g| g != &group);
     for marker in &mut data.markers {
-        if marker.group.as_ref() == Some(&old_name) { marker.group = Some(new_name.clone()); }
+        if marker.group.as_ref() == Some(&group) {
+            marker.group = Some("Default".to_string());
+        }
+    }
+    save_markers(app, data.clone()).await?;
+    Ok(data)
+}
+
+#[tauri::command]
+pub async fn rename_marker_group(
+    app: AppHandle,
+    old_name: String,
+    new_name: String,
+) -> Result<MarkersData, StorageError> {
+    let mut data = load_markers(app.clone()).await?;
+    if let Some(group) = data.groups.iter_mut().find(|g| *g == &old_name) {
+        *group = new_name.clone();
+    }
+    for marker in &mut data.markers {
+        if marker.group.as_ref() == Some(&old_name) {
+            marker.group = Some(new_name.clone());
+        }
     }
     save_markers(app, data.clone()).await?;
     Ok(data)
@@ -245,7 +325,9 @@ pub async fn rename_marker_group(app: AppHandle, old_name: String, new_name: Str
 #[tauri::command]
 pub async fn get_visible_markers(app: AppHandle) -> Result<Vec<SkyMarker>, StorageError> {
     let data = load_markers(app).await?;
-    if !data.show_markers { return Ok(Vec::new()); }
+    if !data.show_markers {
+        return Ok(Vec::new());
+    }
     Ok(data.markers.into_iter().filter(|m| m.visible).collect())
 }
 
@@ -558,6 +640,9 @@ mod tests {
         }
 
         assert_eq!(data.markers.len(), 5);
-        assert!(data.markers.iter().all(|m| m.group == Some("Messier".to_string())));
+        assert!(data
+            .markers
+            .iter()
+            .all(|m| m.group == Some("Messier".to_string())));
     }
 }

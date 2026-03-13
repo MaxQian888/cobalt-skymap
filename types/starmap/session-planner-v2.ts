@@ -1,4 +1,5 @@
 import type { ImagingFeasibility } from '@/lib/core/types/astronomy';
+import type { MessierMarathonPlannerContext } from '@/lib/messier-marathon';
 import type { CalculationSourceMetadata, ScheduledTarget, SessionPlan } from './planning';
 
 export type SessionExportFormat =
@@ -80,6 +81,7 @@ export interface SessionDraftV2 {
   excludedTargetIds: string[];
   manualEdits: ManualScheduleItem[];
   weatherSnapshot?: SessionWeatherSnapshot;
+  guideContext?: MessierMarathonPlannerContext;
   exportMeta?: {
     lastFormat?: SessionExportFormat;
     lastExportedAt?: string;
@@ -145,6 +147,7 @@ export interface PlannedSessionExecution {
   locationName?: string;
   notes?: string;
   weatherSnapshot?: SessionWeatherSnapshot;
+  guideContext?: MessierMarathonPlannerContext;
   createdAt: string;
   updatedAt: string;
   startedAt?: string;

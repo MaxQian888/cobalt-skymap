@@ -63,7 +63,7 @@ pub fn calculate_sun_position(
 
     // Convert to equatorial coordinates directly for better accuracy
     let sun_lon_rad = sun_apparent_lon * DEG_TO_RAD;
-    
+
     let ra = (obliquity_rad.cos() * sun_lon_rad.sin()).atan2(sun_lon_rad.cos());
     let dec = (obliquity_rad.sin() * sun_lon_rad.sin()).asin();
 
@@ -71,7 +71,14 @@ pub fn calculate_sun_position(
     let dec_deg = dec * RAD_TO_DEG;
 
     // Convert to horizontal
-    let hor = equatorial_to_horizontal(ra_deg, dec_deg, latitude, longitude, Some(dt.timestamp()), None);
+    let hor = equatorial_to_horizontal(
+        ra_deg,
+        dec_deg,
+        latitude,
+        longitude,
+        Some(dt.timestamp()),
+        None,
+    );
 
     SunPosition {
         ra: ra_deg,
@@ -93,8 +100,16 @@ mod tests {
     #[test]
     fn test_sun_position_range() {
         let sun = calculate_sun_position(45.0, 0.0, None);
-        assert!(sun.ra >= 0.0 && sun.ra < 360.0, "Sun RA out of range: {}", sun.ra);
-        assert!(sun.dec >= -23.5 && sun.dec <= 23.5, "Sun Dec out of range: {}", sun.dec);
+        assert!(
+            sun.ra >= 0.0 && sun.ra < 360.0,
+            "Sun RA out of range: {}",
+            sun.ra
+        );
+        assert!(
+            sun.dec >= -23.5 && sun.dec <= 23.5,
+            "Sun Dec out of range: {}",
+            sun.dec
+        );
     }
 
     #[test]
@@ -102,8 +117,11 @@ mod tests {
         // Around summer solstice, sun declination should be near +23.44°
         let dt = Utc.with_ymd_and_hms(2024, 6, 21, 12, 0, 0).unwrap();
         let sun = calculate_sun_position(0.0, 0.0, Some(dt.timestamp()));
-        assert!(sun.dec > 23.0 && sun.dec < 24.0, 
-            "Sun Dec on summer solstice should be ~23.44°, got {}", sun.dec);
+        assert!(
+            sun.dec > 23.0 && sun.dec < 24.0,
+            "Sun Dec on summer solstice should be ~23.44°, got {}",
+            sun.dec
+        );
     }
 
     #[test]
@@ -111,8 +129,11 @@ mod tests {
         // Around winter solstice, sun declination should be near -23.44°
         let dt = Utc.with_ymd_and_hms(2024, 12, 21, 12, 0, 0).unwrap();
         let sun = calculate_sun_position(0.0, 0.0, Some(dt.timestamp()));
-        assert!(sun.dec < -23.0 && sun.dec > -24.0, 
-            "Sun Dec on winter solstice should be ~-23.44°, got {}", sun.dec);
+        assert!(
+            sun.dec < -23.0 && sun.dec > -24.0,
+            "Sun Dec on winter solstice should be ~-23.44°, got {}",
+            sun.dec
+        );
     }
 
     #[test]
@@ -120,8 +141,11 @@ mod tests {
         // Around equinox, sun declination should be near 0°
         let dt = Utc.with_ymd_and_hms(2024, 3, 20, 12, 0, 0).unwrap();
         let sun = calculate_sun_position(0.0, 0.0, Some(dt.timestamp()));
-        assert!(sun.dec.abs() < 1.5, 
-            "Sun Dec on equinox should be near 0°, got {}", sun.dec);
+        assert!(
+            sun.dec.abs() < 1.5,
+            "Sun Dec on equinox should be near 0°, got {}",
+            sun.dec
+        );
     }
 
     #[test]
@@ -131,7 +155,10 @@ mod tests {
         let sun = calculate_sun_position(0.0, 0.0, Some(dt.timestamp()));
         // At latitude 0, longitude 0, noon UTC should have sun near zenith in June
         // This is a basic sanity check
-        assert!(sun.altitude > -90.0 && sun.altitude <= 90.0, 
-            "Sun altitude out of range: {}", sun.altitude);
+        assert!(
+            sun.altitude > -90.0 && sun.altitude <= 90.0,
+            "Sun altitude out of range: {}",
+            sun.altitude
+        );
     }
 }

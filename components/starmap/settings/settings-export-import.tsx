@@ -213,12 +213,12 @@ export function SettingsExportImport() {
     }
   }, [handleImportText, setErrorStatus, t]);
 
-  const handleConfirmImport = useCallback(() => {
+  const handleConfirmImport = useCallback(async () => {
     if (!importPreview || !importPreview.parsed.data) {
       return;
     }
 
-    const result = applySettingsProfileImport(importPreview.parsed.data, {
+    const result = await applySettingsProfileImport(importPreview.parsed.data, {
       domains: selectedImportDomains,
       applyThemeMode: setTheme,
       currentThemeMode: normalizeThemeMode(currentThemeMode),
@@ -234,8 +234,8 @@ export function SettingsExportImport() {
     setImportPreview(null);
   }, [currentThemeMode, importPreview, selectedImportDomains, setErrorStatus, setTheme, t]);
 
-  const handleRestoreLastImport = useCallback(() => {
-    const result = restoreLastSettingsImport({ applyThemeMode: setTheme });
+  const handleRestoreLastImport = useCallback(async () => {
+    const result = await restoreLastSettingsImport({ applyThemeMode: setTheme });
     if (!result.success) {
       setErrorStatus(result.error ?? t('settingsNew.exportImport.restoreError'));
       return;

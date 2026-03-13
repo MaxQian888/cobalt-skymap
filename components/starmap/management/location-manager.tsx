@@ -60,6 +60,7 @@ import { useWebLocationStore } from '@/lib/stores/web-location-store';
 import { useShallow } from 'zustand/react/shallow';
 import { geocodingService } from '@/lib/services/geocoding-service';
 import { acquireCurrentLocation } from '@/lib/services/location-acquisition';
+import { syncObservationLocationToMountProfile } from '@/lib/services/observation-location-controller';
 import type { LocationManagerProps } from '@/types/starmap/management';
 
 interface LocationLike {
@@ -296,6 +297,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
           ...payload,
         });
 
+        if (existing.is_current) {
+          syncObservationLocationToMountProfile(payload);
+        }
         if (existing.is_current && onLocationChange) {
           onLocationChange(payload.latitude, payload.longitude, payload.altitude);
         }
@@ -310,6 +314,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
         if (!locations?.locations.length && onLocationChange) {
           onLocationChange(payload.latitude, payload.longitude, payload.altitude);
         }
+        if (!locations?.locations.length) {
+          syncObservationLocationToMountProfile(payload);
+        }
       }
 
       await refresh();
@@ -319,6 +326,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
     if (targetId) {
       updateWebLocation(targetId, payload);
       const existing = webLocations.find((loc) => loc.id === targetId);
+      if (existing?.is_current) {
+        syncObservationLocationToMountProfile(payload);
+      }
       if (existing?.is_current && onLocationChange) {
         onLocationChange(payload.latitude, payload.longitude, payload.altitude);
       }
@@ -333,6 +343,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
       is_current: isFirst,
     });
     toast.success(t('locations.added') || 'Location added');
+    if (isFirst) {
+      syncObservationLocationToMountProfile(payload);
+    }
     if (isFirst && onLocationChange) {
       onLocationChange(payload.latitude, payload.longitude, payload.altitude);
     }
@@ -408,6 +421,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
         if (nextCurrent && onLocationChange && removedWasCurrent) {
           onLocationChange(nextCurrent.latitude, nextCurrent.longitude, nextCurrent.altitude);
         }
+        if (nextCurrent && removedWasCurrent) {
+          syncObservationLocationToMountProfile(nextCurrent);
+        }
         toast.success(t('locations.deleted') || 'Location deleted');
         await refresh();
       } catch (e) {
@@ -423,6 +439,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
       if (nextCurrent && onLocationChange && removedWasCurrent) {
         onLocationChange(nextCurrent.latitude, nextCurrent.longitude, nextCurrent.altitude);
       }
+      if (nextCurrent && removedWasCurrent) {
+        syncObservationLocationToMountProfile(nextCurrent);
+      }
 
       toast.success(t('locations.deleted') || 'Location deleted');
     }
@@ -436,6 +455,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
         if (loc && onLocationChange) {
           onLocationChange(loc.latitude, loc.longitude, loc.altitude);
         }
+        if (loc) {
+          syncObservationLocationToMountProfile(loc);
+        }
         toast.success(t('locations.setCurrent') || 'Location set as current');
       } catch (e) {
         toast.error((e as Error).message);
@@ -445,6 +467,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
       const loc = webLocations.find(l => l.id === id);
       if (loc && onLocationChange) {
         onLocationChange(loc.latitude, loc.longitude, loc.altitude);
+      }
+      if (loc) {
+        syncObservationLocationToMountProfile(loc);
       }
       toast.success(t('locations.setCurrent') || 'Location set as current');
     }

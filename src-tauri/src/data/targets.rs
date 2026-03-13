@@ -998,7 +998,7 @@ mod tests {
     fn test_target_list_data_clone() {
         let mut data = TargetListData::default();
         data.active_target_id = Some("test".to_string());
-        
+
         let cloned = data.clone();
         assert_eq!(cloned.active_target_id, data.active_target_id);
     }
@@ -1160,7 +1160,10 @@ mod tests {
         let json = serde_json::to_string(&target).unwrap();
         let back: TargetItem = serde_json::from_str(&json).unwrap();
         assert_eq!(back.mosaic.as_ref().unwrap().rows, 3);
-        assert_eq!(back.exposure_plan.as_ref().unwrap().filter, Some("L".to_string()));
+        assert_eq!(
+            back.exposure_plan.as_ref().unwrap().filter,
+            Some("L".to_string())
+        );
     }
 
     #[test]

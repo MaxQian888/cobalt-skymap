@@ -90,7 +90,11 @@ mod tests {
         // J2000.0 epoch: January 1, 2000, 12:00 TT = JD 2451545.0
         let dt = Utc.with_ymd_and_hms(2000, 1, 1, 12, 0, 0).unwrap();
         let jd = datetime_to_jd(&dt);
-        assert!(approx_eq(jd, 2451545.0, 0.001), "J2000 JD should be ~2451545.0, got {}", jd);
+        assert!(
+            approx_eq(jd, 2451545.0, 0.001),
+            "J2000 JD should be ~2451545.0, got {}",
+            jd
+        );
     }
 
     #[test]
@@ -98,7 +102,11 @@ mod tests {
         // October 15, 1582 (Gregorian calendar start) = JD 2299160.5
         let dt = Utc.with_ymd_and_hms(1582, 10, 15, 0, 0, 0).unwrap();
         let jd = datetime_to_jd(&dt);
-        assert!(approx_eq(jd, 2299160.5, 0.5), "Expected ~2299160.5, got {}", jd);
+        assert!(
+            approx_eq(jd, 2299160.5, 0.5),
+            "Expected ~2299160.5, got {}",
+            jd
+        );
     }
 
     #[test]
@@ -106,14 +114,22 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
         let jd = date_to_jd(&date);
         // Noon on J2000.0 day
-        assert!(approx_eq(jd, 2451544.5, 0.001), "Expected ~2451544.5, got {}", jd);
+        assert!(
+            approx_eq(jd, 2451544.5, 0.001),
+            "Expected ~2451544.5, got {}",
+            jd
+        );
     }
 
     #[test]
     fn test_calculate_gmst() {
         // At J2000.0 (JD 2451545.0), GMST ≈ 280.46°
         let gmst = calculate_gmst(2451545.0);
-        assert!(approx_eq(gmst, 280.46, 0.1), "GMST at J2000 should be ~280.46°, got {}", gmst);
+        assert!(
+            approx_eq(gmst, 280.46, 0.1),
+            "GMST at J2000 should be ~280.46°, got {}",
+            gmst
+        );
     }
 
     #[test]
@@ -122,7 +138,10 @@ mod tests {
         let longitude = 0.0; // Greenwich
         let lst = calculate_lst(jd, longitude);
         let gmst = calculate_gmst(jd);
-        assert!(approx_eq(lst, gmst, EPSILON), "LST at Greenwich should equal GMST");
+        assert!(
+            approx_eq(lst, gmst, EPSILON),
+            "LST at Greenwich should equal GMST"
+        );
     }
 
     #[test]

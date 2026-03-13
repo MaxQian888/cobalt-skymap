@@ -3,36 +3,42 @@
  * Unified Zustand persist storage adapter
  */
 
+const mockIsTauri = jest.fn().mockReturnValue(false);
+const mockIsServer = jest.fn().mockReturnValue(false);
+const mockInvoke = jest.fn();
+const mockLogger = {
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  debug: jest.fn(),
+};
+
 // Default: web mode
 jest.mock('../platform', () => ({
-  isTauri: jest.fn().mockReturnValue(false),
-  isServer: jest.fn().mockReturnValue(false),
+  isTauri: (...args: unknown[]) => mockIsTauri(...args),
+  isServer: (...args: unknown[]) => mockIsServer(...args),
 }));
 
 jest.mock('@/lib/logger', () => ({
-  createLogger: () => ({
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  }),
+  createLogger: () => mockLogger,
 }));
 
 jest.mock('@tauri-apps/api/core', () => ({
-  invoke: jest.fn(),
+  invoke: (...args: unknown[]) => mockInvoke(...args),
 }));
 
-import { createZustandStorage, getZustandStorage } from '../zustand-storage';
-
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const platformMock = require('../platform') as {
-  isTauri: jest.Mock;
-  isServer: jest.Mock;
-};
+const { createZustandStorage, getZustandStorage } = require('../zustand-storage') as
+  typeof import('../zustand-storage');
 
 const mockGetItem = localStorage.getItem as jest.Mock;
 const mockSetItem = localStorage.setItem as jest.Mock;
 const mockRemoveItem = localStorage.removeItem as jest.Mock;
+
+async function flushAsyncWork() {
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 // ============================================================================
 // Web mode
@@ -40,8 +46,8 @@ const mockRemoveItem = localStorage.removeItem as jest.Mock;
 describe('createZustandStorage (web mode)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    platformMock.isTauri.mockReturnValue(false);
-    platformMock.isServer.mockReturnValue(false);
+    mockIsTauri.mockReturnValue(false);
+    mockIsServer.mockReturnValue(false);
   });
 
   it('should return storage with getItem, setItem, removeItem', () => {
@@ -110,12 +116,12 @@ describe('createZustandStorage (web mode)', () => {
 describe('createZustandStorage (server mode)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    platformMock.isTauri.mockReturnValue(false);
-    platformMock.isServer.mockReturnValue(true);
+    mockIsTauri.mockReturnValue(false);
+    mockIsServer.mockReturnValue(true);
   });
 
   afterEach(() => {
-    platformMock.isServer.mockReturnValue(false);
+    mockIsServer.mockReturnValue(false);
   });
 
   it('should return no-op storage', () => {
@@ -145,16 +151,36 @@ describe('createZustandStorage (server mode)', () => {
 describe('createZustandStorage (Tauri mode)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    platformMock.isTauri.mockReturnValue(true);
-    platformMock.isServer.mockReturnValue(false);
+    mockIsTauri.mockReturnValue(true);
+    mockIsServer.mockReturnValue(false);
     // Mock localStorage for migration testing
     mockGetItem.mockReturnValue(null);
     mockSetItem.mockImplementation(() => {});
     mockRemoveItem.mockImplementation(() => {});
+    mockInvoke.mockResolvedValue(null);
   });
 
   afterEach(() => {
-    platformMock.isTauri.mockReturnValue(false);
+    mockIsTauri.mockReturnValue(false);
+    jest.useRealTimers();
+  });
+
+  it('should ignore per-store initialization failures', async () => {
+    mockInvoke.mockImplementation((command: string, payload?: { storeName?: string }) => {
+      if (command === 'load_store_data' && payload?.storeName === 'starmap-target-list') {
+        return Promise.reject(new Error('load failed'));
+      }
+      return Promise.resolve(null);
+    });
+
+    const storage = createZustandStorage();
+    await flushAsyncWork();
+
+    expect(mockInvoke).toHaveBeenCalledWith('load_store_data', {
+      storeName: 'starmap-target-list',
+    });
+    expect(storage.getItem('starmap-target-list')).toBeNull();
+    expect(mockLogger.error).not.toHaveBeenCalled();
   });
 
   it('should return storage with all methods', () => {
@@ -218,6 +244,62 @@ describe('createZustandStorage (Tauri mode)', () => {
     const result = storage.getItem('bad-json');
     expect(result).toBeNull();
   });
+
+  it('setItem should persist debounced data to the Tauri backend', async () => {
+    jest.useFakeTimers();
+
+    const storage = createZustandStorage<{ count: number }>();
+    const value = { state: { count: 7 }, version: 1 };
+
+    storage.setItem('starmap-settings', value);
+    await jest.advanceTimersByTimeAsync(100);
+
+    expect(mockInvoke).toHaveBeenCalledWith('save_store_data', {
+      storeName: 'starmap-settings',
+      data: JSON.stringify(value),
+    });
+  });
+
+  it('setItem should log when a Tauri save fails', async () => {
+    jest.useFakeTimers();
+    mockInvoke.mockRejectedValue(new Error('save failed'));
+
+    const storage = createZustandStorage<{ count: number }>();
+    storage.setItem('failed-store', { state: { count: 3 }, version: 0 });
+
+    await jest.advanceTimersByTimeAsync(100);
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to save failed-store to Tauri',
+      expect.any(Error)
+    );
+  });
+
+  it('setItem should log when a value cannot be serialized', async () => {
+    jest.useFakeTimers();
+
+    const storage = createZustandStorage<unknown>();
+    storage.setItem('unserializable-store', undefined as never);
+
+    await jest.advanceTimersByTimeAsync(100);
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to serialize unserializable-store: value is undefined'
+    );
+  });
+
+  it('removeItem should log when deleting from Tauri fails', async () => {
+    mockInvoke.mockRejectedValue(new Error('delete failed'));
+
+    const storage = createZustandStorage();
+    storage.removeItem('starmap-settings');
+    await flushAsyncWork();
+
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to delete starmap-settings from Tauri',
+      expect.any(Error)
+    );
+  });
 });
 
 // ============================================================================
@@ -225,8 +307,8 @@ describe('createZustandStorage (Tauri mode)', () => {
 // ============================================================================
 describe('getZustandStorage', () => {
   beforeEach(() => {
-    platformMock.isTauri.mockReturnValue(false);
-    platformMock.isServer.mockReturnValue(false);
+    mockIsTauri.mockReturnValue(false);
+    mockIsServer.mockReturnValue(false);
   });
 
   it('should return a cached storage instance', () => {

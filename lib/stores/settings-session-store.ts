@@ -42,7 +42,7 @@ interface SettingsSessionState {
   clearSession: () => void;
   resetCategoryDraft: (category: SettingsDraftCategory) => void;
   resetAllDraftToDefaults: () => void;
-  applyDraft: () => ApplySettingsTransactionResult;
+  applyDraft: () => Promise<ApplySettingsTransactionResult>;
   clearLastApplyResult: () => void;
 
   setConnection: (connection: Partial<SettingsDraft['connection']>) => void;
@@ -188,7 +188,7 @@ export const useSettingsSessionStore = create<SettingsSessionState>()((set, get)
     });
   },
 
-  applyDraft: () => {
+  applyDraft: async () => {
     const state = get();
     if (!state.sessionActive || !state.baseline || !state.draft) {
       set({ lastApplyResult: EMPTY_APPLY_RESULT });
@@ -201,7 +201,7 @@ export const useSettingsSessionStore = create<SettingsSessionState>()((set, get)
       return invalidResult;
     }
 
-    const result = applySettingsTransaction(state.draft);
+    const result = await applySettingsTransaction(state.draft);
     if (!result.success) {
       set({ lastApplyResult: result });
       return result;
@@ -279,4 +279,3 @@ export const useSettingsSessionStore = create<SettingsSessionState>()((set, get)
     }));
   },
 }));
-

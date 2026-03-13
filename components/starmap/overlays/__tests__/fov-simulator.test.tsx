@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 
 // Mock UI components
 jest.mock('@/components/ui/card', () => ({
@@ -94,7 +94,92 @@ jest.mock('@/components/ui/badge', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => <span data-testid="badge">{children}</span>,
 }));
 
+interface MockFovEquipmentOptions {
+  sensorWidth: number;
+  sensorHeight: number;
+  focalLength: number;
+  pixelSize: number;
+  rotationAngle: number;
+  mosaic: {
+    enabled: boolean;
+    rows: number;
+    cols: number;
+    overlap: number;
+    overlapUnit: 'percent' | 'pixels';
+  };
+  gridType: string;
+  aperture: number;
+  baseFocalLength: number;
+  effectiveFocalLength: number;
+  fovInputMode: 'manual' | 'active-equipment';
+  selectedBarlowReducerId: string | null;
+  activeCamera: {
+    id: string;
+    name: string;
+    sensorWidth: number;
+    sensorHeight: number;
+    pixelSize: number;
+    source: 'store' | 'tauri';
+  } | null;
+  activeTelescope: {
+    id: string;
+    name: string;
+    focalLength: number;
+    aperture: number;
+    type: string;
+    source: 'store' | 'tauri';
+  } | null;
+  selectedBarlowReducer: { id: string; name: string; factor: number } | null;
+  barlowReducers: Array<{ id: string; name: string; factor: number }>;
+  accessorySelectionAvailable: boolean;
+  hasCompleteActiveEquipment: boolean;
+  framePlacement: { x: number; y: number };
+  setFovInputMode: jest.Mock;
+  setSelectedBarlowReducerId: jest.Mock;
+  setFramePlacement: jest.Mock;
+  resetFramePlacement: jest.Mock;
+}
+
+const createMockFovEquipmentOptions = (): MockFovEquipmentOptions => ({
+  sensorWidth: 36,
+  sensorHeight: 24,
+  focalLength: 1000,
+  pixelSize: 4.5,
+  rotationAngle: 0,
+  mosaic: {
+    enabled: false,
+    rows: 2,
+    cols: 2,
+    overlap: 10,
+    overlapUnit: 'percent' as const,
+  },
+  gridType: 'none',
+  aperture: 80,
+  baseFocalLength: 1000,
+  effectiveFocalLength: 1000,
+  fovInputMode: 'manual',
+  selectedBarlowReducerId: null,
+  activeCamera: null,
+  activeTelescope: null,
+  selectedBarlowReducer: null,
+  barlowReducers: [],
+  accessorySelectionAvailable: false,
+  hasCompleteActiveEquipment: false,
+  framePlacement: { x: 0, y: 0 },
+  setFovInputMode: jest.fn(),
+  setSelectedBarlowReducerId: jest.fn(),
+  setFramePlacement: jest.fn(),
+  resetFramePlacement: jest.fn(),
+});
+
+const mockUseFovEquipmentOptions = jest.fn(() => createMockFovEquipmentOptions());
+
+jest.mock('@/lib/hooks/use-equipment-fov-props', () => ({
+  useFovEquipmentOptions: () => mockUseFovEquipmentOptions(),
+}));
+
 import { FOVSimulator, type GridType } from '../fov-simulator';
+import { useEquipmentStore } from '@/lib/stores';
 
 describe('FOVSimulator', () => {
   const defaultMosaic = {
@@ -127,6 +212,17 @@ describe('FOVSimulator', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseFovEquipmentOptions.mockReturnValue({
+      ...createMockFovEquipmentOptions(),
+      mosaic: defaultMosaic,
+    });
+    useEquipmentStore.setState({
+      fovDisplay: {
+        ...useEquipmentStore.getState().fovDisplay,
+        preserveAlignment: false,
+        rotateSky: false,
+      },
+    });
   });
 
   it('renders without crashing', () => {
@@ -288,7 +384,7 @@ describe('FOVSimulator', () => {
     }
   });
 
-  it('handles copy to clipboard', () => {
+  it('handles copy to clipboard', async () => {
     // Mock clipboard
     Object.assign(navigator, {
       clipboard: { writeText: jest.fn().mockResolvedValue(undefined) },
@@ -300,7 +396,9 @@ describe('FOVSimulator', () => {
     // The copy button is a small ghost button in the dialog header
     const copyBtn = buttons.find(b => b.className?.includes('h-7 w-7'));
     if (copyBtn) {
-      fireEvent.click(copyBtn);
+      await act(async () => {
+        fireEvent.click(copyBtn);
+      });
       expect(navigator.clipboard.writeText).toHaveBeenCalled();
     }
   });
@@ -401,5 +499,98 @@ describe('FOVSimulator', () => {
 
     expect(defaultProps.onMosaicChange).toHaveBeenCalled();
     expect(document.body.textContent).toContain('fov.mosaicIssue.overlap_clamped');
+  });
+
+  it('renders active equipment summary when active-equipment mode is complete', () => {
+    mockUseFovEquipmentOptions.mockReturnValue({
+      ...createMockFovEquipmentOptions(),
+      fovInputMode: 'active-equipment',
+      hasCompleteActiveEquipment: true,
+      activeCamera: {
+        id: 'cam-1',
+        name: 'ASI2600MC Pro',
+        sensorWidth: 23.5,
+        sensorHeight: 15.7,
+        pixelSize: 3.76,
+        source: 'store',
+      },
+      activeTelescope: {
+        id: 'scope-1',
+        name: 'RedCat 51',
+        focalLength: 250,
+        aperture: 51,
+        type: 'APO',
+        source: 'store',
+      },
+      focalLength: 250,
+      baseFocalLength: 250,
+      effectiveFocalLength: 250,
+    });
+
+    render(<FOVSimulator {...defaultProps} />);
+
+    expect(document.body.textContent).toContain('fov.inputModeActiveEquipment');
+    expect(document.body.textContent).toContain('ASI2600MC Pro');
+    expect(document.body.textContent).toContain('RedCat 51');
+  });
+
+  it('shows missing equipment warning when active-equipment mode is incomplete', () => {
+    mockUseFovEquipmentOptions.mockReturnValue({
+      ...createMockFovEquipmentOptions(),
+      fovInputMode: 'active-equipment',
+      hasCompleteActiveEquipment: false,
+      activeCamera: null,
+      activeTelescope: null,
+    });
+
+    render(<FOVSimulator {...defaultProps} />);
+
+    expect(document.body.textContent).toContain('fov.activeEquipmentMissing');
+  });
+
+  it('renders accessory-aware effective focal length summary', () => {
+    mockUseFovEquipmentOptions.mockReturnValue({
+      ...createMockFovEquipmentOptions(),
+      accessorySelectionAvailable: true,
+      barlowReducers: [{ id: 'reducer-08', name: '0.8x Reducer', factor: 0.8 }],
+      selectedBarlowReducerId: 'reducer-08',
+      selectedBarlowReducer: { id: 'reducer-08', name: '0.8x Reducer', factor: 0.8 },
+      focalLength: 500,
+      baseFocalLength: 500,
+      effectiveFocalLength: 400,
+    });
+
+    render(<FOVSimulator {...defaultProps} />);
+
+    expect(document.body.textContent).toContain('fov.accessoryLabel');
+    expect(document.body.textContent).toContain('fov.effectiveFocalLength');
+  });
+
+  it('resets frame placement before centering when preserveAlignment is disabled', () => {
+    const resetFramePlacement = jest.fn();
+    const onCenterTarget = jest.fn();
+    mockUseFovEquipmentOptions.mockReturnValue({
+      ...createMockFovEquipmentOptions(),
+      resetFramePlacement,
+    });
+
+    render(
+      <FOVSimulator
+        {...defaultProps}
+        selectedTarget={{ name: 'M31', raDeg: 10, decDeg: 41, size: "190' x 60'" }}
+        onCenterTarget={onCenterTarget}
+      />
+    );
+
+    fireEvent.click(screen.getByText('fov.centerTarget'));
+
+    expect(resetFramePlacement).toHaveBeenCalled();
+    expect(onCenterTarget).toHaveBeenCalledWith(10, 41);
+  });
+
+  it('shows rotate sky unavailable messaging when the engine cannot rotate the background', () => {
+    render(<FOVSimulator {...defaultProps} />);
+
+    expect(document.body.textContent).toContain('fov.rotateSkyUnavailable');
   });
 });

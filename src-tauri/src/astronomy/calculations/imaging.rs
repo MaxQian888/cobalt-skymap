@@ -88,11 +88,22 @@ mod tests {
     fn test_calculate_fov_basic() {
         // Typical DSLR with 50mm lens
         let fov = calculate_fov(36.0, 24.0, 50.0, 5.0, 50.0);
-        
+
         // FOV should be roughly 39° x 27° for full frame + 50mm
-        assert!(fov.width_deg > 30.0 && fov.width_deg < 50.0, "Width FOV unexpected: {}", fov.width_deg);
-        assert!(fov.height_deg > 20.0 && fov.height_deg < 35.0, "Height FOV unexpected: {}", fov.height_deg);
-        assert!(approx_eq(fov.f_ratio, 1.0, EPSILON), "F-ratio should be 1.0");
+        assert!(
+            fov.width_deg > 30.0 && fov.width_deg < 50.0,
+            "Width FOV unexpected: {}",
+            fov.width_deg
+        );
+        assert!(
+            fov.height_deg > 20.0 && fov.height_deg < 35.0,
+            "Height FOV unexpected: {}",
+            fov.height_deg
+        );
+        assert!(
+            approx_eq(fov.f_ratio, 1.0, EPSILON),
+            "F-ratio should be 1.0"
+        );
     }
 
     #[test]
@@ -100,14 +111,21 @@ mod tests {
         // Image scale = 206.265 * pixel_size / focal_length
         let fov = calculate_fov(10.0, 10.0, 1000.0, 5.0, 100.0);
         let expected_scale = 206.265 * 5.0 / 1000.0; // ~1.03 arcsec/pixel
-        assert!(approx_eq(fov.image_scale, expected_scale, 0.01), 
-            "Image scale mismatch: {} vs {}", fov.image_scale, expected_scale);
+        assert!(
+            approx_eq(fov.image_scale, expected_scale, 0.01),
+            "Image scale mismatch: {} vs {}",
+            fov.image_scale,
+            expected_scale
+        );
     }
 
     #[test]
     fn test_calculate_fov_zero_aperture() {
         let fov = calculate_fov(36.0, 24.0, 50.0, 5.0, 0.0);
-        assert!(approx_eq(fov.f_ratio, 0.0, EPSILON), "F-ratio should be 0 with zero aperture");
+        assert!(
+            approx_eq(fov.f_ratio, 0.0, EPSILON),
+            "F-ratio should be 0 with zero aperture"
+        );
     }
 
     #[test]
@@ -116,7 +134,11 @@ mod tests {
         assert_eq!(mosaic.total_panels, 1);
         // Single panel = full FOV regardless of overlap
         let single_fov = calculate_fov(36.0, 24.0, 50.0, 1.0, 1.0);
-        assert!(approx_eq(mosaic.total_width_deg, single_fov.width_deg, 0.01));
+        assert!(approx_eq(
+            mosaic.total_width_deg,
+            single_fov.width_deg,
+            0.01
+        ));
     }
 
     #[test]

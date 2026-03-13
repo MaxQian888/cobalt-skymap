@@ -215,7 +215,11 @@ impl MountSimulator {
         self.ra = ((ra % 360.0) + 360.0) % 360.0;
         self.dec = dec.clamp(-90.0, 90.0);
         self.update_pier_side();
-        log::info!("Simulator synced to RA={:.4}° Dec={:.4}°", self.ra, self.dec);
+        log::info!(
+            "Simulator synced to RA={:.4}° Dec={:.4}°",
+            self.ra,
+            self.dec
+        );
         Ok(())
     }
 
@@ -300,5 +304,158 @@ impl MountSimulator {
         if index < SLEW_RATES.len() {
             self.slew_rate_index = index;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{Duration, Instant};
+
+    use super::*;
+
+    fn approx_eq(left: f64, right: f64, tolerance: f64) -> bool {
+        (left - right).abs() <= tolerance
+    }
+
+    #[test]
+    fn new_simulator_starts_parked_at_home_position() {
+        let mut simulator = MountSimulator::new();
+        let state = simulator.get_state();
+
+        assert!(!state.connected);
+        assert_eq!(state.ra, 0.0);
+        assert_eq!(state.dec, 90.0);
+        assert!(state.parked);
+        assert!(state.at_home);
+        assert_eq!(state.pier_side, PierSide::West);
+    }
+
+    #[test]
+    fn slew_requires_connection_and_unparked_mount() {
+        let mut simulator = MountSimulator::new();
+
+        assert!(matches!(
+            simulator.slew_to(10.0, 20.0),
+            Err(MountError::NotConnected)
+        ));
+
+        simulator.connect().expect("simulator should connect");
+
+        assert!(matches!(
+            simulator.slew_to(10.0, 20.0),
+            Err(MountError::Parked)
+        ));
+    }
+
+    #[test]
+    fn sync_normalizes_coordinates_and_updates_pier_side() {
+        let mut simulator = MountSimulator::new();
+        simulator.connect().expect("simulator should connect");
+
+        simulator
+            .sync_to(-10.0, 120.0)
+            .expect("sync should succeed for connected simulator");
+
+        let state = simulator.get_state();
+        assert_eq!(state.ra, 350.0);
+        assert_eq!(state.dec, 90.0);
+        assert_eq!(state.pier_side, PierSide::East);
+    }
+
+    #[test]
+    fn manual_axis_motion_updates_coordinates_and_clamps_declination() {
+        let mut simulator = MountSimulator::new();
+        simulator.connect().expect("simulator should connect");
+        simulator.unpark().expect("simulator should unpark");
+        simulator
+            .set_tracking(false)
+            .expect("tracking should be configurable once unparked");
+        simulator
+            .sync_to(10.0, 89.5)
+            .expect("sync should succeed for connected simulator");
+        simulator
+            .move_axis(MountAxis::Primary, 800.0)
+            .expect("primary axis move should succeed");
+        simulator
+            .move_axis(MountAxis::Secondary, 1000.0)
+            .expect("secondary axis move should succeed");
+
+        simulator.last_tick = Instant::now() - Duration::from_secs(1);
+        simulator.tick();
+
+        let state = simulator.get_state();
+        assert!(state.ra > 13.0, "primary axis motion should advance RA");
+        assert_eq!(
+            state.dec, 90.0,
+            "declination should be clamped to 90 degrees"
+        );
+        assert_eq!(state.pier_side, PierSide::West);
+
+        simulator
+            .stop_axis(MountAxis::Primary)
+            .expect("primary axis should stop");
+        simulator
+            .stop_axis(MountAxis::Secondary)
+            .expect("secondary axis should stop");
+        assert_eq!(simulator.primary_axis_rate, 0.0);
+        assert_eq!(simulator.secondary_axis_rate, 0.0);
+    }
+
+    #[test]
+    fn tracking_tick_uses_selected_tracking_rate() {
+        let mut simulator = MountSimulator::new();
+        simulator.connect().expect("simulator should connect");
+        simulator.unpark().expect("simulator should unpark");
+        simulator
+            .sync_to(100.0, 5.0)
+            .expect("sync should succeed for connected simulator");
+        simulator
+            .set_tracking_rate(TrackingRate::Lunar)
+            .expect("tracking rate should update");
+
+        simulator.last_tick = Instant::now() - Duration::from_secs(2);
+        simulator.tick();
+
+        let expected_ra = 100.0 + (SIDEREAL_RATE_DEG_PER_SEC * 0.9673 * 2.0);
+        assert!(
+            approx_eq(simulator.ra, expected_ra, 0.01),
+            "expected RA to track at lunar rate"
+        );
+        assert_eq!(simulator.tracking_rate, TrackingRate::Lunar);
+    }
+
+    #[test]
+    fn slew_tick_arrives_via_shortest_ra_wrap_path() {
+        let mut simulator = MountSimulator::new();
+        simulator.connect().expect("simulator should connect");
+        simulator.unpark().expect("simulator should unpark");
+        simulator
+            .set_tracking(false)
+            .expect("tracking should be configurable once unparked");
+        simulator
+            .sync_to(350.0, 0.0)
+            .expect("sync should succeed for connected simulator");
+        simulator
+            .slew_to(10.0, 0.0)
+            .expect("slew should start once simulator is unparked");
+
+        simulator.last_tick = Instant::now() - Duration::from_secs(5);
+        simulator.tick();
+
+        assert!(!simulator.slewing);
+        assert!(approx_eq(simulator.ra, 10.0, 0.001));
+        assert!(approx_eq(simulator.dec, 0.0, 0.001));
+        assert_eq!(simulator.pier_side, PierSide::West);
+        assert!(!simulator.at_home);
+    }
+
+    #[test]
+    fn invalid_slew_rate_index_is_ignored() {
+        let mut simulator = MountSimulator::new();
+
+        simulator.set_slew_rate_index(1);
+        simulator.set_slew_rate_index(SLEW_RATES.len() + 5);
+
+        assert_eq!(simulator.slew_rate_index, 1);
     }
 }

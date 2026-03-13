@@ -5,8 +5,8 @@ use chrono::{DateTime, Utc};
 use std::f64::consts::PI;
 
 use super::common::{
-    atmospheric_refraction, calculate_obliquity, normalize_degrees, DEG_TO_RAD,
-    EQ_TO_GAL_MATRIX, GAL_TO_EQ_MATRIX, RAD_TO_DEG,
+    atmospheric_refraction, calculate_obliquity, normalize_degrees, DEG_TO_RAD, EQ_TO_GAL_MATRIX,
+    GAL_TO_EQ_MATRIX, RAD_TO_DEG,
 };
 use super::time::{calculate_hour_angle, calculate_lst, datetime_to_jd};
 use super::types::{EclipticCoords, EquatorialCoords, GalacticCoords, HorizontalCoords};
@@ -256,8 +256,16 @@ mod tests {
     fn test_equatorial_to_galactic_center() {
         // Galactic center: RA ≈ 266.4°, Dec ≈ -29.0° → l ≈ 0°, b ≈ 0°
         let gc = equatorial_to_galactic(266.4, -29.0);
-        assert!(gc.l.abs() < 5.0 || gc.l > 355.0, "Galactic center l should be near 0°, got {}", gc.l);
-        assert!(gc.b.abs() < 5.0, "Galactic center b should be near 0°, got {}", gc.b);
+        assert!(
+            gc.l.abs() < 5.0 || gc.l > 355.0,
+            "Galactic center l should be near 0°, got {}",
+            gc.l
+        );
+        assert!(
+            gc.b.abs() < 5.0,
+            "Galactic center b should be near 0°, got {}",
+            gc.b
+        );
     }
 
     #[test]
@@ -280,12 +288,20 @@ mod tests {
         // Test galactic_to_equatorial with known galactic coordinates
         // Galactic north pole (l=0, b=90) should be roughly at RA≈192.86°, Dec≈27.13°
         let eq = galactic_to_equatorial(0.0, 90.0);
-        
+
         // Verify output is in valid range
         assert!(eq.ra >= 0.0 && eq.ra < 360.0, "RA out of range: {}", eq.ra);
-        assert!(eq.dec >= -90.0 && eq.dec <= 90.0, "Dec out of range: {}", eq.dec);
+        assert!(
+            eq.dec >= -90.0 && eq.dec <= 90.0,
+            "Dec out of range: {}",
+            eq.dec
+        );
         // Galactic north pole Dec should be positive (northern hemisphere)
-        assert!(eq.dec > 0.0, "Galactic north pole should have positive Dec, got {}", eq.dec);
+        assert!(
+            eq.dec > 0.0,
+            "Galactic north pole should have positive Dec, got {}",
+            eq.dec
+        );
     }
 
     #[test]
@@ -308,12 +324,22 @@ mod tests {
         let original_ra = 120.0;
         let original_dec = 30.0;
         let timestamp = Some(0i64); // Use fixed timestamp
-        
+
         let ecliptic = equatorial_to_ecliptic(original_ra, original_dec, timestamp);
         let back = ecliptic_to_equatorial(ecliptic.lon, ecliptic.lat, timestamp);
-        
-        assert!(approx_eq(back.ra, original_ra, 0.1), "RA roundtrip failed: {} vs {}", back.ra, original_ra);
-        assert!(approx_eq(back.dec, original_dec, 0.1), "Dec roundtrip failed: {} vs {}", back.dec, original_dec);
+
+        assert!(
+            approx_eq(back.ra, original_ra, 0.1),
+            "RA roundtrip failed: {} vs {}",
+            back.ra,
+            original_ra
+        );
+        assert!(
+            approx_eq(back.dec, original_dec, 0.1),
+            "Dec roundtrip failed: {} vs {}",
+            back.dec,
+            original_dec
+        );
     }
 
     // ------------------------------------------------------------------------
@@ -327,9 +353,12 @@ mod tests {
         let with_refraction = equatorial_to_horizontal(0.0, 0.0, 45.0, 0.0, ts, None);
         let without_refraction = equatorial_to_horizontal(0.0, 0.0, 45.0, 0.0, ts, Some(false));
         // Refraction always raises the apparent altitude
-        assert!(with_refraction.alt >= without_refraction.alt,
+        assert!(
+            with_refraction.alt >= without_refraction.alt,
             "Default (refraction on) alt {} should be >= no-refraction alt {}",
-            with_refraction.alt, without_refraction.alt);
+            with_refraction.alt,
+            without_refraction.alt
+        );
     }
 
     #[test]
@@ -337,8 +366,12 @@ mod tests {
         let ts = Some(0i64);
         let explicit_true = equatorial_to_horizontal(0.0, 0.0, 45.0, 0.0, ts, Some(true));
         let default_none = equatorial_to_horizontal(0.0, 0.0, 45.0, 0.0, ts, None);
-        assert!(approx_eq(explicit_true.alt, default_none.alt, 1e-10),
-            "Explicit true should match default: {} vs {}", explicit_true.alt, default_none.alt);
+        assert!(
+            approx_eq(explicit_true.alt, default_none.alt, 1e-10),
+            "Explicit true should match default: {} vs {}",
+            explicit_true.alt,
+            default_none.alt
+        );
     }
 
     #[test]
@@ -347,9 +380,12 @@ mod tests {
         let no_refraction = equatorial_to_horizontal(0.0, 0.0, 45.0, 0.0, ts, Some(false));
         let with_refraction = equatorial_to_horizontal(0.0, 0.0, 45.0, 0.0, ts, Some(true));
         // Without refraction, altitude should be lower (or equal for zenith)
-        assert!(no_refraction.alt <= with_refraction.alt,
+        assert!(
+            no_refraction.alt <= with_refraction.alt,
             "No-refraction alt {} should be <= refraction alt {}",
-            no_refraction.alt, with_refraction.alt);
+            no_refraction.alt,
+            with_refraction.alt
+        );
     }
 
     #[test]
@@ -358,8 +394,12 @@ mod tests {
         let ts = Some(0i64);
         let with = equatorial_to_horizontal(90.0, 20.0, 40.0, -74.0, ts, Some(true));
         let without = equatorial_to_horizontal(90.0, 20.0, 40.0, -74.0, ts, Some(false));
-        assert!(approx_eq(with.az, without.az, 1e-10),
-            "Azimuth should not change with refraction: {} vs {}", with.az, without.az);
+        assert!(
+            approx_eq(with.az, without.az, 1e-10),
+            "Azimuth should not change with refraction: {} vs {}",
+            with.az,
+            without.az
+        );
     }
 
     #[test]
@@ -368,20 +408,31 @@ mod tests {
         // Near zenith, correction should be negligible
         let ts = Some(0i64);
         // Test multiple declinations to find a near-horizon case
-        let results: Vec<(f64, f64)> = (-80..=80).step_by(10).map(|dec| {
-            let with = equatorial_to_horizontal(0.0, dec as f64, 45.0, 0.0, ts, Some(true));
-            let without = equatorial_to_horizontal(0.0, dec as f64, 45.0, 0.0, ts, Some(false));
-            (without.alt, with.alt - without.alt)
-        }).collect();
+        let results: Vec<(f64, f64)> = (-80..=80)
+            .step_by(10)
+            .map(|dec| {
+                let with = equatorial_to_horizontal(0.0, dec as f64, 45.0, 0.0, ts, Some(true));
+                let without = equatorial_to_horizontal(0.0, dec as f64, 45.0, 0.0, ts, Some(false));
+                (without.alt, with.alt - without.alt)
+            })
+            .collect();
 
         for (geo_alt, correction) in &results {
             // Correction should always be non-negative
-            assert!(*correction >= 0.0,
-                "Refraction correction should be >= 0 at geo_alt {}, got {}", geo_alt, correction);
+            assert!(
+                *correction >= 0.0,
+                "Refraction correction should be >= 0 at geo_alt {}, got {}",
+                geo_alt,
+                correction
+            );
             // At high altitudes, correction is small
             if *geo_alt > 60.0 {
-                assert!(*correction < 0.05,
-                    "Refraction at high alt {}° should be < 0.05°, got {}", geo_alt, correction);
+                assert!(
+                    *correction < 0.05,
+                    "Refraction at high alt {}° should be < 0.05°, got {}",
+                    geo_alt,
+                    correction
+                );
             }
         }
     }
@@ -393,14 +444,21 @@ mod tests {
     #[test]
     fn test_angular_separation_same_point() {
         let sep = angular_separation(100.0, 45.0, 100.0, 45.0);
-        assert!(approx_eq(sep, 0.0, EPSILON), "Same point separation should be 0");
+        assert!(
+            approx_eq(sep, 0.0, EPSILON),
+            "Same point separation should be 0"
+        );
     }
 
     #[test]
     fn test_angular_separation_poles() {
         // North pole to south pole = 180°
         let sep = angular_separation(0.0, 90.0, 0.0, -90.0);
-        assert!(approx_eq(sep, 180.0, 0.01), "Pole to pole should be 180°, got {}", sep);
+        assert!(
+            approx_eq(sep, 180.0, 0.01),
+            "Pole to pole should be 180°, got {}",
+            sep
+        );
     }
 
     #[test]

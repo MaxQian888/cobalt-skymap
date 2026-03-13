@@ -1,7 +1,6 @@
 //! Session planner import/export and template persistence
 
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::Utc;
 use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
@@ -9,21 +8,13 @@ use tauri::AppHandle;
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
+pub use super::session_io_core::SessionTemplateEntry;
+use super::session_io_core::{
+    extension_for_format, load_templates_from_path, read_session_plan_from_path,
+    save_templates_to_path, upsert_template_entry, write_session_plan_to_path, SessionIoCoreError,
+    SessionTemplateData,
+};
 use super::storage::StorageError;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SessionTemplateEntry {
-    pub id: String,
-    pub name: String,
-    pub draft: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-struct SessionTemplateData {
-    templates: Vec<SessionTemplateEntry>,
-}
 
 fn get_session_data_dir(app: &AppHandle) -> Result<PathBuf, StorageError> {
     #[cfg(desktop)]
@@ -53,31 +44,24 @@ fn get_templates_path(app: &AppHandle) -> Result<PathBuf, StorageError> {
     Ok(get_session_data_dir(app)?.join("templates.json"))
 }
 
+fn core_error_to_storage(error: SessionIoCoreError) -> StorageError {
+    match error {
+        SessionIoCoreError::Io(error) => StorageError::Io(error),
+        SessionIoCoreError::Json(error) => StorageError::Json(error),
+    }
+}
+
 fn load_templates_internal(app: &AppHandle) -> Result<SessionTemplateData, StorageError> {
     let path = get_templates_path(app)?;
-    if !path.exists() {
-        return Ok(SessionTemplateData::default());
-    }
-    let content = fs::read_to_string(path)?;
-    Ok(serde_json::from_str(&content)?)
+    load_templates_from_path(&path).map_err(core_error_to_storage)
 }
 
-fn save_templates_internal(app: &AppHandle, data: &SessionTemplateData) -> Result<(), StorageError> {
+fn save_templates_internal(
+    app: &AppHandle,
+    data: &SessionTemplateData,
+) -> Result<(), StorageError> {
     let path = get_templates_path(app)?;
-    let serialized = serde_json::to_string_pretty(data)?;
-    fs::write(path, serialized)?;
-    Ok(())
-}
-
-fn extension_for_format(format: &str) -> &'static str {
-    match format {
-        "markdown" => "md",
-        "json" => "json",
-        "nina-xml" => "xml",
-        "csv" => "csv",
-        "sgp-csv" => "csv",
-        _ => "txt",
-    }
+    save_templates_to_path(&path, data).map_err(core_error_to_storage)
 }
 
 #[tauri::command]
@@ -100,7 +84,9 @@ pub async fn export_session_plan(
             .blocking_save_file();
 
         match file_path {
-            Some(path) => path.into_path().map_err(|_| StorageError::AppDataDirNotFound)?,
+            Some(path) => path
+                .into_path()
+                .map_err(|_| StorageError::AppDataDirNotFound)?,
             None => {
                 return Err(StorageError::Io(std::io::Error::new(
                     std::io::ErrorKind::Interrupted,
@@ -110,8 +96,7 @@ pub async fn export_session_plan(
         }
     };
 
-    fs::write(&target_path, content)?;
-    Ok(target_path.to_string_lossy().to_string())
+    write_session_plan_to_path(&target_path, &content).map_err(core_error_to_storage)
 }
 
 #[tauri::command]
@@ -130,7 +115,9 @@ pub async fn import_session_plan(
             .blocking_pick_file();
 
         match file_path {
-            Some(path) => path.into_path().map_err(|_| StorageError::AppDataDirNotFound)?,
+            Some(path) => path
+                .into_path()
+                .map_err(|_| StorageError::AppDataDirNotFound)?,
             None => {
                 return Err(StorageError::Io(std::io::Error::new(
                     std::io::ErrorKind::Interrupted,
@@ -140,8 +127,7 @@ pub async fn import_session_plan(
         }
     };
 
-    let content = fs::read_to_string(&source_path)?;
-    Ok(content)
+    read_session_plan_from_path(&source_path).map_err(core_error_to_storage)
 }
 
 #[tauri::command]
@@ -153,29 +139,15 @@ pub async fn save_session_template(
     let now = Utc::now();
     let draft_json: serde_json::Value = serde_json::from_str(&draft)?;
     let mut data = load_templates_internal(&app)?;
-
-    if let Some(existing) = data.templates.iter_mut().find(|template| template.name == name) {
-        existing.draft = draft_json;
-        existing.updated_at = now;
-        let updated = existing.clone();
-        save_templates_internal(&app, &data)?;
-        return Ok(updated);
-    }
-
-    let entry = SessionTemplateEntry {
-        id: format!("template-{}-{}", now.timestamp_millis(), data.templates.len() + 1),
-        name,
-        draft: draft_json,
-        created_at: now,
-        updated_at: now,
-    };
-    data.templates.push(entry.clone());
+    let entry = upsert_template_entry(&mut data, name, draft_json, now);
     save_templates_internal(&app, &data)?;
     Ok(entry)
 }
 
 #[tauri::command]
-pub async fn load_session_templates(app: AppHandle) -> Result<Vec<SessionTemplateEntry>, StorageError> {
+pub async fn load_session_templates(
+    app: AppHandle,
+) -> Result<Vec<SessionTemplateEntry>, StorageError> {
     let data = load_templates_internal(&app)?;
     Ok(data.templates)
 }

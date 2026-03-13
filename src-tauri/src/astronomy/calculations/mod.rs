@@ -13,16 +13,16 @@
 //! - `imaging`: FOV and mosaic coverage
 //! - `formatting`: RA/Dec formatting and parsing
 
-pub mod types;
 pub mod common;
-pub mod time;
 pub mod coordinates;
-pub mod visibility;
-pub mod twilight;
+pub mod formatting;
+pub mod imaging;
 pub mod moon;
 pub mod sun;
-pub mod imaging;
-pub mod formatting;
+pub mod time;
+pub mod twilight;
+pub mod types;
+pub mod visibility;
 
 // Re-export all public types
 pub use types::{
@@ -41,3 +41,29 @@ pub use moon::{calculate_moon_phase, calculate_moon_position};
 pub use sun::calculate_sun_position;
 pub use twilight::calculate_twilight;
 pub use visibility::calculate_visibility;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_reexports_expose_core_calculation_api() {
+        let location = GeoLocation {
+            latitude: 35.6895,
+            longitude: 139.6917,
+            altitude: 40.0,
+        };
+        assert_eq!(location.altitude, 40.0);
+
+        let formatted_ra = format_ra_hms(83.6331);
+        let parsed_ra = parse_ra_hms(formatted_ra).unwrap();
+        assert!((parsed_ra - 83.6331).abs() < 1e-3);
+
+        let separation = angular_separation(parsed_ra, 22.0145, parsed_ra, 22.0145);
+        assert!(separation.abs() < 1e-9);
+
+        let fov = calculate_fov(36.0, 24.0, 400.0, 4.3, 80.0);
+        assert!(fov.width_deg > fov.height_deg);
+        assert!((fov.f_ratio - 5.0).abs() < 1e-9);
+    }
+}

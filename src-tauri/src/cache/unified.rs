@@ -108,14 +108,21 @@ fn get_unified_cache_dir(app: &AppHandle) -> Result<PathBuf, StorageError> {
 
     #[cfg(not(desktop))]
     let base = {
-        let app_data_dir = app.path().app_data_dir().map_err(|_| StorageError::AppDataDirNotFound)?;
+        let app_data_dir = app
+            .path()
+            .app_data_dir()
+            .map_err(|_| StorageError::AppDataDirNotFound)?;
         let d = app_data_dir.join("skymap");
-        if !d.exists() { fs::create_dir_all(&d)?; }
+        if !d.exists() {
+            fs::create_dir_all(&d)?;
+        }
         d
     };
 
     let cache_dir = base.join("unified_cache");
-    if !cache_dir.exists() { fs::create_dir_all(&cache_dir)?; }
+    if !cache_dir.exists() {
+        fs::create_dir_all(&cache_dir)?;
+    }
     Ok(cache_dir)
 }
 
@@ -125,7 +132,9 @@ fn get_cache_index_path(app: &AppHandle) -> Result<PathBuf, StorageError> {
 
 fn get_cache_data_dir(app: &AppHandle) -> Result<PathBuf, StorageError> {
     let data_dir = get_unified_cache_dir(app)?.join("data");
-    if !data_dir.exists() { fs::create_dir_all(&data_dir)?; }
+    if !data_dir.exists() {
+        fs::create_dir_all(&data_dir)?;
+    }
     Ok(data_dir)
 }
 
@@ -140,21 +149,28 @@ fn key_to_filename(key: &str) -> String {
 /// Load cache index from disk (internal use only)
 fn load_cache_index_from_disk(app: &AppHandle) -> Result<CacheIndex, StorageError> {
     let path = get_cache_index_path(app)?;
-    if !path.exists() { return Ok(CacheIndex::default()); }
+    if !path.exists() {
+        return Ok(CacheIndex::default());
+    }
     Ok(serde_json::from_str(&fs::read_to_string(&path)?)?)
 }
 
 /// Save cache index to disk (internal use only)
 fn save_cache_index_to_disk(app: &AppHandle, index: &CacheIndex) -> Result<(), StorageError> {
-    fs::write(&get_cache_index_path(app)?, serde_json::to_string_pretty(index)?)?;
+    fs::write(
+        &get_cache_index_path(app)?,
+        serde_json::to_string_pretty(index)?,
+    )?;
     Ok(())
 }
 
 /// Get or load the cache index (uses in-memory cache)
 fn get_cache_index(app: &AppHandle) -> Result<CacheIndex, StorageError> {
     let mutex = get_cache_index_mutex();
-    let mut guard = mutex.lock().map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
-    
+    let mut guard = mutex
+        .lock()
+        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+
     match &*guard {
         Some(state) => Ok(state.index.clone()),
         None => {
@@ -166,21 +182,28 @@ fn get_cache_index(app: &AppHandle) -> Result<CacheIndex, StorageError> {
 }
 
 /// Update the cache index (marks as dirty, persists if interval exceeded)
-fn update_cache_index(app: &AppHandle, index: CacheIndex, force_persist: bool) -> Result<(), StorageError> {
+fn update_cache_index(
+    app: &AppHandle,
+    index: CacheIndex,
+    force_persist: bool,
+) -> Result<(), StorageError> {
     let mutex = get_cache_index_mutex();
-    let mut guard = mutex.lock().map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
-    
+    let mut guard = mutex
+        .lock()
+        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+
     let now = Utc::now().timestamp_millis();
-    let should_persist = force_persist || match &*guard {
-        Some(state) => now - state.last_persist > PERSIST_INTERVAL_MS,
-        None => true,
-    };
-    
+    let should_persist = force_persist
+        || match &*guard {
+            Some(state) => now - state.last_persist > PERSIST_INTERVAL_MS,
+            None => true,
+        };
+
     let (prev_hits, prev_misses) = match &*guard {
         Some(state) => (state.hits, state.misses),
         None => (0, 0),
     };
-    
+
     if should_persist {
         save_cache_index_to_disk(app, &index)?;
         *guard = Some(CacheIndexState {
@@ -199,15 +222,17 @@ fn update_cache_index(app: &AppHandle, index: CacheIndex, force_persist: bool) -
             misses: prev_misses,
         });
     }
-    
+
     Ok(())
 }
 
 /// Force persist any dirty cache index to disk
 fn flush_cache_index(app: &AppHandle) -> Result<(), StorageError> {
     let mutex = get_cache_index_mutex();
-    let mut guard = mutex.lock().map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
-    
+    let mut guard = mutex
+        .lock()
+        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+
     if let Some(state) = &*guard {
         if state.dirty {
             save_cache_index_to_disk(app, &state.index)?;
@@ -220,7 +245,7 @@ fn flush_cache_index(app: &AppHandle) -> Result<(), StorageError> {
             });
         }
     }
-    
+
     Ok(())
 }
 
@@ -233,7 +258,10 @@ fn invalidate_cache_index() {
 }
 
 #[tauri::command]
-pub async fn get_unified_cache_entry(app: AppHandle, key: String) -> Result<Option<UnifiedCacheResponse>, StorageError> {
+pub async fn get_unified_cache_entry(
+    app: AppHandle,
+    key: String,
+) -> Result<Option<UnifiedCacheResponse>, StorageError> {
     let mut index = get_cache_index(&app)?;
     let meta = match index.entries.get(&key) {
         Some(m) => m.clone(),
@@ -308,16 +336,45 @@ fn get_hit_rate() -> f64 {
     0.0
 }
 
-/// Evict the N least-recently-accessed entries from the cache
-fn evict_lru_entries(app: &AppHandle, index: &mut CacheIndex, count: usize) -> Result<u64, StorageError> {
-    let data_dir = get_cache_data_dir(app)?;
-    let mut entries: Vec<(String, i64, u64)> = index.entries.iter()
-        .map(|(k, m)| (k.clone(), m.last_access, m.size_bytes))
+fn lru_entries(index: &CacheIndex) -> Vec<(String, i64, u64)> {
+    let mut entries: Vec<(String, i64, u64)> = index
+        .entries
+        .iter()
+        .map(|(key, meta)| (key.clone(), meta.last_access, meta.size_bytes))
         .collect();
     entries.sort_by_key(|(_, last_access, _)| *last_access);
+    entries
+}
+
+fn expired_keys(index: &CacheIndex, now: i64) -> Vec<String> {
+    index
+        .entries
+        .iter()
+        .filter(|(_, meta)| meta.ttl > 0 && now > meta.timestamp + meta.ttl)
+        .map(|(key, _)| key.clone())
+        .collect()
+}
+
+fn expired_stats(index: &CacheIndex, now: i64) -> (usize, u64) {
+    index
+        .entries
+        .values()
+        .filter(|meta| meta.ttl > 0 && now > meta.timestamp + meta.ttl)
+        .fold((0usize, 0u64), |(count, size), meta| {
+            (count + 1, size + meta.size_bytes)
+        })
+}
+
+/// Evict the N least-recently-accessed entries from the cache
+fn evict_lru_entries(
+    app: &AppHandle,
+    index: &mut CacheIndex,
+    count: usize,
+) -> Result<u64, StorageError> {
+    let data_dir = get_cache_data_dir(app)?;
 
     let mut deleted = 0u64;
-    for (key, _, size) in entries.into_iter().take(count) {
+    for (key, _, size) in lru_entries(index).into_iter().take(count) {
         let path = data_dir.join(key_to_filename(&key));
         let _ = fs::remove_file(&path);
         index.entries.remove(&key);
@@ -328,16 +385,16 @@ fn evict_lru_entries(app: &AppHandle, index: &mut CacheIndex, count: usize) -> R
 }
 
 /// Evict least-recently-accessed entries until at least `target_bytes` are freed
-fn evict_lru_by_size(app: &AppHandle, index: &mut CacheIndex, target_bytes: u64) -> Result<u64, StorageError> {
+fn evict_lru_by_size(
+    app: &AppHandle,
+    index: &mut CacheIndex,
+    target_bytes: u64,
+) -> Result<u64, StorageError> {
     let data_dir = get_cache_data_dir(app)?;
-    let mut entries: Vec<(String, i64, u64)> = index.entries.iter()
-        .map(|(k, m)| (k.clone(), m.last_access, m.size_bytes))
-        .collect();
-    entries.sort_by_key(|(_, last_access, _)| *last_access);
 
     let mut freed = 0u64;
     let mut deleted = 0u64;
-    for (key, _, size) in entries {
+    for (key, _, size) in lru_entries(index) {
         if freed >= target_bytes {
             break;
         }
@@ -352,7 +409,13 @@ fn evict_lru_by_size(app: &AppHandle, index: &mut CacheIndex, target_bytes: u64)
 }
 
 #[tauri::command]
-pub async fn put_unified_cache_entry(app: AppHandle, key: String, data: Vec<u8>, content_type: String, ttl: i64) -> Result<(), StorageError> {
+pub async fn put_unified_cache_entry(
+    app: AppHandle,
+    key: String,
+    data: Vec<u8>,
+    content_type: String,
+    ttl: i64,
+) -> Result<(), StorageError> {
     let mut index = get_cache_index(&app)?;
 
     if index.entries.len() >= security::limits::MAX_CACHE_ENTRIES {
@@ -366,7 +429,8 @@ pub async fn put_unified_cache_entry(app: AppHandle, key: String, data: Vec<u8>,
     if index.total_size + data.len() as u64 > security::limits::MAX_CACHE_TOTAL_SIZE as u64 {
         let _ = cleanup_expired_entries_internal(&app, &mut index);
         if index.total_size + data.len() as u64 > security::limits::MAX_CACHE_TOTAL_SIZE as u64 {
-            let target = (index.total_size + data.len() as u64).saturating_sub(security::limits::MAX_CACHE_TOTAL_SIZE as u64);
+            let target = (index.total_size + data.len() as u64)
+                .saturating_sub(security::limits::MAX_CACHE_TOTAL_SIZE as u64);
             evict_lru_by_size(&app, &mut index, target)?;
         }
     }
@@ -380,10 +444,19 @@ pub async fn put_unified_cache_entry(app: AppHandle, key: String, data: Vec<u8>,
     }
 
     let now = Utc::now().timestamp_millis();
-    index.entries.insert(key.clone(), CacheEntryMeta {
-        key, content_type, size_bytes, timestamp: now, ttl, etag: None,
-        access_count: 0, last_access: now,
-    });
+    index.entries.insert(
+        key.clone(),
+        CacheEntryMeta {
+            key,
+            content_type,
+            size_bytes,
+            timestamp: now,
+            ttl,
+            etag: None,
+            access_count: 0,
+            last_access: now,
+        },
+    );
     index.total_size += size_bytes;
     update_cache_index(&app, index, false)?;
     Ok(())
@@ -395,7 +468,9 @@ pub async fn delete_unified_cache_entry(app: AppHandle, key: String) -> Result<b
     if let Some(meta) = index.entries.remove(&key) {
         index.total_size = index.total_size.saturating_sub(meta.size_bytes);
         let data_path = get_cache_data_dir(&app)?.join(key_to_filename(&key));
-        if data_path.exists() { fs::remove_file(&data_path)?; }
+        if data_path.exists() {
+            fs::remove_file(&data_path)?;
+        }
         update_cache_index(&app, index, false)?;
         return Ok(true);
     }
@@ -429,14 +504,7 @@ pub async fn list_unified_cache_keys(app: AppHandle) -> Result<Vec<String>, Stor
 pub async fn get_unified_cache_stats(app: AppHandle) -> Result<UnifiedCacheStats, StorageError> {
     let index = get_cache_index(&app)?;
     let now = Utc::now().timestamp_millis();
-    let mut expired_count = 0;
-    let mut expired_size = 0u64;
-    for meta in index.entries.values() {
-        if meta.ttl > 0 && now > meta.timestamp + meta.ttl {
-            expired_count += 1;
-            expired_size += meta.size_bytes;
-        }
-    }
+    let (expired_count, expired_size) = expired_stats(&index, now);
     Ok(UnifiedCacheStats {
         total_entries: index.entries.len(),
         total_size: index.total_size,
@@ -449,19 +517,21 @@ pub async fn get_unified_cache_stats(app: AppHandle) -> Result<UnifiedCacheStats
     })
 }
 
-fn cleanup_expired_entries_internal(app: &AppHandle, index: &mut CacheIndex) -> Result<u64, StorageError> {
+fn cleanup_expired_entries_internal(
+    app: &AppHandle,
+    index: &mut CacheIndex,
+) -> Result<u64, StorageError> {
     let data_dir = get_cache_data_dir(app)?;
     let now = Utc::now().timestamp_millis();
     let mut deleted_count = 0u64;
-    let keys_to_remove: Vec<String> = index.entries.iter()
-        .filter(|(_, meta)| meta.ttl > 0 && now > meta.timestamp + meta.ttl)
-        .map(|(k, _)| k.clone()).collect();
 
-    for key in keys_to_remove {
+    for key in expired_keys(index, now) {
         if let Some(meta) = index.entries.remove(&key) {
             index.total_size = index.total_size.saturating_sub(meta.size_bytes);
             let data_path = data_dir.join(key_to_filename(&key));
-            if data_path.exists() { let _ = fs::remove_file(&data_path); }
+            if data_path.exists() {
+                let _ = fs::remove_file(&data_path);
+            }
             deleted_count += 1;
         }
     }
@@ -489,13 +559,23 @@ pub async fn prefetch_url(app: AppHandle, url: String, ttl: i64) -> Result<bool,
     log::info!("Prefetching URL: {}", url);
     let request_id = format!("prefetch-{}", chrono::Utc::now().timestamp_millis());
 
-    match http_client::http_request(app.clone(), http_client::RequestConfig {
-        method: "GET".to_string(), url: url.clone(), request_id: Some(request_id),
-        allow_http: false, ..Default::default()
-    }).await {
+    match http_client::http_request(
+        app.clone(),
+        http_client::RequestConfig {
+            method: "GET".to_string(),
+            url: url.clone(),
+            request_id: Some(request_id),
+            allow_http: false,
+            ..Default::default()
+        },
+    )
+    .await
+    {
         Ok(response) => {
             if response.status >= 200 && response.status < 300 {
-                let content_type = response.content_type.unwrap_or_else(|| "application/octet-stream".to_string());
+                let content_type = response
+                    .content_type
+                    .unwrap_or_else(|| "application/octet-stream".to_string());
                 security::validate_size(&response.body, security::limits::MAX_TILE_SIZE)
                     .map_err(|e| StorageError::Other(e.to_string()))?;
                 let key = url_to_cache_key(&url);
@@ -506,12 +586,19 @@ pub async fn prefetch_url(app: AppHandle, url: String, ttl: i64) -> Result<bool,
                 Ok(false)
             }
         }
-        Err(e) => { log::warn!("Prefetch error: {}", e); Ok(false) }
+        Err(e) => {
+            log::warn!("Prefetch error: {}", e);
+            Ok(false)
+        }
     }
 }
 
 #[tauri::command]
-pub async fn prefetch_urls(app: AppHandle, urls: Vec<String>, ttl: i64) -> Result<PrefetchResult, StorageError> {
+pub async fn prefetch_urls(
+    app: AppHandle,
+    urls: Vec<String>,
+    ttl: i64,
+) -> Result<PrefetchResult, StorageError> {
     let mut success = 0;
     let mut failed = 0;
     for url in urls {
@@ -524,9 +611,12 @@ pub async fn prefetch_urls(app: AppHandle, urls: Vec<String>, ttl: i64) -> Resul
 }
 
 fn url_to_cache_key(url: &str) -> String {
-    url.replace("https://", "").replace("http://", "")
-        .chars().filter(|c| c.is_alphanumeric() || *c == '/' || *c == '.' || *c == '-' || *c == '_')
-        .take(200).collect()
+    url.replace("https://", "")
+        .replace("http://", "")
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '/' || *c == '.' || *c == '-' || *c == '_')
+        .take(200)
+        .collect()
 }
 
 // ============================================================================
@@ -536,6 +626,25 @@ fn url_to_cache_key(url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cache::test_support::cache_test_lock;
+
+    fn test_entry_meta(
+        key: &str,
+        size_bytes: u64,
+        timestamp: i64,
+        last_access: i64,
+    ) -> CacheEntryMeta {
+        CacheEntryMeta {
+            key: key.to_string(),
+            content_type: "application/octet-stream".to_string(),
+            size_bytes,
+            timestamp,
+            ttl: 0,
+            etag: None,
+            access_count: 0,
+            last_access,
+        }
+    }
 
     // ------------------------------------------------------------------------
     // key_to_filename Tests
@@ -546,7 +655,10 @@ mod tests {
         let key = "https://example.com/path/to/resource";
         let filename1 = key_to_filename(key);
         let filename2 = key_to_filename(key);
-        assert_eq!(filename1, filename2, "Same key should produce same filename");
+        assert_eq!(
+            filename1, filename2,
+            "Same key should produce same filename"
+        );
     }
 
     #[test]
@@ -555,7 +667,10 @@ mod tests {
         let key2 = "https://example.com/path2";
         let filename1 = key_to_filename(key1);
         let filename2 = key_to_filename(key2);
-        assert_ne!(filename1, filename2, "Different keys should produce different filenames");
+        assert_ne!(
+            filename1, filename2,
+            "Different keys should produce different filenames"
+        );
     }
 
     #[test]
@@ -610,6 +725,152 @@ mod tests {
         assert!(key.contains("-"));
         assert!(key.contains("_"));
         assert!(key.contains("."));
+    }
+
+    // ------------------------------------------------------------------------
+    // Unified Cache Behavior Tests
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn test_cache_index_state_new_initializes_tracking_fields() {
+        let before = Utc::now().timestamp_millis();
+        let state = CacheIndexState::new(CacheIndex::default());
+        let after = Utc::now().timestamp_millis();
+
+        assert!(!state.dirty);
+        assert_eq!(state.hits, 0);
+        assert_eq!(state.misses, 0);
+        assert!(
+            state.last_persist >= before && state.last_persist <= after,
+            "last_persist should be initialized to current time"
+        );
+    }
+
+    #[test]
+    fn test_record_cache_hit_and_miss_updates_hit_rate() {
+        let _guard = cache_test_lock();
+        invalidate_cache_index();
+
+        {
+            let mut state = get_cache_index_mutex().lock().unwrap();
+            *state = Some(CacheIndexState::new(CacheIndex::default()));
+        }
+
+        record_cache_hit();
+        record_cache_miss();
+        record_cache_hit();
+
+        {
+            let state = get_cache_index_mutex().lock().unwrap();
+            let state = state.as_ref().unwrap();
+            assert_eq!(state.hits, 2);
+            assert_eq!(state.misses, 1);
+        }
+        assert!(
+            (get_hit_rate() - (2.0 / 3.0)).abs() < f64::EPSILON,
+            "hit rate should reflect hit/miss counters"
+        );
+
+        invalidate_cache_index();
+    }
+
+    #[test]
+    fn test_lru_entries_sorts_oldest_access_first() {
+        let now = Utc::now().timestamp_millis();
+        let mut index = CacheIndex::default();
+        index.entries.insert(
+            "newest".to_string(),
+            test_entry_meta("newest", 30, now - 100, now - 10),
+        );
+        index.entries.insert(
+            "oldest".to_string(),
+            test_entry_meta("oldest", 10, now - 100, now - 30),
+        );
+        index.entries.insert(
+            "middle".to_string(),
+            test_entry_meta("middle", 20, now - 100, now - 20),
+        );
+
+        let ordered_keys: Vec<String> = lru_entries(&index)
+            .into_iter()
+            .map(|(key, _, _)| key)
+            .collect();
+
+        assert_eq!(ordered_keys, vec!["oldest", "middle", "newest"]);
+    }
+
+    #[test]
+    fn test_expired_keys_returns_only_elapsed_ttl_entries() {
+        let now = Utc::now().timestamp_millis();
+        let mut index = CacheIndex::default();
+        index.entries.insert(
+            "expired".to_string(),
+            CacheEntryMeta {
+                ttl: 10,
+                timestamp: now - 50,
+                ..test_entry_meta("expired", 128, now - 50, now - 50)
+            },
+        );
+        index.entries.insert(
+            "fresh".to_string(),
+            CacheEntryMeta {
+                ttl: 100,
+                timestamp: now - 50,
+                ..test_entry_meta("fresh", 64, now - 50, now - 20)
+            },
+        );
+        index.entries.insert(
+            "no-ttl".to_string(),
+            test_entry_meta("no-ttl", 32, now - 100, now - 100),
+        );
+
+        assert_eq!(expired_keys(&index, now), vec!["expired".to_string()]);
+    }
+
+    #[test]
+    fn test_expired_stats_aggregates_count_and_size() {
+        let now = Utc::now().timestamp_millis();
+        let mut index = CacheIndex::default();
+        index.entries.insert(
+            "expired-a".to_string(),
+            CacheEntryMeta {
+                ttl: 10,
+                timestamp: now - 100,
+                ..test_entry_meta("expired-a", 40, now - 100, now - 100)
+            },
+        );
+        index.entries.insert(
+            "expired-b".to_string(),
+            CacheEntryMeta {
+                ttl: 20,
+                timestamp: now - 100,
+                ..test_entry_meta("expired-b", 60, now - 100, now - 50)
+            },
+        );
+        index.entries.insert(
+            "fresh".to_string(),
+            CacheEntryMeta {
+                ttl: 200,
+                timestamp: now - 100,
+                ..test_entry_meta("fresh", 80, now - 100, now - 10)
+            },
+        );
+
+        assert_eq!(expired_stats(&index, now), (2, 100));
+    }
+
+    #[test]
+    fn test_invalidate_cache_index_clears_global_state() {
+        let _guard = cache_test_lock();
+        {
+            let mut state = get_cache_index_mutex().lock().unwrap();
+            *state = Some(CacheIndexState::new(CacheIndex::default()));
+        }
+
+        invalidate_cache_index();
+
+        let state = get_cache_index_mutex().lock().unwrap();
+        assert!(state.is_none(), "invalidate should drop cached index state");
     }
 
     // ------------------------------------------------------------------------
@@ -822,7 +1083,10 @@ mod tests {
 
     #[test]
     fn test_prefetch_result_clone() {
-        let result = PrefetchResult { success: 5, failed: 3 };
+        let result = PrefetchResult {
+            success: 5,
+            failed: 3,
+        };
         let cloned = result.clone();
         assert_eq!(cloned.success, result.success);
         assert_eq!(cloned.failed, result.failed);
@@ -866,7 +1130,7 @@ mod tests {
     #[test]
     fn test_cache_index_multiple_entries() {
         let mut index = CacheIndex::default();
-        
+
         for i in 0..5 {
             index.entries.insert(
                 format!("key-{}", i),

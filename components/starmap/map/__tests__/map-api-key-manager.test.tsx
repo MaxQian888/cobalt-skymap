@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import * as nextIntl from 'next-intl';
 
 // Mock map config
 jest.mock('@/lib/services/map-config', () => ({
@@ -36,6 +37,30 @@ jest.mock('@/lib/utils/clipboard-feedback', () => ({
 import { copyTextWithFeedback } from '@/lib/utils/clipboard-feedback';
 
 const mockCopyTextWithFeedback = copyTextWithFeedback as jest.Mock;
+
+jest.mock('@/lib/tauri/secret-vault-api', () => ({
+  secretVaultApi: {
+    getStatus: jest.fn(async () => ({
+      available: true,
+      mode: 'desktop',
+      state: 'ready',
+      message: 'Vault ready',
+    })),
+    getMapApiKey: jest.fn(async (_provider: string, keyId: string) => `secure-${keyId}`),
+  },
+}));
+
+import { secretVaultApi } from '@/lib/tauri/secret-vault-api';
+
+const mockSecretVaultApi = secretVaultApi as jest.Mocked<typeof secretVaultApi>;
+type SecretVaultStatusResult = Awaited<ReturnType<typeof secretVaultApi.getStatus>>;
+
+const readyVaultStatus: SecretVaultStatusResult = {
+  available: true,
+  mode: 'desktop',
+  state: 'ready',
+  message: 'Vault ready',
+};
 
 // Mock UI components
 jest.mock('@/components/ui/button', () => ({
@@ -243,6 +268,8 @@ describe('MapApiKeyManager', () => {
     mockMapConfig.getApiKeys.mockReturnValue([]);
     mockMapConfig.addConfigurationListener.mockReturnValue(() => {});
     mockCopyTextWithFeedback.mockResolvedValue(true);
+    mockSecretVaultApi.getStatus.mockResolvedValue(readyVaultStatus);
+    mockSecretVaultApi.getMapApiKey.mockImplementation(async (_provider: string, keyId: string) => `secure-${keyId}`);
   });
 
   afterAll(() => {
@@ -292,6 +319,27 @@ describe('MapApiKeyManager', () => {
       render(<MapApiKeyManager />);
       const buttons = screen.getAllByRole('button');
       expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    it('renders fallback labels when translations return empty strings', () => {
+      const nextIntlMock = jest.requireMock('next-intl') as typeof nextIntl;
+      const originalUseTranslations = nextIntlMock.useTranslations;
+      Object.defineProperty(nextIntlMock, 'useTranslations', {
+        configurable: true,
+        value: () => (((_key: string) => '') as ReturnType<typeof nextIntl.useTranslations>),
+      });
+
+      try {
+        render(<MapApiKeyManager />);
+
+        expect(screen.getByText(/API Keys/)).toBeInTheDocument();
+        expect(screen.getByText(/Security Notice/)).toBeInTheDocument();
+      } finally {
+        Object.defineProperty(nextIntlMock, 'useTranslations', {
+          configurable: true,
+          value: originalUseTranslations,
+        });
+      }
     });
   });
 
@@ -438,9 +486,66 @@ describe('MapApiKeyManager', () => {
         await act(async () => {
           fireEvent.click(visibilityButton);
         });
-        // After clicking, the key should be visible (full text shown)
-        expect(screen.getByText('AIza123456789abcdef')).toBeInTheDocument();
+        expect(screen.getByText('secure-key-1')).toBeInTheDocument();
       }
+    });
+
+    it('falls back to the stored key when secure reveal returns no secret', async () => {
+      mockSecretVaultApi.getMapApiKey.mockResolvedValueOnce(null);
+      mockMapConfig.getApiKeys.mockReturnValue([
+        {
+          id: 'key-1',
+          provider: 'google',
+          apiKey: 'AIza123456789abcdef',
+          isDefault: false,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      render(<MapApiKeyManager />);
+
+      const visibilityButton = screen
+        .getAllByRole('button')
+        .find((btn) => btn.getAttribute('data-size') === 'icon');
+
+      if (visibilityButton) {
+        await act(async () => {
+          fireEvent.click(visibilityButton);
+        });
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText('AIza123456789abcdef')).toBeInTheDocument();
+      });
+    });
+
+    it('keeps toggling visibility when secure reveal fails', async () => {
+      mockSecretVaultApi.getMapApiKey.mockRejectedValueOnce(new Error('Vault unavailable'));
+      mockMapConfig.getApiKeys.mockReturnValue([
+        {
+          id: 'key-1',
+          provider: 'google',
+          apiKey: 'AIza123456789abcdef',
+          isDefault: false,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      render(<MapApiKeyManager />);
+
+      const visibilityButton = screen
+        .getAllByRole('button')
+        .find((btn) => btn.getAttribute('data-size') === 'icon');
+
+      if (visibilityButton) {
+        await act(async () => {
+          fireEvent.click(visibilityButton);
+        });
+      }
+
+      await waitFor(() => {
+        expect(screen.getByText('AIza123456789abcdef')).toBeInTheDocument();
+      });
     });
   });
 
@@ -471,7 +576,7 @@ describe('MapApiKeyManager', () => {
         await waitFor(() => {
           expect(mockCopyTextWithFeedback).toHaveBeenCalledWith(
             expect.objectContaining({
-              text: 'AIza123456789',
+              text: 'secure-key-1',
             })
           );
         });
@@ -507,6 +612,79 @@ describe('MapApiKeyManager', () => {
       await waitFor(() => {
         expect(mockCopyTextWithFeedback).toHaveBeenCalled();
       });
+    });
+
+    it('falls back to the configured key when secure copy lookup fails', async () => {
+      mockSecretVaultApi.getMapApiKey.mockRejectedValueOnce(new Error('Secure lookup failed'));
+      mockMapConfig.getApiKeys.mockReturnValue([
+        {
+          id: 'key-1',
+          provider: 'google',
+          apiKey: 'AIza123456789abcdef',
+          isDefault: false,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      render(<MapApiKeyManager />);
+
+      const copyButton = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.getAttribute('data-size') === 'icon')[1];
+
+      if (copyButton) {
+        await act(async () => {
+          fireEvent.click(copyButton);
+        });
+      }
+
+      await waitFor(() => {
+        expect(mockCopyTextWithFeedback).toHaveBeenCalledWith(
+          expect.objectContaining({ text: 'AIza123456789abcdef' })
+        );
+      });
+    });
+
+    it('shows and clears the copied indicator after a successful copy', async () => {
+      jest.useFakeTimers();
+      mockCopyTextWithFeedback.mockImplementation(async ({ onSuccess }) => {
+        onSuccess?.();
+        return true;
+      });
+      mockMapConfig.getApiKeys.mockReturnValue([
+        {
+          id: 'key-1',
+          provider: 'google',
+          apiKey: 'AIza123456789abcdef',
+          isDefault: false,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      render(<MapApiKeyManager />);
+
+      const copyButton = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.getAttribute('data-size') === 'icon')[1];
+
+      if (copyButton) {
+        await act(async () => {
+          fireEvent.click(copyButton);
+        });
+      }
+
+      await waitFor(() => {
+        expect(document.querySelector('.text-green-500')).toBeTruthy();
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
+
+      await waitFor(() => {
+        expect(document.querySelector('.text-green-500')).toBeFalsy();
+      });
+      jest.useRealTimers();
     });
   });
 
@@ -807,6 +985,48 @@ describe('MapApiKeyManager', () => {
       unmount();
 
       expect(unsubscribe).toHaveBeenCalled();
+    });
+
+    it('handles listeners without an unsubscribe callback', () => {
+      mockMapConfig.addConfigurationListener.mockReturnValue(undefined as unknown as () => void);
+
+      const { unmount } = render(<MapApiKeyManager />);
+
+      expect(() => unmount()).not.toThrow();
+    });
+  });
+
+  describe('Vault status', () => {
+    it('loads the vault status message when the dialog opens', async () => {
+      render(<MapApiKeyManager />);
+
+      expect(mockSecretVaultApi.getStatus).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getAllByTestId('dialog-toggle')[0]);
+
+      await waitFor(() => {
+        expect(mockSecretVaultApi.getStatus).toHaveBeenCalled();
+        expect(screen.getByText('Vault ready')).toBeInTheDocument();
+      });
+    });
+
+    it('does not update state after the dialog unmounts before status resolves', async () => {
+      let resolveStatus: ((value: SecretVaultStatusResult) => void) | undefined;
+      mockSecretVaultApi.getStatus.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        })
+      );
+
+      const { unmount } = render(<MapApiKeyManager />);
+      fireEvent.click(screen.getAllByTestId('dialog-toggle')[0]);
+      unmount();
+
+      await act(async () => {
+        resolveStatus?.({ ...readyVaultStatus, message: 'Late vault message' });
+      });
+
+      expect(screen.queryByText('Late vault message')).not.toBeInTheDocument();
     });
   });
 

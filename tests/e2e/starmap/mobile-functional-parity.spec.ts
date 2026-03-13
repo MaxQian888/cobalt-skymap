@@ -149,6 +149,7 @@ test.describe('Mobile Functional Parity', () => {
     await expect(page.getByText(/Use Sensor Control to grant or retry orientation permission\./i)).toBeVisible();
   });
 
+
   test('shows calibration-required fallback when AR sensor is available and uncalibrated', async ({ page }) => {
     await page.addInitScript(() => {
       class MockDeviceOrientationEvent extends Event {

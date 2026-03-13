@@ -159,7 +159,8 @@ describe('FOVOverlay', () => {
   it('applies rotation transform', () => {
     const { container } = render(<FOVOverlay {...defaultProps} rotationAngle={90} />);
     const rotatedDiv = container.querySelector('.transition-transform') as HTMLElement;
-    expect(rotatedDiv?.style.transform).toBe('rotate(90deg)');
+    expect(rotatedDiv?.style.transform).toContain('translate(0px, 0px)');
+    expect(rotatedDiv?.style.transform).toContain('rotate(90deg)');
   });
 
   it('handles mouse drag on rotation handle', () => {
@@ -210,5 +211,60 @@ describe('FOVOverlay', () => {
     // Each panel has 4 corner markers with border styles
     const corners = container.querySelectorAll('.border-t-2.border-l-2');
     expect(corners.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('applies normalized frame placement as translate transform', () => {
+    const { container } = render(
+      <FOVOverlay
+        {...(defaultProps as React.ComponentProps<typeof FOVOverlay> & Record<string, unknown>)}
+        framePlacement={{ x: 0.5, y: -0.5 }}
+      />
+    );
+
+    const frame = container.querySelector('[data-testid="fov-overlay-frame"]') as HTMLElement | null;
+    expect(frame?.style.transform).toContain('translate(');
+    expect(frame?.style.transform).toContain('rotate(0deg)');
+  });
+
+  it('emits frame placement changes when drag-to-position is enabled', () => {
+    const onFramePlacementChange = jest.fn();
+    const { container } = render(
+      <FOVOverlay
+        {...(defaultProps as React.ComponentProps<typeof FOVOverlay> & Record<string, unknown>)}
+        dragToPosition
+        framePlacement={{ x: 0, y: 0 }}
+        onFramePlacementChange={onFramePlacementChange}
+      />
+    );
+
+    const frame = container.querySelector('[data-testid="fov-overlay-frame"]') as HTMLElement;
+    expect(frame).toBeInTheDocument();
+
+    fireEvent.mouseDown(frame, { clientX: 100, clientY: 100, preventDefault: jest.fn() });
+    fireEvent.mouseMove(document, { clientX: 140, clientY: 120 });
+    fireEvent.mouseUp(document);
+
+    expect(onFramePlacementChange).toHaveBeenCalled();
+  });
+
+  it('does not emit frame placement changes when drag-to-position is disabled', () => {
+    const onFramePlacementChange = jest.fn();
+    const { container } = render(
+      <FOVOverlay
+        {...(defaultProps as React.ComponentProps<typeof FOVOverlay> & Record<string, unknown>)}
+        dragToPosition={false}
+        framePlacement={{ x: 0, y: 0 }}
+        onFramePlacementChange={onFramePlacementChange}
+      />
+    );
+
+    const frame = container.querySelector('[data-testid="fov-overlay-frame"]') as HTMLElement;
+    expect(frame).toBeInTheDocument();
+
+    fireEvent.mouseDown(frame, { clientX: 100, clientY: 100, preventDefault: jest.fn() });
+    fireEvent.mouseMove(document, { clientX: 140, clientY: 120 });
+    fireEvent.mouseUp(document);
+
+    expect(onFramePlacementChange).not.toHaveBeenCalled();
   });
 });

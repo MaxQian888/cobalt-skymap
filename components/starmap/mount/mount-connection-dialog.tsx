@@ -32,6 +32,10 @@ import { isTauri } from '@/lib/tauri/app-control-api';
 import { createLogger } from '@/lib/logger';
 import type { MountProtocol } from '@/lib/core/types';
 import { PRIMARY_MOUNT_DEVICE_PROFILE_ID, useDeviceStore } from '@/lib/stores/device-store';
+import {
+  buildSupportedMountDeviceId,
+  createSimulatorMountDevice,
+} from '@/lib/core/mount-support';
 
 const logger = createLogger('mount-connection');
 
@@ -46,8 +50,12 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
   const connectionHost = useMountStore((s) => s.connectionConfig.host);
   const connectionPort = useMountStore((s) => s.connectionConfig.port);
   const connectionDeviceId = useMountStore((s) => s.connectionConfig.deviceId);
+  const connectionSelectedDeviceId = useMountStore((s) => s.connectionConfig.selectedDeviceId);
+  const selectedDevice = useMountStore((s) => s.selectedDevice);
   const setConnectionConfig = useMountStore((s) => s.setConnectionConfig);
   const setCapabilities = useMountStore((s) => s.setCapabilities);
+  const setSelectedDevice = useMountStore((s) => s.setSelectedDevice);
+  const setCapabilitySnapshot = useMountStore((s) => s.setCapabilitySnapshot);
   const applyMountState = useMountStore((s) => s.applyMountState);
   const resetMountInfo = useMountStore((s) => s.resetMountInfo);
   const connected = useMountStore((s) => s.mountInfo.Connected);
@@ -67,6 +75,7 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
   const [connecting, setConnecting] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [devices, setDevices] = useState<DiscoveredDevice[]>([]);
+  const [selectedDiscoveredDevice, setSelectedDiscoveredDevice] = useState<DiscoveredDevice | null>(null);
   const [error, setError] = useState('');
 
   // Reset local state to store values when dialog opens
@@ -76,10 +85,15 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
       setHost(connectionHost);
       setPort(String(connectionPort));
       setDeviceId(String(connectionDeviceId));
+      setSelectedDiscoveredDevice(
+        selectedDevice && selectedDevice.protocol === connectionProtocol
+          ? selectedDevice
+          : null,
+      );
       setError('');
       setDevices([]);
     }
-  }, [connected, connectionDeviceId, connectionHost, connectionPort, connectionProtocol, open]);
+  }, [connected, connectionDeviceId, connectionHost, connectionPort, connectionProtocol, open, selectedDevice]);
 
   useEffect(() => {
     syncFromMountStore({
@@ -88,13 +102,17 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
       host: connectionHost,
       port: connectionPort,
       deviceId: connectionDeviceId,
+      selectedDeviceId: connectionSelectedDeviceId,
+      selectedDevice: selectedDevice ?? undefined,
     });
   }, [
     connected,
     connectionDeviceId,
     connectionHost,
     connectionPort,
+    connectionSelectedDeviceId,
     connectionProtocol,
+    selectedDevice,
     syncFromMountStore,
   ]);
 
@@ -121,17 +139,42 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
     setConnecting(true);
     setError('');
 
+    const mountDevice = protocol === 'simulator'
+      ? createSimulatorMountDevice()
+      : (selectedDiscoveredDevice ?? {
+        id: buildSupportedMountDeviceId({
+          protocol,
+          host,
+          port: parseInt(port, 10) || 11111,
+          deviceId: parseInt(deviceId, 10) || 0,
+        }),
+        protocol,
+        host,
+        port: parseInt(port, 10) || 11111,
+        deviceId: parseInt(deviceId, 10) || 0,
+        name: `${host || 'localhost'} #${parseInt(deviceId, 10) || 0}`,
+        deviceType: 'telescope',
+        source: 'manual',
+        description: t('manualConnectionFallback'),
+      });
+
     const config = {
       protocol,
       host,
       port: parseInt(port, 10) || 11111,
       deviceId: parseInt(deviceId, 10) || 0,
+      selectedDeviceId: mountDevice.id,
     };
 
     try {
       setConnectionConfig(config);
+      setSelectedDevice(mountDevice);
       const caps = await mountApi.connect(config);
       setCapabilities(caps);
+      setCapabilitySnapshot({
+        ...caps,
+        capturedAt: new Date().toISOString(),
+      });
 
       // Fetch initial state
       const state = await mountApi.getState();
@@ -162,8 +205,11 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
     host,
     port,
     deviceId,
+    selectedDiscoveredDevice,
     setConnectionConfig,
     setCapabilities,
+    setSelectedDevice,
+    setCapabilitySnapshot,
     applyMountState,
     markConnected,
     beginConnection,
@@ -199,18 +245,24 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
         setHost(found[0].host);
         setPort(String(found[0].port));
         setDeviceId(String(found[0].deviceId));
+        setSelectedDiscoveredDevice(found[0]);
+        setError('');
+      } else {
+        setSelectedDiscoveredDevice(null);
+        setError(t('discoveryNoDevices'));
       }
     } catch (e) {
       logger.error('Discovery failed', { error: e });
     } finally {
       setDiscovering(false);
     }
-  }, []);
+  }, [t]);
 
   const handleDeviceSelect = useCallback((device: DiscoveredDevice) => {
     setHost(device.host);
     setPort(String(device.port));
     setDeviceId(String(device.deviceId));
+    setSelectedDiscoveredDevice(device);
   }, []);
 
   return (
@@ -238,7 +290,7 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
                   </Badge>
                 )}
                 <span className="text-sm text-muted-foreground">
-                  {connectionProtocol === 'simulator' ? t('simulator') : `${connectionHost}:${connectionPort}`}
+                  {selectedDevice?.name ?? (connectionProtocol === 'simulator' ? t('simulator') : `${connectionHost}:${connectionPort}`)}
                 </span>
               </div>
               <Button variant="destructive" onClick={handleDisconnect} className="w-full">
@@ -323,6 +375,15 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
                     {t('discoverDevices')}
                   </Button>
 
+                  {selectedDiscoveredDevice && (
+                    <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs">
+                      <p className="font-medium">{t('selectedDevice')}: {selectedDiscoveredDevice.name}</p>
+                      <p className="text-muted-foreground">
+                        {selectedDiscoveredDevice.description ?? `${selectedDiscoveredDevice.host}:${selectedDiscoveredDevice.port}`}
+                      </p>
+                    </div>
+                  )}
+
                   {devices.length > 0 && (
                     <div className="space-y-1">
                       {devices.map((d, i) => (
@@ -332,8 +393,8 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
                           className="w-full justify-start text-xs h-auto py-2 px-2 font-normal"
                           onClick={() => handleDeviceSelect(d)}
                         >
-                          <span className="font-medium">{d.deviceName}</span>
-                          <span className="text-muted-foreground ml-2">{d.host}:{d.port}</span>
+                          <span className="font-medium">{d.name}</span>
+                          <span className="text-muted-foreground ml-2">{d.description ?? `${d.host}:${d.port}`}</span>
                         </Button>
                       ))}
                     </div>

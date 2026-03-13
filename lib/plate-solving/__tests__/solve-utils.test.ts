@@ -104,6 +104,15 @@ describe('getProgressText', () => {
     expect(text).toContain('Uploading');
   });
 
+  it('should use fallback text for queued, processing, success, and failed stages', () => {
+    const emptyT = () => '';
+
+    expect(getProgressText({ stage: 'queued', subid: 9 }, emptyT)).toBe('Queued (ID: 9)');
+    expect(getProgressText({ stage: 'processing', jobId: 12 }, emptyT)).toBe('Processing (Job: 12)');
+    expect(getProgressText({ stage: 'success', result: {} as PlateSolveResult }, emptyT)).toBe('Success!');
+    expect(getProgressText({ stage: 'failed', error: 'Network down' }, emptyT)).toBe('Failed: Network down');
+  });
+
   it('should support normalized session stages', () => {
     const session = {
       ...createInitialOnlineSolveSessionState('tauri'),
@@ -112,6 +121,85 @@ describe('getProgressText', () => {
     };
     const text = getProgressText(session, mockT);
     expect(text).toContain('authenticating');
+  });
+
+  it.each([
+    [
+      {
+        ...createInitialOnlineSolveSessionState('web'),
+        stage: 'queued' as const,
+        subId: 18,
+      },
+      '18',
+    ],
+    [
+      {
+        ...createInitialOnlineSolveSessionState('web'),
+        stage: 'solving' as const,
+        jobId: 27,
+      },
+      '27',
+    ],
+    [
+      {
+        ...createInitialOnlineSolveSessionState('web'),
+        stage: 'failed' as const,
+        errorMessage: 'Bad header',
+      },
+      'Bad header',
+    ],
+  ])('should format normalized session state details', (session, expectedText) => {
+    expect(getProgressText(session, mockT)).toContain(expectedText);
+  });
+
+  it('should format normalized session fallback states', () => {
+    const emptyT = () => '';
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'preflight',
+    }, emptyT)).toBe('Checking requirements...');
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'uploading',
+      progress: 22,
+    }, emptyT)).toBe('Uploading... 22%');
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'queued',
+    }, emptyT)).toBe('Queued');
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'solving',
+    }, emptyT)).toBe('Processing');
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'fetching',
+    }, emptyT)).toBe('Fetching solve result...');
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'success',
+    }, emptyT)).toBe('Success!');
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'failed',
+    }, emptyT)).toBe('Failed');
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'cancelled',
+    }, emptyT)).toBe('Solve cancelled by user');
+
+    expect(getProgressText({
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'idle',
+    }, emptyT)).toBe('');
   });
 });
 
@@ -160,5 +248,36 @@ describe('getProgressPercent', () => {
       progress: 42,
     };
     expect(getProgressPercent('online', 0, session)).toBe(42);
+  });
+
+  it.each([
+    [{ stage: 'idle' as const, progress: 0 }, 0],
+    [{ stage: 'preflight' as const, progress: 0 }, 5],
+    [{ stage: 'authenticating' as const, progress: 0 }, 10],
+    [{ stage: 'uploading' as const, progress: 5 }, 10],
+    [{ stage: 'solving' as const, progress: 55 }, 55],
+    [{ stage: 'fetching' as const, progress: 79 }, 80],
+    [{ stage: 'cancelled' as const, progress: 0 }, 100],
+  ])('should normalize session stage %s progress', (partialSession, expectedPercent) => {
+    const session = {
+      ...createInitialOnlineSolveSessionState('web'),
+      ...partialSession,
+    };
+
+    expect(getProgressPercent('online', 0, session)).toBe(expectedPercent);
+  });
+
+  it('should return default progress for unknown states', () => {
+    const unknownSession = {
+      ...createInitialOnlineSolveSessionState('web'),
+      stage: 'mystery' as never,
+    };
+
+    const unknownProgress = {
+      stage: 'mystery',
+    } as unknown as SolveProgress;
+
+    expect(getProgressPercent('online', 0, unknownSession)).toBe(0);
+    expect(getProgressPercent('online', 0, unknownProgress)).toBe(0);
   });
 });

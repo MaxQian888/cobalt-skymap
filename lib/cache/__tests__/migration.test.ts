@@ -33,7 +33,15 @@ const localStorageMock = (() => {
   };
 })();
 
-Object.defineProperty(global, 'localStorage', { value: localStorageMock });
+function installLocalStorageMock(value: typeof localStorageMock | undefined = localStorageMock) {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value,
+    configurable: true,
+    writable: true,
+  });
+}
+
+installLocalStorageMock();
 
 // Mock caches API
 const cachesMock = {
@@ -57,11 +65,22 @@ jest.mock('@/lib/tauri/cache-api', () => ({
 describe('getCacheVersion', () => {
   beforeEach(() => {
     localStorageMock.clear();
+    installLocalStorageMock();
   });
 
   it('should return null when no version is stored', () => {
     const version = getCacheVersion();
     expect(version).toBeNull();
+  });
+
+  it('should return null when localStorage is unavailable', () => {
+    installLocalStorageMock(undefined);
+
+    try {
+      expect(getCacheVersion()).toBeNull();
+    } finally {
+      installLocalStorageMock();
+    }
   });
 
   it('should return stored version', () => {
@@ -89,6 +108,7 @@ describe('getCacheVersion', () => {
 describe('setCacheVersion', () => {
   beforeEach(() => {
     localStorageMock.clear();
+    installLocalStorageMock();
   });
 
   it('should store version that can be retrieved by getCacheVersion', () => {
@@ -106,6 +126,16 @@ describe('setCacheVersion', () => {
     const version = getCacheVersion();
     expect(version?.version).toBe(3);
     expect(version?.description).toBe('Second');
+  });
+
+  it('should no-op when localStorage is unavailable', () => {
+    installLocalStorageMock(undefined);
+
+    try {
+      expect(() => setCacheVersion(2, 'Offline')).not.toThrow();
+    } finally {
+      installLocalStorageMock();
+    }
   });
 });
 
@@ -144,6 +174,7 @@ describe('isMigrationNeeded', () => {
 describe('runMigrations', () => {
   beforeEach(() => {
     localStorageMock.clear();
+    installLocalStorageMock();
     cachesMock.keys.mockResolvedValue([]);
     cachesMock.delete.mockClear();
   });
@@ -220,6 +251,16 @@ describe('runMigrations', () => {
     // Version should still be updated even with errors
     const version = getCacheVersion();
     expect(version?.version).toBe(1);
+  });
+
+  it('should report unknown migration errors when a non-Error is thrown', async () => {
+    cachesMock.keys.mockResolvedValue(['skymap-cache-old']);
+    cachesMock.delete.mockRejectedValueOnce('boom');
+
+    const result = await runMigrations();
+
+    expect(result.success).toBe(false);
+    expect(result.errors[0]).toContain('Unknown error');
   });
 });
 

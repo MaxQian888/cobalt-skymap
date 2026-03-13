@@ -8,18 +8,17 @@ import { SatelliteOverlay } from '../overlays/satellite-overlay';
 
 import { useEquipmentStore } from '@/lib/stores';
 import { useSettingsStore } from '@/lib/stores/settings-store';
-import { useEquipmentFOVRead } from '@/lib/hooks/use-equipment-fov-props';
+import { useFovEquipmentOptions } from '@/lib/hooks/use-equipment-fov-props';
 import type { SkyMarker } from '@/lib/stores/marker-store';
 
 /**
  * Wrapper that reads fovDisplay settings from equipment-store
  * and passes them as props to FOVOverlay.
  */
-function FOVOverlayConnected(props: Omit<ComponentProps<typeof FOVOverlay>, 'frameColor' | 'frameStyle' | 'overlayOpacity' | 'pixelSize'>) {
+function FOVOverlayConnected(props: Omit<ComponentProps<typeof FOVOverlay>, 'frameColor' | 'frameStyle' | 'overlayOpacity'>) {
   const frameColor = useEquipmentStore((s) => s.fovDisplay.frameColor);
   const frameStyle = useEquipmentStore((s) => s.fovDisplay.frameStyle);
   const overlayOpacity = useEquipmentStore((s) => s.fovDisplay.overlayOpacity);
-  const pixelSize = useEquipmentStore((s) => s.pixelSize);
 
   return (
     <FOVOverlay
@@ -27,7 +26,6 @@ function FOVOverlayConnected(props: Omit<ComponentProps<typeof FOVOverlay>, 'fra
       frameColor={frameColor}
       frameStyle={frameStyle}
       overlayOpacity={overlayOpacity}
-      pixelSize={pixelSize}
     />
   );
 }
@@ -50,9 +48,20 @@ export const OverlaysContainer = memo(function OverlaysContainer({
   onMarkerNavigate,
 }: OverlaysContainerProps) {
   // Equipment FOV read props — shared hook avoids duplicating selectors
-  const { fovSimEnabled: fovEnabled, sensorWidth, sensorHeight, focalLength, mosaic, gridType } = useEquipmentFOVRead();
+  const {
+    fovSimEnabled: fovEnabled,
+    sensorWidth,
+    sensorHeight,
+    effectiveFocalLength,
+    pixelSize,
+    mosaic,
+    gridType,
+    framePlacement,
+    setFramePlacement,
+  } = useFovEquipmentOptions();
   const rotationAngle = useEquipmentStore((s) => s.rotationAngle);
   const ocularDisplay = useEquipmentStore((s) => s.ocularDisplay);
+  const dragToPosition = useEquipmentStore((s) => s.fovDisplay.dragToPosition);
   const skyEngine = useSettingsStore((s) => s.skyEngine);
 
   return (
@@ -62,11 +71,15 @@ export const OverlaysContainer = memo(function OverlaysContainer({
         enabled={fovEnabled}
         sensorWidth={sensorWidth}
         sensorHeight={sensorHeight}
-        focalLength={focalLength}
+        focalLength={effectiveFocalLength}
         currentFov={currentFov}
         rotationAngle={rotationAngle}
         onRotationChange={onRotationChange}
         mosaic={mosaic}
+        pixelSize={pixelSize}
+        framePlacement={framePlacement}
+        onFramePlacementChange={setFramePlacement}
+        dragToPosition={dragToPosition}
         gridType={gridType}
       />
 

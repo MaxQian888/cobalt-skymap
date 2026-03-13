@@ -46,7 +46,7 @@ const SETTINGS_VALIDATION_CATEGORIES = new Set([
 
 export interface SettingsProfileMetadata {
   schemaVersion: number;
-  domains: SettingsProfileDomain[];
+  domains: readonly SettingsProfileDomain[];
 }
 
 export interface SettingsProfileData {

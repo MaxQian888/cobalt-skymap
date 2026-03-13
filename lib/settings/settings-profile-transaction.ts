@@ -28,7 +28,7 @@ import { createSettingsDraftSnapshot } from './settings-draft';
 type DomainApplier = (
   profile: SettingsProfileData,
   options: ApplySettingsProfileOptions,
-) => void;
+) => void | Promise<void>;
 
 export interface ApplySettingsProfileOptions {
   domains?: SettingsProfileDomain[];
@@ -88,7 +88,10 @@ function normalizeDomains(profile: SettingsProfileData, domains?: SettingsProfil
   return SETTINGS_PROFILE_DOMAINS.filter((domain) => sourceDomains.includes(domain));
 }
 
-function applySettingsAndLocationDomains(profile: SettingsProfileData, domains: SettingsProfileDomain[]): void {
+async function applySettingsAndLocationDomains(
+  profile: SettingsProfileData,
+  domains: SettingsProfileDomain[],
+): Promise<void> {
   const includeSettings = domains.includes('settings');
   const includeLocation = domains.includes('location');
   if (!includeSettings && !includeLocation) {
@@ -139,7 +142,7 @@ function applySettingsAndLocationDomains(profile: SettingsProfileData, domains: 
   ];
 
   const transactionResult = draftOrder.length > 0
-    ? applySettingsTransaction(draft, { domainOrder: draftOrder })
+    ? await applySettingsTransaction(draft, { domainOrder: draftOrder })
     : { success: true, appliedDomains: [], failedDomains: [], rolledBackDomains: [] };
 
   if (!transactionResult.success) {
@@ -155,7 +158,7 @@ function applySettingsAndLocationDomains(profile: SettingsProfileData, domains: 
     }
   } catch (error) {
     if (draftOrder.length > 0) {
-      applySettingsTransaction(draftSnapshot, { domainOrder: draftOrder });
+      await applySettingsTransaction(draftSnapshot, { domainOrder: draftOrder });
     }
     settingsStore.setSkyEngine(extrasSnapshot.skyEngine);
     settingsStore.setStellariumSettings(extrasSnapshot.stellarium);
@@ -336,11 +339,11 @@ const defaultDomainAppliers: Record<Exclude<SettingsProfileDomain, 'settings' | 
   dailyKnowledge: applyDailyKnowledgeDomain,
 };
 
-function applyDomains(
+async function applyDomains(
   profile: SettingsProfileData,
   options: ApplySettingsProfileOptions,
   appliers: Partial<Record<SettingsProfileDomain, DomainApplier>> = {},
-): SettingsProfileDomain[] {
+): Promise<SettingsProfileDomain[]> {
   const domains = normalizeDomains(profile, options.domains);
   const appliedDomains: SettingsProfileDomain[] = [];
   let settingsGroupApplied = false;
@@ -348,7 +351,7 @@ function applyDomains(
   for (const domain of domains) {
     if ((domain === 'settings' || domain === 'location') && !settingsGroupApplied) {
       try {
-        applySettingsAndLocationDomains(profile, domains);
+        await applySettingsAndLocationDomains(profile, domains);
       } catch (error) {
         throw withDomainError(error, domains.includes('settings') ? 'settings' : 'location');
       }
@@ -364,7 +367,7 @@ function applyDomains(
 
     const applier = appliers[domain] ?? defaultDomainAppliers[domain];
     try {
-      applier(profile, options);
+      await applier(profile, options);
     } catch (error) {
       throw withDomainError(error, domain);
     }
@@ -374,10 +377,10 @@ function applyDomains(
   return appliedDomains;
 }
 
-export function applySettingsProfileImport(
+export async function applySettingsProfileImport(
   profile: SettingsProfileData,
   options: ApplySettingsProfileOptions = {},
-): ApplySettingsProfileResult {
+): Promise<ApplySettingsProfileResult> {
   const domains = normalizeDomains(profile, options.domains);
   const restorePointProfile = buildSettingsProfile({
     domains,
@@ -391,7 +394,7 @@ export function applySettingsProfileImport(
   };
 
   try {
-    const appliedDomains = applyDomains(profile, options, options.domainAppliers);
+    const appliedDomains = await applyDomains(profile, options, options.domainAppliers);
     if (options.persistRestorePoint !== false) {
       useSettingsImportRestoreStore.getState().setRestorePoint(restorePoint);
     }
@@ -402,7 +405,7 @@ export function applySettingsProfileImport(
     };
   } catch (error) {
     try {
-      applyDomains(restorePointProfile, {
+      await applyDomains(restorePointProfile, {
         domains,
         applyThemeMode: options.applyThemeMode,
         currentThemeMode: restorePoint.profile.themeMode,
@@ -420,9 +423,9 @@ export function applySettingsProfileImport(
   }
 }
 
-export function restoreLastSettingsImport(
+export async function restoreLastSettingsImport(
   options: Pick<ApplySettingsProfileOptions, 'applyThemeMode'> = {},
-): ApplySettingsProfileResult {
+): Promise<ApplySettingsProfileResult> {
   const restorePoint = useSettingsImportRestoreStore.getState().restorePoint;
   if (!restorePoint) {
     return {

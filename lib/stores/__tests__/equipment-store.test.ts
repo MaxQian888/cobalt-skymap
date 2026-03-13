@@ -21,6 +21,9 @@ describe('useEquipmentStore', () => {
         fovSetups: [],
         selectedFovSetupId: null,
         fovSimulatorLastTab: 'camera',
+        fovInputMode: 'manual',
+        selectedBarlowReducerId: null,
+        framePlacement: { x: 0, y: 0 },
         ocularDisplay: {
           enabled: false,
           opacity: 70,
@@ -83,6 +86,18 @@ describe('useEquipmentStore', () => {
       expect(state.selectedOcularTelescopeId).toBe('t1');
       expect(state.selectedEyepieceId).toBe('e1');
       expect(state.selectedBarlowId).toBe('b0');
+    });
+
+    it('should have default FOV workflow state', () => {
+      const state = useEquipmentStore.getState() as ReturnType<typeof useEquipmentStore.getState> & {
+        fovInputMode?: string;
+        selectedBarlowReducerId?: string | null;
+        framePlacement?: { x: number; y: number };
+      };
+
+      expect(state.fovInputMode).toBe('manual');
+      expect(state.selectedBarlowReducerId).toBeNull();
+      expect(state.framePlacement).toEqual({ x: 0, y: 0 });
     });
   });
 
@@ -315,6 +330,36 @@ describe('useEquipmentStore', () => {
   });
 
   describe('fov setup workflow', () => {
+    it('should update workflow mode, accessory selection, and frame placement', () => {
+      const { result } = renderHook(() => useEquipmentStore()) as {
+        result: { current: ReturnType<typeof useEquipmentStore.getState> & {
+          setFovInputMode?: (mode: 'manual' | 'active-equipment') => void;
+          setSelectedBarlowReducerId?: (id: string | null) => void;
+          setFramePlacement?: (placement: { x: number; y: number }) => void;
+          resetFramePlacement?: () => void;
+          fovInputMode?: string;
+          selectedBarlowReducerId?: string | null;
+          framePlacement?: { x: number; y: number };
+        } };
+      };
+
+      act(() => {
+        result.current.setFovInputMode?.('active-equipment');
+        result.current.setSelectedBarlowReducerId?.('barlow-2x');
+        result.current.setFramePlacement?.({ x: 0.35, y: -0.2 });
+      });
+
+      expect(result.current.fovInputMode).toBe('active-equipment');
+      expect(result.current.selectedBarlowReducerId).toBe('barlow-2x');
+      expect(result.current.framePlacement).toEqual({ x: 0.35, y: -0.2 });
+
+      act(() => {
+        result.current.resetFramePlacement?.();
+      });
+
+      expect(result.current.framePlacement).toEqual({ x: 0, y: 0 });
+    });
+
     it('should save setup snapshot and select it', () => {
       const { result } = renderHook(() => useEquipmentStore());
 
@@ -354,7 +399,14 @@ describe('useEquipmentStore', () => {
     });
 
     it('should apply setup values', () => {
-      const { result } = renderHook(() => useEquipmentStore());
+      const { result } = renderHook(() => useEquipmentStore()) as {
+        result: { current: ReturnType<typeof useEquipmentStore.getState> & {
+          setFovInputMode?: (mode: 'manual' | 'active-equipment') => void;
+          setSelectedBarlowReducerId?: (id: string | null) => void;
+          fovInputMode?: string;
+          selectedBarlowReducerId?: string | null;
+        } };
+      };
 
       let savedId: string | null = null;
       act(() => {
@@ -372,6 +424,8 @@ describe('useEquipmentStore', () => {
         result.current.setFocalLength(1200);
         result.current.setPixelSize(1.5);
         result.current.setRotationAngle(55);
+        result.current.setFovInputMode?.('active-equipment');
+        result.current.setSelectedBarlowReducerId?.('barlow-2x');
       });
 
       act(() => {
@@ -386,6 +440,8 @@ describe('useEquipmentStore', () => {
       expect(result.current.pixelSize).toBe(3.76);
       expect(result.current.rotationAngle).toBe(0);
       expect(result.current.selectedFovSetupId).toBe(savedId);
+      expect(result.current.fovInputMode).toBe('manual');
+      expect(result.current.selectedBarlowReducerId).toBeNull();
     });
 
     it('should rename and remove setup', () => {
@@ -438,6 +494,29 @@ describe('useEquipmentStore', () => {
       expect(Array.isArray(migratedState.fovSetups)).toBe(true);
       expect(migratedState.selectedFovSetupId).toBeNull();
       expect(migratedState.fovSimulatorLastTab).toBe('camera');
+      expect(migratedState.fovInputMode).toBe('manual');
+      expect(migratedState.selectedBarlowReducerId).toBeNull();
+      expect(migratedState.framePlacement).toEqual({ x: 0, y: 0 });
+    });
+
+    it('migration should clear invalid workflow references and clamp frame placement', () => {
+      const migrate = useEquipmentStore.persist?.getOptions().migrate;
+      expect(typeof migrate).toBe('function');
+      if (!migrate) return;
+
+      const migrated = migrate({
+        fovInputMode: 'active-equipment',
+        selectedBarlowReducerId: 123,
+        framePlacement: { x: 2.4, y: -3.1 },
+      } as Record<string, unknown>, 4);
+
+      const migratedState = migrated as Record<string, unknown> & {
+        selectedBarlowReducerId?: string | null;
+        framePlacement?: { x: number; y: number };
+      };
+
+      expect(migratedState.selectedBarlowReducerId).toBeNull();
+      expect(migratedState.framePlacement).toEqual({ x: 1, y: -1 });
     });
   });
 

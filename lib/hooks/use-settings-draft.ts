@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useMountStore } from '@/lib/stores/mount-store';
 import { useSettingsStore } from '@/lib/stores/settings-store';
+import { applyCanonicalObservationLocation } from '@/lib/services/observation-location-controller';
 import {
   useSettingsSessionStore,
 } from '@/lib/stores/settings-session-store';
@@ -158,14 +159,26 @@ export function useLocationDraftModel() {
 
   const setPersistedLocation = (location: Partial<typeof persistedLocation>) => {
     const current = useMountStore.getState().profileInfo;
+    const nextLocation = {
+      latitude: location.latitude ?? current.AstrometrySettings.Latitude,
+      longitude: location.longitude ?? current.AstrometrySettings.Longitude,
+      elevation: location.elevation ?? current.AstrometrySettings.Elevation,
+    };
+
     setProfileInfo({
       ...current,
       AstrometrySettings: {
         ...current.AstrometrySettings,
-        Latitude: location.latitude ?? current.AstrometrySettings.Latitude,
-        Longitude: location.longitude ?? current.AstrometrySettings.Longitude,
-        Elevation: location.elevation ?? current.AstrometrySettings.Elevation,
+        Latitude: nextLocation.latitude,
+        Longitude: nextLocation.longitude,
+        Elevation: nextLocation.elevation,
       },
+    });
+
+    void applyCanonicalObservationLocation({
+      latitude: nextLocation.latitude,
+      longitude: nextLocation.longitude,
+      altitude: nextLocation.elevation,
     });
   };
 

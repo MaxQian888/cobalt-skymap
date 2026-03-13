@@ -4,15 +4,21 @@ import {
   DAILY_KNOWLEDGE_REPEAT_WINDOW_DAYS,
 } from './constants';
 import { dedupeItems } from './normalizers';
+import { fetchDailyKnowledgeRegistryItems } from './source-registry';
 import { fetchApodItem } from './source-apod';
 import { getCuratedDailyItem, getCuratedItems } from './source-curated';
 import { fetchWikimediaItem } from './source-wikimedia';
 import type {
+  DailyKnowledgeFallbackReason,
   DailyKnowledgeFactSource,
   DailyKnowledgeItem,
   DailyKnowledgeLanguageStatus,
   DailyKnowledgeOptions,
+  DailyKnowledgeOnlineSource,
   DailyKnowledgeServiceResult,
+  DailyKnowledgeSourceStatus,
+  DailyKnowledgeSourceStatusReason,
+  DailyKnowledgeSourceTransport,
 } from './types';
 
 const logger = createLogger('daily-knowledge-service');
@@ -40,6 +46,26 @@ function getNextLocalMidnight(now = new Date()): number {
   return Date.now() + DAILY_KNOWLEDGE_AGGREGATED_TTL_FALLBACK_MS;
 }
 
+const ONLINE_SOURCE_DEFINITIONS: Array<{
+  source: DailyKnowledgeOnlineSource;
+  transport: DailyKnowledgeSourceTransport;
+}> = [
+  { source: 'nasa-apod', transport: 'api' },
+  { source: 'wikimedia', transport: 'api' },
+  { source: 'nasa-image-library', transport: 'api' },
+  { source: 'nasa-photojournal', transport: 'rss' },
+  { source: 'esa-science', transport: 'rss' },
+];
+
+const SOURCE_PRIORITY: Record<DailyKnowledgeItem['source'], number> = {
+  curated: 80,
+  'nasa-apod': 110,
+  wikimedia: 60,
+  'nasa-image-library': 100,
+  'nasa-photojournal': 92,
+  'esa-science': 88,
+};
+
 function getCacheKey(
   dateKey: string,
   locale: 'en' | 'zh',
@@ -53,6 +79,23 @@ function getCacheKey(
   return `${dateKey}:${locale}:${onlineEnhancement ? 'enhance' : 'local'}:${
     onlineAvailable ? 'online' : 'offline'
   }:${repeatWindowDays}:${recentSignature}`;
+}
+
+function makeSourceStatus(
+  source: DailyKnowledgeOnlineSource,
+  transport: DailyKnowledgeSourceTransport,
+  state: DailyKnowledgeSourceStatus['state'],
+  reason: DailyKnowledgeSourceStatusReason,
+  itemCount: number,
+  message?: string
+): DailyKnowledgeSourceStatus {
+  return { source, transport, state, reason, itemCount, message };
+}
+
+function makeSkippedStatuses(reason: 'offline' | 'disabled'): DailyKnowledgeSourceStatus[] {
+  return ONLINE_SOURCE_DEFINITIONS.map(({ source, transport }) =>
+    makeSourceStatus(source, transport, 'skipped', reason, 0)
+  );
 }
 
 function enrichItemWithWikimedia(
@@ -89,6 +132,118 @@ function mergeFactSources(
   return Array.from(byUrl.values());
 }
 
+function normalizeIdentityValue(value: string): string {
+  return value.trim().toLowerCase().replace(/[#?].*$/, '').replace(/\/+$/, '');
+}
+
+function getIdentityKeys(item: DailyKnowledgeItem): string[] {
+  const keys = new Set<string>();
+  if (item.externalUrl) {
+    keys.add(`external:${normalizeIdentityValue(item.externalUrl)}`);
+  }
+  if (item.attribution.sourceUrl) {
+    keys.add(`source:${normalizeIdentityValue(item.attribution.sourceUrl)}`);
+  }
+  if (keys.size === 0) {
+    keys.add(`title:${item.title.trim().toLowerCase()}`);
+  }
+  return Array.from(keys);
+}
+
+function mergeItems(primary: DailyKnowledgeItem, secondary: DailyKnowledgeItem): DailyKnowledgeItem {
+  return {
+    ...primary,
+    summary: primary.summary || secondary.summary,
+    body: primary.body.length >= secondary.body.length ? primary.body : secondary.body,
+    image: primary.image ?? secondary.image,
+    externalUrl: primary.externalUrl ?? secondary.externalUrl,
+    relatedObjects:
+      primary.relatedObjects.length > 0
+        ? primary.relatedObjects
+        : secondary.relatedObjects,
+    tags: Array.from(new Set([...primary.tags, ...secondary.tags])),
+    categories: Array.from(new Set([...primary.categories, ...secondary.categories])),
+    factSources: mergeFactSources(primary.factSources, secondary.factSources),
+    attribution: {
+      sourceName: primary.attribution.sourceName || secondary.attribution.sourceName,
+      sourceUrl: primary.attribution.sourceUrl ?? secondary.attribution.sourceUrl,
+      copyright: primary.attribution.copyright ?? secondary.attribution.copyright,
+      licenseName: primary.attribution.licenseName ?? secondary.attribution.licenseName,
+      licenseUrl: primary.attribution.licenseUrl ?? secondary.attribution.licenseUrl,
+    },
+    observationTips: Array.from(new Set([...primary.observationTips, ...secondary.observationTips])),
+    bestViewingMonths: Array.from(new Set([...primary.bestViewingMonths, ...secondary.bestViewingMonths])).sort(
+      (a, b) => a - b
+    ),
+  };
+}
+
+function dedupeMergedItems(items: DailyKnowledgeItem[]): DailyKnowledgeItem[] {
+  const identityToIndex = new Map<string, number>();
+  const result: DailyKnowledgeItem[] = [];
+
+  for (const item of items) {
+    const keys = getIdentityKeys(item);
+    const existingIndex = keys
+      .map((key) => identityToIndex.get(key))
+      .find((value): value is number => typeof value === 'number');
+
+    if (typeof existingIndex === 'number') {
+      result[existingIndex] = mergeItems(result[existingIndex], item);
+      for (const key of getIdentityKeys(result[existingIndex])) {
+        identityToIndex.set(key, existingIndex);
+      }
+      continue;
+    }
+
+    const index = result.push(item) - 1;
+    for (const key of keys) {
+      identityToIndex.set(key, index);
+    }
+  }
+
+  return result;
+}
+
+function scoreCandidate(
+  item: DailyKnowledgeItem,
+  locale: 'en' | 'zh',
+  curatedAnchor: DailyKnowledgeItem,
+  recentHistoryItemIds: string[]
+): number {
+  let score = SOURCE_PRIORITY[item.source] ?? 0;
+  if (item.contentLanguage.toLowerCase().startsWith(locale)) score += 24;
+  if (item.languageStatus === 'fallback') score -= 12;
+  if (item.id === curatedAnchor.id) score += 12;
+  if (item.isDateEvent && curatedAnchor.isDateEvent) score += 10;
+  if (item.summary.trim()) score += 4;
+  if (item.body.trim()) score += 4;
+  if (item.image) score += 4;
+  if (item.factSources.length > 0) score += 3;
+  if (item.relatedObjects.some((object) => curatedAnchor.relatedObjects.some((anchor) => anchor.name === object.name))) {
+    score += 6;
+  }
+  if (recentHistoryItemIds.includes(item.id)) score -= 8;
+  if (locale === 'zh' && item.source === 'curated' && item.languageStatus === 'native') score += 10;
+  return score;
+}
+
+function selectPrimaryItem(
+  items: DailyKnowledgeItem[],
+  locale: 'en' | 'zh',
+  curatedAnchor: DailyKnowledgeItem,
+  recentHistoryItemIds: string[]
+): DailyKnowledgeItem {
+  const ranked = [...items].sort((left, right) => {
+    const scoreDelta =
+      scoreCandidate(right, locale, curatedAnchor, recentHistoryItemIds) -
+      scoreCandidate(left, locale, curatedAnchor, recentHistoryItemIds);
+    if (scoreDelta !== 0) return scoreDelta;
+    return left.id.localeCompare(right.id);
+  });
+  return ranked[0] ?? curatedAnchor;
+}
+
 function resolveLanguageStatus(
   item: DailyKnowledgeItem,
   locale: 'en' | 'zh'
@@ -108,6 +263,82 @@ function applyLanguageStatus(
 
 export function __clearDailyKnowledgeServiceCacheForTests(): void {
   aggregatedResultCache.clear();
+}
+
+async function fetchApodWithStatus(
+  dateKey: string,
+  apiKey: string,
+  signal?: AbortSignal
+): Promise<{ item: DailyKnowledgeItem | null; status: DailyKnowledgeSourceStatus }> {
+  try {
+    const item = await fetchApodItem(dateKey, apiKey, { signal });
+    return {
+      item,
+      status: makeSourceStatus('nasa-apod', 'api', item ? 'ready' : 'skipped', item ? 'success' : 'empty', item ? 1 : 0),
+    };
+  } catch (error) {
+    logger.warn('APOD fetch failed, fallback to curated', error);
+    return {
+      item: null,
+      status: makeSourceStatus(
+        'nasa-apod',
+        'api',
+        'failed',
+        'error',
+        0,
+        error instanceof Error ? error.message : String(error)
+      ),
+    };
+  }
+}
+
+async function fetchWikimediaWithStatus(
+  dateKey: string,
+  query: string,
+  locale: 'en' | 'zh',
+  signal?: AbortSignal
+): Promise<{ item: DailyKnowledgeItem | null; status: DailyKnowledgeSourceStatus }> {
+  try {
+    const item = await fetchWikimediaItem(dateKey, query, { locale, signal });
+    return {
+      item,
+      status: makeSourceStatus('wikimedia', 'api', item ? 'ready' : 'skipped', item ? 'success' : 'empty', item ? 1 : 0),
+    };
+  } catch (error) {
+    logger.warn('Wikimedia fetch failed, fallback to curated', error);
+    return {
+      item: null,
+      status: makeSourceStatus(
+        'wikimedia',
+        'api',
+        'failed',
+        'error',
+        0,
+        error instanceof Error ? error.message : String(error)
+      ),
+    };
+  }
+}
+
+function resolveFallbackState(
+  selected: DailyKnowledgeItem,
+  sourceStatuses: DailyKnowledgeSourceStatus[],
+  onlineEnhancement: boolean,
+  onlineAvailable: boolean
+): { usedCuratedFallback: boolean; fallbackReason: DailyKnowledgeFallbackReason } {
+  if (selected.source !== 'curated' || !onlineEnhancement) {
+    return { usedCuratedFallback: false, fallbackReason: null };
+  }
+  if (!onlineAvailable) {
+    return { usedCuratedFallback: true, fallbackReason: 'offline' };
+  }
+  if (sourceStatuses.some((status) => status.state === 'failed')) {
+    return { usedCuratedFallback: true, fallbackReason: 'source-failure' };
+  }
+  if (sourceStatuses.every((status) => status.state !== 'ready')) {
+    return { usedCuratedFallback: true, fallbackReason: 'quality-threshold' };
+  }
+  return { usedCuratedFallback: false, fallbackReason: null };
 }
 
 export async function getDailyKnowledge(
@@ -142,49 +373,64 @@ export async function getDailyKnowledge(
 
   if (!onlineEnhancement || !onlineAvailable) {
     const deduped = applyLanguageStatus(dedupeItems(offlineItems), locale);
-    const result = { items: deduped, selected: deduped[0] };
+    const selected = deduped[0];
+    const result = {
+      items: deduped,
+      selected,
+      sourceStatuses: makeSkippedStatuses(!onlineEnhancement ? 'disabled' : 'offline'),
+      ...resolveFallbackState(selected, makeSkippedStatuses(!onlineEnhancement ? 'disabled' : 'offline'), onlineEnhancement, onlineAvailable),
+    };
     aggregatedResultCache.set(cacheKey, { result, expiresAt: getNextLocalMidnight() });
     return result;
   }
 
   const apiKey = getNasaApiKey();
-  let apodItem = null;
-  let wikimediaItem = null;
-  try {
-    apodItem = await fetchApodItem(dateKey, apiKey, { signal });
-  } catch (error) {
-    logger.warn('APOD fetch failed, fallback to curated', error);
-  }
+  const registryQuery = curatedDaily.relatedObjects[0]?.name || curatedDaily.title;
+  const [{ item: apodItem, status: apodStatus }, registryResult] = await Promise.all([
+    fetchApodWithStatus(dateKey, apiKey, signal),
+    fetchDailyKnowledgeRegistryItems(
+      {
+        dateKey,
+        locale,
+        query: registryQuery,
+        anchorItem: curatedDaily,
+        signal,
+      }
+    ),
+  ]);
 
-  try {
-    const wikiQuery = apodItem?.title || curatedDaily.relatedObjects[0]?.name || curatedDaily.title;
-    wikimediaItem = await fetchWikimediaItem(dateKey, wikiQuery, { locale, signal });
-  } catch (error) {
-    logger.warn('Wikimedia fetch failed, fallback to curated', error);
-  }
-
+  const wikiQuery = apodItem?.title || registryResult.items[0]?.title || registryQuery;
+  const { item: wikimediaItem, status: wikimediaStatus } = await fetchWikimediaWithStatus(
+    dateKey,
+    wikiQuery,
+    locale,
+    signal
+  );
   const localizedWiki = wikimediaItem?.contentLanguage === locale ? wikimediaItem : null;
-  const selectedBase =
-    locale === 'zh'
-      ? enrichItemWithWikimedia(curatedDaily, localizedWiki)
-      : enrichItemWithWikimedia(apodItem ?? curatedDaily, wikimediaItem);
+  const curatedWithWiki = enrichItemWithWikimedia(curatedDaily, localizedWiki);
+  const apodWithWiki = apodItem ? enrichItemWithWikimedia(apodItem, wikimediaItem) : null;
 
   const mergedCandidates: DailyKnowledgeItem[] = [
-    selectedBase,
+    ...(apodWithWiki ? [apodWithWiki] : []),
+    ...registryResult.items,
+    curatedWithWiki,
     ...(localizedWiki ? [localizedWiki] : []),
-    ...(apodItem ? [apodItem] : []),
     ...(wikimediaItem ? [wikimediaItem] : []),
     ...offlineItems,
   ];
 
-  const merged = applyLanguageStatus(dedupeItems(mergedCandidates), locale);
-  const selected = merged.find((item) => item.id === selectedBase.id) ?? {
-    ...selectedBase,
-    languageStatus: resolveLanguageStatus(selectedBase, locale),
-  };
+  const merged = applyLanguageStatus(
+    dedupeMergedItems(dedupeItems(mergedCandidates)),
+    locale
+  );
+  const selected = selectPrimaryItem(merged, locale, curatedWithWiki, recentHistoryItemIds);
+  const sourceStatuses = [apodStatus, wikimediaStatus, ...registryResult.sourceStatuses];
+  const fallbackState = resolveFallbackState(selected, sourceStatuses, onlineEnhancement, onlineAvailable);
   const result = {
     items: merged,
     selected,
+    sourceStatuses,
+    ...fallbackState,
   };
   aggregatedResultCache.set(cacheKey, { result, expiresAt: getNextLocalMidnight() });
   return result;

@@ -19,6 +19,9 @@ export function FOVOverlay({
   onRotationChange,
   mosaic,
   pixelSize,
+  framePlacement = { x: 0, y: 0 },
+  onFramePlacementChange,
+  dragToPosition = false,
   gridType = 'crosshair',
   frameColor = '#3b82f6',
   frameStyle = 'solid',
@@ -59,6 +62,10 @@ export function FOVOverlay({
     scaledStepX, scaledStepY, scaledTotalWidth, scaledTotalHeight,
     cameraFovWidth, cameraFovHeight,
   } = dims;
+  const availableOffsetX = Math.max((containerSize.width - scaledTotalWidth) / 2, 0);
+  const availableOffsetY = Math.max((containerSize.height - scaledTotalHeight) / 2, 0);
+  const translateX = availableOffsetX * framePlacement.x;
+  const translateY = availableOffsetY * framePlacement.y;
 
   const mosaicCols = mosaic.enabled ? mosaic.cols : 1;
   const mosaicRows = mosaic.enabled ? mosaic.rows : 1;
@@ -69,6 +76,45 @@ export function FOVOverlay({
     scaledStepX, scaledStepY,
     mosaicCols, mosaicRows
   );
+
+  const handleFrameDragStart = (
+    startClientX: number,
+    startClientY: number
+  ) => {
+    if (!dragToPosition || !onFramePlacementChange) return;
+
+    const startPlacement = framePlacement;
+
+    const handlePointerMove = (clientX: number, clientY: number) => {
+      const nextPlacement = {
+        x: availableOffsetX > 0 ? startPlacement.x + (clientX - startClientX) / availableOffsetX : 0,
+        y: availableOffsetY > 0 ? startPlacement.y + (clientY - startClientY) / availableOffsetY : 0,
+      };
+      onFramePlacementChange(nextPlacement);
+    };
+
+    const handleMouseMove = (event: MouseEvent) => {
+      handlePointerMove(event.clientX, event.clientY);
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      handlePointerMove(touch.clientX, touch.clientY);
+    };
+
+    const cleanup = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', cleanup);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', cleanup);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', cleanup);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', cleanup);
+  };
 
   return (
     <div ref={containerRef} className="absolute inset-0 pointer-events-none flex items-center justify-center">
@@ -82,12 +128,28 @@ export function FOVOverlay({
         </Alert>
       ) : (
         <div
+          data-testid="fov-overlay-frame"
           className="relative transition-transform duration-100"
           style={{
             width: `${scaledTotalWidth}px`,
             height: `${scaledTotalHeight}px`,
-            transform: `rotate(${rotationAngle}deg)`,
+            transform: `translate(${translateX}px, ${translateY}px) rotate(${rotationAngle}deg)`,
             opacity: overlayOpacity / 100,
+            pointerEvents: dragToPosition || !!onRotationChange ? 'auto' : 'none',
+          }}
+          onMouseDown={(event) => {
+            if (!dragToPosition) return;
+            if ((event.target as HTMLElement).closest('[data-rotation-handle="true"]')) return;
+            event.preventDefault();
+            handleFrameDragStart(event.clientX, event.clientY);
+          }}
+          onTouchStart={(event) => {
+            if (!dragToPosition) return;
+            if ((event.target as HTMLElement).closest('[data-rotation-handle="true"]')) return;
+            event.preventDefault();
+            const touch = event.touches[0];
+            if (!touch) return;
+            handleFrameDragStart(touch.clientX, touch.clientY);
           }}
         >
           {/* Mosaic Panels */}
@@ -177,6 +239,7 @@ export function FOVOverlay({
           {/* Rotation handle */}
           {onRotationChange && (
             <div
+              data-rotation-handle="true"
               className="absolute -top-6 left-1/2 -translate-x-1/2 pointer-events-auto cursor-grab active:cursor-grabbing touch-none"
               onMouseDown={(e) => {
                 e.preventDefault();

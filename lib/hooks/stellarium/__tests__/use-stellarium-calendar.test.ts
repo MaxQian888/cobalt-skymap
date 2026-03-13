@@ -29,7 +29,10 @@ describe('useStellariumCalendar', () => {
   });
 
   it('should call stel.calendar when engine is available', async () => {
-    const calendarFn = jest.fn();
+    const calendarFn = jest.fn(({ onEvent }: { onEvent: (event: unknown) => void }) => {
+      onEvent({ type: 'rise' });
+      onEvent({ type: 'set' });
+    });
     const mockStel = { calendar: calendarFn };
 
     const { result } = renderHook(() => {
@@ -37,10 +40,12 @@ describe('useStellariumCalendar', () => {
       return useStellariumCalendar(ref as never);
     });
 
-    await result.current.runCalendar({
+    const events = await result.current.runCalendar({
       start: new Date('2024-01-01'),
       end: new Date('2024-01-02'),
     });
-    expect(calendarFn).toHaveBeenCalled();
+
+    expect(calendarFn).toHaveBeenCalledTimes(1);
+    expect(events).toEqual([{ type: 'rise' }, { type: 'set' }]);
   });
 });

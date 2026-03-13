@@ -78,6 +78,10 @@ import { tauriApi } from '@/lib/tauri';
 import { isTauri } from '@/lib/storage/platform';
 import { usePlanningUiStore } from '@/lib/stores/planning-ui-store';
 import { useSessionPlanStore } from '@/lib/stores/session-plan-store';
+import {
+  applyExecutionTargetStatusAction,
+  buildObservationExecutionWorkspaceViewModel,
+} from '@/lib/stores/session-execution-helpers';
 import { useLocations, useEquipment } from '@/lib/tauri/hooks';
 import { exportExecutionSummary, type ExecutionExportFormat } from '@/lib/astronomy/execution-exporter';
 import type { 
@@ -143,6 +147,9 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
   const savedPlans = useSessionPlanStore((state) => state.savedPlans);
   const importPlanV2 = useSessionPlanStore((state) => state.importPlanV2);
   const syncExecutionFromObservationSession = useSessionPlanStore((state) => state.syncExecutionFromObservationSession);
+  const updateExecutionTarget = useSessionPlanStore((state) => state.updateExecutionTarget);
+  const completeExecution = useSessionPlanStore((state) => state.completeExecution);
+  const archiveExecution = useSessionPlanStore((state) => state.archiveExecution);
   const openSessionPlanner = usePlanningUiStore((state) => state.openSessionPlanner);
 
   // Load data
@@ -320,39 +327,43 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
     () => sessions.find((session) => !session.end_time && session.execution_targets?.length),
     [sessions],
   );
+  const activeExecutionView = useMemo(
+    () => buildObservationExecutionWorkspaceViewModel(activeExecutionSession),
+    [activeExecutionSession],
+  );
 
   const handleExecutionTargetStatus = useCallback(async (
     session: ObservationSession,
     targetId: string,
     status: NonNullable<ObservationSession['execution_targets']>[number]['status'],
   ) => {
-    if (!isTauri() || !session.execution_targets) return;
-
-    const now = new Date().toISOString();
-    const nextSession: ObservationSession = {
-      ...session,
-      execution_targets: session.execution_targets.map((target) => (
-        target.target_id !== targetId
-          ? target
-          : {
-              ...target,
-              status,
-              actual_start: status === 'in_progress' ? target.actual_start ?? now : target.actual_start,
-              actual_end: status === 'completed' ? now : target.actual_end,
-            }
-      )),
-    };
+    if (!session.execution_targets) return;
 
     try {
-      const updatedSession = await tauriApi.observationLog.updateSession(nextSession);
-      const normalized = updatedSession && 'id' in updatedSession ? updatedSession : nextSession;
-      updateSessionCollection(normalized);
-      syncExecutionFromObservationSession(normalized);
+      const updatedSession = await applyExecutionTargetStatusAction({
+        runtime: isTauri() ? 'tauri' : 'web',
+        executionId: session.id,
+        targetId,
+        nextStatus: status,
+        observationSession: session,
+        persistSession: isTauri()
+          ? async (nextSession) => tauriApi.observationLog.updateSession(nextSession)
+          : undefined,
+        syncExecutionFromObservationSession,
+        storeActions: {
+          updateExecutionTarget,
+          completeExecution,
+          archiveExecution,
+        },
+      });
+      if (updatedSession) {
+        updateSessionCollection(updatedSession);
+      }
     } catch (error) {
       logger.error('Failed to update execution target status', error);
       toast.error(t('observationLog.updateFailed'));
     }
-  }, [syncExecutionFromObservationSession, t, updateSessionCollection]);
+  }, [archiveExecution, completeExecution, syncExecutionFromObservationSession, t, updateExecutionTarget, updateSessionCollection]);
 
   const resetObservationForm = useCallback(() => {
     setObsObjectName('');
@@ -744,6 +755,25 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
                         </div>
                         <Badge>{activeExecutionSession.execution_status || 'active'}</Badge>
                       </div>
+                      <div
+                        className="rounded-md border border-border/60 bg-background/70 p-2 text-xs text-muted-foreground"
+                        data-testid="observation-log-execution-summary"
+                      >
+                        <p>
+                          {t('observationLog.executionSummaryCompleted', { count: activeExecutionView.summary.completedTargets })} ·{' '}
+                          {t('observationLog.executionSummarySkipped', { count: activeExecutionView.summary.skippedTargets })} ·{' '}
+                          {t('observationLog.executionSummaryFailed', { count: activeExecutionView.summary.failedTargets })} ·{' '}
+                          {t('observationLog.executionSummaryRemaining', { count: activeExecutionView.summary.remainingTargets })}
+                        </p>
+                        {activeExecutionView.focusTarget && (
+                          <p className="mt-1">
+                            {activeExecutionView.activeTarget
+                              ? t('observationLog.currentTargetLabel')
+                              : t('observationLog.nextTargetLabel')}
+                            : {activeExecutionView.focusTarget.targetName}
+                          </p>
+                        )}
+                      </div>
                       <div className="space-y-2">
                         {activeExecutionSession.execution_targets.map((target) => (
                           <div
@@ -761,22 +791,46 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
                               <Badge>{target.status}</Badge>
                             </div>
                             <div className="mt-2 flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => void handleExecutionTargetStatus(activeExecutionSession, target.target_id, 'in_progress')}
-                              >
-                                {t('observationLog.startTarget')}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={() => void handleExecutionTargetStatus(activeExecutionSession, target.target_id, 'completed')}
-                              >
-                                {t('observationLog.completeTarget')}
-                              </Button>
+                              {(activeExecutionView.targetActions[target.target_id] ?? []).includes('start') && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => void handleExecutionTargetStatus(activeExecutionSession, target.target_id, 'in_progress')}
+                                >
+                                  {t('observationLog.startTarget')}
+                                </Button>
+                              )}
+                              {(activeExecutionView.targetActions[target.target_id] ?? []).includes('complete') && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => void handleExecutionTargetStatus(activeExecutionSession, target.target_id, 'completed')}
+                                >
+                                  {t('observationLog.completeTarget')}
+                                </Button>
+                              )}
+                              {(activeExecutionView.targetActions[target.target_id] ?? []).includes('skip') && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => void handleExecutionTargetStatus(activeExecutionSession, target.target_id, 'skipped')}
+                                >
+                                  {t('observationLog.skipTarget')}
+                                </Button>
+                              )}
+                              {(activeExecutionView.targetActions[target.target_id] ?? []).includes('fail') && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 text-xs"
+                                  onClick={() => void handleExecutionTargetStatus(activeExecutionSession, target.target_id, 'failed')}
+                                >
+                                  {t('observationLog.failTarget')}
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -789,6 +843,18 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
                           </div>
                         ))}
                       </div>
+                      <Button
+                        data-testid="observation-log-open-linked-planner"
+                        variant="outline"
+                        size="sm"
+                        className="w-full h-7 text-xs"
+                        onClick={() => {
+                          setOpen(false);
+                          openSessionPlanner();
+                        }}
+                      >
+                        {t('observationLog.openLinkedPlanner')}
+                      </Button>
                       <div className="flex gap-2 pt-1">
                         <Button
                           variant="outline"

@@ -27,15 +27,48 @@ function isPositiveNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
 
+function isMountProtocol(value: unknown): value is MountDeviceMetadata['protocol'] {
+  return value === 'alpaca' || value === 'simulator';
+}
+
 function validateMountMetadata(metadata: MountDeviceMetadata): DeviceProfileValidationIssue[] {
   const issues: DeviceProfileValidationIssue[] = [];
-  if (!isNonEmptyString(metadata.protocol)) {
+  if (!isMountProtocol(metadata.protocol)) {
     issues.push({
       field: 'metadata.protocol',
       code: 'required',
       message: 'Mount protocol is required.',
     });
+    return issues;
   }
+
+  if (metadata.protocol === 'simulator') {
+    if (metadata.selectedDeviceId !== undefined && metadata.selectedDeviceId !== null && !isNonEmptyString(metadata.selectedDeviceId)) {
+      issues.push({
+        field: 'metadata.selectedDeviceId',
+        code: 'invalid',
+        message: 'Simulator selectedDeviceId must be a non-empty string when provided.',
+      });
+    }
+    if (metadata.selectedDevice) {
+      if (!isNonEmptyString(metadata.selectedDevice.id)) {
+        issues.push({
+          field: 'metadata.selectedDevice.id',
+          code: 'required',
+          message: 'Simulator selected device id is required.',
+        });
+      }
+      if (!isNonEmptyString(metadata.selectedDevice.name)) {
+        issues.push({
+          field: 'metadata.selectedDevice.name',
+          code: 'required',
+          message: 'Simulator selected device name is required.',
+        });
+      }
+    }
+    return issues;
+  }
+
   if (!isNonEmptyString(metadata.host)) {
     issues.push({
       field: 'metadata.host',
@@ -135,11 +168,10 @@ function validateMetadataByType(profile: DeviceProfile): DeviceProfileValidation
     case 'focuser':
       return validateFocuserMetadata(profile.metadata);
     default: {
-      const exhaustive: never = profile.type;
       return [{
         field: 'type',
         code: 'unsupported',
-        message: `Unsupported device type: ${String(exhaustive)}`,
+        message: 'Unsupported device type.',
       }];
     }
   }

@@ -36,6 +36,8 @@ import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
+import { usePlanningUiStore } from '@/lib/stores/planning-ui-store';
+import { useMessierMarathonStore } from '@/lib/stores/messier-marathon-store';
 import { SETUP_WIZARD_STEPS, STEP_ICONS } from '@/lib/constants/onboarding';
 import { TOUR_DEFINITIONS } from '@/lib/constants/onboarding-capabilities';
 import type {
@@ -83,6 +85,8 @@ export function UnifiedOnboarding({
   const completedTours = useOnboardingStore((state) => state.completedTours);
   const setTourHubOpen = useOnboardingStore((state) => state.setTourHubOpen);
   const resolveEntrySurface = useOnboardingStore((state) => state.resolveEntrySurface);
+  const openMessierMarathonGuide = usePlanningUiStore((state) => state.openMessierMarathonGuide);
+  const activeMessierSession = useMessierMarathonStore((state) => state.activeSession);
 
   const [direction, setDirection] = useState(1);
   const [showSetupSkipConfirm, setShowSetupSkipConfirm] = useState(false);
@@ -216,6 +220,11 @@ export function UnifiedOnboarding({
     () => TOUR_DEFINITIONS.filter((tour) => !tour.isCore),
     [],
   );
+  const showMessierMarathonCard = useMemo(() => {
+    if (activeMessierSession) return true;
+    const month = new Date().getMonth();
+    return month >= 1 && month <= 4;
+  }, [activeMessierSession]);
 
   const stepContent = (() => {
     switch (setupStep) {
@@ -424,6 +433,37 @@ export function UnifiedOnboarding({
             <DialogDescription>{t('onboarding.hub.description')}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 max-h-[45vh] max-h-[45dvh] overflow-y-auto pr-1">
+            {showMessierMarathonCard && (
+              <Card className="py-3 gap-0 border-primary/30 bg-primary/5">
+                <CardContent className="flex items-center justify-between gap-3 px-4">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm">{t('messierMarathon.title')}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {activeMessierSession
+                        ? t('onboarding.hub.messierMarathonResumeDescription')
+                        : t('onboarding.hub.messierMarathonDescription')}
+                    </p>
+                    <Badge variant="outline" className="mt-1.5 text-xs">
+                      {activeMessierSession
+                        ? t(`messierMarathon.readiness.${activeMessierSession.readiness}`)
+                        : t('onboarding.hub.seasonalGuide')}
+                    </Badge>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={activeMessierSession ? 'secondary' : 'default'}
+                    onClick={() => {
+                      setTourHubOpen(false);
+                      openMessierMarathonGuide();
+                    }}
+                  >
+                    {activeMessierSession
+                      ? t('onboarding.hub.resumeMarathon')
+                      : t('onboarding.hub.startMarathon')}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
             {moduleTours.map((tour) => {
               const progress = getTourProgress(tour.id);
               const done = completedTours.includes(tour.id);

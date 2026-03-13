@@ -109,6 +109,41 @@ describe('device-readiness', () => {
     expect(readiness.issues.some((issue) => issue.code === 'device-degraded')).toBe(true);
   });
 
+  it('returns warning when mount is connected but optional actions are unavailable', () => {
+    const readiness = evaluateDeviceReadiness({
+      profiles: [
+        cameraProfile(),
+        telescopeProfile(),
+        {
+          ...mountProfile(),
+          metadata: {
+            ...mountProfile().metadata,
+            actionAvailability: {
+              connect: false,
+              discover: true,
+              slew: true,
+              sync: false,
+              park: false,
+              unpark: true,
+              tracking: true,
+              trackingRate: false,
+              moveAxis: false,
+              abortSlew: false,
+            },
+          },
+        },
+      ],
+      connections: {
+        'mount-1': mountConnection('connected'),
+      },
+      requiredTypes: ['camera', 'telescope', 'mount'],
+      connectionRequiredTypes: ['mount'],
+    });
+
+    expect(readiness.state).toBe('warning');
+    expect(readiness.issues.some((issue) => issue.code === 'mount-capability-limited')).toBe(true);
+  });
+
   it('returns ready when all required devices are valid and connected', () => {
     const readiness = evaluateDeviceReadiness({
       profiles: [cameraProfile(), telescopeProfile(), mountProfile()],

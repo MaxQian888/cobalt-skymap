@@ -5,6 +5,8 @@
 import React from 'react';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
+import { usePlanningUiStore } from '@/lib/stores/planning-ui-store';
+import { useMessierMarathonStore } from '@/lib/stores/messier-marathon-store';
 
 // Mock framer-motion to pass through
 jest.mock('framer-motion', () => ({
@@ -68,6 +70,18 @@ describe('UnifiedOnboarding', () => {
   beforeEach(() => {
     act(() => {
       useOnboardingStore.getState().resetAll();
+      usePlanningUiStore.setState({
+        sessionPlannerOpen: false,
+        shotListOpen: false,
+        tonightRecommendationsOpen: false,
+        messierMarathonGuideOpen: false,
+        plannerDraftSeed: null,
+        plannerDraftSeedRequestId: 0,
+      });
+      useMessierMarathonStore.setState({
+        activeSession: null,
+        lastCompletedSessionId: null,
+      });
     });
   });
 
@@ -340,5 +354,76 @@ describe('UnifiedOnboarding', () => {
 
     render(<UnifiedOnboarding />);
     expect(screen.getByText('onboarding.hub.title')).toBeInTheDocument();
+  });
+
+  it('shows messier marathon resume entry when an active guide session exists', () => {
+    act(() => {
+      useOnboardingStore.getState().setTourHubOpen(true);
+      useMessierMarathonStore.setState({
+        activeSession: {
+          sessionId: 'session-1',
+          date: '2026-03-21T12:00:00.000Z',
+          latitude: 35,
+          longitude: -105,
+          readiness: 'recommended',
+          visibleTargetCount: 2,
+          totalMessierCount: 110,
+          darknessHours: 9.5,
+          limitingFactors: [],
+          stages: [],
+          checkpoints: [],
+          recovery: {
+            mode: 'full',
+            nextCheckpointId: 'M74',
+            nextStageId: 'dusk',
+            catchUpTargetIds: ['M74'],
+            updatedAt: '2026-03-21T12:00:00.000Z',
+          },
+          startedAt: '2026-03-21T12:00:00.000Z',
+          updatedAt: '2026-03-21T12:00:00.000Z',
+        },
+      });
+    });
+
+    render(<UnifiedOnboarding />);
+    expect(screen.getByText('messierMarathon.title')).toBeInTheDocument();
+    expect(screen.getByText('onboarding.hub.resumeMarathon')).toBeInTheDocument();
+  });
+
+  it('opens the messier marathon guide from the hub without resetting onboarding progress', () => {
+    act(() => {
+      useOnboardingStore.getState().setTourHubOpen(true);
+      useMessierMarathonStore.setState({
+        activeSession: {
+          sessionId: 'session-1',
+          date: '2026-03-21T12:00:00.000Z',
+          latitude: 35,
+          longitude: -105,
+          readiness: 'recommended',
+          visibleTargetCount: 2,
+          totalMessierCount: 110,
+          darknessHours: 9.5,
+          limitingFactors: [],
+          stages: [],
+          checkpoints: [],
+          recovery: {
+            mode: 'full',
+            nextCheckpointId: 'M74',
+            nextStageId: 'dusk',
+            catchUpTargetIds: ['M74'],
+            updatedAt: '2026-03-21T12:00:00.000Z',
+          },
+          startedAt: '2026-03-21T12:00:00.000Z',
+          updatedAt: '2026-03-21T12:00:00.000Z',
+        },
+      });
+    });
+
+    render(<UnifiedOnboarding />);
+    fireEvent.click(screen.getByText('onboarding.hub.resumeMarathon'));
+
+    expect(usePlanningUiStore.getState().messierMarathonGuideOpen).toBe(true);
+    expect(useOnboardingStore.getState().tourHubOpen).toBe(false);
+    expect(useOnboardingStore.getState().phase).toBe('idle');
   });
 });

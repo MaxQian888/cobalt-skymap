@@ -9,6 +9,7 @@ import { useSettingsStore } from '@/lib/stores/settings-store';
 import { useOnboardingBridgeStore } from '@/lib/stores';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import { executeARRecoveryAction, type ARRecoveryActionHandlers } from '@/lib/core/ar-recovery-actions';
+import type { ARRecoveryAction } from '@/lib/core/ar-session';
 
 const RECOVERY_COOLDOWN_MS = 3000;
 
@@ -16,6 +17,22 @@ function getCheckIcon(status: 'pending' | 'pass' | 'warn' | 'block') {
   if (status === 'pass') return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
   if (status === 'warn' || status === 'block') return <AlertTriangle className="h-4 w-4 text-amber-300" />;
   return <LoaderCircle className="h-4 w-4 animate-spin text-sky-300" />;
+}
+
+function getActionRequestedNoticeKey(action: ARRecoveryAction): string {
+  if (action === 'retry-camera') return 'settings.arRecoveryNoticeRetryCameraRequested';
+  if (action === 'switch-camera') return 'settings.arRecoveryNoticeSwitchCameraRequested';
+  if (action === 'request-sensor-permission') return 'settings.arRecoveryNoticeSensorPermissionRequested';
+  if (action === 'calibrate-sensor') return 'settings.arRecoveryNoticeCalibrationRequested';
+  if (action === 'open-camera-settings') return 'settings.arRecoveryNoticeOpenCameraSettingsRequested';
+  if (action === 'revert-last-known-good-profile') return 'settings.arRecoveryNoticeRevertProfileRequested';
+  return 'settings.arRecoveryNoticeDisableArRequested';
+}
+
+function getActionFailureNoticeKey(action: ARRecoveryAction): string {
+  if (action === 'request-sensor-permission') return 'settings.arRecoveryNoticeSensorPermissionFailed';
+  if (action === 'calibrate-sensor') return 'settings.arRecoveryNoticeCalibrationFailed';
+  return 'settings.arRecoveryNoticeActionFailed';
 }
 
 export function ARLaunchAssistant() {
@@ -30,6 +47,7 @@ export function ARLaunchAssistant() {
   const markLaunchAssistantResumed = useARRuntimeStore((state) => state.markLaunchAssistantResumed);
   const recoveryActionLastFiredAt = useARRuntimeStore((state) => state.recoveryActionLastFiredAt);
   const setRecoveryNoticeKey = useARRuntimeStore((state) => state.setRecoveryNoticeKey);
+  const recoveryNoticeKey = useARRuntimeStore((state) => state.recoveryNoticeKey);
   const [now, setNow] = useState(0);
 
   useEffect(() => {
@@ -83,6 +101,26 @@ export function ARLaunchAssistant() {
     }),
     [closeLaunchAssistant, openSettingsDrawer, requestRecoveryAction, setStellariumSetting],
   );
+
+  const handleRecoveryAction = async (action: ARRecoveryAction): Promise<void> => {
+    setRecoveryNoticeKey(getActionRequestedNoticeKey(action));
+
+    const succeeded = await executeARRecoveryAction(action, handlers, {
+      onError: (_a, err) => {
+        if (err instanceof Error && err.message.startsWith('settings.')) {
+          setRecoveryNoticeKey(err.message);
+          return;
+        }
+        setRecoveryNoticeKey(getActionFailureNoticeKey(action));
+      },
+    });
+
+    if (!succeeded) return;
+
+    if (action === 'disable-ar') {
+      setRecoveryNoticeKey(null);
+    }
+  };
 
   if (!launchAssistant.visible) {
     return null;
@@ -194,12 +232,9 @@ export function ARLaunchAssistant() {
                     && lastFiredAt > 0
                     && now - lastFiredAt < RECOVERY_COOLDOWN_MS;
                 })()}
-                onClick={() => executeARRecoveryAction(action, handlers, {
-                  onError: (_a, err) => {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    setRecoveryNoticeKey(msg);
-                  },
-                })}
+                onClick={() => {
+                  void handleRecoveryAction(action);
+                }}
                 data-testid={`ar-launch-action-${action}`}
               >
                 {t(
@@ -219,6 +254,12 @@ export function ARLaunchAssistant() {
                 )}
               </Button>
             ))}
+          </div>
+        )}
+
+        {recoveryNoticeKey && (
+          <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-xs text-amber-100" data-testid="ar-launch-recovery-notice">
+            {t(recoveryNoticeKey)}
           </div>
         )}
 

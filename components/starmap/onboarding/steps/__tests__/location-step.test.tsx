@@ -4,13 +4,13 @@
 
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ObserverLocation } from '@/types/starmap/onboarding';
 
 // --- Mocks ---
 
 const mockSetProfileInfo = jest.fn();
 const mockUpdateSetupData = jest.fn();
-const mockSaveLocation = jest.fn();
-let mockLoadStoredLocation: jest.Mock = jest.fn(() => null);
+type MockLocation = ObserverLocation;
 const mockIsValidLocation = jest.fn(
   (loc: { latitude: number; longitude: number } | null) =>
     loc !== null &&
@@ -21,11 +21,21 @@ const mockIsValidLocation = jest.fn(
     loc.longitude >= -180 &&
     loc.longitude <= 180,
 );
+const mockLoadObservationStepLocation = jest.fn<Promise<MockLocation | null>, []>(async () => null);
+const mockSaveObservationStepLocation = jest.fn<Promise<MockLocation>, [MockLocation]>(async (location) => location);
+const mockDetectObservationStepLocation = jest.fn<Promise<{ location?: MockLocation; errorKey?: string }>, []>(
+  async () => ({}),
+);
 
 jest.mock('@/lib/stores/mount-store', () => ({
   useMountStore: Object.assign(
     jest.fn((selector: (s: Record<string, unknown>) => unknown) => {
-      const state = { setProfileInfo: mockSetProfileInfo };
+      const state = {
+        profileInfo: {
+          AstrometrySettings: { Latitude: 0, Longitude: 0, Elevation: 0 },
+        },
+        setProfileInfo: mockSetProfileInfo,
+      };
       return selector(state);
     }),
     {
@@ -33,6 +43,7 @@ jest.mock('@/lib/stores/mount-store', () => ({
         profileInfo: {
           AstrometrySettings: { Latitude: 0, Longitude: 0, Elevation: 0 },
         },
+        setProfileInfo: mockSetProfileInfo,
       })),
     },
   ),
@@ -46,61 +57,32 @@ jest.mock('@/lib/stores/onboarding-store', () => ({
 }));
 
 jest.mock('@/lib/utils/observer-location', () => ({
-  loadStoredLocation: () => mockLoadStoredLocation(),
-  saveLocation: (...args: unknown[]) => mockSaveLocation(...args),
   isValidLocation: (loc: { latitude: number; longitude: number } | null) => mockIsValidLocation(loc),
+}));
+
+jest.mock('@/lib/services/observation-location-entry', () => ({
+  loadObservationStepLocation: () => mockLoadObservationStepLocation(),
+  saveObservationStepLocation: (location: MockLocation) => mockSaveObservationStepLocation(location),
+  detectObservationStepLocation: () => mockDetectObservationStepLocation(),
+}));
+
+jest.mock('@/lib/hooks/use-canonical-observation-location', () => ({
+  useCanonicalObservationLocationState: () => ({
+    currentLocation: { id: 'loc-1', name: 'Backyard' },
+    hasSavedLocation: true,
+    loading: false,
+    isTauriManaged: false,
+  }),
 }));
 
 import { LocationStep } from '../location-step';
 
-// Helper to set up a mock geolocation API
-function mockGeolocation(
-  response?: { latitude: number; longitude: number; altitude: number | null },
-  error?: { code: number; message: string },
-) {
-  const getCurrentPosition = jest.fn(
-    (
-      success: PositionCallback,
-      errorCb?: PositionErrorCallback | null,
-    ) => {
-      if (error && errorCb) {
-        errorCb({
-          code: error.code,
-          message: error.message,
-          PERMISSION_DENIED: 1,
-          POSITION_UNAVAILABLE: 2,
-          TIMEOUT: 3,
-        } as GeolocationPositionError);
-      } else if (response) {
-        success({
-          coords: {
-            latitude: response.latitude,
-            longitude: response.longitude,
-            altitude: response.altitude,
-            accuracy: 10,
-            altitudeAccuracy: null,
-            heading: null,
-            speed: null,
-          },
-          timestamp: Date.now(),
-        } as GeolocationPosition);
-      }
-    },
-  );
-
-  Object.defineProperty(navigator, 'geolocation', {
-    value: { getCurrentPosition },
-    writable: true,
-    configurable: true,
-  });
-
-  return getCurrentPosition;
-}
-
 describe('LocationStep', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockLoadStoredLocation = jest.fn(() => null);
+    mockLoadObservationStepLocation.mockResolvedValue(null);
+    mockSaveObservationStepLocation.mockImplementation(async (location) => location);
+    mockDetectObservationStepLocation.mockResolvedValue({});
   });
 
   it('renders description and two tabs (GPS / Manual)', () => {
@@ -122,23 +104,27 @@ describe('LocationStep', () => {
 
   it('loads stored location on mount and updates mount store', () => {
     const stored = { latitude: 40.7128, longitude: -74.006, altitude: 10 };
-    mockLoadStoredLocation = jest.fn(() => stored);
+    mockLoadObservationStepLocation.mockResolvedValue(stored);
 
     render(<LocationStep />);
 
-    expect(mockSetProfileInfo).toHaveBeenCalledWith(
-      expect.objectContaining({
-        AstrometrySettings: expect.objectContaining({
-          Latitude: 40.7128,
-          Longitude: -74.006,
-          Elevation: 10,
+    return waitFor(() => {
+      expect(mockSetProfileInfo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          AstrometrySettings: expect.objectContaining({
+            Latitude: 40.7128,
+            Longitude: -74.006,
+            Elevation: 10,
+          }),
         }),
-      }),
-    );
+      );
+    });
   });
 
   it('handles GPS success and displays location summary', async () => {
-    mockGeolocation({ latitude: 51.5074, longitude: -0.1278, altitude: 15 });
+    mockDetectObservationStepLocation.mockResolvedValue({
+      location: { latitude: 51.5074, longitude: -0.1278, altitude: 15 },
+    });
 
     render(<LocationStep />);
 
@@ -146,14 +132,16 @@ describe('LocationStep', () => {
     fireEvent.click(detectBtn);
 
     await waitFor(() => {
-      expect(mockSaveLocation).toHaveBeenCalledWith(
+      expect(mockSaveObservationStepLocation).toHaveBeenCalledWith(
         expect.objectContaining({ latitude: 51.5074, longitude: -0.1278, altitude: 15 }),
       );
     });
   });
 
   it('handles GPS permission denied error', async () => {
-    mockGeolocation(undefined, { code: 1, message: 'denied' });
+    mockDetectObservationStepLocation.mockResolvedValue({
+      errorKey: 'setupWizard.steps.location.permissionDenied',
+    });
 
     render(<LocationStep />);
 
@@ -166,7 +154,9 @@ describe('LocationStep', () => {
   });
 
   it('handles GPS position unavailable error', async () => {
-    mockGeolocation(undefined, { code: 2, message: 'unavailable' });
+    mockDetectObservationStepLocation.mockResolvedValue({
+      errorKey: 'setupWizard.steps.location.positionUnavailable',
+    });
 
     render(<LocationStep />);
     fireEvent.click(screen.getByText('setupWizard.steps.location.detectLocation'));
@@ -177,7 +167,9 @@ describe('LocationStep', () => {
   });
 
   it('handles GPS timeout error', async () => {
-    mockGeolocation(undefined, { code: 3, message: 'timeout' });
+    mockDetectObservationStepLocation.mockResolvedValue({
+      errorKey: 'setupWizard.steps.location.timeout',
+    });
 
     render(<LocationStep />);
     fireEvent.click(screen.getByText('setupWizard.steps.location.detectLocation'));

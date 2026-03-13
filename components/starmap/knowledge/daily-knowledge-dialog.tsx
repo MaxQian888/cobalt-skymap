@@ -63,6 +63,9 @@ const SOURCE_OPTIONS: Array<{ value: DailyKnowledgeSource | 'all'; labelKey: str
   { value: 'curated', labelKey: 'dailyKnowledge.sourceCurated' },
   { value: 'nasa-apod', labelKey: 'dailyKnowledge.sourceApod' },
   { value: 'wikimedia', labelKey: 'dailyKnowledge.sourceWikimedia' },
+  { value: 'nasa-image-library', labelKey: 'dailyKnowledge.sourceNasaImageLibrary' },
+  { value: 'nasa-photojournal', labelKey: 'dailyKnowledge.sourceNasaPhotojournal' },
+  { value: 'esa-science', labelKey: 'dailyKnowledge.sourceEsaScience' },
 ];
 
 export function DailyKnowledgeDialog() {
@@ -75,6 +78,8 @@ export function DailyKnowledgeDialog() {
   const currentItem = useDailyKnowledgeStore((state) => state.currentItem);
   const favorites = useDailyKnowledgeStore((state) => state.favorites);
   const history = useDailyKnowledgeStore((state) => state.history);
+  const sourceStatuses = useDailyKnowledgeStore((state) => state.sourceStatuses);
+  const usedCuratedFallback = useDailyKnowledgeStore((state) => state.usedCuratedFallback);
   const filters = useDailyKnowledgeStore((state) => state.filters);
   const closeDialog = useDailyKnowledgeStore((state) => state.closeDialog);
   const loadDaily = useDailyKnowledgeStore((state) => state.loadDaily);
@@ -170,6 +175,10 @@ export function DailyKnowledgeDialog() {
   const favoriteIds = useMemo(() => new Set(favorites.map((entry) => entry.itemId)), [favorites]);
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const lastSearchHistoryKeyRef = useRef<string | null>(null);
+  const degradedSourceStatuses = useMemo(
+    () => sourceStatuses.filter((status) => status.state !== 'ready'),
+    [sourceStatuses]
+  );
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -421,6 +430,19 @@ export function DailyKnowledgeDialog() {
         <Separator />
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+        {!loading && !error && (usedCuratedFallback || degradedSourceStatuses.length > 0) && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="space-y-1 text-xs">
+              {usedCuratedFallback && <p>{t('dailyKnowledge.curatedFallbackNotice')}</p>}
+              {degradedSourceStatuses.map((status) => (
+                <p key={`${status.source}-${status.reason}`}>
+                  {t(`dailyKnowledge.sourceStatus.${status.source}.${status.reason}`)}
+                </p>
+              ))}
+            </AlertDescription>
+          </Alert>
+        )}
         {loading && (
           <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
             <div className="space-y-3">
@@ -594,6 +616,16 @@ export function DailyKnowledgeDialog() {
                 </CardHeader>
                 <CardContent className="px-3 py-0 text-sm text-muted-foreground space-y-0.5">
                   <p>{effectiveItem.attribution.sourceName}</p>
+                  {effectiveItem.attribution.sourceUrl && (
+                    <a
+                      href={effectiveItem.attribution.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline underline-offset-2"
+                    >
+                      {t('dailyKnowledge.sourceReference')}
+                    </a>
+                  )}
                   {effectiveItem.attribution.copyright && (
                     <p>{effectiveItem.attribution.copyright}</p>
                   )}

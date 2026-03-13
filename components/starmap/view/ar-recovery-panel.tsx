@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,22 @@ function getActionTextKey(action: ARRecoveryAction): string {
   return 'settings.arRecoveryDisable';
 }
 
+function getActionRequestedNoticeKey(action: ARRecoveryAction): string {
+  if (action === 'retry-camera') return 'settings.arRecoveryNoticeRetryCameraRequested';
+  if (action === 'switch-camera') return 'settings.arRecoveryNoticeSwitchCameraRequested';
+  if (action === 'request-sensor-permission') return 'settings.arRecoveryNoticeSensorPermissionRequested';
+  if (action === 'calibrate-sensor') return 'settings.arRecoveryNoticeCalibrationRequested';
+  if (action === 'open-camera-settings') return 'settings.arRecoveryNoticeOpenCameraSettingsRequested';
+  if (action === 'revert-last-known-good-profile') return 'settings.arRecoveryNoticeRevertProfileRequested';
+  return 'settings.arRecoveryNoticeDisableArRequested';
+}
+
+function getActionFailureNoticeKey(action: ARRecoveryAction): string {
+  if (action === 'request-sensor-permission') return 'settings.arRecoveryNoticeSensorPermissionFailed';
+  if (action === 'calibrate-sensor') return 'settings.arRecoveryNoticeCalibrationFailed';
+  return 'settings.arRecoveryNoticeActionFailed';
+}
+
 export function ARRecoveryPanel({
   status,
   recoveryActions,
@@ -56,20 +72,38 @@ export function ARRecoveryPanel({
   const recoveryActionLastFiredAt = useARRuntimeStore((state) => state.recoveryActionLastFiredAt);
   const [now, setNow] = useState(0);
 
-  const actions = useMemo(() => Array.from(new Set(recoveryActions)), [recoveryActions]);
+  const actions = Array.from(new Set(recoveryActions));
 
-  const handlers = useMemo<ARRecoveryActionHandlers>(
-    () => ({
-      onRetryCamera: () => requestRecoveryAction('retry-camera'),
-      onSwitchCamera: () => requestRecoveryAction('switch-camera'),
-      onRequestSensorPermission: () => requestRecoveryAction('request-sensor-permission'),
-      onCalibrateSensor: () => requestRecoveryAction('calibrate-sensor'),
-      onOpenCameraSettings: () => openSettingsDrawer('display'),
-      onRevertLastKnownGoodProfile: () => requestRecoveryAction('revert-last-known-good-profile'),
-      onDisableAr: () => setStellariumSetting('arMode', false),
-    }),
-    [openSettingsDrawer, requestRecoveryAction, setStellariumSetting]
-  );
+  const handlers: ARRecoveryActionHandlers = {
+    onRetryCamera: () => requestRecoveryAction('retry-camera'),
+    onSwitchCamera: () => requestRecoveryAction('switch-camera'),
+    onRequestSensorPermission: () => requestRecoveryAction('request-sensor-permission'),
+    onCalibrateSensor: () => requestRecoveryAction('calibrate-sensor'),
+    onOpenCameraSettings: () => openSettingsDrawer('display'),
+    onRevertLastKnownGoodProfile: () => requestRecoveryAction('revert-last-known-good-profile'),
+    onDisableAr: () => setStellariumSetting('arMode', false),
+  };
+
+  const handleRecoveryAction = async (action: ARRecoveryAction): Promise<void> => {
+    setRecoveryNoticeKey(getActionRequestedNoticeKey(action));
+
+    const succeeded = await executeARRecoveryAction(action, handlers, {
+      onError: (_a, err) => {
+        const fallbackKey = getActionFailureNoticeKey(action);
+        if (err instanceof Error && err.message.startsWith('settings.')) {
+          setRecoveryNoticeKey(err.message);
+          return;
+        }
+        setRecoveryNoticeKey(fallbackKey);
+      },
+    });
+
+    if (!succeeded) return;
+
+    if (action === 'disable-ar') {
+      setRecoveryNoticeKey(null);
+    }
+  };
 
   useEffect(() => {
     if (status === 'ready' && recoveryNoticeKey) {
@@ -144,13 +178,7 @@ export function ARRecoveryPanel({
                   && now - lastFiredAt < RECOVERY_COOLDOWN_MS;
               })()}
               onClick={() => {
-                setRecoveryNoticeKey(null);
-                executeARRecoveryAction(action, handlers, {
-                  onError: (_a, err) => {
-                    const msg = err instanceof Error ? err.message : String(err);
-                    setRecoveryNoticeKey(msg);
-                  },
-                });
+                void handleRecoveryAction(action);
               }}
               data-testid={`ar-recovery-action-${action}`}
             >

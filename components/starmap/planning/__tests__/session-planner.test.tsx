@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SessionPlanner } from '../session-planner';
 
 jest.mock('next-intl', () => ({
@@ -11,6 +11,14 @@ jest.mock('next-intl', () => ({
 
 jest.mock('../mount-safety-simulator', () => ({
   MountSafetySimulator: () => <div data-testid="mount-safety-simulator" />,
+}));
+
+jest.mock('sonner', () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+  },
 }));
 
 jest.mock('@/lib/storage/platform', () => ({
@@ -186,6 +194,7 @@ const mockSessionPlanState = {
   executions: [] as Array<Record<string, unknown>>,
   activeExecutionId: null as string | null,
   savePlan: jest.fn(() => 'saved-plan-1'),
+  updatePlan: jest.fn(),
   saveTemplate: jest.fn(),
   loadTemplate: jest.fn(),
   importPlanV2: jest.fn(),
@@ -200,6 +209,10 @@ const mockPlanningUiState = {
   setSessionPlannerOpen: jest.fn(),
   openShotList: jest.fn(),
   openTonightRecommendations: jest.fn(),
+  openMessierMarathonGuide: jest.fn(),
+  plannerDraftSeed: null as Record<string, unknown> | null,
+  plannerDraftSeedRequestId: 0,
+  clearPlannerDraftSeed: jest.fn(),
 };
 
 const mockStoreSelectors = {
@@ -418,6 +431,251 @@ describe('SessionPlanner', () => {
     expect(screen.getByRole('button', { name: 'sessionPlanner.replanRemaining' })).toBeInTheDocument();
   });
 
+  it('falls back to start execution when there is no related execution', () => {
+    render(<SessionPlanner />);
+
+    expect(screen.getByRole('button', { name: 'sessionPlanner.startExecution' })).toBeInTheDocument();
+    expect(screen.queryByTestId('session-planner-execution-summary')).not.toBeInTheDocument();
+  });
+
+  it('renders active execution summary with focus target context', () => {
+    mockSessionPlanState.savedPlans = [{
+      id: 'saved-plan-1',
+      name: 'Saved Plan',
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      planDate: new Date().toISOString(),
+      latitude: 40,
+      longitude: -74,
+      strategy: 'balanced',
+      minAltitude: 30,
+      minImagingTime: 30,
+      targets: [{
+        targetId: 'target-1',
+        targetName: 'M31',
+        ra: 10.684,
+        dec: 41.269,
+        startTime: '2025-06-15T20:30:00.000Z',
+        endTime: '2025-06-15T22:00:00.000Z',
+        duration: 1.5,
+        maxAltitude: 72,
+        moonDistance: 88,
+        feasibilityScore: 86,
+        order: 1,
+      }],
+      excludedTargetIds: [],
+      totalImagingTime: 1.5,
+      nightCoverage: 40,
+      efficiency: 100,
+    }];
+    mockSessionPlanState.executions = [{
+      id: 'session-1',
+      sourcePlanId: 'saved-plan-1',
+      sourcePlanName: 'Saved Plan',
+      status: 'active',
+      planDate: new Date().toISOString(),
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      targets: [{
+        id: 'saved-plan-1-target-1',
+        targetId: 'target-1',
+        targetName: 'M31',
+        scheduledStart: '2025-06-15T20:30:00.000Z',
+        scheduledEnd: '2025-06-15T22:00:00.000Z',
+        scheduledDurationMinutes: 90,
+        order: 1,
+        status: 'in_progress',
+        observationIds: [],
+      }],
+    }];
+
+    render(<SessionPlanner />);
+
+    const summary = screen.getByTestId('session-planner-execution-summary');
+    expect(summary).toBeInTheDocument();
+    expect(within(summary).getByText('M31')).toBeInTheDocument();
+  });
+
+  it('shows archive follow-through for completed executions', () => {
+    mockSessionPlanState.savedPlans = [{
+      id: 'saved-plan-1',
+      name: 'Saved Plan',
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      planDate: new Date().toISOString(),
+      latitude: 40,
+      longitude: -74,
+      strategy: 'balanced',
+      minAltitude: 30,
+      minImagingTime: 30,
+      targets: [{
+        targetId: 'target-1',
+        targetName: 'M31',
+        ra: 10.684,
+        dec: 41.269,
+        startTime: '2025-06-15T20:30:00.000Z',
+        endTime: '2025-06-15T22:00:00.000Z',
+        duration: 1.5,
+        maxAltitude: 72,
+        moonDistance: 88,
+        feasibilityScore: 86,
+        order: 1,
+      }],
+      excludedTargetIds: [],
+      totalImagingTime: 1.5,
+      nightCoverage: 40,
+      efficiency: 100,
+    }];
+    mockSessionPlanState.executions = [{
+      id: 'session-1',
+      sourcePlanId: 'saved-plan-1',
+      sourcePlanName: 'Saved Plan',
+      status: 'completed',
+      planDate: new Date().toISOString(),
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      summary: {
+        completedTargets: 1,
+        skippedTargets: 0,
+        failedTargets: 0,
+        totalTargets: 1,
+        totalObservations: 1,
+      },
+      targets: [{
+        id: 'saved-plan-1-target-1',
+        targetId: 'target-1',
+        targetName: 'M31',
+        scheduledStart: '2025-06-15T20:30:00.000Z',
+        scheduledEnd: '2025-06-15T22:00:00.000Z',
+        scheduledDurationMinutes: 90,
+        order: 1,
+        status: 'completed',
+        observationIds: ['obs-1'],
+      }],
+    }];
+
+    render(<SessionPlanner />);
+
+    expect(screen.getByTestId('session-planner-archive-button')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'sessionPlanner.continueExecution' })).not.toBeInTheDocument();
+  });
+
+  it('hides live execution controls for archived executions', () => {
+    mockSessionPlanState.savedPlans = [{
+      id: 'saved-plan-1',
+      name: 'Saved Plan',
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      planDate: new Date().toISOString(),
+      latitude: 40,
+      longitude: -74,
+      strategy: 'balanced',
+      minAltitude: 30,
+      minImagingTime: 30,
+      targets: [{
+        targetId: 'target-1',
+        targetName: 'M31',
+        ra: 10.684,
+        dec: 41.269,
+        startTime: '2025-06-15T20:30:00.000Z',
+        endTime: '2025-06-15T22:00:00.000Z',
+        duration: 1.5,
+        maxAltitude: 72,
+        moonDistance: 88,
+        feasibilityScore: 86,
+        order: 1,
+      }],
+      excludedTargetIds: [],
+      totalImagingTime: 1.5,
+      nightCoverage: 40,
+      efficiency: 100,
+    }];
+    mockSessionPlanState.executions = [{
+      id: 'session-1',
+      sourcePlanId: 'saved-plan-1',
+      sourcePlanName: 'Saved Plan',
+      status: 'archived',
+      planDate: new Date().toISOString(),
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      targets: [{
+        id: 'saved-plan-1-target-1',
+        targetId: 'target-1',
+        targetName: 'M31',
+        scheduledStart: '2025-06-15T20:30:00.000Z',
+        scheduledEnd: '2025-06-15T22:00:00.000Z',
+        scheduledDurationMinutes: 90,
+        order: 1,
+        status: 'completed',
+        observationIds: ['obs-1'],
+      }],
+    }];
+
+    render(<SessionPlanner />);
+
+    expect(screen.getByRole('button', { name: 'sessionPlanner.startExecution' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'sessionPlanner.continueExecution' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('session-planner-execution-summary')).not.toBeInTheDocument();
+  });
+
+  it('blocks replan when no remaining targets are available', () => {
+    const { toast } = jest.requireMock('sonner');
+    mockSessionPlanState.savedPlans = [{
+      id: 'saved-plan-1',
+      name: 'Saved Plan',
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      planDate: new Date().toISOString(),
+      latitude: 40,
+      longitude: -74,
+      strategy: 'balanced',
+      minAltitude: 30,
+      minImagingTime: 30,
+      targets: [{
+        targetId: 'target-1',
+        targetName: 'M31',
+        ra: 10.684,
+        dec: 41.269,
+        startTime: '2025-06-15T20:30:00.000Z',
+        endTime: '2025-06-15T22:00:00.000Z',
+        duration: 1.5,
+        maxAltitude: 72,
+        moonDistance: 88,
+        feasibilityScore: 86,
+        order: 1,
+      }],
+      excludedTargetIds: [],
+      totalImagingTime: 1.5,
+      nightCoverage: 40,
+      efficiency: 100,
+    }];
+    mockSessionPlanState.executions = [{
+      id: 'session-1',
+      sourcePlanId: 'saved-plan-1',
+      sourcePlanName: 'Saved Plan',
+      status: 'active',
+      planDate: new Date().toISOString(),
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      targets: [{
+        id: 'saved-plan-1-target-1',
+        targetId: 'target-1',
+        targetName: 'M31',
+        scheduledStart: '2025-06-15T20:30:00.000Z',
+        scheduledEnd: '2025-06-15T22:00:00.000Z',
+        scheduledDurationMinutes: 90,
+        order: 1,
+        status: 'completed',
+        observationIds: ['obs-1'],
+      }],
+    }];
+
+    render(<SessionPlanner />);
+    fireEvent.click(screen.getByRole('button', { name: 'sessionPlanner.replanRemaining' }));
+
+    expect(toast.error).toHaveBeenCalledWith('sessionPlanner.noRemainingTargetsToReplan');
+  });
+
   it('blocks save when session window is incomplete', () => {
     render(<SessionPlanner />);
 
@@ -430,6 +688,50 @@ describe('SessionPlanner', () => {
     fireEvent.click(screen.getByRole('button', { name: 'sessionPlanner.savePlan' }));
 
     expect(mockSessionPlanState.savePlan).not.toHaveBeenCalled();
+  });
+
+  it('renders messier marathon guide entry point', () => {
+    render(<SessionPlanner />);
+
+    expect(screen.getByRole('button', { name: 'sessionPlanner.messierMarathonGuide' })).toBeInTheDocument();
+  });
+
+  it('persists guide context when launched from a seeded draft', () => {
+    mockPlanningUiState.plannerDraftSeed = {
+      planDate: new Date('2025-06-15T00:00:00.000Z').toISOString(),
+      strategy: 'balanced',
+      constraints: {
+        minAltitude: 20,
+        minImagingTime: 30,
+      },
+      excludedTargetIds: [],
+      manualEdits: [],
+      notes: 'Messier Marathon (recommended)',
+      guideContext: {
+        kind: 'messier-marathon',
+        sessionId: 'marathon-1',
+        readiness: 'recommended',
+        mode: 'full',
+        checkpointOrder: ['target-1'],
+        criticalCheckpointIds: ['target-1'],
+        stageByTargetId: { 'target-1': 'dusk' },
+      },
+    };
+    mockPlanningUiState.plannerDraftSeedRequestId = 1;
+
+    render(<SessionPlanner />);
+    fireEvent.click(screen.getByRole('button', { name: 'sessionPlanner.savePlan' }));
+
+    expect(mockPlanningUiState.clearPlannerDraftSeed).toHaveBeenCalled();
+    expect(mockSessionPlanState.savePlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        guideContext: expect.objectContaining({
+          kind: 'messier-marathon',
+          sessionId: 'marathon-1',
+        }),
+        notes: 'Messier Marathon (recommended)',
+      }),
+    );
   });
 });
 

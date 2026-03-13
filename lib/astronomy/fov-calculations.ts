@@ -55,6 +55,11 @@ export interface MosaicCoverage {
   totalPanels: number;
 }
 
+export interface FramePlacement {
+  x: number;
+  y: number;
+}
+
 export type FOVFitStatus = 'too_large' | 'tight' | 'good' | 'roomy';
 
 export interface ParsedAngularSizeArcmin {
@@ -103,6 +108,36 @@ const MOSAIC_PANEL_COUNT_EXTREME = 36;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * Resolve effective focal length using an optional accessory factor.
+ * Invalid factors fall back to the base focal length.
+ */
+export function resolveEffectiveFocalLength(
+  baseFocalLength: number,
+  accessoryFactor?: number | null
+): number {
+  if (!Number.isFinite(baseFocalLength) || baseFocalLength <= 0) {
+    return 0;
+  }
+  const validAccessoryFactor = typeof accessoryFactor === 'number' && Number.isFinite(accessoryFactor) && accessoryFactor > 0
+    ? accessoryFactor
+    : null;
+  if (validAccessoryFactor === null) {
+    return baseFocalLength;
+  }
+  return baseFocalLength * validAccessoryFactor;
+}
+
+/**
+ * Clamp normalized frame placement offsets to visible overlay bounds.
+ */
+export function clampFramePlacement(placement: FramePlacement): FramePlacement {
+  return {
+    x: clamp(placement.x, -1, 1),
+    y: clamp(placement.y, -1, 1),
+  };
 }
 
 function toArcmin(value: number, rawUnit: string | undefined, fallbackUnit: string): number {

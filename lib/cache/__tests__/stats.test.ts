@@ -200,6 +200,30 @@ describe('formatCacheStats', () => {
     const result = formatCacheStats(statsWithNoHitRate);
     expect(result).toContain('N/A');
   });
+
+  it('should fall back when diagnostics or optional cache fields are missing', () => {
+    const result = formatCacheStats({
+      ...makeDiagnosticsStats(),
+      providerDiagnostics: undefined as never,
+      integrationDiagnostics: undefined as never,
+      caches: [{
+        name: 'Fallback Cache',
+        size: 256,
+        maxSize: 1024,
+        entries: 1,
+        hits: 0,
+        misses: 0,
+        hitRate: undefined,
+      }],
+    } as AggregatedCacheStats);
+
+    expect(result).toContain('Provider: unavailable');
+    expect(result).toContain('Integrations: 0');
+    expect(result).toContain('Fallback Cache');
+    expect(result).toContain('Entries: 1');
+    expect(result).not.toContain('Entries: 1 /');
+    expect(result).toContain('Hit Rate: N/A (0 hits, 0 misses)');
+  });
 });
 
 describe('getCacheStatsSummary', () => {

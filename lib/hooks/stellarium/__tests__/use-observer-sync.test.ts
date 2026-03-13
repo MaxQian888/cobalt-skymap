@@ -3,37 +3,60 @@
  * Observer location sync from profile to Stellarium engine
  */
 
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { useObserverSync } from '../use-observer-sync';
 import { useRef } from 'react';
+
+const mockSetProfileInfo = jest.fn();
 
 jest.mock('@/lib/stores', () => ({
   useMountStore: Object.assign(
     jest.fn((selector: (s: Record<string, unknown>) => unknown) =>
       selector({
         profileInfo: {
-          AstrometrySettings: { Latitude: 40, Longitude: -74, Elevation: 100 },
+          AstrometrySettings: { Latitude: 0, Longitude: 0, Elevation: 0 },
         },
-        setProfileInfo: jest.fn(),
+        setProfileInfo: mockSetProfileInfo,
       })
     ),
     {
       getState: () => ({
         profileInfo: {
-          AstrometrySettings: { Latitude: 40, Longitude: -74, Elevation: 100 },
+          AstrometrySettings: { Latitude: 0, Longitude: 0, Elevation: 0 },
         },
+        setProfileInfo: mockSetProfileInfo,
       }),
     }
   ),
 }));
 
-jest.mock('@/lib/stores/web-location-store', () => ({
-  useWebLocationStore: Object.assign(jest.fn(), {
-    getState: () => ({ locations: [] }),
-  }),
+const mockMigrateLegacyObserverLocation = jest.fn<
+  Promise<{ status: 'skipped'; location: null }>,
+  []
+>(async () => ({ status: 'skipped', location: null }));
+const mockResolveCanonicalObservationLocation = jest.fn<
+  Promise<{
+    id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    altitude: number;
+    is_current: boolean;
+    is_default: boolean;
+  } | null>,
+  []
+>(async () => null);
+
+jest.mock('@/lib/services/observation-location-controller', () => ({
+  migrateLegacyObserverLocation: () => mockMigrateLegacyObserverLocation(),
+  resolveCanonicalObservationLocation: () => mockResolveCanonicalObservationLocation(),
 }));
 
 describe('useObserverSync', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   it('should not throw when stelRef is null', () => {
     expect(() => {
       renderHook(() => {
@@ -58,5 +81,34 @@ describe('useObserverSync', () => {
       useObserverSync(ref as never);
     });
     // Should not throw
+  });
+
+  it('bootstraps mount profile from the canonical current site', async () => {
+    mockResolveCanonicalObservationLocation.mockResolvedValue({
+      id: 'loc-1',
+      name: 'Backyard',
+      latitude: 51.5,
+      longitude: -0.1,
+      altitude: 100,
+      is_current: true,
+      is_default: true,
+    });
+
+    renderHook(() => {
+      const ref = useRef(null);
+      useObserverSync(ref);
+    });
+
+    await waitFor(() => {
+      expect(mockMigrateLegacyObserverLocation).toHaveBeenCalled();
+      expect(mockResolveCanonicalObservationLocation).toHaveBeenCalled();
+      expect(mockSetProfileInfo).toHaveBeenCalledWith({
+        AstrometrySettings: {
+          Latitude: 51.5,
+          Longitude: -0.1,
+          Elevation: 100,
+        },
+      });
+    });
   });
 });

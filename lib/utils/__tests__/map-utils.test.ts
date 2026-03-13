@@ -28,6 +28,20 @@ describe('map-utils', () => {
       expect(getQuotaUsagePercent({ id: '1', provider: 'google', apiKey: 'k', createdAt: '' })).toBe(0);
     });
 
+    it('should fall back to monthly quota when daily quota is missing', () => {
+      expect(getQuotaUsagePercent({
+        id: '1', provider: 'google', apiKey: 'k', createdAt: '',
+        quota: { monthly: 2000, used: 500 },
+      })).toBe(25);
+    });
+
+    it('should return 0 when quota exists but no limits are configured', () => {
+      expect(getQuotaUsagePercent({
+        id: '1', provider: 'google', apiKey: 'k', createdAt: '',
+        quota: { used: 500 },
+      })).toBe(0);
+    });
+
     it('should calculate percentage', () => {
       expect(getQuotaUsagePercent({
         id: '1', provider: 'google', apiKey: 'k', createdAt: '',

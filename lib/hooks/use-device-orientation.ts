@@ -110,11 +110,63 @@ const ABSOLUTE_SAMPLE_HOLD_MS = 1500;
 const SOURCE_TRANSITION_STABILIZE_MS = 600;
 const STALE_SAMPLE_MS = 1400;
 const LOW_CONFIDENCE_ACCURACY_DEG = 18;
+const PERMISSION_REQUEST_TIMEOUT_MS = 4000;
+const PERMISSION_CACHE_KEY = 'skymap:ar:device-orientation-permission';
 type PermissionCacheState = 'unknown' | 'granted' | 'denied';
 let permissionCacheState: PermissionCacheState = 'unknown';
 
+function getCachedPermissionState(): PermissionCacheState {
+  if (typeof window === 'undefined') {
+    return permissionCacheState;
+  }
+
+  try {
+    const cached = window.sessionStorage.getItem(PERMISSION_CACHE_KEY);
+    if (cached === 'granted' || cached === 'denied' || cached === 'unknown') {
+      permissionCacheState = cached;
+      return cached;
+    }
+  } catch {
+    // Ignore storage access errors and fallback to in-memory cache.
+  }
+
+  return permissionCacheState;
+}
+
+function setCachedPermissionState(next: PermissionCacheState): void {
+  permissionCacheState = next;
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (next === 'unknown') {
+      window.sessionStorage.removeItem(PERMISSION_CACHE_KEY);
+      return;
+    }
+    window.sessionStorage.setItem(PERMISSION_CACHE_KEY, next);
+  } catch {
+    // Ignore storage access errors and keep in-memory cache only.
+  }
+}
+
+function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  if (timeoutMs <= 0) return promise;
+
+  let timeoutId: number | null = null;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = window.setTimeout(() => {
+      reject(new Error(errorMessage));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+    }
+  });
+}
+
 export function __resetDeviceOrientationPermissionCacheForTests() {
-  permissionCacheState = 'unknown';
+  setCachedPermissionState('unknown');
 }
 
 interface SourceConditioning {
@@ -317,10 +369,11 @@ export function useDeviceOrientation(
   const [orientation, setOrientation] = useState<DeviceOrientation | null>(null);
   const [skyDirection, setSkyDirection] = useState<SkyDirection | null>(null);
   const [isSupported] = useState(supportsDeviceOrientation);
+  const [cachedPermissionState] = useState<PermissionCacheState>(() => getCachedPermissionState());
   const [isPermissionGranted, setIsPermissionGranted] = useState(
-    () => isSupported && (!usesPermissionRequestApi() || permissionCacheState === 'granted')
+    () => isSupported && (!usesPermissionRequestApi() || cachedPermissionState === 'granted')
   );
-  const [permissionDenied, setPermissionDenied] = useState(permissionCacheState === 'denied');
+  const [permissionDenied, setPermissionDenied] = useState(cachedPermissionState === 'denied');
   const [source, setSource] = useState<OrientationSource>('none');
   const [accuracyDeg, setAccuracyDeg] = useState<number | null>(null);
   const [degradedReason, setDegradedReason] = useState<SensorDegradedReason | null>(null);
@@ -374,6 +427,50 @@ export function useDeviceOrientation(
     setDegradedReason(next);
   }, []);
 
+  const revalidatePermissionState = useCallback(async (): Promise<void> => {
+    if (!isSupported || !usesPermissionRequestApi()) return;
+    if (typeof navigator === 'undefined' || !navigator.permissions || typeof navigator.permissions.query !== 'function') {
+      return;
+    }
+
+    const names = ['accelerometer', 'gyroscope', 'magnetometer'] as const;
+    let hasPrompt = false;
+    let allGranted = true;
+
+    for (const name of names) {
+      try {
+        const status = await navigator.permissions.query({ name: name as PermissionName });
+        if (status.state === 'denied') {
+          setCachedPermissionState('denied');
+          setIsPermissionGranted(false);
+          setPermissionDenied(true);
+          setError('Permission denied');
+          setDegradedReasonState(null);
+          return;
+        }
+        if (status.state === 'prompt') {
+          hasPrompt = true;
+          allGranted = false;
+        }
+      } catch {
+        // Some browsers reject unsupported descriptors; skip them.
+      }
+    }
+
+    if (allGranted) {
+      setCachedPermissionState('granted');
+      setIsPermissionGranted(true);
+      setPermissionDenied(false);
+      return;
+    }
+
+    if (hasPrompt) {
+      setCachedPermissionState('unknown');
+      setIsPermissionGranted(false);
+      setPermissionDenied(false);
+    }
+  }, [isSupported, setDegradedReasonState]);
+
   const requestPermission = useCallback(async (): Promise<boolean> => {
     if (!isSupported) {
       setError('Device orientation not supported');
@@ -389,18 +486,26 @@ export function useDeviceOrientation(
         let permission: string | null = null;
 
         try {
-          permission = await deviceOrientationEventType.requestPermission(true);
+          permission = await runWithTimeout(
+            deviceOrientationEventType.requestPermission(true),
+            PERMISSION_REQUEST_TIMEOUT_MS,
+            'Permission request timed out'
+          );
         } catch {
           // Fallback to old API signature without absolute argument
           permission = null;
         }
 
         if (permission !== 'granted') {
-          permission = await deviceOrientationEventType.requestPermission();
+          permission = await runWithTimeout(
+            deviceOrientationEventType.requestPermission(),
+            PERMISSION_REQUEST_TIMEOUT_MS,
+            'Permission request timed out'
+          );
         }
 
         const granted = permission === 'granted';
-        permissionCacheState = granted ? 'granted' : 'denied';
+        setCachedPermissionState(granted ? 'granted' : 'denied');
         setIsPermissionGranted(granted);
         setPermissionDenied(!granted);
         setDegradedReasonState(null);
@@ -412,7 +517,7 @@ export function useDeviceOrientation(
         return granted;
       }
 
-      permissionCacheState = 'granted';
+      setCachedPermissionState('granted');
       setIsPermissionGranted(true);
       setPermissionDenied(false);
       setDegradedReasonState(null);
@@ -422,12 +527,28 @@ export function useDeviceOrientation(
       const message = permissionError instanceof Error
         ? permissionError.message
         : 'Failed to request permission';
-      permissionCacheState = 'denied';
+      if (message === 'Permission request timed out') {
+        setCachedPermissionState('unknown');
+        setPermissionDenied(false);
+      } else {
+        setCachedPermissionState('denied');
+        setPermissionDenied(true);
+      }
       setError(message);
-      setPermissionDenied(true);
+      setIsPermissionGranted(false);
       return false;
     }
   }, [isSupported, setDegradedReasonState]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const timerId = window.setTimeout(() => {
+      void revalidatePermissionState();
+    }, 0);
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [enabled, revalidatePermissionState]);
 
   const calibrateToCurrentView = useCallback((reference: CalibrationReference) => {
     const measured = latestRawDirectionRef.current ?? (() => {
@@ -633,7 +754,10 @@ export function useDeviceOrientation(
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') return;
+      if (document.visibilityState === 'visible') {
+        void revalidatePermissionState();
+        return;
+      }
 
       latestSampleRef.current = null;
       latestRawDirectionRef.current = null;
@@ -678,6 +802,7 @@ export function useDeviceOrientation(
     absolutePreferred,
     useCompassHeading,
     setDegradedReasonState,
+    revalidatePermissionState,
   ]);
 
   useEffect(() => {

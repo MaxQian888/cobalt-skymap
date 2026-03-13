@@ -29,7 +29,9 @@ pub enum HttpClientError {
 
 impl Serialize for HttpClientError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where S: serde::Serializer {
+    where
+        S: serde::Serializer,
+    {
         serializer.serialize_str(&self.to_string())
     }
 }
@@ -56,14 +58,23 @@ pub struct RequestConfig {
     pub report_progress: bool,
 }
 
-fn default_timeout() -> u64 { 30 }
+fn default_timeout() -> u64 {
+    30
+}
 
 impl Default for RequestConfig {
     fn default() -> Self {
         Self {
-            method: "GET".to_string(), url: String::new(), headers: HashMap::new(),
-            body: None, timeout_seconds: 30, max_retries: 3, retry_delay_ms: 1000,
-            request_id: None, allow_http: false, report_progress: false,
+            method: "GET".to_string(),
+            url: String::new(),
+            headers: HashMap::new(),
+            body: None,
+            timeout_seconds: 30,
+            max_retries: 3,
+            retry_delay_ms: 1000,
+            request_id: None,
+            allow_http: false,
+            report_progress: false,
         }
     }
 }
@@ -85,7 +96,7 @@ pub struct DownloadProgress {
     pub percent: f64,
 }
 
-static ACTIVE_REQUESTS: Lazy<Arc<Mutex<HashMap<String, bool>>>> = 
+static ACTIVE_REQUESTS: Lazy<Arc<Mutex<HashMap<String, bool>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 fn is_cancelled(request_id: &Option<String>) -> bool {
@@ -116,7 +127,10 @@ fn unregister_request(request_id: &Option<String>) {
 }
 
 #[tauri::command]
-pub async fn http_request(app: AppHandle, config: RequestConfig) -> Result<HttpResponse, HttpClientError> {
+pub async fn http_request(
+    app: AppHandle,
+    config: RequestConfig,
+) -> Result<HttpResponse, HttpClientError> {
     security::validate_url(&config.url, config.allow_http, None)?;
     register_request(&config.request_id);
 
@@ -138,7 +152,9 @@ pub async fn http_request(app: AppHandle, config: RequestConfig) -> Result<HttpR
 
     // Apply redirect settings
     if global_config.follow_redirects {
-        client_builder = client_builder.redirect(reqwest::redirect::Policy::limited(global_config.max_redirects as usize));
+        client_builder = client_builder.redirect(reqwest::redirect::Policy::limited(
+            global_config.max_redirects as usize,
+        ));
     } else {
         client_builder = client_builder.redirect(reqwest::redirect::Policy::none());
     }
@@ -186,8 +202,11 @@ pub async fn http_request(app: AppHandle, config: RequestConfig) -> Result<HttpR
         match request.send().await {
             Ok(response) => {
                 let status = response.status().as_u16();
-                let content_type = response.headers().get("content-type")
-                    .and_then(|v| v.to_str().ok()).map(String::from);
+                let content_type = response
+                    .headers()
+                    .get("content-type")
+                    .and_then(|v| v.to_str().ok())
+                    .map(String::from);
                 let content_length = response.content_length();
 
                 let mut headers = HashMap::new();
@@ -200,33 +219,38 @@ pub async fn http_request(app: AppHandle, config: RequestConfig) -> Result<HttpR
                 let body = if let (true, Some(total)) = (config.report_progress, content_length) {
                     // Validate response size before allocation
                     if total > global_config.max_response_size as u64 {
-                        return Err(HttpClientError::InvalidResponse(
-                            format!("Response size {} exceeds maximum allowed {}", total, global_config.max_response_size)
-                        ));
+                        return Err(HttpClientError::InvalidResponse(format!(
+                            "Response size {} exceeds maximum allowed {}",
+                            total, global_config.max_response_size
+                        )));
                     }
                     let mut downloaded = 0u64;
                     let mut body_bytes = Vec::with_capacity(total as usize);
                     let mut stream = response.bytes_stream();
                     let mut stream_error = None;
-                    
+
                     use futures_util::StreamExt;
                     while let Some(chunk) = stream.next().await {
                         if is_cancelled(&config.request_id) {
                             unregister_request(&config.request_id);
                             return Err(HttpClientError::Cancelled);
                         }
-                        
+
                         match chunk {
                             Ok(bytes) => {
                                 downloaded += bytes.len() as u64;
                                 body_bytes.extend_from_slice(&bytes);
-                                
+
                                 if let Some(ref id) = config.request_id {
-                                    let _ = app.emit("download-progress", DownloadProgress {
-                                        request_id: id.clone(),
-                                        downloaded, total: Some(total),
-                                        percent: (downloaded as f64 / total as f64) * 100.0,
-                                    });
+                                    let _ = app.emit(
+                                        "download-progress",
+                                        DownloadProgress {
+                                            request_id: id.clone(),
+                                            downloaded,
+                                            total: Some(total),
+                                            percent: (downloaded as f64 / total as f64) * 100.0,
+                                        },
+                                    );
                                 }
                             }
                             Err(e) => {
@@ -235,7 +259,7 @@ pub async fn http_request(app: AppHandle, config: RequestConfig) -> Result<HttpR
                             }
                         }
                     }
-                    
+
                     // If streaming failed, retry in outer loop
                     if let Some(err) = stream_error {
                         last_error = Some(err);
@@ -243,12 +267,21 @@ pub async fn http_request(app: AppHandle, config: RequestConfig) -> Result<HttpR
                     }
                     body_bytes
                 } else {
-                    response.bytes().await
-                        .map_err(|e| HttpClientError::Request(e.to_string()))?.to_vec()
+                    response
+                        .bytes()
+                        .await
+                        .map_err(|e| HttpClientError::Request(e.to_string()))?
+                        .to_vec()
                 };
 
                 unregister_request(&config.request_id);
-                return Ok(HttpResponse { status, headers, body, content_type, content_length });
+                return Ok(HttpResponse {
+                    status,
+                    headers,
+                    body,
+                    content_type,
+                    content_length,
+                });
             }
             Err(e) => {
                 last_error = Some(if e.is_timeout() {
@@ -261,15 +294,30 @@ pub async fn http_request(app: AppHandle, config: RequestConfig) -> Result<HttpR
     }
 
     unregister_request(&config.request_id);
-    Err(HttpClientError::MaxRetries(last_error.map(|e| e.to_string()).unwrap_or_default()))
+    Err(HttpClientError::MaxRetries(
+        last_error.map(|e| e.to_string()).unwrap_or_default(),
+    ))
 }
 
 #[tauri::command]
-pub async fn http_download(app: AppHandle, url: String, request_id: String, allow_http: bool) -> Result<HttpResponse, HttpClientError> {
-    http_request(app, RequestConfig {
-        method: "GET".to_string(), url, request_id: Some(request_id),
-        allow_http, report_progress: true, ..Default::default()
-    }).await
+pub async fn http_download(
+    app: AppHandle,
+    url: String,
+    request_id: String,
+    allow_http: bool,
+) -> Result<HttpResponse, HttpClientError> {
+    http_request(
+        app,
+        RequestConfig {
+            method: "GET".to_string(),
+            url,
+            request_id: Some(request_id),
+            allow_http,
+            report_progress: true,
+            ..Default::default()
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -285,7 +333,10 @@ pub fn cancel_request(request_id: String) -> bool {
 
 #[tauri::command]
 pub fn get_active_requests() -> Vec<String> {
-    ACTIVE_REQUESTS.lock().map(|r| r.keys().cloned().collect()).unwrap_or_default()
+    ACTIVE_REQUESTS
+        .lock()
+        .map(|r| r.keys().cloned().collect())
+        .unwrap_or_default()
 }
 
 // ============================================================================
@@ -333,7 +384,7 @@ static HTTP_CONFIG: Lazy<Arc<Mutex<HttpClientConfig>>> =
 /// Build a reqwest client with global configuration applied
 fn build_configured_client(timeout_secs: u64) -> Result<reqwest::Client, HttpClientError> {
     let global_config = HTTP_CONFIG.lock().map(|c| c.clone()).unwrap_or_default();
-    
+
     let mut builder = reqwest::Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
         .connect_timeout(Duration::from_millis(global_config.connect_timeout_ms))
@@ -346,7 +397,9 @@ fn build_configured_client(timeout_secs: u64) -> Result<reqwest::Client, HttpCli
     }
 
     if global_config.follow_redirects {
-        builder = builder.redirect(reqwest::redirect::Policy::limited(global_config.max_redirects as usize));
+        builder = builder.redirect(reqwest::redirect::Policy::limited(
+            global_config.max_redirects as usize,
+        ));
     } else {
         builder = builder.redirect(reqwest::redirect::Policy::none());
     }
@@ -357,7 +410,9 @@ fn build_configured_client(timeout_secs: u64) -> Result<reqwest::Client, HttpCli
         }
     }
 
-    builder.build().map_err(|e| HttpClientError::Request(e.to_string()))
+    builder
+        .build()
+        .map_err(|e| HttpClientError::Request(e.to_string()))
 }
 
 #[tauri::command]
@@ -383,13 +438,17 @@ pub async fn http_get(
     headers: Option<HashMap<String, String>>,
     allow_http: Option<bool>,
 ) -> Result<HttpResponse, HttpClientError> {
-    http_request(app, RequestConfig {
-        method: "GET".to_string(),
-        url,
-        headers: headers.unwrap_or_default(),
-        allow_http: allow_http.unwrap_or(false),
-        ..Default::default()
-    }).await
+    http_request(
+        app,
+        RequestConfig {
+            method: "GET".to_string(),
+            url,
+            headers: headers.unwrap_or_default(),
+            allow_http: allow_http.unwrap_or(false),
+            ..Default::default()
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -405,14 +464,18 @@ pub async fn http_post(
     if let Some(ct) = content_type {
         hdrs.insert("Content-Type".to_string(), ct);
     }
-    http_request(app, RequestConfig {
-        method: "POST".to_string(),
-        url,
-        headers: hdrs,
-        body: Some(body),
-        allow_http: allow_http.unwrap_or(false),
-        ..Default::default()
-    }).await
+    http_request(
+        app,
+        RequestConfig {
+            method: "POST".to_string(),
+            url,
+            headers: hdrs,
+            body: Some(body),
+            allow_http: allow_http.unwrap_or(false),
+            ..Default::default()
+        },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -421,10 +484,13 @@ pub async fn http_head(
     allow_http: Option<bool>,
 ) -> Result<HashMap<String, String>, HttpClientError> {
     security::validate_url(&url, allow_http.unwrap_or(false), None)?;
-    
+
     let client = build_configured_client(30)?;
 
-    let response = client.head(&url).send().await
+    let response = client
+        .head(&url)
+        .send()
+        .await
         .map_err(|e| HttpClientError::Request(e.to_string()))?;
 
     let mut headers = HashMap::new();
@@ -437,9 +503,12 @@ pub async fn http_head(
 }
 
 #[tauri::command]
-pub async fn http_check_url(url: String, allow_http: Option<bool>) -> Result<bool, HttpClientError> {
+pub async fn http_check_url(
+    url: String,
+    allow_http: Option<bool>,
+) -> Result<bool, HttpClientError> {
     security::validate_url(&url, allow_http.unwrap_or(false), None)?;
-    
+
     let client = build_configured_client(10)?;
 
     match client.head(&url).send().await {
@@ -492,21 +561,26 @@ pub async fn http_batch_download(
     allow_http: Option<bool>,
 ) -> Result<BatchDownloadResult, HttpClientError> {
     use futures_util::stream::{self, StreamExt};
-    
+
     let start = std::time::Instant::now();
     let concurrency = concurrency.unwrap_or(4).min(10);
     let allow_http = allow_http.unwrap_or(false);
-    
+
     let results: Vec<BatchItemResult> = stream::iter(urls.clone())
         .map(|url| {
             let app_clone = app.clone();
             async move {
-                match http_request(app_clone, RequestConfig {
-                    method: "GET".to_string(),
-                    url: url.clone(),
-                    allow_http,
-                    ..Default::default()
-                }).await {
+                match http_request(
+                    app_clone,
+                    RequestConfig {
+                        method: "GET".to_string(),
+                        url: url.clone(),
+                        allow_http,
+                        ..Default::default()
+                    },
+                )
+                .await
+                {
                     Ok(response) => BatchItemResult {
                         url,
                         success: response.status >= 200 && response.status < 300,
@@ -547,6 +621,38 @@ pub async fn http_batch_download(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    static TEST_MUTEX: Mutex<()> = Mutex::new(());
+
+    struct HttpTestContext {
+        _guard: MutexGuard<'static, ()>,
+        original_config: HttpClientConfig,
+    }
+
+    impl HttpTestContext {
+        fn new() -> Self {
+            let guard = TEST_MUTEX.lock().unwrap();
+            let original_config = get_http_config();
+            clear_active_requests();
+
+            Self {
+                _guard: guard,
+                original_config,
+            }
+        }
+    }
+
+    impl Drop for HttpTestContext {
+        fn drop(&mut self) {
+            set_http_config(self.original_config.clone());
+            clear_active_requests();
+        }
+    }
+
+    fn clear_active_requests() {
+        ACTIVE_REQUESTS.lock().unwrap().clear();
+    }
 
     // ------------------------------------------------------------------------
     // RequestConfig Tests
@@ -594,7 +700,7 @@ mod tests {
             "url": "https://test.com",
             "timeout_seconds": 45
         }"#;
-        
+
         let config: RequestConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.method, "GET");
         assert_eq!(config.url, "https://test.com");
@@ -718,15 +824,13 @@ mod tests {
             total: 5,
             success: 4,
             failed: 1,
-            results: vec![
-                BatchItemResult {
-                    url: "https://example.com/1".to_string(),
-                    success: true,
-                    status: Some(200),
-                    size: Some(1024),
-                    error: None,
-                },
-            ],
+            results: vec![BatchItemResult {
+                url: "https://example.com/1".to_string(),
+                success: true,
+                status: Some(200),
+                size: Some(1024),
+                error: None,
+            }],
             total_time_ms: 1000,
         };
 
@@ -812,6 +916,8 @@ mod tests {
 
     #[test]
     fn test_cancel_request_nonexistent() {
+        let _ctx = HttpTestContext::new();
+
         // Cancelling a nonexistent request should return false
         let result = cancel_request("nonexistent-request-id".to_string());
         assert!(!result);
@@ -819,14 +925,66 @@ mod tests {
 
     #[test]
     fn test_get_active_requests_empty() {
-        // When no requests are active, should return empty vec
-        // Note: This might not be empty if other tests are running
-        // Just verify it doesn't panic and returns a Vec
-        let _requests = get_active_requests();
+        let _ctx = HttpTestContext::new();
+
+        assert!(get_active_requests().is_empty());
+    }
+
+    #[test]
+    fn test_cancel_request_marks_registered_request_cancelled() {
+        let _ctx = HttpTestContext::new();
+        let request_id = Some("cancel-me".to_string());
+
+        register_request(&request_id);
+
+        assert!(cancel_request("cancel-me".to_string()));
+        assert!(is_cancelled(&request_id));
+    }
+
+    #[test]
+    fn test_get_active_requests_returns_registered_request_ids() {
+        let _ctx = HttpTestContext::new();
+        let first = Some("req-1".to_string());
+        let second = Some("req-2".to_string());
+
+        register_request(&first);
+        register_request(&second);
+
+        let active = get_active_requests();
+        assert_eq!(active.len(), 2);
+        assert!(active.contains(&"req-1".to_string()));
+        assert!(active.contains(&"req-2".to_string()));
+    }
+
+    #[test]
+    fn test_http_cancel_all_requests_marks_registered_requests_as_cancelled() {
+        let _ctx = HttpTestContext::new();
+        let first = Some("req-1".to_string());
+        let second = Some("req-2".to_string());
+
+        register_request(&first);
+        register_request(&second);
+
+        http_cancel_all_requests();
+
+        assert!(is_cancelled(&first));
+        assert!(is_cancelled(&second));
+    }
+
+    #[test]
+    fn test_http_cancel_request_wrapper_delegates_to_cancel_request() {
+        let _ctx = HttpTestContext::new();
+        let request_id = Some("wrapped-cancel".to_string());
+
+        register_request(&request_id);
+
+        assert!(http_cancel_request("wrapped-cancel".to_string()));
+        assert!(is_cancelled(&request_id));
     }
 
     #[test]
     fn test_get_http_config() {
+        let _ctx = HttpTestContext::new();
         let config = get_http_config();
         // Should return default config or whatever is set
         assert!(config.connect_timeout_ms > 0);
@@ -835,20 +993,28 @@ mod tests {
 
     #[test]
     fn test_set_http_config() {
-        let original = get_http_config();
-        
+        let _ctx = HttpTestContext::new();
+
         let new_config = HttpClientConfig {
             connect_timeout_ms: 5000,
             ..HttpClientConfig::default()
         };
-        
+
         set_http_config(new_config);
-        
+
         let updated = get_http_config();
         assert_eq!(updated.connect_timeout_ms, 5000);
-        
-        // Restore original
-        set_http_config(original);
+    }
+
+    #[test]
+    fn test_build_configured_client_ignores_invalid_proxy_url() {
+        let _ctx = HttpTestContext::new();
+        set_http_config(HttpClientConfig {
+            proxy_url: Some("not a valid proxy url".to_string()),
+            ..HttpClientConfig::default()
+        });
+
+        assert!(build_configured_client(5).is_ok());
     }
 
     // ------------------------------------------------------------------------
@@ -868,17 +1034,18 @@ mod tests {
 
     #[test]
     fn test_register_unregister_request() {
+        let _ctx = HttpTestContext::new();
         let request_id = Some("test-reg-123".to_string());
-        
+
         // Register
         register_request(&request_id);
-        
+
         // Should not be cancelled after registration
         assert!(!is_cancelled(&request_id));
-        
+
         // Unregister
         unregister_request(&request_id);
-        
+
         // After unregister, is_cancelled returns false (not found = not cancelled)
         assert!(!is_cancelled(&request_id));
     }
@@ -925,5 +1092,15 @@ mod tests {
 
         assert!(progress.total.is_none());
         assert_eq!(progress.percent, 0.0);
+    }
+
+    #[test]
+    fn test_http_client_error_wraps_security_errors() {
+        let error = HttpClientError::from(SecurityError::BlockedLocalhost);
+
+        assert!(matches!(
+            error,
+            HttpClientError::Security(SecurityError::BlockedLocalhost)
+        ));
     }
 }

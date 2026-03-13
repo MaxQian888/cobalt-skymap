@@ -370,12 +370,31 @@ export interface FramingState {
 export type MountProtocol = 'alpaca' | 'simulator';
 export type MountTrackingRate = 'sidereal' | 'lunar' | 'solar' | 'stopped';
 export type MountPierSide = 'east' | 'west' | 'unknown';
+export type SupportedMountSource = 'simulator' | 'alpaca-discovery' | 'manual';
+
+export interface SupportedMountDevice {
+  id: string;
+  protocol: MountProtocol;
+  host: string;
+  port: number;
+  deviceId: number;
+  name: string;
+  deviceType: string;
+  source: SupportedMountSource;
+  uniqueId?: string;
+  manufacturer?: string;
+  model?: string;
+  description?: string;
+  driverInfo?: string;
+  driverVersion?: string;
+}
 
 export interface MountConnectionConfig {
   protocol: MountProtocol;
   host: string;
   port: number;
   deviceId: number;
+  selectedDeviceId?: string | null;
 }
 
 export interface MountCapabilities {
@@ -389,6 +408,23 @@ export interface MountCapabilities {
   canPulseGuide: boolean;
   alignmentMode: string;
   equatorialSystem: string;
+}
+
+export interface MountCapabilitySnapshot extends MountCapabilities {
+  capturedAt: string;
+}
+
+export interface MountActionAvailability {
+  connect: boolean;
+  discover: boolean;
+  slew: boolean;
+  sync: boolean;
+  park: boolean;
+  unpark: boolean;
+  tracking: boolean;
+  trackingRate: boolean;
+  moveAxis: boolean;
+  abortSlew: boolean;
 }
 
 export interface MountInfo {

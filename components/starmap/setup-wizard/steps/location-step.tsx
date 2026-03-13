@@ -11,12 +11,23 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useMountStore } from '@/lib/stores/mount-store';
 import { useSetupWizardStore } from '@/lib/stores/setup-wizard-store';
 import type { ObserverLocation } from '@/types/starmap/setup-wizard';
-import { loadStoredLocation, saveLocation, isValidLocation } from '@/lib/utils/observer-location';
+import { isValidLocation } from '@/lib/utils/observer-location';
+import {
+  detectObservationStepLocation,
+  loadObservationStepLocation,
+  saveObservationStepLocation,
+} from '@/lib/services/observation-location-entry';
+import { useCanonicalObservationLocationState } from '@/lib/hooks/use-canonical-observation-location';
 
 export function LocationStep() {
   const t = useTranslations();
   const updateSetupData = useSetupWizardStore((state) => state.updateSetupData);
   const setProfileInfo = useMountStore((state) => state.setProfileInfo);
+  const {
+    currentLocation,
+    hasSavedLocation,
+    loading: canonicalLocationLoading,
+  } = useCanonicalObservationLocationState();
 
   const [location, setLocationState] = useState<ObserverLocation | null>(null);
 
@@ -26,25 +37,30 @@ export function LocationStep() {
   const [manualLon, setManualLon] = useState(location?.longitude?.toString() || '');
   const [manualAlt, setManualAlt] = useState(location?.altitude?.toString() || '0');
 
-  const setLocation = useCallback((loc: ObserverLocation) => {
-    setLocationState(loc);
-    saveLocation(loc);
+  const setLocation = useCallback(async (loc: ObserverLocation) => {
+    const resolvedLocation = await saveObservationStepLocation(loc) ?? loc;
+    setLocationState(resolvedLocation);
 
     const currentProfile = useMountStore.getState().profileInfo;
     setProfileInfo({
       AstrometrySettings: {
         ...currentProfile.AstrometrySettings,
-        Latitude: loc.latitude,
-        Longitude: loc.longitude,
-        Elevation: loc.altitude,
+        Latitude: resolvedLocation.latitude,
+        Longitude: resolvedLocation.longitude,
+        Elevation: resolvedLocation.altitude,
       },
     });
   }, [setProfileInfo]);
 
-  // Load stored location on mount
   useEffect(() => {
-    const stored = loadStoredLocation();
-    if (stored) {
+    let active = true;
+
+    void (async () => {
+      const stored = await loadObservationStepLocation();
+      if (!active || !stored) {
+        return;
+      }
+
       setLocationState(stored);
       setManualLat(stored.latitude.toString());
       setManualLon(stored.longitude.toString());
@@ -59,7 +75,11 @@ export function LocationStep() {
           Elevation: stored.altitude,
         },
       });
-    }
+    })();
+
+    return () => {
+      active = false;
+    };
   }, [setProfileInfo]);
 
   const hasLocation = isValidLocation(location);
@@ -69,45 +89,24 @@ export function LocationStep() {
   }, [hasLocation, updateSetupData]);
 
   const handleGetGPSLocation = async () => {
-    if (!navigator.geolocation) {
-      setGpsError(t('setupWizard.steps.location.gpsNotSupported'));
-      return;
-    }
-
     setIsGettingLocation(true);
     setGpsError(null);
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const alt = position.coords.altitude || 0;
-        setLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          altitude: alt,
-        });
-        setManualLat(position.coords.latitude.toString());
-        setManualLon(position.coords.longitude.toString());
-        setManualAlt(alt.toString());
-        setIsGettingLocation(false);
-      },
-      (error) => {
-        setIsGettingLocation(false);
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            setGpsError(t('setupWizard.steps.location.permissionDenied'));
-            break;
-          case error.POSITION_UNAVAILABLE:
-            setGpsError(t('setupWizard.steps.location.positionUnavailable'));
-            break;
-          case error.TIMEOUT:
-            setGpsError(t('setupWizard.steps.location.timeout'));
-            break;
-          default:
-            setGpsError(t('setupWizard.steps.location.unknownError'));
-        }
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    const result = await detectObservationStepLocation();
+    if (result.errorKey) {
+      setGpsError(t(result.errorKey));
+      setIsGettingLocation(false);
+      return;
+    }
+
+    if (result.location) {
+      await setLocation(result.location);
+      setManualLat(result.location.latitude.toString());
+      setManualLon(result.location.longitude.toString());
+      setManualAlt(result.location.altitude.toString());
+    }
+
+    setIsGettingLocation(false);
   };
 
   const isManualValid = () => {
@@ -116,13 +115,13 @@ export function LocationStep() {
     return !isNaN(lat) && !isNaN(lon) && lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
   };
 
-  const handleManualSubmit = () => {
+  const handleManualSubmit = async () => {
     if (!isManualValid()) return;
     const lat = parseFloat(manualLat);
     const lon = parseFloat(manualLon);
     const alt = parseFloat(manualAlt);
 
-    setLocation({
+    await setLocation({
       latitude: lat,
       longitude: lon,
       altitude: !isNaN(alt) && alt >= 0 ? alt : 0,
@@ -135,6 +134,22 @@ export function LocationStep() {
       <p className="text-sm text-muted-foreground">
         {t('setupWizard.steps.location.description')}
       </p>
+
+      {!canonicalLocationLoading && (
+        <p className="text-xs text-muted-foreground">
+          {hasSavedLocation
+            ? (
+              t('setupWizard.steps.location.currentSiteHint', {
+                name: currentLocation?.name ?? (t('locations.title') || 'Current site'),
+              })
+              || `Applying coordinates will update the active observation site: ${currentLocation?.name ?? 'Current site'}.`
+            )
+            : (
+              t('setupWizard.steps.location.createFirstSiteHint')
+              || 'Applying coordinates will create your first saved observation site.'
+            )}
+        </p>
+      )}
 
       {/* Mode selection with Tabs */}
       <Tabs defaultValue="gps" className="space-y-4">

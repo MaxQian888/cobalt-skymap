@@ -3,7 +3,9 @@
  * Camera FOV, mosaic coverage, overlay dimensions, and mosaic layout calculations
  */
 
-import {
+import * as fovCalculations from '../fov-calculations';
+
+const {
   calculateCameraFov,
   calculateImageScale,
   calculateSensorResolution,
@@ -14,7 +16,7 @@ import {
   validateMosaicSettings,
   calculateOverlayDimensions,
   calculateMosaicLayout,
-} from '../fov-calculations';
+} = fovCalculations;
 
 describe('calculateCameraFov', () => {
   it('should calculate FOV from sensor dimensions and focal length', () => {
@@ -92,6 +94,37 @@ describe('calculateMosaicCoverage', () => {
     );
     expect(result).not.toBeNull();
     expect(result!.totalPanels).toBe(6);
+  });
+});
+
+describe('effective focal length helpers', () => {
+  it('resolves effective focal length with accessory factor', () => {
+    const resolveEffectiveFocalLength = (fovCalculations as Record<string, unknown>).resolveEffectiveFocalLength as
+      | ((baseFocalLength: number, accessoryFactor?: number | null) => number)
+      | undefined;
+
+    expect(resolveEffectiveFocalLength).toBeDefined();
+    expect(resolveEffectiveFocalLength?.(500, 0.8)).toBeCloseTo(400);
+    expect(resolveEffectiveFocalLength?.(500, 2)).toBeCloseTo(1000);
+  });
+
+  it('falls back to base focal length for invalid accessory factors', () => {
+    const resolveEffectiveFocalLength = (fovCalculations as Record<string, unknown>).resolveEffectiveFocalLength as
+      | ((baseFocalLength: number, accessoryFactor?: number | null) => number)
+      | undefined;
+
+    expect(resolveEffectiveFocalLength?.(500, 0)).toBe(500);
+    expect(resolveEffectiveFocalLength?.(500, Number.NaN)).toBe(500);
+    expect(resolveEffectiveFocalLength?.(500, null)).toBe(500);
+  });
+
+  it('returns zero when the base focal length is not positive', () => {
+    const resolveEffectiveFocalLength = (fovCalculations as Record<string, unknown>).resolveEffectiveFocalLength as
+      | ((baseFocalLength: number, accessoryFactor?: number | null) => number)
+      | undefined;
+
+    expect(resolveEffectiveFocalLength?.(0, 2)).toBe(0);
+    expect(resolveEffectiveFocalLength?.(-100, 0.8)).toBe(0);
   });
 });
 
@@ -184,6 +217,18 @@ describe('validateMosaicSettings', () => {
 
     expect(result.issues.some((i) => i.code === 'panel_count_high')).toBe(true);
   });
+
+  it('adds warning for extreme panel count', () => {
+    const result = validateMosaicSettings({
+      enabled: true,
+      rows: 7,
+      cols: 6,
+      overlap: 10,
+      overlapUnit: 'percent',
+    });
+
+    expect(result.issues.some((i) => i.code === 'panel_count_extreme')).toBe(true);
+  });
 });
 
 describe('calculateOverlayDimensions', () => {
@@ -214,6 +259,45 @@ describe('calculateOverlayDimensions', () => {
     );
     expect(result.totalMosaicWidthPx).toBeGreaterThan(result.panelWidthPx);
     expect(result.totalMosaicHeightPx).toBeGreaterThan(result.panelHeightPx);
+  });
+
+  it('should use pixel overlap math when pixel size is provided', () => {
+    const mosaic = { enabled: true, rows: 2, cols: 2, overlap: 120, overlapUnit: 'pixels' as const };
+    const result = calculateOverlayDimensions(
+      23.5, 15.6, 200, 10, 800, 600, mosaic, 3.75
+    );
+
+    expect(result.scaledStepX).toBeLessThan(result.scaledPanelWidth);
+    expect(result.scaledStepY).toBeLessThan(result.scaledPanelHeight);
+  });
+
+  it('should handle zero-width containers by falling back to horizontal fov math', () => {
+    const result = calculateOverlayDimensions(
+      23.5, 15.6, 200, 10, 0, 0, baseMosaic
+    );
+
+    expect(Number.isNaN(result.scale)).toBe(true);
+    expect(Number.isFinite(result.cameraFovWidth)).toBe(true);
+    expect(result.panelWidthPx).toBe(0);
+  });
+});
+
+describe('frame placement helpers', () => {
+  it('clamps normalized frame placement to visible bounds', () => {
+    const clampFramePlacement = (fovCalculations as Record<string, unknown>).clampFramePlacement as
+      | ((placement: { x: number; y: number }) => { x: number; y: number })
+      | undefined;
+
+    expect(clampFramePlacement).toBeDefined();
+    expect(clampFramePlacement?.({ x: 1.4, y: -2.2 })).toEqual({ x: 1, y: -1 });
+  });
+
+  it('keeps valid normalized frame placement unchanged', () => {
+    const clampFramePlacement = (fovCalculations as Record<string, unknown>).clampFramePlacement as
+      | ((placement: { x: number; y: number }) => { x: number; y: number })
+      | undefined;
+
+    expect(clampFramePlacement?.({ x: 0.25, y: -0.5 })).toEqual({ x: 0.25, y: -0.5 });
   });
 });
 

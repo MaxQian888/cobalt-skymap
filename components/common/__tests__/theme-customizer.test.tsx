@@ -4,17 +4,18 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { ThemeCustomizer } from '../theme-customizer';
+import { ThemeCustomizer, ThemeCustomizerButton } from '../theme-customizer';
 import { NextIntlClientProvider } from 'next-intl';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Mock next-themes
 const mockSetTheme = jest.fn();
+let mockResolvedTheme = 'light';
 jest.mock('next-themes', () => ({
   useTheme: () => ({
     theme: 'light',
     setTheme: mockSetTheme,
-    resolvedTheme: 'light',
+    resolvedTheme: mockResolvedTheme,
   }),
 }));
 
@@ -237,6 +238,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe('ThemeCustomizer', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResolvedTheme = 'light';
   });
 
   it('renders trigger button', () => {
@@ -250,10 +252,28 @@ describe('ThemeCustomizer', () => {
     expect(screen.getByText('theme.customizeTheme')).toBeInTheDocument();
   });
 
+  it('opens with a custom trigger when one is provided', () => {
+    renderWithProviders(
+      <ThemeCustomizer trigger={<button type="button">Open customizer</button>} />
+    );
+
+    fireEvent.click(screen.getByText('Open customizer'));
+
+    expect(screen.getByText('theme.customizeTheme')).toBeInTheDocument();
+  });
+
   it('shows presets by default', () => {
     renderWithProviders(<ThemeCustomizer open={true} />);
     expect(screen.getByText('theme.colorPresets')).toBeInTheDocument();
     expect(screen.getByText('Preset 1')).toBeInTheDocument();
+  });
+
+  it('shows the resolved dark mode label on the presets tab', () => {
+    mockResolvedTheme = 'dark';
+
+    renderWithProviders(<ThemeCustomizer open={true} />);
+
+    expect(screen.getByText('common.darkMode')).toBeInTheDocument();
   });
 
   it('calls setActivePreset when a preset is clicked', () => {
@@ -362,5 +382,11 @@ describe('ThemeCustomizer', () => {
     expect(screen.getAllByText('theme.previewWorkspace').length).toBeGreaterThan(0);
     expect(screen.getByText('theme.accessibilityWarnings')).toBeInTheDocument();
     expect(screen.getByText('theme.warningPairForegroundBackground')).toBeInTheDocument();
+  });
+
+  it('renders the icon button wrapper entry point', () => {
+    renderWithProviders(<ThemeCustomizerButton />);
+
+    expect(screen.getByText('theme.customize')).toBeInTheDocument();
   });
 });

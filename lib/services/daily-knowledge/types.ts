@@ -1,4 +1,26 @@
-export type DailyKnowledgeSource = 'curated' | 'nasa-apod' | 'wikimedia';
+export type DailyKnowledgeSource =
+  | 'curated'
+  | 'nasa-apod'
+  | 'wikimedia'
+  | 'nasa-image-library'
+  | 'nasa-photojournal'
+  | 'esa-science';
+
+export type DailyKnowledgeOnlineSource = Exclude<DailyKnowledgeSource, 'curated'>;
+
+export type DailyKnowledgeSourceTransport = 'api' | 'rss' | 'html';
+
+export type DailyKnowledgeSourceStatusState = 'ready' | 'failed' | 'skipped';
+
+export type DailyKnowledgeSourceStatusReason =
+  | 'success'
+  | 'empty'
+  | 'error'
+  | 'invalid'
+  | 'offline'
+  | 'disabled';
+
+export type DailyKnowledgeFallbackReason = 'offline' | 'source-failure' | 'quality-threshold' | null;
 
 export interface DailyKnowledgeFactSource {
   title: string;
@@ -90,6 +112,37 @@ export interface DailyKnowledgeFilters {
   favoritesOnly: boolean;
 }
 
+export interface DailyKnowledgeSourceStatus {
+  source: DailyKnowledgeOnlineSource;
+  transport: DailyKnowledgeSourceTransport;
+  state: DailyKnowledgeSourceStatusState;
+  reason: DailyKnowledgeSourceStatusReason;
+  itemCount: number;
+  message?: string;
+}
+
+export interface DailyKnowledgeSourceFetchContext {
+  dateKey: string;
+  locale: 'en' | 'zh';
+  query: string;
+  anchorItem: DailyKnowledgeItem;
+  signal?: AbortSignal;
+}
+
+export interface DailyKnowledgeSourceAdapter {
+  source: DailyKnowledgeOnlineSource;
+  transport: DailyKnowledgeSourceTransport;
+  supportsLocales: Array<'en' | 'zh'>;
+  cachePolicyId: string;
+  freshnessWindowMs: number;
+  fetchItems: (context: DailyKnowledgeSourceFetchContext) => Promise<DailyKnowledgeItem[]>;
+}
+
+export interface DailyKnowledgeRegistryResult {
+  items: DailyKnowledgeItem[];
+  sourceStatuses: DailyKnowledgeSourceStatus[];
+}
+
 export interface DailyKnowledgeOptions {
   locale: 'en' | 'zh';
   onlineEnhancement: boolean;
@@ -101,4 +154,7 @@ export interface DailyKnowledgeOptions {
 export interface DailyKnowledgeServiceResult {
   items: DailyKnowledgeItem[];
   selected: DailyKnowledgeItem;
+  sourceStatuses: DailyKnowledgeSourceStatus[];
+  usedCuratedFallback: boolean;
+  fallbackReason: DailyKnowledgeFallbackReason;
 }

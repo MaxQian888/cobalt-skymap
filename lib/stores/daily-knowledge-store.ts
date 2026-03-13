@@ -8,11 +8,13 @@ import {
   HISTORY_LIMIT,
 } from '@/lib/services/daily-knowledge/constants';
 import type {
+  DailyKnowledgeFallbackReason,
   DailyKnowledgeFilters,
   DailyKnowledgeHistory,
   DailyKnowledgeHistoryEntry,
   DailyKnowledgeItem,
   DailyKnowledgeFavorite,
+  DailyKnowledgeSourceStatus,
 } from '@/lib/services/daily-knowledge/types';
 import { useSettingsStore } from './settings-store';
 import { useStellariumStore } from './stellarium-store';
@@ -49,6 +51,9 @@ interface DailyKnowledgeState extends DailyKnowledgePersistedState {
   error: string | null;
   currentItem: DailyKnowledgeItem | null;
   items: DailyKnowledgeItem[];
+  sourceStatuses: DailyKnowledgeSourceStatus[];
+  usedCuratedFallback: boolean;
+  fallbackReason: DailyKnowledgeFallbackReason;
   filters: DailyKnowledgeFilters;
 
   openDialog: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
@@ -103,6 +108,9 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
       error: null,
       currentItem: null,
       items: [],
+      sourceStatuses: [],
+      usedCuratedFallback: false,
+      fallbackReason: null,
       filters: DEFAULT_FILTERS,
 
       openDialog: async (entry = 'manual') => {
@@ -147,6 +155,9 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
             loading: false,
             items: result.items,
             currentItem: result.selected,
+            sourceStatuses: result.sourceStatuses,
+            usedCuratedFallback: result.usedCuratedFallback,
+            fallbackReason: result.fallbackReason,
             lastSeenItemId: result.selected.id,
             lastShownDate: entry === 'auto' ? dateKey : get().lastShownDate,
           });
@@ -155,6 +166,9 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
           set({
             loading: false,
             error: 'dailyKnowledge.loadFailed',
+            sourceStatuses: [],
+            usedCuratedFallback: false,
+            fallbackReason: null,
           });
         }
       },

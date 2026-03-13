@@ -11,14 +11,12 @@ use tauri_plugin_dialog::DialogExt;
 use super::storage::StorageError;
 
 /// Static compiled regex for RA parsing (HMS format)
-static RA_REGEX: Lazy<regex_lite::Regex> = Lazy::new(|| {
-    regex_lite::Regex::new(r"(\d+)[h:\s]+(\d+)[m:\s]+(\d+\.?\d*)s?").unwrap()
-});
+static RA_REGEX: Lazy<regex_lite::Regex> =
+    Lazy::new(|| regex_lite::Regex::new(r"(\d+)[h:\s]+(\d+)[m:\s]+(\d+\.?\d*)s?").unwrap());
 
 /// Static compiled regex for Dec parsing (DMS format)
-static DEC_REGEX: Lazy<regex_lite::Regex> = Lazy::new(|| {
-    regex_lite::Regex::new(r#"([+-]?\d+)[°:\s]+(\d+)[':\s]+(\d+\.?\d*)"?"#).unwrap()
-});
+static DEC_REGEX: Lazy<regex_lite::Regex> =
+    Lazy::new(|| regex_lite::Regex::new(r#"([+-]?\d+)[°:\s]+(\d+)[':\s]+(\d+\.?\d*)"?"#).unwrap());
 
 /// Target item for import/export
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,11 +89,15 @@ pub async fn export_targets(
             .blocking_save_file();
 
         match file_path {
-            Some(p) => p.into_path().map_err(|_| StorageError::AppDataDirNotFound)?,
-            None => return Err(StorageError::Io(std::io::Error::new(
-                std::io::ErrorKind::Interrupted,
-                "Export cancelled",
-            ))),
+            Some(p) => p
+                .into_path()
+                .map_err(|_| StorageError::AppDataDirNotFound)?,
+            None => {
+                return Err(StorageError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "Export cancelled",
+                )))
+            }
         }
     };
 
@@ -131,18 +133,25 @@ pub async fn import_targets(
             .blocking_pick_file();
 
         match file_path {
-            Some(p) => p.into_path().map_err(|_| StorageError::AppDataDirNotFound)?,
-            None => return Err(StorageError::Io(std::io::Error::new(
-                std::io::ErrorKind::Interrupted,
-                "Import cancelled",
-            ))),
+            Some(p) => p
+                .into_path()
+                .map_err(|_| StorageError::AppDataDirNotFound)?,
+            None => {
+                return Err(StorageError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "Import cancelled",
+                )))
+            }
         }
     };
 
     let content = fs::read_to_string(&import_path)?;
 
-    crate::network::security::validate_size(&content, crate::network::security::limits::MAX_CSV_SIZE)
-        .map_err(|e| StorageError::Other(e.to_string()))?;
+    crate::network::security::validate_size(
+        &content,
+        crate::network::security::limits::MAX_CSV_SIZE,
+    )
+    .map_err(|e| StorageError::Other(e.to_string()))?;
 
     let extension = import_path
         .extension()
@@ -157,19 +166,28 @@ pub async fn import_targets(
         _ => import_csv(&content),
     };
 
-    log::info!("Imported {} targets from {:?}", result.imported, import_path);
+    log::info!(
+        "Imported {} targets from {:?}",
+        result.imported,
+        import_path
+    );
     Ok(result)
 }
 
 fn export_csv(targets: &[TargetExportItem]) -> String {
     let mut lines = vec![
-        "Name,RA,Dec,RA_HMS,Dec_DMS,Type,Constellation,Magnitude,Size,Priority,Tags,Notes".to_string(),
+        "Name,RA,Dec,RA_HMS,Dec_DMS,Type,Constellation,Magnitude,Size,Priority,Tags,Notes"
+            .to_string(),
     ];
 
     for t in targets {
         let line = format!(
             "\"{}\",{},{},\"{}\",\"{}\",\"{}\",\"{}\",{},\"{}\",\"{}\",\"{}\",\"{}\"",
-            escape_csv(&t.name), t.ra, t.dec, escape_csv(&t.ra_string), escape_csv(&t.dec_string),
+            escape_csv(&t.name),
+            t.ra,
+            t.dec,
+            escape_csv(&t.ra_string),
+            escape_csv(&t.dec_string),
             escape_csv(&t.object_type.clone().unwrap_or_default()),
             escape_csv(&t.constellation.clone().unwrap_or_default()),
             t.magnitude.map(|m| m.to_string()).unwrap_or_default(),
@@ -194,7 +212,8 @@ fn import_csv(content: &str) -> ImportTargetsResult {
 
     if lines.len() > crate::network::security::limits::MAX_CSV_ROWS {
         return ImportTargetsResult {
-            imported: 0, skipped: 0,
+            imported: 0,
+            skipped: 0,
             errors: vec![format!("CSV exceeds max rows: {}", lines.len())],
             targets: Vec::new(),
         };
@@ -204,60 +223,117 @@ fn import_csv(content: &str) -> ImportTargetsResult {
     let use_tsv = lines.first().map(|l| l.contains('\t')).unwrap_or(false);
 
     // Detect header row: skip if it looks like a header (case-insensitive check)
-    let skip_header = lines.first().map(|l| {
-        let lower = l.to_lowercase();
-        lower.contains("name") && (lower.contains("ra") || lower.contains("right"))
-    }).unwrap_or(false);
+    let skip_header = lines
+        .first()
+        .map(|l| {
+            let lower = l.to_lowercase();
+            lower.contains("name") && (lower.contains("ra") || lower.contains("right"))
+        })
+        .unwrap_or(false);
     let start_line = if skip_header { 1 } else { 0 };
 
     for (i, line) in lines.iter().enumerate().skip(start_line) {
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
 
         let fields = if use_tsv {
-            line.split('\t').map(|s| s.trim().to_string()).collect::<Vec<_>>()
+            line.split('\t')
+                .map(|s| s.trim().to_string())
+                .collect::<Vec<_>>()
         } else {
             parse_csv_line(line)
         };
 
         if fields.len() < 3 {
-            errors.push(format!("Line {}: insufficient fields ({})", i + 1, fields.len()));
+            errors.push(format!(
+                "Line {}: insufficient fields ({})",
+                i + 1,
+                fields.len()
+            ));
             skipped += 1;
             continue;
         }
 
         let get_field = |idx: usize| -> &str { fields.get(idx).map(|s| s.as_str()).unwrap_or("") };
-        let (ra, dec) = if let (Ok(ra), Ok(dec)) = (get_field(1).parse::<f64>(), get_field(2).parse::<f64>()) {
-            match validate_coordinates(ra, dec) {
-                Some(coords) => coords,
-                None => { errors.push(format!("Line {}: coords out of range", i + 1)); skipped += 1; continue; }
-            }
-        } else if fields.len() >= 5 {
-            match parse_coordinates(get_field(3), get_field(4)) {
-                Some((ra, dec)) => (ra, dec),
-                None => { errors.push(format!("Line {}: invalid coords", i + 1)); skipped += 1; continue; }
-            }
-        } else {
-            // Try parsing first two non-name fields as coordinate strings
-            match parse_coordinates(get_field(1), get_field(2)) {
-                Some((ra, dec)) => (ra, dec),
-                None => { errors.push(format!("Line {}: invalid coords", i + 1)); skipped += 1; continue; }
-            }
-        };
+        let (ra, dec) =
+            if let (Ok(ra), Ok(dec)) = (get_field(1).parse::<f64>(), get_field(2).parse::<f64>()) {
+                match validate_coordinates(ra, dec) {
+                    Some(coords) => coords,
+                    None => {
+                        errors.push(format!("Line {}: coords out of range", i + 1));
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            } else if fields.len() >= 5 {
+                match parse_coordinates(get_field(3), get_field(4)) {
+                    Some((ra, dec)) => (ra, dec),
+                    None => {
+                        errors.push(format!("Line {}: invalid coords", i + 1));
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            } else {
+                // Try parsing first two non-name fields as coordinate strings
+                match parse_coordinates(get_field(1), get_field(2)) {
+                    Some((ra, dec)) => (ra, dec),
+                    None => {
+                        errors.push(format!("Line {}: invalid coords", i + 1));
+                        skipped += 1;
+                        continue;
+                    }
+                }
+            };
 
         targets.push(TargetExportItem {
-            name: get_field(0).to_string(), ra, dec,
-            ra_string: if fields.len() > 3 { get_field(3).to_string() } else { String::new() },
-            dec_string: if fields.len() > 4 { get_field(4).to_string() } else { String::new() },
-            object_type: fields.get(5).map(|s| s.to_string()).filter(|s| !s.is_empty()),
-            constellation: fields.get(6).map(|s| s.to_string()).filter(|s| !s.is_empty()),
+            name: get_field(0).to_string(),
+            ra,
+            dec,
+            ra_string: if fields.len() > 3 {
+                get_field(3).to_string()
+            } else {
+                String::new()
+            },
+            dec_string: if fields.len() > 4 {
+                get_field(4).to_string()
+            } else {
+                String::new()
+            },
+            object_type: fields
+                .get(5)
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty()),
+            constellation: fields
+                .get(6)
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty()),
             magnitude: fields.get(7).and_then(|s| s.parse().ok()),
-            size: fields.get(8).map(|s| s.to_string()).filter(|s| !s.is_empty()),
-            priority: fields.get(9).map(|s| s.to_string()).filter(|s| !s.is_empty()),
-            tags: fields.get(10).map(|s| s.to_string()).filter(|s| !s.is_empty()),
-            notes: fields.get(11).map(|s| s.to_string()).filter(|s| !s.is_empty()),
+            size: fields
+                .get(8)
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty()),
+            priority: fields
+                .get(9)
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty()),
+            tags: fields
+                .get(10)
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty()),
+            notes: fields
+                .get(11)
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty()),
         });
     }
-    ImportTargetsResult { imported: targets.len(), skipped, errors, targets }
+    ImportTargetsResult {
+        imported: targets.len(),
+        skipped,
+        errors,
+        targets,
+    }
 }
 
 fn export_json(targets: &[TargetExportItem]) -> Result<String, StorageError> {
@@ -266,12 +342,23 @@ fn export_json(targets: &[TargetExportItem]) -> Result<String, StorageError> {
 
 fn import_json(content: &str) -> Result<ImportTargetsResult, StorageError> {
     let targets: Vec<TargetExportItem> = serde_json::from_str(content)?;
-    Ok(ImportTargetsResult { imported: targets.len(), skipped: 0, errors: Vec::new(), targets })
+    Ok(ImportTargetsResult {
+        imported: targets.len(),
+        skipped: 0,
+        errors: Vec::new(),
+        targets,
+    })
 }
 
 fn export_stellarium(targets: &[TargetExportItem]) -> String {
-    let mut lines = vec!["[Stellarium Observing List]".to_string(), format!("# Exported: {}", targets.len()), "".to_string()];
-    for t in targets { lines.push(format!("{}\t{}\t{}", t.name, t.ra_string, t.dec_string)); }
+    let mut lines = vec![
+        "[Stellarium Observing List]".to_string(),
+        format!("# Exported: {}", targets.len()),
+        "".to_string(),
+    ];
+    for t in targets {
+        lines.push(format!("{}\t{}\t{}", t.name, t.ra_string, t.dec_string));
+    }
     lines.join("\n")
 }
 
@@ -282,12 +369,18 @@ fn import_stellarium(content: &str) -> ImportTargetsResult {
 
     for (i, line) in content.lines().enumerate() {
         let line = line.trim();
-        if line.is_empty() || line.starts_with('#') || line.starts_with('[') { continue; }
+        if line.is_empty() || line.starts_with('#') || line.starts_with('[') {
+            continue;
+        }
 
         let mut parts: Vec<&str> = line.split('\t').collect();
         if parts.len() < 3 {
             parts = line.split(',').collect();
-            if parts.len() < 3 { errors.push(format!("Line {}: invalid", i + 1)); skipped += 1; continue; }
+            if parts.len() < 3 {
+                errors.push(format!("Line {}: invalid", i + 1));
+                skipped += 1;
+                continue;
+            }
         }
 
         let name = parts[0].trim();
@@ -296,28 +389,61 @@ fn import_stellarium(content: &str) -> ImportTargetsResult {
 
         match parse_coordinates(ra_str, dec_str) {
             Some((ra, dec)) => targets.push(TargetExportItem {
-                name: name.to_string(), ra, dec, ra_string: ra_str.to_string(), dec_string: dec_str.to_string(),
-                object_type: None, constellation: None, magnitude: None, size: None, priority: None, tags: None, notes: None,
+                name: name.to_string(),
+                ra,
+                dec,
+                ra_string: ra_str.to_string(),
+                dec_string: dec_str.to_string(),
+                object_type: None,
+                constellation: None,
+                magnitude: None,
+                size: None,
+                priority: None,
+                tags: None,
+                notes: None,
             }),
-            None => { errors.push(format!("Line {}: invalid coords", i + 1)); skipped += 1; }
+            None => {
+                errors.push(format!("Line {}: invalid coords", i + 1));
+                skipped += 1;
+            }
         }
     }
-    ImportTargetsResult { imported: targets.len(), skipped, errors, targets }
+    ImportTargetsResult {
+        imported: targets.len(),
+        skipped,
+        errors,
+        targets,
+    }
 }
 
 fn export_mosaic(targets: &[TargetExportItem]) -> Result<String, StorageError> {
     #[derive(Serialize)]
-    struct MosaicSession { targets: Vec<MosaicTarget> }
+    struct MosaicSession {
+        targets: Vec<MosaicTarget>,
+    }
     #[derive(Serialize)]
-    struct MosaicTarget { name: String, ra: f64, dec: f64 }
+    struct MosaicTarget {
+        name: String,
+        ra: f64,
+        dec: f64,
+    }
 
     let session = MosaicSession {
-        targets: targets.iter().map(|t| MosaicTarget { name: t.name.clone(), ra: t.ra, dec: t.dec }).collect(),
+        targets: targets
+            .iter()
+            .map(|t| MosaicTarget {
+                name: t.name.clone(),
+                ra: t.ra,
+                dec: t.dec,
+            })
+            .collect(),
     };
     Ok(serde_json::to_string_pretty(&session)?)
 }
 
-fn escape_csv(s: &str) -> String { s.replace('"', "\"\"") }
+fn escape_csv(s: &str) -> String {
+    s.replace('"', "\"\"")
+}
 
 fn parse_csv_line(line: &str) -> Vec<String> {
     let mut fields = Vec::new();
@@ -328,10 +454,17 @@ fn parse_csv_line(line: &str) -> Vec<String> {
     while let Some(c) = chars.next() {
         match c {
             '"' => {
-                if in_quotes && chars.peek() == Some(&'"') { current.push('"'); chars.next(); }
-                else { in_quotes = !in_quotes; }
+                if in_quotes && chars.peek() == Some(&'"') {
+                    current.push('"');
+                    chars.next();
+                } else {
+                    in_quotes = !in_quotes;
+                }
             }
-            ',' if !in_quotes => { fields.push(current.trim().to_string()); current = String::new(); }
+            ',' if !in_quotes => {
+                fields.push(current.trim().to_string());
+                current = String::new();
+            }
             _ => current.push(c),
         }
     }
@@ -351,7 +484,13 @@ fn validate_coordinates(ra: f64, dec: f64) -> Option<(f64, f64)> {
     // Dec: -90 to +90 degrees
     if ra >= -0.001 && ra < 360.001 && dec >= -90.0 && dec <= 90.0 {
         // Normalize RA to 0-360 range
-        let normalized_ra = if ra < 0.0 { ra + 360.0 } else if ra >= 360.0 { ra - 360.0 } else { ra };
+        let normalized_ra = if ra < 0.0 {
+            ra + 360.0
+        } else if ra >= 360.0 {
+            ra - 360.0
+        } else {
+            ra
+        };
         Some((normalized_ra, dec))
     } else {
         None
@@ -360,13 +499,17 @@ fn validate_coordinates(ra: f64, dec: f64) -> Option<(f64, f64)> {
 
 fn parse_ra(s: &str) -> Option<f64> {
     let s = s.trim();
-    if let Ok(deg) = s.parse::<f64>() { return Some(deg); }
+    if let Ok(deg) = s.parse::<f64>() {
+        return Some(deg);
+    }
     if let Some(caps) = RA_REGEX.captures(s) {
         let h: f64 = caps.get(1)?.as_str().parse().ok()?;
         let m: f64 = caps.get(2)?.as_str().parse().ok()?;
         let sec: f64 = caps.get(3)?.as_str().parse().ok()?;
         // Validate component ranges
-        if h >= 24.0 || m >= 60.0 || sec >= 60.0 { return None; }
+        if h >= 24.0 || m >= 60.0 || sec >= 60.0 {
+            return None;
+        }
         return Some((h + m / 60.0 + sec / 3600.0) * 15.0);
     }
     None
@@ -374,14 +517,18 @@ fn parse_ra(s: &str) -> Option<f64> {
 
 fn parse_dec(s: &str) -> Option<f64> {
     let s = s.trim();
-    if let Ok(deg) = s.parse::<f64>() { return Some(deg); }
+    if let Ok(deg) = s.parse::<f64>() {
+        return Some(deg);
+    }
     if let Some(caps) = DEC_REGEX.captures(s) {
         let d_str = caps.get(1)?.as_str();
         let d: f64 = d_str.parse().ok()?;
         let m: f64 = caps.get(2)?.as_str().parse().ok()?;
         let sec: f64 = caps.get(3)?.as_str().parse().ok()?;
         // Validate component ranges
-        if m >= 60.0 || sec >= 60.0 { return None; }
+        if m >= 60.0 || sec >= 60.0 {
+            return None;
+        }
         // Use string sign check to handle -0° correctly (IEEE 754: -0.0 < 0.0 is false)
         let sign = if d_str.starts_with('-') { -1.0 } else { 1.0 };
         return Some(sign * (d.abs() + m / 60.0 + sec / 3600.0));
@@ -456,7 +603,11 @@ mod tests {
         // 12h 00m 00s = 180°
         let ra = parse_ra("12h 00m 00s");
         assert!(ra.is_some());
-        assert!(approx_eq(ra.unwrap(), 180.0), "12h should be 180°, got {:?}", ra);
+        assert!(
+            approx_eq(ra.unwrap(), 180.0),
+            "12h should be 180°, got {:?}",
+            ra
+        );
     }
 
     #[test]
@@ -539,7 +690,7 @@ mod tests {
         let csv = "Name,RA,Dec,RA_HMS,Dec_DMS,Type,Constellation,Magnitude,Size,Priority,Tags,Notes\n\
                    M31,10.68,41.27,\"00h 42m 44s\",\"+41° 16' 09\"\",Galaxy,Andromeda,3.4,3°,high,galaxy,Andromeda Galaxy";
         let result = import_csv(csv);
-        
+
         assert_eq!(result.imported, 1);
         assert_eq!(result.skipped, 0);
         assert!(result.errors.is_empty());
@@ -550,7 +701,7 @@ mod tests {
     fn test_import_csv_insufficient_fields() {
         let csv = "Name,RA,Dec,RA_HMS\nM31,10.68"; // Only 2 fields
         let result = import_csv(csv);
-        
+
         assert_eq!(result.imported, 0);
         assert_eq!(result.skipped, 1);
         assert!(!result.errors.is_empty());
@@ -558,9 +709,10 @@ mod tests {
 
     #[test]
     fn test_import_csv_empty_lines() {
-        let csv = "Name,RA,Dec,RA_HMS,Dec_DMS\n\nM31,10.68,41.27,\"00h 42m 44s\",\"+41° 16' 09\"\"\n\n";
+        let csv =
+            "Name,RA,Dec,RA_HMS,Dec_DMS\n\nM31,10.68,41.27,\"00h 42m 44s\",\"+41° 16' 09\"\"\n\n";
         let result = import_csv(csv);
-        
+
         assert_eq!(result.imported, 1);
         // Empty lines should be skipped, not counted as errors
     }
@@ -570,7 +722,7 @@ mod tests {
         let csv = "Name,RA,Dec,RA_HMS,Dec_DMS\n\
                    Test,invalid,invalid,12h 00m 00s,+45° 00' 00\"";
         let result = import_csv(csv);
-        
+
         // Should fall back to HMS parsing
         if result.imported == 1 {
             assert!(approx_eq(result.targets[0].ra, 180.0));
@@ -584,9 +736,10 @@ mod tests {
 
     #[test]
     fn test_import_stellarium_basic() {
-        let content = "[Stellarium Observing List]\n# Exported: 1\n\nM31\t00h 42m 44s\t+41° 16' 09\"";
+        let content =
+            "[Stellarium Observing List]\n# Exported: 1\n\nM31\t00h 42m 44s\t+41° 16' 09\"";
         let result = import_stellarium(content);
-        
+
         // Just verify the function runs without panicking; imported count depends on format
         let _ = result.imported;
     }
@@ -595,7 +748,7 @@ mod tests {
     fn test_import_stellarium_skips_comments() {
         let content = "# This is a comment\n[Header]\nM31\t12h 00m 00s\t+45° 00' 00\"";
         let result = import_stellarium(content);
-        
+
         // Comments and headers should be skipped
         assert!(result.errors.is_empty() || result.imported > 0);
     }
@@ -620,7 +773,7 @@ mod tests {
             priority: Some("high".to_string()),
             tags: Some("galaxy".to_string()),
         }];
-        
+
         let json = export_json(&targets);
         assert!(json.is_ok());
         let json_str = json.unwrap();
@@ -632,7 +785,7 @@ mod tests {
     fn test_import_json() {
         let json = r#"[{"name":"M31","ra":10.68,"dec":41.27,"ra_string":"00h 42m 44s","dec_string":"+41°"}]"#;
         let result = import_json(json);
-        
+
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.imported, 1);
@@ -665,7 +818,7 @@ mod tests {
             priority: None,
             tags: None,
         }];
-        
+
         let csv = export_csv(&targets);
         assert!(csv.contains("Test"));
         assert!(csv.contains("180"));
@@ -690,7 +843,7 @@ mod tests {
             priority: None,
             tags: None,
         }];
-        
+
         let csv = export_csv(&targets);
         // Name with comma should be quoted in CSV
         assert!(csv.contains("\"Test, with comma\""));
@@ -716,7 +869,7 @@ mod tests {
             priority: None,
             tags: None,
         }];
-        
+
         let stellarium = export_stellarium(&targets);
         assert!(stellarium.contains("[Stellarium Observing List]"));
         assert!(stellarium.contains("M31"));
@@ -742,7 +895,7 @@ mod tests {
             priority: None,
             tags: None,
         }];
-        
+
         let result = export_mosaic(&targets);
         assert!(result.is_ok());
         let json = result.unwrap();
@@ -762,7 +915,7 @@ mod tests {
             errors: vec!["Error 1".to_string()],
             targets: vec![],
         };
-        
+
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("\"imported\":5"));
         assert!(json.contains("\"skipped\":2"));
@@ -777,7 +930,7 @@ mod tests {
         let format = ExportFormat::Csv;
         let json = serde_json::to_string(&format).unwrap();
         assert_eq!(json, "\"csv\"");
-        
+
         let format = ExportFormat::Stellarium;
         let json = serde_json::to_string(&format).unwrap();
         assert_eq!(json, "\"stellarium\"");

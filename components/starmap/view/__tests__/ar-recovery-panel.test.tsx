@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ARRecoveryPanel } from '../ar-recovery-panel';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 
@@ -62,7 +62,7 @@ describe('ARRecoveryPanel', () => {
     expect(useARRuntimeStore.getState().launchAssistant.visible).toBe(true);
   });
 
-  it('dispatches retry-camera recovery action through shared handlers', () => {
+  it('dispatches retry-camera recovery action through shared handlers', async () => {
     render(
       <ARRecoveryPanel
         status="blocked"
@@ -71,7 +71,11 @@ describe('ARRecoveryPanel', () => {
     );
 
     fireEvent.click(screen.getByTestId('ar-recovery-action-retry-camera'));
-    expect(useARRuntimeStore.getState().recoveryRequestVersion['retry-camera']).toBe(1);
+
+    await waitFor(() => {
+      expect(useARRuntimeStore.getState().recoveryRequestVersion['retry-camera']).toBe(1);
+      expect(useARRuntimeStore.getState().recoveryNoticeKey).toBe('settings.arRecoveryNoticeRetryCameraRequested');
+    });
   });
 
   it('disables AR when disable action is clicked', () => {
@@ -85,7 +89,7 @@ describe('ARRecoveryPanel', () => {
     fireEvent.click(screen.getByTestId('ar-recovery-action-disable-ar'));
     expect(mockSetStellariumSetting).toHaveBeenCalledWith('arMode', false);
   });
-  it('dispatches switch-camera recovery action through shared handlers', () => {
+  it('dispatches switch-camera recovery action through shared handlers', async () => {
     render(
       <ARRecoveryPanel
         status="blocked"
@@ -94,7 +98,11 @@ describe('ARRecoveryPanel', () => {
     );
 
     fireEvent.click(screen.getByTestId('ar-recovery-action-switch-camera'));
-    expect(useARRuntimeStore.getState().recoveryRequestVersion['switch-camera']).toBe(1);
+
+    await waitFor(() => {
+      expect(useARRuntimeStore.getState().recoveryRequestVersion['switch-camera']).toBe(1);
+      expect(useARRuntimeStore.getState().recoveryNoticeKey).toBe('settings.arRecoveryNoticeSwitchCameraRequested');
+    });
   });
 
   it('renders acquisition diagnostics from runtime store', () => {

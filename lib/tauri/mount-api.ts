@@ -4,23 +4,26 @@
  */
 
 import { isTauri } from '@/lib/storage/platform';
+import { BUILT_IN_SIMULATOR_MOUNT_ID } from '@/lib/core/mount-support';
+import type {
+  MountActionAvailability,
+  MountCapabilitySnapshot,
+  MountCapabilities as CoreMountCapabilities,
+  MountConnectionConfig as CoreConnectionConfig,
+  MountPierSide as CorePierSide,
+  MountProtocol as CoreMountProtocol,
+  MountTrackingRate as CoreTrackingRate,
+  SupportedMountDevice,
+} from '@/lib/core/types';
 
 // ============================================================================
 // Types (mirror Rust types)
 // ============================================================================
 
-export type MountProtocol = 'alpaca' | 'simulator';
-
-export interface ConnectionConfig {
-  protocol: MountProtocol;
-  host: string;
-  port: number;
-  deviceId: number;
-}
-
-export type TrackingRate = 'sidereal' | 'lunar' | 'solar' | 'stopped';
-
-export type PierSide = 'east' | 'west' | 'unknown';
+export type MountProtocol = CoreMountProtocol;
+export type ConnectionConfig = CoreConnectionConfig;
+export type TrackingRate = CoreTrackingRate;
+export type PierSide = CorePierSide;
 
 export type MountAxis = 'primary' | 'secondary';
 
@@ -37,26 +40,10 @@ export interface MountState {
   slewRateIndex: number;
 }
 
-export interface MountCapabilities {
-  canSlew: boolean;
-  canSlewAsync: boolean;
-  canSync: boolean;
-  canPark: boolean;
-  canUnpark: boolean;
-  canSetTracking: boolean;
-  canMoveAxis: boolean;
-  canPulseGuide: boolean;
-  alignmentMode: string;
-  equatorialSystem: string;
-}
-
-export interface DiscoveredDevice {
-  host: string;
-  port: number;
-  deviceId: number;
-  deviceName: string;
-  deviceType: string;
-}
+export type MountCapabilities = CoreMountCapabilities;
+export type DiscoveredDevice = SupportedMountDevice;
+export type CapabilitySnapshot = MountCapabilitySnapshot;
+export type ActionAvailability = MountActionAvailability;
 
 export interface SlewRatePreset {
   label: string;
@@ -89,6 +76,7 @@ export const DEFAULT_CONNECTION_CONFIG: ConnectionConfig = {
   host: 'localhost',
   port: 11111,
   deviceId: 0,
+  selectedDeviceId: BUILT_IN_SIMULATOR_MOUNT_ID,
 };
 
 // ============================================================================

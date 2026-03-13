@@ -65,12 +65,19 @@ import {
   Lock,
   Unlock,
   RotateCcw,
+  Archive,
+  Telescope,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMountStore, useStellariumStore, useEquipmentStore, useSessionPlanStore, usePlanningUiStore } from '@/lib/stores';
 import { useCliBridgeStore } from '@/lib/stores/cli-bridge-store';
 import { useDeviceStore } from '@/lib/stores/device-store';
+import { useMessierMarathonStore } from '@/lib/stores/messier-marathon-store';
 import { useTargetListStore, type TargetItem } from '@/lib/stores/target-list-store';
+import {
+  applyExecutionSessionStatusAction,
+  buildExecutionWorkspaceViewModel,
+} from '@/lib/stores/session-execution-helpers';
 import { degreesToHMS, degreesToDMS } from '@/lib/astronomy/starmap-utils';
 import {
   calculateTwilightTimes,
@@ -524,6 +531,10 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const setOpen = usePlanningUiStore((state) => state.setSessionPlannerOpen);
   const openShotList = usePlanningUiStore((state) => state.openShotList);
   const openTonightRecommendations = usePlanningUiStore((state) => state.openTonightRecommendations);
+  const openMessierMarathonGuide = usePlanningUiStore((state) => state.openMessierMarathonGuide);
+  const plannerDraftSeed = usePlanningUiStore((state) => state.plannerDraftSeed);
+  const plannerDraftSeedRequestId = usePlanningUiStore((state) => state.plannerDraftSeedRequestId);
+  const clearPlannerDraftSeed = usePlanningUiStore((state) => state.clearPlannerDraftSeed);
   const [strategy, setStrategy] = useState<OptimizationStrategy>('balanced');
   const [planningMode, setPlanningMode] = useState<'auto' | 'manual'>('auto');
   const [minAltitude, setMinAltitude] = useState(30);
@@ -550,6 +561,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const [safetyState, setSafetyState] = useState<SafetyState | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [remoteTemplates, setRemoteTemplates] = useState<SavedSessionTemplate[]>([]);
+  const [guideContext, setGuideContext] = useState<SessionDraftV2['guideContext']>(undefined);
   
   const profileInfo = useMountStore((state) => state.profileInfo);
   const mountConnected = useMountStore((state) => state.mountInfo.Connected ?? false);
@@ -563,6 +575,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   // Session plan persistence
   const savedPlans = useSessionPlanStore((state) => state.savedPlans);
   const savePlan = useSessionPlanStore((state) => state.savePlan);
+  const updateSavedPlan = useSessionPlanStore((state) => state.updatePlan);
   const templates = useSessionPlanStore((state) => state.templates);
   const saveTemplate = useSessionPlanStore((state) => state.saveTemplate);
   const loadTemplate = useSessionPlanStore((state) => state.loadTemplate);
@@ -576,8 +589,13 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const syncExecutionFromObservationSession = useSessionPlanStore((state) => state.syncExecutionFromObservationSession);
   const setActiveExecution = useSessionPlanStore((state) => state.setActiveExecution);
   const createExecutionFromPlan = useSessionPlanStore((state) => state.createExecutionFromPlan);
+  const updateExecutionTarget = useSessionPlanStore((state) => state.updateExecutionTarget);
+  const completeExecution = useSessionPlanStore((state) => state.completeExecution);
+  const archiveExecution = useSessionPlanStore((state) => state.archiveExecution);
   const [showSavedPlans, setShowSavedPlans] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const handledPlannerSeedRef = useRef(0);
+  const lastSyncedGuideOrderRef = useRef('');
   
   // Equipment profile
   const focalLength = useEquipmentStore((state) => state.focalLength);
@@ -761,8 +779,28 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     } else {
       setWeatherInput({});
     }
+    setGuideContext(normalized.guideContext);
     setPlanningMode(normalized.manualEdits.length > 0 ? 'manual' : 'auto');
   }, []);
+
+  useEffect(() => {
+    if (
+      !plannerDraftSeed
+      || plannerDraftSeedRequestId <= 0
+      || plannerDraftSeedRequestId === handledPlannerSeedRef.current
+    ) {
+      return;
+    }
+
+    handledPlannerSeedRef.current = plannerDraftSeedRequestId;
+    applyDraft(plannerDraftSeed);
+    clearPlannerDraftSeed();
+  }, [
+    applyDraft,
+    clearPlannerDraftSeed,
+    plannerDraftSeed,
+    plannerDraftSeedRequestId,
+  ]);
 
   const refreshWeatherAndSafety = useCallback(async () => {
     invalidateAstronomyCache('planner_refresh');
@@ -1102,6 +1140,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     manualEdits: Object.values(manualEdits),
     notes: sessionNotes,
     weatherSnapshot,
+    guideContext,
   }, {
     fallbackDate: planDate,
     knownTargetIds,
@@ -1114,6 +1153,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     sessionNotes,
     strategy,
     weatherSnapshot,
+    guideContext,
   ]);
 
   const normalizedDraft = plannerDraftValidation.draft;
@@ -1203,6 +1243,20 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     [displayedPlan.targets],
   );
 
+  useEffect(() => {
+    const catalogBindings = guideContext?.catalogIdByPlannerTargetId;
+    if (!catalogBindings) return;
+    const catalogOrder = displayedPlan.targets
+      .map((target) => catalogBindings[target.target.id])
+      .filter((targetId): targetId is string => typeof targetId === 'string' && targetId.length > 0);
+    if (catalogOrder.length === 0) return;
+
+    const signature = catalogOrder.join('|');
+    if (signature === lastSyncedGuideOrderRef.current) return;
+    lastSyncedGuideOrderRef.current = signature;
+    useMessierMarathonStore.getState().rewriteRemainingOrder(catalogOrder);
+  }, [displayedPlan.targets, guideContext]);
+
   const relatedSavedPlan = useMemo(
     () => savedPlans.find((saved) => (
       new Date(saved.planDate).toDateString() === planDate.toDateString()
@@ -1221,6 +1275,29 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     },
     [executions, relatedSavedPlan],
   );
+  const executionView = useMemo(
+    () => buildExecutionWorkspaceViewModel(relatedExecution),
+    [relatedExecution],
+  );
+  const replanSnapshot = useMemo(() => {
+    const preservedTargetIds = new Set<string>();
+    if (relatedExecution) {
+      for (const target of relatedExecution.targets) {
+        if (['completed', 'skipped', 'failed'].includes(target.status)) {
+          preservedTargetIds.add(target.targetId);
+        }
+      }
+    }
+    for (const edit of Object.values(manualEdits)) {
+      if (edit.locked) {
+        preservedTargetIds.add(edit.targetId);
+      }
+    }
+    return {
+      preservedCount: preservedTargetIds.size,
+      remainingCount: executionView.summary.remainingTargets,
+    };
+  }, [executionView.summary.remainingTargets, manualEdits, relatedExecution]);
   
   // Get excluded targets for display
   const excludedTargets = useMemo(
@@ -1272,6 +1349,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       manualEdits: Object.values(manualEdits),
       notes: sessionNotes,
       weatherSnapshot,
+      guideContext,
     }, {
       fallbackDate: planDate,
       knownTargetIds,
@@ -1283,6 +1361,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
 
     const normalizedDraft = validation.draft;
     const dateStr = planDate.toLocaleDateString();
+    const provisionalGuideContext = normalizedDraft.guideContext;
     const savedPlanId = savePlan({
       name: `${t('sessionPlanner.title')} - ${dateStr}`,
       planDate: normalizedDraft.planDate,
@@ -1313,7 +1392,25 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       notes: normalizedDraft.notes,
       weatherSnapshot: normalizedDraft.weatherSnapshot,
       manualEdits: normalizedDraft.manualEdits,
+      guideContext: provisionalGuideContext,
     });
+
+    const nextGuideContext = provisionalGuideContext
+      ? {
+          ...provisionalGuideContext,
+          sourcePlanId: savedPlanId,
+        }
+      : undefined;
+    if (nextGuideContext) {
+      setGuideContext(nextGuideContext);
+      useMessierMarathonStore.getState().linkPlanner({
+        sourceListId: nextGuideContext.sourceListId,
+        sourcePlanId: savedPlanId,
+      });
+      updateSavedPlan(savedPlanId, {
+        guideContext: nextGuideContext,
+      });
+    }
 
     if (validation.warningIssues.length > 0) {
       toast.warning(validation.warningIssues[0].message);
@@ -1334,7 +1431,9 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     sessionNotes,
     strategy,
     t,
+    updateSavedPlan,
     weatherSnapshot,
+    guideContext,
   ]);
 
   const handleStartExecution = useCallback(async () => {
@@ -1401,6 +1500,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       manualEdits: Object.values(manualEdits),
       notes: sessionNotes,
       weatherSnapshot,
+      guideContext,
     }, {
       fallbackDate: planDate,
       knownTargetIds,
@@ -1408,6 +1508,12 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
 
     const dateStr = planDate.toLocaleDateString();
     const planName = `${t('sessionPlanner.title')} - ${dateStr}`;
+    const executionGuideContext = normalizedDraft.guideContext
+      ? {
+          ...normalizedDraft.guideContext,
+          sourcePlanId: savedPlanId,
+        }
+      : undefined;
     const executionTargets = displayedPlan.targets.map((target) => ({
       id: `${savedPlanId}-${target.target.id}`,
       targetId: target.target.id,
@@ -1421,6 +1527,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     }));
 
     try {
+      let linkedExecutionId: string | null = null;
       if (isTauri()) {
         const session = await tauriApi.observationLog.createPlannedSession({
           planDate: planDate.toISOString().slice(0, 10),
@@ -1430,9 +1537,9 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
           weatherSnapshot: normalizedDraft.weatherSnapshot,
           executionTargets,
         });
-        syncExecutionFromObservationSession(session);
+        linkedExecutionId = syncExecutionFromObservationSession(session);
       } else {
-        createExecutionFromPlan({
+        linkedExecutionId = createExecutionFromPlan({
           id: savedPlanId,
           name: planName,
           createdAt: new Date().toISOString(),
@@ -1465,9 +1572,18 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
           notes: normalizedDraft.notes || undefined,
           weatherSnapshot: normalizedDraft.weatherSnapshot,
           manualEdits: normalizedDraft.manualEdits,
+          guideContext: executionGuideContext,
         }, {
           status: 'active',
         });
+      }
+
+      if (executionGuideContext && linkedExecutionId) {
+        setGuideContext({
+          ...executionGuideContext,
+          sourceExecutionId: linkedExecutionId,
+        });
+        useMessierMarathonStore.getState().linkExecution(linkedExecutionId);
       }
 
       toast.success(t('sessionPlanner.executionStarted'));
@@ -1507,6 +1623,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     syncExecutionFromObservationSession,
     t,
     weatherSnapshot,
+    guideContext,
   ]);
 
   const handleContinueExecution = useCallback(() => {
@@ -1517,6 +1634,10 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
 
   const handleReplanRemaining = useCallback(() => {
     if (!relatedExecution) return;
+    if (executionView.summary.remainingTargets === 0) {
+      toast.error(t('sessionPlanner.noRemainingTargetsToReplan'));
+      return;
+    }
     invalidateAstronomyCache('planner_refresh');
 
     const preserved = new Map<string, ManualScheduleItem>();
@@ -1549,8 +1670,54 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     }
     setManualEdits(nextEdits);
     setPlanningMode('auto');
-    toast.success(t('sessionPlanner.replanApplied'));
-  }, [manualEdits, relatedExecution, t]);
+    toast.success(t('sessionPlanner.replanApplied'), {
+      description: t('sessionPlanner.replanSummary', {
+        preserved: replanSnapshot.preservedCount,
+        remaining: replanSnapshot.remainingCount,
+      }),
+    });
+  }, [executionView.summary.remainingTargets, manualEdits, relatedExecution, replanSnapshot.preservedCount, replanSnapshot.remainingCount, t]);
+
+  const handleArchiveExecution = useCallback(async () => {
+    if (!relatedExecution) return;
+
+    try {
+      let observationSession = undefined;
+      if (isTauri()) {
+        const logData = await tauriApi.observationLog.load();
+        observationSession = logData.sessions.find((session) => (
+          session.source_plan_id === relatedExecution.sourcePlanId
+          && session.execution_targets?.length
+        ));
+      }
+
+      await applyExecutionSessionStatusAction({
+        runtime: observationSession ? 'tauri' : 'web',
+        executionId: relatedExecution.id,
+        nextStatus: 'archived',
+        observationSession,
+        persistSession: observationSession
+          ? async (session) => tauriApi.observationLog.updateSession(session)
+          : undefined,
+        syncExecutionFromObservationSession,
+        storeActions: {
+          updateExecutionTarget,
+          completeExecution,
+          archiveExecution,
+        },
+      });
+      toast.success(t('sessionPlanner.executionArchived'));
+    } catch {
+      toast.error(t('sessionPlanner.executionArchiveFailed'));
+    }
+  }, [
+    archiveExecution,
+    completeExecution,
+    relatedExecution,
+    syncExecutionFromObservationSession,
+    t,
+    updateExecutionTarget,
+  ]);
 
   const handleSaveTemplate = useCallback(() => {
     const validation = validateSessionDraft({
@@ -1561,6 +1728,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       manualEdits: Object.values(manualEdits),
       notes: sessionNotes,
       weatherSnapshot,
+      guideContext,
     }, {
       fallbackDate: planDate,
       knownTargetIds,
@@ -1610,6 +1778,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     strategy,
     t,
     weatherSnapshot,
+    guideContext,
   ]);
 
   const handleLoadTemplate = useCallback((templateId: string) => {
@@ -1632,6 +1801,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       manualEdits: saved.manualEdits ?? [],
       notes: saved.notes,
       weatherSnapshot: saved.weatherSnapshot,
+      guideContext: saved.guideContext,
     }, {
       fallbackDate: new Date(saved.planDate),
       knownTargetIds: new Set(activeTargets.map((target) => target.id)),
@@ -1827,6 +1997,57 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
             <Badge variant={activeExecutionId === relatedExecution.id ? 'default' : 'secondary'}>
               {t(`sessionPlanner.executionStatus.${relatedExecution.status}`)}
             </Badge>
+          </div>
+        )}
+        {relatedExecution && (
+          <div
+            data-testid="session-planner-execution-summary"
+            className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-3 text-sm"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-medium">{t('sessionPlanner.executionOverview')}</p>
+                <p className="text-xs text-muted-foreground">{relatedExecution.sourcePlanName}</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <Badge variant="secondary">
+                  {t('sessionPlanner.executionSummaryCompleted', { count: executionView.summary.completedTargets })}
+                </Badge>
+                <Badge variant="secondary">
+                  {t('sessionPlanner.executionSummarySkipped', { count: executionView.summary.skippedTargets })}
+                </Badge>
+                <Badge variant="secondary">
+                  {t('sessionPlanner.executionSummaryFailed', { count: executionView.summary.failedTargets })}
+                </Badge>
+                <Badge variant="secondary">
+                  {t('sessionPlanner.executionSummaryRemaining', { count: executionView.summary.remainingTargets })}
+                </Badge>
+              </div>
+            </div>
+            {executionView.focusTarget ? (
+              <div className="rounded-md border border-border/60 bg-background/80 px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {executionView.activeTarget
+                    ? t('sessionPlanner.currentTargetLabel')
+                    : t('sessionPlanner.nextTargetLabel')}
+                </p>
+                <p className="text-sm font-medium">{executionView.focusTarget.targetName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {executionView.focusTarget.scheduledDurationMinutes} {t('sessionPlanner.durationMinutes').toLowerCase()}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-md border border-border/60 bg-background/80 px-3 py-2">
+                <p className="text-sm font-medium">{t('sessionPlanner.executionCompletedTitle')}</p>
+                <p className="text-xs text-muted-foreground">{t('sessionPlanner.executionCompletedHint')}</p>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {t('sessionPlanner.replanSummary', {
+                preserved: replanSnapshot.preservedCount,
+                remaining: replanSnapshot.remainingCount,
+              })}
+            </p>
           </div>
         )}
         
@@ -2091,6 +2312,19 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
               <span>{t('sessionPlanner.safetyWarning')}</span>
             </div>
           )}
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+          <div>
+            <p className="text-sm font-medium">{t('sessionPlanner.messierMarathonGuide')}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('sessionPlanner.messierMarathonGuideDescription')}
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={openMessierMarathonGuide}>
+            <Telescope className="h-3.5 w-3.5 mr-1.5" />
+            {t('sessionPlanner.messierMarathonGuide')}
+          </Button>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -2393,14 +2627,29 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
             </Tooltip>
             {relatedExecution ? (
               <>
-                <Button variant="secondary" size="sm" onClick={handleContinueExecution}>
-                  <ArrowRight className="h-3.5 w-3.5 mr-1.5" />
-                  {t('sessionPlanner.continueExecution')}
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleReplanRemaining}>
-                  <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                  {t('sessionPlanner.replanRemaining')}
-                </Button>
+                {executionView.canResume && (
+                  <Button variant="secondary" size="sm" onClick={handleContinueExecution}>
+                    <ArrowRight className="h-3.5 w-3.5 mr-1.5" />
+                    {t('sessionPlanner.continueExecution')}
+                  </Button>
+                )}
+                {executionView.canResume && (
+                  <Button variant="outline" size="sm" onClick={handleReplanRemaining}>
+                    <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                    {t('sessionPlanner.replanRemaining')}
+                  </Button>
+                )}
+                {executionView.canArchive && (
+                  <Button
+                    data-testid="session-planner-archive-button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void handleArchiveExecution()}
+                  >
+                    <Archive className="h-3.5 w-3.5 mr-1.5" />
+                    {t('sessionPlanner.archiveExecution')}
+                  </Button>
+                )}
               </>
             ) : (
               <Button

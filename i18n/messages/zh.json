@@ -266,18 +266,33 @@
     "opticsTab": "光学",
     "mosaicTab": "拼接",
     "displayTab": "显示",
+    "inputMode": "输入模式",
+    "inputModeManual": "手动",
+    "inputModeActiveEquipment": "当前设备",
+    "manualInputModeHelp": "使用手动数值和已保存的取景快照进行独立规划。",
     "sensorPreset": "传感器预设",
     "telescopePreset": "望远镜预设",
     "manualInput": "手动输入",
+    "activeCamera": "当前相机",
+    "activeTelescope": "当前望远镜",
+    "activeEquipmentMissing": "当前设备模式需要同时有相机和望远镜配置，才能驱动取景参数。",
     "sensorWidth": "宽度",
     "sensorHeight": "高度",
     "pixelSize": "像素尺寸",
     "rotation": "旋转",
     "focalLength": "焦距",
+    "baseFocalLength": "基础焦距",
+    "effectiveFocalLength": "有效焦距",
     "mosaic": "拼接",
     "columns": "列数",
     "rows": "行数",
     "overlap": "重叠",
+    "accessoryLabel": "光学附件",
+    "accessoryPlaceholder": "选择减焦镜或巴洛",
+    "noAccessory": "无附件",
+    "accessorySelectedSummary": "已应用 {name}（{factor}x）。",
+    "accessoryNoneSummary": "当前光路未应用减焦镜或巴洛。",
+    "accessoryUnavailable": "当前运行环境没有可用的减焦镜或巴洛数据源。",
     "compositionGrid": "构图网格",
     "calculatedFOV": "计算视场",
     "fieldWidth": "视场宽度",
@@ -312,10 +327,12 @@
     "framingOptions": "取景选项",
     "rotateSky": "旋转天空",
     "rotateSkyDesc": "旋转天空背景而非视场框",
+    "rotateSkyUnavailable": "当前星图引擎暂不支持旋转天空背景。",
     "preserveAlignment": "保持对齐",
     "preserveAlignmentDesc": "旋转时补偿场曲",
     "dragToPosition": "拖拽定位",
     "dragToPositionDesc": "启用拖拽来重新定位视场",
+    "resetFramePlacement": "重置取景位置",
     "label": "视场",
     "sensorWidthPlaceholder": "23.5",
     "sensorHeightPlaceholder": "15.6",
@@ -524,6 +541,8 @@
     "resetAllDescription": "这将重置所有设置（显示、设备、偏好、主题）为默认值。此操作无法撤销。",
     "instantEffectHint": "更改立即生效",
     "locationInstantHint": "位置更改立即生效",
+    "currentSiteSyncHint": "保存这些坐标会更新当前观测地点：{name}。",
+    "createFirstSiteHint": "保存这些坐标会创建您的第一个已保存观测地点。",
     "milkyWay": "银河",
     "fog": "雾气",
     "rendering": "渲染设置",
@@ -602,7 +621,17 @@
     "arAdaptiveDismiss": "忽略",
     "arAdaptiveAutoApplyOn": "自动应用已开启",
     "arAdaptiveAutoApplyOff": "自动应用已关闭",
-    "arStatusStabilizing": "正在稳定…"
+    "arStatusStabilizing": "正在稳定…",
+    "arRecoveryNoticeRetryCameraRequested": "已触发相机重试。",
+    "arRecoveryNoticeSwitchCameraRequested": "已触发切换相机。",
+    "arRecoveryNoticeSensorPermissionRequested": "已触发传感器权限请求。",
+    "arRecoveryNoticeCalibrationRequested": "已触发传感器校准。",
+    "arRecoveryNoticeOpenCameraSettingsRequested": "已打开相机设置。",
+    "arRecoveryNoticeRevertProfileRequested": "已触发恢复已知稳定配置。",
+    "arRecoveryNoticeDisableArRequested": "已触发关闭 AR。",
+    "arRecoveryNoticeSensorPermissionFailed": "无法请求传感器权限。",
+    "arRecoveryNoticeCalibrationFailed": "无法启动传感器校准。",
+    "arRecoveryNoticeActionFailed": "恢复操作失败，请重试。"
   },
   "session": {
     "sessionInfo": "观测信息",
@@ -848,9 +877,18 @@
     "exportSuccess": "导出完成",
     "exportFailed": "导出失败",
     "executionWorkspace": "执行工作区",
+    "executionSummaryCompleted": "已完成 {count} 个",
+    "executionSummarySkipped": "已跳过 {count} 个",
+    "executionSummaryFailed": "失败 {count} 个",
+    "executionSummaryRemaining": "剩余 {count} 个",
+    "currentTargetLabel": "当前目标",
+    "nextTargetLabel": "下一个目标",
     "startTarget": "开始目标",
     "completeTarget": "完成目标",
+    "skipTarget": "跳过目标",
+    "failTarget": "标记失败",
     "addTargetObservation": "为目标添加记录",
+    "openLinkedPlanner": "打开关联计划器",
     "executionExportSuccess": "执行摘要已导出",
     "updateFailed": "更新执行状态失败",
     "allTime": "全部"
@@ -1100,6 +1138,10 @@
     "port": "端口",
     "deviceId": "设备 ID",
     "discoverDevices": "发现设备",
+    "selectedDevice": "当前设备",
+    "discoveryNoDevices": "没有发现受支持的赤道仪设备",
+    "manualConnectionFallback": "你仍然可以手动输入主机、端口和设备 ID。",
+    "actionUnavailable": "当前赤道仪不支持此操作",
     "cancel": "取消",
     "notDesktop": "赤道仪控制需要桌面应用",
     "notConnectedWarning": "赤道仪未连接",
@@ -1142,7 +1184,10 @@
       "slew_through_pole": "指向路径经过天极"
     },
     "operationFailed": "赤道仪操作失败",
-    "connectionLost": "赤道仪连接已断开"
+    "connectionLost": "赤道仪连接已断开",
+    "trackingUnavailable": "当前赤道仪不支持跟踪控制",
+    "parkUnavailable": "当前赤道仪不支持归位或解除归位",
+    "axisMotionUnavailable": "当前赤道仪不支持轴向点动"
   },
   "cache": {
     "offlineCache": "离线缓存",
@@ -2015,7 +2060,12 @@
       "restart": "重新导览",
       "completed": "已完成",
       "progress": "{current} / {total}",
-      "finishLater": "稍后再看"
+      "finishLater": "稍后再看",
+      "messierMarathonDescription": "打开一个围绕经典梅西耶马拉松挑战构建的季节性观测引导。",
+      "messierMarathonResumeDescription": "继续当前进行中的梅西耶马拉松引导，保持今晚的 checkpoint 节奏不丢失。",
+      "seasonalGuide": "季节引导",
+      "startMarathon": "开始马拉松",
+      "resumeMarathon": "继续马拉松"
     },
     "skipReasons": {
       "unavailable": "该功能在当前环境不可用，已自动跳过。",
@@ -2206,6 +2256,8 @@
         "setLocation": "设置位置",
         "locationSet": "位置已设置",
         "skipNote": "您也可以跳过此步骤，稍后在设置中配置位置。",
+        "currentSiteHint": "应用这些坐标会更新当前观测地点：{name}。",
+        "createFirstSiteHint": "应用这些坐标会创建您的第一个已保存观测地点。",
         "gpsNotSupported": "您的浏览器不支持 GPS 定位",
         "permissionDenied": "定位权限被拒绝，请在浏览器设置中允许",
         "positionUnavailable": "无法获取位置信息",
@@ -3092,7 +3144,21 @@
     "executionStartFailed": "启动执行失败",
     "executionResumed": "已恢复执行",
     "replanApplied": "已为剩余目标重新排程",
+    "noRemainingTargetsToReplan": "没有可重新排程的剩余目标",
     "executionStatusLabel": "执行状态",
+    "executionOverview": "执行概览",
+    "executionSummaryCompleted": "已完成 {count} 个",
+    "executionSummarySkipped": "已跳过 {count} 个",
+    "executionSummaryFailed": "失败 {count} 个",
+    "executionSummaryRemaining": "剩余 {count} 个",
+    "currentTargetLabel": "当前目标",
+    "nextTargetLabel": "下一个目标",
+    "executionCompletedTitle": "执行已完成",
+    "executionCompletedHint": "可回顾本次会话，或将其归档以清理当前执行流程。",
+    "archiveExecution": "归档执行",
+    "executionArchived": "执行已归档",
+    "executionArchiveFailed": "归档执行失败",
+    "replanSummary": "已保留 {preserved} 个，剩余 {remaining} 个可重排",
     "executionStatus": {
       "draft": "草稿",
       "ready": "就绪",
@@ -3124,6 +3190,8 @@
     "weatherWindSpeed": "风速 (km/h)",
     "weatherDewPoint": "露点 (°C)",
     "refreshWeather": "刷新",
+    "messierMarathonGuide": "梅西耶马拉松引导",
+    "messierMarathonGuideDescription": "从分阶段的梅西耶马拉松引导生成计划，并保留 checkpoint 元数据。",
     "safetySafe": "安全：正常",
     "safetyUnsafe": "安全：风险",
     "safetyWarning": "安全监控报告当前不安全。排程会保留天文结果，但会标记天气/安全冲突。",
@@ -3140,6 +3208,54 @@
       "nina-xml": "NINA 序列 XML",
       "csv": "CSV",
       "sgp-csv": "SGP CSV"
+    }
+  },
+  "messierMarathon": {
+    "title": "梅西耶马拉松",
+    "description": "围绕梅西耶马拉松夜的准备度、关键抢窗目标与 planner 交接进行引导。",
+    "readiness": {
+      "recommended": "适合挑战",
+      "limited": "条件受限",
+      "not_recommended": "不建议进行"
+    },
+    "mode": {
+      "full": "完整挑战",
+      "best_effort": "尽力而为"
+    },
+    "fields": {
+      "date": "观测日期",
+      "location": "观测位置",
+      "progress": "可见目标",
+      "mode": "挑战模式"
+    },
+    "actions": {
+      "refresh": "刷新评估",
+      "markCompleted": "标记完成",
+      "skipCheckpoint": "跳过检查点",
+      "resetGuide": "重置引导",
+      "openPlanner": "打开规划器"
+    },
+    "labels": {
+      "critical": "关键"
+    },
+    "status": {
+      "pending": "待处理",
+      "completed": "已完成",
+      "skipped": "已跳过",
+      "missed": "已错过"
+    },
+    "stages": {
+      "dusk": "黄昏冲刺",
+      "early-evening": "前半夜",
+      "prime-night": "黄金时段",
+      "pre-dawn": "黎明前冲刺",
+      "final-window": "最后窗口"
+    },
+    "limitingFactors": {
+      "no-astronomical-night": "当前日期和纬度下没有可用的天文黑夜。",
+      "short-darkness": "暗夜窗口过短，不适合完整的马拉松流程。",
+      "low-visible-count": "可在黑夜窗口内观测的梅西耶目标数量不足，难以完成完整挑战。",
+      "critical-checkpoint-missed": "关键抢窗目标已错过，引导已切换到尽力恢复模式。"
     }
   },
   "mountSafety": {
@@ -3766,11 +3882,14 @@
     "categoryMission": "任务",
     "categoryTechnique": "技巧",
     "categoryCulture": "文化",
-    "sourceAll": "全部来源",
-    "sourceCurated": "本地策展",
-    "sourceApod": "NASA APOD",
-    "sourceWikimedia": "Wikimedia",
-    "favorites": "收藏",
+      "sourceAll": "全部来源",
+      "sourceCurated": "本地策展",
+      "sourceApod": "NASA APOD",
+      "sourceWikimedia": "Wikimedia",
+      "sourceNasaImageLibrary": "NASA 图像库",
+      "sourceNasaPhotojournal": "NASA 图片日志",
+      "sourceEsaScience": "ESA 空间科学",
+      "favorites": "收藏",
     "viewModePager": "翻页",
     "viewModeFeed": "列表流",
     "wheelPaging": "滚轮翻页",
@@ -3795,18 +3914,40 @@
     "loadFailed": "加载每日知识失败。",
     "videoEntry": "该条目为视频内容，可点击“打开来源”查看原视频。",
     "eventOfToday": "今日天文事件",
-    "factSources": "事实来源",
-    "noFactSources": "暂无外部事实来源链接。",
-    "fallbackNotice": "该条目因数据可用性以回退语言显示。",
-    "languageStatus": {
-      "native": "本地语言",
-      "fallback": "回退语言"
-    },
-    "sourceBadge": {
-      "curated": "本地策展",
-      "nasa-apod": "NASA APOD",
-      "wikimedia": "Wikimedia"
-    },
+      "factSources": "事实来源",
+      "noFactSources": "暂无外部事实来源链接。",
+      "fallbackNotice": "该条目因数据可用性以回退语言显示。",
+      "curatedFallbackNotice": "当前展示的是本地策展回退内容，因为部分在线来源暂时不可用或未返回有效天文条目。",
+      "sourceReference": "来源链接",
+      "languageStatus": {
+        "native": "本地语言",
+        "fallback": "回退语言"
+      },
+      "sourceStatus": {
+        "nasa-apod": {
+          "error": "NASA APOD 当前暂不可用。"
+        },
+        "wikimedia": {
+          "error": "Wikimedia 增强内容当前暂不可用。"
+        },
+        "nasa-image-library": {
+          "error": "NASA 图像库当前未返回可用条目。"
+        },
+        "nasa-photojournal": {
+          "error": "NASA 图片日志订阅当前暂不可用。"
+        },
+        "esa-science": {
+          "error": "ESA 空间科学订阅当前暂不可用。"
+        }
+      },
+      "sourceBadge": {
+        "curated": "本地策展",
+        "nasa-apod": "NASA APOD",
+        "wikimedia": "Wikimedia",
+        "nasa-image-library": "NASA 图像库",
+        "nasa-photojournal": "NASA 图片日志",
+        "esa-science": "ESA 空间科学"
+      },
     "categoryBadge": {
       "object": "天体",
       "event": "事件",

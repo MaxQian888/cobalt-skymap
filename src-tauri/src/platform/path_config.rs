@@ -232,7 +232,11 @@ fn get_available_space(path: &PathBuf) -> Option<u64> {
     {
         use std::os::windows::ffi::OsStrExt;
         // Convert path to wide string for Windows API
-        let wide: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let wide: Vec<u16> = path
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
         let mut free_bytes_available: u64 = 0;
         let ret = unsafe {
             windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW(
@@ -242,7 +246,11 @@ fn get_available_space(path: &PathBuf) -> Option<u64> {
                 std::ptr::null_mut(),
             )
         };
-        if ret != 0 { Some(free_bytes_available) } else { None }
+        if ret != 0 {
+            Some(free_bytes_available)
+        } else {
+            None
+        }
     }
 
     #[cfg(unix)]
@@ -305,7 +313,10 @@ pub fn resolve_data_dir(app: &AppHandle) -> Result<PathBuf, StorageError> {
         if p.exists() || fs::create_dir_all(&p).is_ok() {
             return Ok(p);
         }
-        log::warn!("Custom data dir '{}' is not accessible, falling back to default", custom);
+        log::warn!(
+            "Custom data dir '{}' is not accessible, falling back to default",
+            custom
+        );
     }
     get_default_base_dir(app)
 }
@@ -319,7 +330,10 @@ pub fn resolve_cache_dir(app: &AppHandle) -> Result<PathBuf, StorageError> {
         if p.exists() || fs::create_dir_all(&p).is_ok() {
             return Ok(p);
         }
-        log::warn!("Custom cache dir '{}' is not accessible, falling back to default", custom);
+        log::warn!(
+            "Custom cache dir '{}' is not accessible, falling back to default",
+            custom
+        );
     }
     get_default_base_dir(app)
 }
@@ -352,7 +366,9 @@ pub async fn set_custom_data_dir(app: AppHandle, path: String) -> Result<(), Sto
     let validation = validate_dir(&path);
     if !validation.valid {
         return Err(StorageError::Other(
-            validation.error.unwrap_or_else(|| "Directory is not valid".to_string()),
+            validation
+                .error
+                .unwrap_or_else(|| "Directory is not valid".to_string()),
         ));
     }
 
@@ -369,7 +385,9 @@ pub async fn set_custom_cache_dir(app: AppHandle, path: String) -> Result<(), St
     let validation = validate_dir(&path);
     if !validation.valid {
         return Err(StorageError::Other(
-            validation.error.unwrap_or_else(|| "Directory is not valid".to_string()),
+            validation
+                .error
+                .unwrap_or_else(|| "Directory is not valid".to_string()),
         ));
     }
 
@@ -382,7 +400,10 @@ pub async fn set_custom_cache_dir(app: AppHandle, path: String) -> Result<(), St
 
 /// Migrate data to a new directory
 #[tauri::command]
-pub async fn migrate_data_dir(app: AppHandle, target_dir: String) -> Result<MigrationResult, StorageError> {
+pub async fn migrate_data_dir(
+    app: AppHandle,
+    target_dir: String,
+) -> Result<MigrationResult, StorageError> {
     let validation = validate_dir(&target_dir);
     if !validation.valid {
         return Ok(MigrationResult {
@@ -431,7 +452,9 @@ pub async fn migrate_data_dir(app: AppHandle, target_dir: String) -> Result<Migr
 
     log::info!(
         "Data migrated to '{}': {} files, {} bytes",
-        target_dir, total_files, total_bytes
+        target_dir,
+        total_files,
+        total_bytes
     );
 
     Ok(MigrationResult {
@@ -444,7 +467,10 @@ pub async fn migrate_data_dir(app: AppHandle, target_dir: String) -> Result<Migr
 
 /// Migrate cache to a new directory
 #[tauri::command]
-pub async fn migrate_cache_dir(app: AppHandle, target_dir: String) -> Result<MigrationResult, StorageError> {
+pub async fn migrate_cache_dir(
+    app: AppHandle,
+    target_dir: String,
+) -> Result<MigrationResult, StorageError> {
     let validation = validate_dir(&target_dir);
     if !validation.valid {
         return Ok(MigrationResult {
@@ -487,7 +513,9 @@ pub async fn migrate_cache_dir(app: AppHandle, target_dir: String) -> Result<Mig
 
     log::info!(
         "Cache migrated to '{}': {} files, {} bytes",
-        target_dir, total_files, total_bytes
+        target_dir,
+        total_files,
+        total_bytes
     );
 
     Ok(MigrationResult {

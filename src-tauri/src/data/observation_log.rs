@@ -175,9 +175,14 @@ pub struct ObservationStats {
 }
 
 fn get_log_path(app: &AppHandle) -> Result<PathBuf, StorageError> {
-    let app_data_dir = app.path().app_data_dir().map_err(|_| StorageError::AppDataDirNotFound)?;
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| StorageError::AppDataDirNotFound)?;
     let dir = app_data_dir.join("skymap").join("logs");
-    if !dir.exists() { fs::create_dir_all(&dir)?; }
+    if !dir.exists() {
+        fs::create_dir_all(&dir)?;
+    }
     Ok(dir.join("observation_log.json"))
 }
 
@@ -217,11 +222,13 @@ fn map_planned_target(target: CreatePlannedSessionTarget) -> Result<ExecutionTar
         order: target.order,
         status: target.status,
         observation_ids: target.observation_ids,
-        actual_start: target.actual_start
+        actual_start: target
+            .actual_start
             .as_deref()
             .map(parse_execution_datetime)
             .transpose()?,
-        actual_end: target.actual_end
+        actual_end: target
+            .actual_end
             .as_deref()
             .map(parse_execution_datetime)
             .transpose()?,
@@ -233,15 +240,14 @@ fn map_planned_target(target: CreatePlannedSessionTarget) -> Result<ExecutionTar
 }
 
 fn normalize_optional_text(value: Option<String>) -> Option<String> {
-    value
-        .and_then(|raw| {
-            let trimmed = raw.trim();
-            if trimmed.is_empty() {
-                None
-            } else {
-                Some(trimmed.to_lowercase())
-            }
-        })
+    value.and_then(|raw| {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_lowercase())
+        }
+    })
 }
 
 fn normalize_observation_filters(
@@ -264,11 +270,13 @@ fn normalize_observation_filters(
 
     Ok(ParsedObservationFilters {
         text: normalize_optional_text(merged.text),
-        start_date: merged.start_date
+        start_date: merged
+            .start_date
             .as_deref()
             .map(parse_session_date)
             .transpose()?,
-        end_date: merged.end_date
+        end_date: merged
+            .end_date
             .as_deref()
             .map(parse_session_date)
             .transpose()?,
@@ -330,23 +338,28 @@ fn observation_matches_filters(
 
     if let Some(text) = &filters.text {
         let matches_text = observation.object_name.to_lowercase().contains(text)
-            || observation.object_type
+            || observation
+                .object_type
                 .as_ref()
                 .map(|value| value.to_lowercase().contains(text))
                 .unwrap_or(false)
-            || observation.constellation
+            || observation
+                .constellation
                 .as_ref()
                 .map(|value| value.to_lowercase().contains(text))
                 .unwrap_or(false)
-            || observation.notes
+            || observation
+                .notes
                 .as_ref()
                 .map(|value| value.to_lowercase().contains(text))
                 .unwrap_or(false)
-            || session.location_name
+            || session
+                .location_name
                 .as_ref()
                 .map(|value| value.to_lowercase().contains(text))
                 .unwrap_or(false)
-            || session.notes
+            || session
+                .notes
                 .as_ref()
                 .map(|value| value.to_lowercase().contains(text))
                 .unwrap_or(false);
@@ -439,17 +452,52 @@ fn export_observation_log_csv(
                 escape_csv_value(&observation.object_name),
                 escape_csv_value(observation.object_type.as_deref().unwrap_or("")),
                 escape_csv_value(&observation.observed_at.to_rfc3339()),
-                escape_csv_value(&observation.ra.map(|value| value.to_string()).unwrap_or_default()),
-                escape_csv_value(&observation.dec.map(|value| value.to_string()).unwrap_or_default()),
+                escape_csv_value(
+                    &observation
+                        .ra
+                        .map(|value| value.to_string())
+                        .unwrap_or_default(),
+                ),
+                escape_csv_value(
+                    &observation
+                        .dec
+                        .map(|value| value.to_string())
+                        .unwrap_or_default(),
+                ),
                 escape_csv_value(observation.constellation.as_deref().unwrap_or("")),
-                escape_csv_value(&observation.rating.map(|value| value.to_string()).unwrap_or_default()),
-                escape_csv_value(&observation.difficulty.map(|value| value.to_string()).unwrap_or_default()),
+                escape_csv_value(
+                    &observation
+                        .rating
+                        .map(|value| value.to_string())
+                        .unwrap_or_default(),
+                ),
+                escape_csv_value(
+                    &observation
+                        .difficulty
+                        .map(|value| value.to_string())
+                        .unwrap_or_default(),
+                ),
                 escape_csv_value(observation.telescope_id.as_deref().unwrap_or("")),
                 escape_csv_value(observation.camera_id.as_deref().unwrap_or("")),
                 escape_csv_value(observation.execution_target_id.as_deref().unwrap_or("")),
-                escape_csv_value(&session.seeing.map(|value| value.to_string()).unwrap_or_default()),
-                escape_csv_value(&session.transparency.map(|value| value.to_string()).unwrap_or_default()),
-                escape_csv_value(&session.bortle_class.map(|value| value.to_string()).unwrap_or_default()),
+                escape_csv_value(
+                    &session
+                        .seeing
+                        .map(|value| value.to_string())
+                        .unwrap_or_default(),
+                ),
+                escape_csv_value(
+                    &session
+                        .transparency
+                        .map(|value| value.to_string())
+                        .unwrap_or_default(),
+                ),
+                escape_csv_value(
+                    &session
+                        .bortle_class
+                        .map(|value| value.to_string())
+                        .unwrap_or_default(),
+                ),
                 escape_csv_value(session.notes.as_deref().unwrap_or("")),
                 escape_csv_value(observation.notes.as_deref().unwrap_or("")),
             ]
@@ -465,13 +513,18 @@ fn export_observation_log_csv(
 #[tauri::command]
 pub async fn load_observation_log(app: AppHandle) -> Result<ObservationLogData, StorageError> {
     let path = get_log_path(&app)?;
-    if !path.exists() { return Ok(ObservationLogData::default()); }
+    if !path.exists() {
+        return Ok(ObservationLogData::default());
+    }
     let data = fs::read_to_string(&path)?;
     Ok(serde_json::from_str(&data)?)
 }
 
 #[tauri::command]
-pub async fn save_observation_log(app: AppHandle, log: ObservationLogData) -> Result<(), StorageError> {
+pub async fn save_observation_log(
+    app: AppHandle,
+    log: ObservationLogData,
+) -> Result<(), StorageError> {
     let path = get_log_path(&app)?;
     fs::write(&path, serde_json::to_string_pretty(&log)?)?;
     log::info!("Saved observation log to {:?}", path);
@@ -479,17 +532,37 @@ pub async fn save_observation_log(app: AppHandle, log: ObservationLogData) -> Re
 }
 
 #[tauri::command]
-pub async fn create_session(app: AppHandle, date: String, location_id: Option<String>, location_name: Option<String>) -> Result<ObservationSession, StorageError> {
+pub async fn create_session(
+    app: AppHandle,
+    date: String,
+    location_id: Option<String>,
+    location_name: Option<String>,
+) -> Result<ObservationSession, StorageError> {
     let mut log = load_observation_log(app.clone()).await?;
     let date = parse_session_date(&date)?;
 
     let session = ObservationSession {
-        id: generate_id("session"), date, location_id, location_name,
-        start_time: Some(Utc::now()), end_time: None, weather: None,
-        seeing: None, transparency: None, equipment_ids: Vec::new(),
-        bortle_class: None, notes: None, observations: Vec::new(),
-        source_plan_id: None, source_plan_name: None, execution_status: None, execution_targets: None,
-        weather_snapshot: None, execution_summary: None, created_at: Utc::now(), updated_at: Utc::now(),
+        id: generate_id("session"),
+        date,
+        location_id,
+        location_name,
+        start_time: Some(Utc::now()),
+        end_time: None,
+        weather: None,
+        seeing: None,
+        transparency: None,
+        equipment_ids: Vec::new(),
+        bortle_class: None,
+        notes: None,
+        observations: Vec::new(),
+        source_plan_id: None,
+        source_plan_name: None,
+        execution_status: None,
+        execution_targets: None,
+        weather_snapshot: None,
+        execution_summary: None,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     };
     log.sessions.push(session.clone());
     save_observation_log(app, log).await?;
@@ -540,9 +613,16 @@ pub async fn create_planned_session(
 }
 
 #[tauri::command]
-pub async fn add_observation(app: AppHandle, session_id: String, observation: Observation) -> Result<ObservationSession, StorageError> {
+pub async fn add_observation(
+    app: AppHandle,
+    session_id: String,
+    observation: Observation,
+) -> Result<ObservationSession, StorageError> {
     let mut log = load_observation_log(app.clone()).await?;
-    let session = log.sessions.iter_mut().find(|s| s.id == session_id)
+    let session = log
+        .sessions
+        .iter_mut()
+        .find(|s| s.id == session_id)
         .ok_or_else(|| StorageError::StoreNotFound(session_id.clone()))?;
 
     let mut obs = observation;
@@ -557,7 +637,10 @@ pub async fn add_observation(app: AppHandle, session_id: String, observation: Ob
 }
 
 #[tauri::command]
-pub async fn update_session(app: AppHandle, session: ObservationSession) -> Result<ObservationSession, StorageError> {
+pub async fn update_session(
+    app: AppHandle,
+    session: ObservationSession,
+) -> Result<ObservationSession, StorageError> {
     let mut log = load_observation_log(app.clone()).await?;
     if let Some(existing) = log.sessions.iter_mut().find(|s| s.id == session.id) {
         existing.location_id = session.location_id;
@@ -585,9 +668,15 @@ pub async fn update_session(app: AppHandle, session: ObservationSession) -> Resu
 }
 
 #[tauri::command]
-pub async fn end_session(app: AppHandle, session_id: String) -> Result<ObservationSession, StorageError> {
+pub async fn end_session(
+    app: AppHandle,
+    session_id: String,
+) -> Result<ObservationSession, StorageError> {
     let mut log = load_observation_log(app.clone()).await?;
-    let session = log.sessions.iter_mut().find(|s| s.id == session_id)
+    let session = log
+        .sessions
+        .iter_mut()
+        .find(|s| s.id == session_id)
         .ok_or_else(|| StorageError::StoreNotFound(session_id.clone()))?;
     session.end_time = Some(Utc::now());
     session.updated_at = Utc::now();
@@ -605,12 +694,23 @@ pub async fn delete_session(app: AppHandle, session_id: String) -> Result<(), St
 }
 
 #[tauri::command]
-pub async fn update_observation(app: AppHandle, session_id: String, observation: Observation) -> Result<ObservationSession, StorageError> {
+pub async fn update_observation(
+    app: AppHandle,
+    session_id: String,
+    observation: Observation,
+) -> Result<ObservationSession, StorageError> {
     let mut log = load_observation_log(app.clone()).await?;
-    let session = log.sessions.iter_mut().find(|s| s.id == session_id)
+    let session = log
+        .sessions
+        .iter_mut()
+        .find(|s| s.id == session_id)
         .ok_or_else(|| StorageError::StoreNotFound(session_id.clone()))?;
 
-    if let Some(existing) = session.observations.iter_mut().find(|o| o.id == observation.id) {
+    if let Some(existing) = session
+        .observations
+        .iter_mut()
+        .find(|o| o.id == observation.id)
+    {
         existing.object_name = observation.object_name;
         existing.object_type = observation.object_type;
         existing.ra = observation.ra;
@@ -638,9 +738,16 @@ pub async fn update_observation(app: AppHandle, session_id: String, observation:
 }
 
 #[tauri::command]
-pub async fn delete_observation(app: AppHandle, session_id: String, observation_id: String) -> Result<ObservationSession, StorageError> {
+pub async fn delete_observation(
+    app: AppHandle,
+    session_id: String,
+    observation_id: String,
+) -> Result<ObservationSession, StorageError> {
     let mut log = load_observation_log(app.clone()).await?;
-    let session = log.sessions.iter_mut().find(|s| s.id == session_id)
+    let session = log
+        .sessions
+        .iter_mut()
+        .find(|s| s.id == session_id)
         .ok_or_else(|| StorageError::StoreNotFound(session_id.clone()))?;
 
     let before = session.observations.len();
@@ -663,19 +770,28 @@ pub async fn get_observation_stats(app: AppHandle) -> Result<ObservationStats, S
 
     let mut unique_objects = std::collections::HashSet::new();
     for session in &log.sessions {
-        for obs in &session.observations { unique_objects.insert(obs.object_name.to_lowercase()); }
+        for obs in &session.observations {
+            unique_objects.insert(obs.object_name.to_lowercase());
+        }
     }
 
-    let total_hours: f64 = log.sessions.iter()
+    let total_hours: f64 = log
+        .sessions
+        .iter()
         .filter_map(|s| match (s.start_time, s.end_time) {
             (Some(start), Some(end)) => Some((end - start).num_minutes() as f64 / 60.0),
             _ => None,
-        }).sum();
+        })
+        .sum();
 
-    let mut type_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut type_counts: std::collections::HashMap<String, usize> =
+        std::collections::HashMap::new();
     for session in &log.sessions {
         for obs in &session.observations {
-            let obj_type = obs.object_type.clone().unwrap_or_else(|| "Unknown".to_string());
+            let obj_type = obs
+                .object_type
+                .clone()
+                .unwrap_or_else(|| "Unknown".to_string());
             *type_counts.entry(obj_type).or_insert(0) += 1;
         }
     }
@@ -690,7 +806,14 @@ pub async fn get_observation_stats(app: AppHandle) -> Result<ObservationStats, S
     let mut monthly_counts: Vec<(String, usize)> = monthly.into_iter().collect();
     monthly_counts.sort_by(|a, b| a.0.cmp(&b.0));
 
-    Ok(ObservationStats { total_sessions, total_observations, unique_objects: unique_objects.len(), total_hours, objects_by_type, monthly_counts })
+    Ok(ObservationStats {
+        total_sessions,
+        total_observations,
+        unique_objects: unique_objects.len(),
+        total_hours,
+        objects_by_type,
+        monthly_counts,
+    })
 }
 
 #[tauri::command]
@@ -719,11 +842,13 @@ pub async fn export_observation_log(
             } else {
                 log
             };
-            serde_json::to_string_pretty(&payload)
-                .map_err(|e| StorageError::Other(e.to_string()))
+            serde_json::to_string_pretty(&payload).map_err(|e| StorageError::Other(e.to_string()))
         }
         "csv" => Ok(export_observation_log_csv(&log, &normalized)),
-        _ => Err(StorageError::Other(format!("Unsupported format: {}", format))),
+        _ => Err(StorageError::Other(format!(
+            "Unsupported format: {}",
+            format
+        ))),
     }
 }
 
@@ -988,14 +1113,8 @@ mod tests {
             total_observations: 50,
             unique_objects: 35,
             total_hours: 45.5,
-            objects_by_type: vec![
-                ("Galaxy".to_string(), 15),
-                ("Nebula".to_string(), 12),
-            ],
-            monthly_counts: vec![
-                ("2024-01".to_string(), 20),
-                ("2024-02".to_string(), 30),
-            ],
+            objects_by_type: vec![("Galaxy".to_string(), 15), ("Nebula".to_string(), 12)],
+            monthly_counts: vec![("2024-01".to_string(), 20), ("2024-02".to_string(), 30)],
         };
 
         let json = serde_json::to_string(&stats).unwrap();
@@ -1168,7 +1287,10 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].observation.id, "obs-ngc7000");
         assert_eq!(hits[0].session_id, "session-newer");
-        assert_eq!(hits[0].session_date, NaiveDate::from_ymd_opt(2025, 1, 12).unwrap());
+        assert_eq!(
+            hits[0].session_date,
+            NaiveDate::from_ymd_opt(2025, 1, 12).unwrap()
+        );
     }
 
     #[test]
@@ -1204,7 +1326,8 @@ mod tests {
         assert!(csv.contains("obs-ngc7000"));
         assert!(!csv.contains("obs-m42"));
 
-        let filtered_json = serde_json::to_string(&build_filtered_log_data(&log, &galaxy_filters)).unwrap();
+        let filtered_json =
+            serde_json::to_string(&build_filtered_log_data(&log, &galaxy_filters)).unwrap();
         assert!(filtered_json.contains("obs-m31"));
         assert!(filtered_json.contains("obs-ngc7000"));
         assert!(!filtered_json.contains("obs-m42"));
