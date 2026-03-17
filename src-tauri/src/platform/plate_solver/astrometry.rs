@@ -51,7 +51,7 @@ pub(super) async fn solve_with_local_astrometry(
     )
     .await
     .map_err(|_| {
-        PlateSolverError::LocalInvocation(LocalInvocationDiagnostics {
+        PlateSolverError::LocalInvocation(Box::new(LocalInvocationDiagnostics {
             error_code: "timeout".to_string(),
             profile_id,
             executable_path: Some(executable_path.clone()),
@@ -60,7 +60,7 @@ pub(super) async fn solve_with_local_astrometry(
             availability_reason: astrometry.availability_reason.clone(),
             stdout_excerpt: None,
             stderr_excerpt: None,
-        })
+        }))
     })?
     .map_err(|e| PlateSolverError::SolveFailed(format!("Task join error: {}", e)))?
     .map_err(PlateSolverError::Io)?;
@@ -73,7 +73,7 @@ pub(super) async fn solve_with_local_astrometry(
         }
         Ok(result)
     } else {
-        Err(PlateSolverError::LocalInvocation(
+        Err(PlateSolverError::LocalInvocation(Box::new(
             LocalInvocationDiagnostics {
                 error_code: "nonzero_exit".to_string(),
                 profile_id,
@@ -84,13 +84,13 @@ pub(super) async fn solve_with_local_astrometry(
                 stdout_excerpt: excerpt_output(&output.stdout),
                 stderr_excerpt: excerpt_output(&output.stderr),
             },
-        ))
+        )))
     }
 }
 
 fn parse_astrometry_result(wcs_path: &Path) -> Result<PlateSolveResult, PlateSolverError> {
     if !wcs_path.exists() {
-        return Err(PlateSolverError::LocalInvocation(
+        return Err(PlateSolverError::LocalInvocation(Box::new(
             LocalInvocationDiagnostics {
                 error_code: "result_missing".to_string(),
                 profile_id: Some(LocalSolverProfileId::AstrometrySolveField),
@@ -103,11 +103,11 @@ fn parse_astrometry_result(wcs_path: &Path) -> Result<PlateSolveResult, PlateSol
                 stdout_excerpt: None,
                 stderr_excerpt: None,
             },
-        ));
+        )));
     }
 
     // Parse the FITS WCS header from the .wcs file
-    let data = fs::read(&wcs_path)
+    let data = fs::read(wcs_path)
         .map_err(|e| PlateSolverError::SolveFailed(format!("Failed to read WCS file: {}", e)))?;
 
     let header_str = parse_fits_header_from_bytes(&data);
@@ -454,7 +454,7 @@ pub fn scan_astrometry_indexes_in_directory(dir: &Path) -> Vec<AstrometryIndex> 
 
         let metadata = entry.metadata().ok();
         let size_bytes = metadata.map(|m| m.len()).unwrap_or(0);
-        let size_mb = (size_bytes + (1024 * 1024) - 1) / (1024 * 1024);
+        let size_mb = size_bytes.div_ceil(1024 * 1024);
 
         let scale = parse_index_scale(&name);
         indexes.push(AstrometryIndex {

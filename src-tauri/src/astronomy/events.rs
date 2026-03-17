@@ -945,7 +945,7 @@ mod tests {
                     );
                     let day: u32 = date[8..10].parse().unwrap_or(0);
                     assert!(
-                        day >= 19 && day <= 21,
+                        (19..=21).contains(&day),
                         "Vernal equinox day should be 19-21, got {}",
                         day
                     );
@@ -958,7 +958,7 @@ mod tests {
                     );
                     let day: u32 = date[8..10].parse().unwrap_or(0);
                     assert!(
-                        day >= 20 && day <= 22,
+                        (20..=22).contains(&day),
                         "Summer solstice day should be 20-22, got {}",
                         day
                     );
@@ -971,7 +971,7 @@ mod tests {
                     );
                     let day: u32 = date[8..10].parse().unwrap_or(0);
                     assert!(
-                        day >= 22 && day <= 24,
+                        (22..=24).contains(&day),
                         "Autumnal equinox day should be 22-24, got {}",
                         day
                     );
@@ -984,7 +984,7 @@ mod tests {
                     );
                     let day: u32 = date[8..10].parse().unwrap_or(0);
                     assert!(
-                        day >= 20 && day <= 23,
+                        (20..=23).contains(&day),
                         "Winter solstice day should be 20-23, got {}",
                         day
                     );

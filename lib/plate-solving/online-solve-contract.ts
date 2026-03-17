@@ -1,42 +1,12 @@
 import type { SolveProgress } from './astrometry-api';
 import type { OnlineSolveProgress } from '@/lib/tauri/plate-solver-api';
-
-export type OnlineSolveRuntime = 'tauri' | 'web';
-
-export type OnlineSolveLifecycleStage =
-  | 'idle'
-  | 'preflight'
-  | 'authenticating'
-  | 'uploading'
-  | 'queued'
-  | 'solving'
-  | 'fetching'
-  | 'success'
-  | 'failed'
-  | 'cancelled';
-
-export type OnlineSolveErrorCode =
-  | 'missing_api_key'
-  | 'offline'
-  | 'auth_failed'
-  | 'upload_failed'
-  | 'timeout'
-  | 'network'
-  | 'service_failed'
-  | 'cancelled'
-  | 'invalid_image'
-  | 'unknown';
-
-export interface OnlineSolveDiagnostics {
-  runtime: OnlineSolveRuntime;
-  attemptCount: number;
-  maxAttempts: number;
-  terminalErrorCode?: OnlineSolveErrorCode | null;
-  cancelled?: boolean;
-  submissionId?: number | null;
-  jobId?: number | null;
-  operationId?: string | null;
-}
+import type {
+  OnlineServiceStatus,
+  OnlineSolveErrorCode,
+  OnlineSolveLifecycleStage,
+  OnlineSolveRuntime,
+  OnlineSolverReadiness,
+} from './online-solve-types';
 
 export interface OnlineSolveSessionState {
   stage: OnlineSolveLifecycleStage;
@@ -145,6 +115,17 @@ export function mapWebProgressToOnlineSession(
     };
   }
 
+  if (payload.stage === 'fetching') {
+    return {
+      ...current,
+      runtime: 'web',
+      stage: 'fetching',
+      progress: clampProgress(payload.progress),
+      jobId: payload.jobId,
+      message: '',
+    };
+  }
+
   if (payload.stage === 'success') {
     return {
       ...current,
@@ -216,4 +197,85 @@ export function classifyOnlineSolveError(input: unknown): {
 
 export function isRetryableOnlineError(code: OnlineSolveErrorCode): boolean {
   return code === 'timeout' || code === 'network' || code === 'service_failed';
+}
+
+export function deriveOnlineSolverReadiness(input: {
+  apiKey: string;
+  networkAvailable: boolean;
+  serviceStatus?: OnlineServiceStatus | null;
+}): OnlineSolverReadiness {
+  const trimmedKey = input.apiKey.trim();
+  const serviceStatus = input.serviceStatus ?? {
+    status: 'unknown' as const,
+    checkedAt: null,
+    message: null,
+  };
+  const serviceReachable = serviceStatus.status === 'reachable'
+    ? true
+    : serviceStatus.status === 'unreachable'
+      ? false
+      : null;
+
+  if (!trimmedKey) {
+    return {
+      state: 'blocked',
+      reason: 'missing_api_key',
+      message: 'API key required for online solving',
+      checkedAt: serviceStatus.checkedAt,
+      hasApiKey: false,
+      networkAvailable: input.networkAvailable,
+      serviceReachable,
+      canStart: false,
+    };
+  }
+
+  if (!input.networkAvailable) {
+    return {
+      state: 'blocked',
+      reason: 'offline',
+      message: 'Network is offline. Online solving unavailable.',
+      checkedAt: serviceStatus.checkedAt,
+      hasApiKey: true,
+      networkAvailable: false,
+      serviceReachable,
+      canStart: false,
+    };
+  }
+
+  if (serviceStatus.status === 'unreachable') {
+    return {
+      state: 'blocked',
+      reason: 'service_unreachable',
+      message: serviceStatus.message ?? 'Astrometry.net service is unreachable',
+      checkedAt: serviceStatus.checkedAt,
+      hasApiKey: true,
+      networkAvailable: true,
+      serviceReachable: false,
+      canStart: false,
+    };
+  }
+
+  if (serviceStatus.status === 'reachable') {
+    return {
+      state: 'ready',
+      reason: 'ready',
+      message: 'Online solver is ready',
+      checkedAt: serviceStatus.checkedAt,
+      hasApiKey: true,
+      networkAvailable: true,
+      serviceReachable: true,
+      canStart: true,
+    };
+  }
+
+  return {
+    state: 'degraded',
+    reason: 'checking',
+    message: 'Checking Astrometry.net availability...',
+    checkedAt: serviceStatus.checkedAt,
+    hasApiKey: true,
+    networkAvailable: true,
+    serviceReachable: null,
+    canStart: true,
+  };
 }

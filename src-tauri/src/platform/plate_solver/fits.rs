@@ -19,7 +19,7 @@ pub fn parse_fits_header_from_bytes(data: &[u8]) -> String {
         let card_str: String = card
             .iter()
             .map(|&b| {
-                if b >= 0x20 && b <= 0x7E {
+                if (0x20..=0x7E).contains(&b) {
                     b as char
                 } else {
                     ' '
@@ -155,11 +155,13 @@ pub fn parse_string_header_value(header: &HashMap<String, String>, key: &str) ->
 }
 
 pub fn parse_sip_coefficients(header: &HashMap<String, String>) -> Option<SipCoefficients> {
-    let mut sip = SipCoefficients::default();
-    sip.a_order = parse_u32_header_value(header, "A_ORDER");
-    sip.b_order = parse_u32_header_value(header, "B_ORDER");
-    sip.ap_order = parse_u32_header_value(header, "AP_ORDER");
-    sip.bp_order = parse_u32_header_value(header, "BP_ORDER");
+    let mut sip = SipCoefficients {
+        a_order: parse_u32_header_value(header, "A_ORDER"),
+        b_order: parse_u32_header_value(header, "B_ORDER"),
+        ap_order: parse_u32_header_value(header, "AP_ORDER"),
+        bp_order: parse_u32_header_value(header, "BP_ORDER"),
+        ..Default::default()
+    };
 
     for (key, raw) in header {
         let parsed = raw.trim().replace('D', "E").parse::<f64>();
@@ -325,8 +327,8 @@ mod tests {
         let sip = wcs.sip.unwrap();
         assert_eq!(sip.a_order, Some(2));
         assert_eq!(sip.b_order, Some(2));
-        assert!(sip.a_coeffs.get("A_0_2").is_some());
-        assert!(sip.b_coeffs.get("B_1_1").is_some());
+        assert!(sip.a_coeffs.contains_key("A_0_2"));
+        assert!(sip.b_coeffs.contains_key("B_1_1"));
         assert!(fov_w.unwrap() > 0.3 && fov_w.unwrap() < 0.4);
         assert!(fov_h.unwrap() > 0.2 && fov_h.unwrap() < 0.3);
     }

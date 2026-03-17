@@ -10,8 +10,13 @@ import { getZustandStorage } from '@/lib/storage';
 import { isTauri } from '@/lib/storage/platform';
 import {
   createInitialOnlineSolveSessionState,
+  deriveOnlineSolverReadiness,
   type OnlineSolveSessionState,
 } from '@/lib/plate-solving/online-solve-contract';
+import type {
+  OnlineServiceStatus,
+  OnlineSolverReadiness,
+} from '@/lib/plate-solving/online-solve-types';
 import { secretVaultApi } from '@/lib/tauri/secret-vault-api';
 import type {
   SolverType,
@@ -56,6 +61,7 @@ export interface PlateSolverState {
   
   // Online API key (for astrometry.net online)
   onlineApiKey: string;
+  onlineServiceStatus: OnlineServiceStatus;
   
   // Solve state
   solveStatus: SolveStatus;
@@ -92,6 +98,7 @@ export interface PlateSolverState {
   saveConfig: () => Promise<void>;
   loadConfig: () => Promise<void>;
   setOnlineApiKey: (key: string) => void;
+  setOnlineServiceStatus: (status: OnlineServiceStatus) => void;
   setSolveStatus: (status: SolveStatus, message?: string, progress?: number) => void;
   setLastResult: (result: SolveResult | null) => void;
   loadAvailableIndexes: (solverType: SolverType) => Promise<void>;
@@ -118,6 +125,11 @@ const initialState = {
   detectionError: null as string | null,
   config: DEFAULT_SOLVER_CONFIG,
   onlineApiKey: '',
+  onlineServiceStatus: {
+    status: 'unknown',
+    checkedAt: null,
+    message: null,
+  } as OnlineServiceStatus,
   solveStatus: 'idle' as SolveStatus,
   solveProgress: 0,
   solveMessage: '',
@@ -210,6 +222,10 @@ export const usePlateSolverStore = create<PlateSolverState>()(
 
       setOnlineApiKey: (key) => {
         set({ onlineApiKey: key });
+      },
+
+      setOnlineServiceStatus: (status) => {
+        set({ onlineServiceStatus: status });
       },
 
       setSolveStatus: (status, message = '', progress = 0) => {
@@ -354,24 +370,86 @@ if (typeof window !== 'undefined') {
 // ============================================================================
 
 export const selectActiveSolver = (state: PlateSolverState): SolverInfo | undefined => {
-  const solvers = state.detectedSolvers ?? [];
+  const solvers = selectDetectedSolversWithReadiness(state);
   const config = state.config ?? DEFAULT_SOLVER_CONFIG;
   return solvers.find(
     (solver) => solver.solver_type === config.solver_type
   );
 };
 
+export const selectOnlineSolverReadiness = (
+  state: PlateSolverState
+): OnlineSolverReadiness => deriveOnlineSolverReadiness({
+  apiKey: state.onlineApiKey,
+  networkAvailable: typeof navigator === 'undefined' ? true : navigator.onLine !== false,
+  serviceStatus: state.onlineServiceStatus,
+});
+
+let cachedDetectedSolversInput: SolverInfo[] | null = null;
+let cachedOnlineReadinessKey = '';
+let cachedDetectedSolversWithReadiness: SolverInfo[] = [];
+
+function getOnlineReadinessKey(readiness: OnlineSolverReadiness): string {
+  return [
+    readiness.state,
+    readiness.reason,
+    readiness.message ?? '',
+    readiness.canStart ? '1' : '0',
+  ].join('|');
+}
+
+export const selectDetectedSolversWithReadiness = (
+  state: PlateSolverState
+): SolverInfo[] => {
+  const detectedSolvers = state.detectedSolvers ?? [];
+  const readiness = selectOnlineSolverReadiness(state);
+  const readinessKey = getOnlineReadinessKey(readiness);
+
+  if (
+    cachedDetectedSolversInput === detectedSolvers
+    && cachedOnlineReadinessKey === readinessKey
+  ) {
+    return cachedDetectedSolversWithReadiness;
+  }
+
+  cachedDetectedSolversInput = detectedSolvers;
+  cachedOnlineReadinessKey = readinessKey;
+  cachedDetectedSolversWithReadiness = detectedSolvers.map((solver) => {
+    if (solver.solver_type !== 'astrometry_net_online') {
+      return solver;
+    }
+
+    const nextAvailabilityReason = readiness.state === 'ready' ? null : readiness.message;
+    if (
+      solver.is_available === readiness.canStart
+      && (solver.availability_reason ?? null) === (nextAvailabilityReason ?? null)
+    ) {
+      return solver;
+    }
+
+    return {
+      ...solver,
+      is_available: readiness.canStart,
+      availability_reason: nextAvailabilityReason,
+    };
+  });
+
+  return cachedDetectedSolversWithReadiness;
+};
+
 export const selectIsLocalSolverAvailable = (state: PlateSolverState): boolean => {
   const activeSolver = selectActiveSolver(state);
   if (!activeSolver) return false;
-  if (activeSolver.solver_type === 'astrometry_net_online') return true;
+  if (activeSolver.solver_type === 'astrometry_net_online') {
+    return selectOnlineSolverReadiness(state).canStart;
+  }
   return activeSolver.is_available;
 };
 
 export const selectCanSolve = (state: PlateSolverState): boolean => {
   const config = state.config ?? DEFAULT_SOLVER_CONFIG;
   if (config.solver_type === 'astrometry_net_online') {
-    return !!state.onlineApiKey;
+    return selectOnlineSolverReadiness(state).canStart;
   }
   return selectIsLocalSolverAvailable(state);
 };

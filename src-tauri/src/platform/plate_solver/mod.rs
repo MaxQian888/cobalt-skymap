@@ -228,7 +228,7 @@ pub async fn solve_image_local(
         }),
         Err(e) => {
             let local_diagnostics = match &e {
-                PlateSolverError::LocalInvocation(diagnostics) => Some(diagnostics.clone()),
+                PlateSolverError::LocalInvocation(diagnostics) => Some((**diagnostics).clone()),
                 _ => None,
             };
             Ok(SolveResult {

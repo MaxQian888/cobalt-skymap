@@ -8,6 +8,8 @@ import {
   selectActiveSolver,
   selectIsLocalSolverAvailable,
   selectCanSolve,
+  selectDetectedSolversWithReadiness,
+  selectOnlineSolverReadiness,
 } from '../plate-solver-store';
 import type { SolverInfo } from '@/lib/tauri/plate-solver-api';
 
@@ -106,6 +108,11 @@ describe('usePlateSolverStore', () => {
       imageAnalysis: null,
       isAnalysingImage: false,
       onlineSolveProgress: null,
+      onlineServiceStatus: {
+        status: 'unknown',
+        checkedAt: null,
+        message: null,
+      },
       solveHistory: [],
     });
     jest.clearAllMocks();
@@ -707,6 +714,12 @@ describe('selectors', () => {
       usePlateSolverStore.setState({
         detectedSolvers: [mockSolver],
         config: { ...usePlateSolverStore.getState().config, solver_type: 'astrometry_net_online' },
+        onlineApiKey: 'test-api-key',
+        onlineServiceStatus: {
+          status: 'reachable',
+          checkedAt: Date.now(),
+          message: null,
+        },
       });
 
       const state = usePlateSolverStore.getState();
@@ -794,10 +807,103 @@ describe('selectors', () => {
       usePlateSolverStore.setState({
         config: { ...usePlateSolverStore.getState().config, solver_type: 'astrometry_net_online' },
         onlineApiKey: 'test-api-key',
+        onlineServiceStatus: {
+          status: 'reachable',
+          checkedAt: Date.now(),
+          message: null,
+        },
       });
 
       const state = usePlateSolverStore.getState();
       expect(selectCanSolve(state)).toBe(true);
+    });
+
+    it('should return false for online solver when service is unreachable', () => {
+      usePlateSolverStore.setState({
+        config: { ...usePlateSolverStore.getState().config, solver_type: 'astrometry_net_online' },
+        onlineApiKey: 'test-api-key',
+        onlineServiceStatus: {
+          status: 'unreachable',
+          checkedAt: Date.now(),
+          message: 'Astrometry.net probe failed',
+        },
+      });
+
+      const state = usePlateSolverStore.getState();
+      expect(selectCanSolve(state)).toBe(false);
+    });
+  });
+
+  describe('online solver readiness selectors', () => {
+    it('returns degraded readiness while service health is still unknown', () => {
+      usePlateSolverStore.setState({
+        onlineApiKey: 'test-api-key',
+        onlineServiceStatus: {
+          status: 'unknown',
+          checkedAt: null,
+          message: null,
+        },
+      });
+
+      const readiness = selectOnlineSolverReadiness(usePlateSolverStore.getState());
+      expect(readiness.state).toBe('degraded');
+      expect(readiness.reason).toBe('checking');
+      expect(readiness.canStart).toBe(true);
+    });
+
+    it('enriches the online solver metadata with blocked availability reason', () => {
+      const mockSolver: SolverInfo = {
+        solver_type: 'astrometry_net_online',
+        name: 'Astrometry.net (Online)',
+        version: 'nova.astrometry.net',
+        executable_path: '',
+        is_available: true,
+        index_path: null,
+        installed_indexes: [],
+      };
+
+      usePlateSolverStore.setState({
+        detectedSolvers: [mockSolver],
+        config: { ...usePlateSolverStore.getState().config, solver_type: 'astrometry_net_online' },
+        onlineApiKey: '',
+        onlineServiceStatus: {
+          status: 'unknown',
+          checkedAt: null,
+          message: null,
+        },
+      });
+
+      const [displaySolver] = selectDetectedSolversWithReadiness(usePlateSolverStore.getState());
+      expect(displaySolver?.is_available).toBe(false);
+      expect(displaySolver?.availability_reason).toContain('API key');
+    });
+
+    it('keeps the derived online solver reference stable when inputs do not change', () => {
+      const mockSolver: SolverInfo = {
+        solver_type: 'astrometry_net_online',
+        name: 'Astrometry.net (Online)',
+        version: 'nova.astrometry.net',
+        executable_path: '',
+        is_available: true,
+        index_path: null,
+        installed_indexes: [],
+      };
+
+      usePlateSolverStore.setState({
+        detectedSolvers: [mockSolver],
+        config: { ...usePlateSolverStore.getState().config, solver_type: 'astrometry_net_online' },
+        onlineApiKey: '',
+        onlineServiceStatus: {
+          status: 'unknown',
+          checkedAt: null,
+          message: null,
+        },
+      });
+
+      const [firstSolver] = selectDetectedSolversWithReadiness(usePlateSolverStore.getState());
+      const [secondSolver] = selectDetectedSolversWithReadiness(usePlateSolverStore.getState());
+
+      expect(firstSolver).toBe(secondSolver);
     });
   });
 });

@@ -60,26 +60,20 @@ import type { ImageMetadata } from '@/types/starmap/plate-solving';
 import { SolverSettings } from './solver-settings';
 import { IndexManager } from './index-manager';
 import { 
-  AstrometryApiClient, 
   classifyOnlineSolveError,
   createErrorResult,
   createInitialOnlineSolveSessionState,
+  executeOnlineSolve,
   persistFileForLocalSolve,
-  isRetryableOnlineError,
   getProgressText,
   getProgressPercent,
-  mapTauriProgressToOnlineSession,
-  mapWebProgressToOnlineSession,
-  type OnlineSolveErrorCode,
   type OnlineSolveSessionState,
-  type SolveProgress,
   type UploadOptions 
 } from '@/lib/plate-solving';
 import type { PlateSolveResult } from '@/lib/plate-solving';
 import type { PlateSolverUnifiedProps, SolveMode } from '@/types/starmap/plate-solving';
 import { SolveResultCard } from './solve-result-card';
 import { isTauri } from '@/lib/tauri/app-control-api';
-import { formatRA, formatDec } from '@/lib/astronomy/coordinates/formats';
 import {
   usePlateSolverStore,
   selectActiveSolver,
@@ -90,107 +84,11 @@ import {
   isLocalSolver,
   cancelPlateSolve,
   cancelOnlineSolve,
-  solveOnline,
   DEFAULT_SOLVER_CONFIG,
-  type OnlineSolveResult as TauriOnlineSolveResult,
 } from '@/lib/tauri/plate-solver-api';
-import { secretVaultApi } from '@/lib/tauri/secret-vault-api';
 
 // Re-export types for backward compatibility
 export type { PlateSolverUnifiedProps, SolveMode } from '@/types/starmap/plate-solving';
-
-function toLegacyOnlineResult(online: TauriOnlineSolveResult): PlateSolveResult {
-  if (!online.success) {
-    const errorPrefix = online.error_code ? `[${online.error_code}] ` : '';
-    return createErrorResult(
-      'astrometry.net',
-      `${errorPrefix}${online.error_message ?? 'Online plate solve failed'}`
-    );
-  }
-
-  const wcs = online.wcs;
-  const ra = online.ra ?? wcs?.crval1 ?? null;
-  const dec = online.dec ?? wcs?.crval2 ?? null;
-
-  const wcsPixelScale = (() => {
-    if (wcs?.cd1_1 !== null && wcs?.cd1_1 !== undefined && wcs?.cd2_1 !== null && wcs?.cd2_1 !== undefined) {
-      return Math.sqrt((wcs.cd1_1 ** 2) + (wcs.cd2_1 ** 2)) * 3600;
-    }
-    if (wcs?.cdelt1 !== null && wcs?.cdelt1 !== undefined) {
-      return Math.abs(wcs.cdelt1) * 3600;
-    }
-    return null;
-  })();
-
-  const wcsRotation = (() => {
-    if (wcs?.cd1_1 !== null && wcs?.cd1_1 !== undefined && wcs?.cd2_1 !== null && wcs?.cd2_1 !== undefined) {
-      return Math.atan2(wcs.cd2_1, wcs.cd1_1) * (180 / Math.PI);
-    }
-    return wcs?.crota2 ?? wcs?.crota1 ?? null;
-  })();
-
-  const wcsFov = (() => {
-    if (!wcs?.naxis1 || !wcs?.naxis2) {
-      return null;
-    }
-    if (
-      wcs.cd1_1 !== null && wcs.cd1_1 !== undefined &&
-      wcs.cd1_2 !== null && wcs.cd1_2 !== undefined &&
-      wcs.cd2_1 !== null && wcs.cd2_1 !== undefined &&
-      wcs.cd2_2 !== null && wcs.cd2_2 !== undefined
-    ) {
-      const width = Math.sqrt((wcs.cd1_1 ** 2) + (wcs.cd2_1 ** 2)) * wcs.naxis1;
-      const height = Math.sqrt((wcs.cd1_2 ** 2) + (wcs.cd2_2 ** 2)) * wcs.naxis2;
-      return { width, height };
-    }
-    if (
-      wcs.cdelt1 !== null && wcs.cdelt1 !== undefined &&
-      wcs.cdelt2 !== null && wcs.cdelt2 !== undefined
-    ) {
-      return {
-        width: Math.abs(wcs.cdelt1) * wcs.naxis1,
-        height: Math.abs(wcs.cdelt2) * wcs.naxis2,
-      };
-    }
-    return null;
-  })();
-
-  const flipped = (() => {
-    if (
-      wcs?.cd1_1 !== null && wcs?.cd1_1 !== undefined &&
-      wcs?.cd1_2 !== null && wcs?.cd1_2 !== undefined &&
-      wcs?.cd2_1 !== null && wcs?.cd2_1 !== undefined &&
-      wcs?.cd2_2 !== null && wcs?.cd2_2 !== undefined
-    ) {
-      const det = (wcs.cd1_1 * wcs.cd2_2) - (wcs.cd1_2 * wcs.cd2_1);
-      return det > 0;
-    }
-    if (online.parity !== null && online.parity !== undefined) {
-      return online.parity > 0;
-    }
-    return false;
-  })();
-
-  return {
-    success: true,
-    coordinates: ra !== null && dec !== null ? {
-      ra,
-      dec,
-      raHMS: formatRA(ra),
-      decDMS: formatDec(dec),
-    } : null,
-    positionAngle: online.orientation ?? wcsRotation ?? 0,
-    pixelScale: online.pixscale ?? wcsPixelScale ?? 0,
-    fov: {
-      width: online.fov_width ?? wcsFov?.width ?? 0,
-      height: online.fov_height ?? wcsFov?.height ?? 0,
-    },
-    flipped,
-    solverName: 'Astrometry.net (Online)',
-    solveTime: online.solve_time_ms,
-    errorMessage: online.error_message ?? undefined,
-  };
-}
 
 // ============================================================================
 // Component
@@ -232,7 +130,7 @@ export function PlateSolverUnified({
   });
 
   // Cancel ref for online solve
-  const cancelClientRef = useRef<AstrometryApiClient | null>(null);
+  const cancelClientRef = useRef<{ cancel: () => void } | null>(null);
 
   // Ref to hold latest handleImageCapture for use in effects without stale closures
   const handleImageCaptureRef = useRef<((file: File, metadata?: ImageMetadata) => Promise<void>) | undefined>(undefined);
@@ -382,290 +280,73 @@ export function PlateSolverUnified({
     }
   }, [isDesktop, canSolveLocal, config, raHint, decHint, fovHint, activeSolver, onSolveComplete, addToHistory, t]);
 
-  // Handle online solve with optional retry logic
+  // Handle online solve through the shared dispatcher for both runtimes
   const handleOnlineSolve = useCallback(async (file: File, effectiveRaHint?: number, effectiveDecHint?: number) => {
     const runtime = isDesktop ? 'tauri' : 'web';
-    const maxAttempts = config?.retry_on_failure ? (config.max_retries + 1) : 1;
-    let session = createInitialOnlineSolveSessionState(runtime);
+    setSolving(true);
+    setResult(null);
 
-    const commitSession = (next: OnlineSolveSessionState) => {
-      session = next;
-      updateOnlineSession(next);
-    };
+    try {
+      const { result: solveResult, diagnostics } = await executeOnlineSolve({
+        runtime,
+        file,
+        onlineApiKey,
+        options,
+        searchRadius: config?.search_radius ?? 30,
+        retryOnFailure: config?.retry_on_failure ?? false,
+        maxRetries: config?.max_retries ?? 0,
+        timeoutSeconds: config?.timeout_seconds ?? 120,
+        effectiveRaHint,
+        effectiveDecHint,
+        updateSession: updateOnlineSession,
+        registerWebClient: runtime === 'web' ? (client) => {
+          cancelClientRef.current = client;
+        } : undefined,
+        t,
+      });
 
-    const pushOnlineHistory = (
-      solveResult: PlateSolveResult,
-      attemptCount: number,
-      terminalErrorCode?: OnlineSolveErrorCode | null,
-      cancelled = false
-    ) => {
+      setResult(solveResult);
       addToHistory({
         imageName: file.name,
         solveMode: 'online',
         result: solveResult,
-        diagnostics: {
-          runtime,
-          attemptCount,
-          maxAttempts,
-          terminalErrorCode: terminalErrorCode ?? null,
-          cancelled,
-          submissionId: session.subId,
-          jobId: session.jobId,
-          operationId: session.operationId,
-        },
+        diagnostics,
       });
-    };
 
-    const failImmediately = (code: OnlineSolveErrorCode, message: string) => {
-      const finalSession: OnlineSolveSessionState = {
-        ...session,
+      if (solveResult.success) {
+        onSolveComplete?.(solveResult);
+      }
+    } catch (error) {
+      const { code, message } = classifyOnlineSolveError(error);
+      const fallbackSession: OnlineSolveSessionState = {
+        ...createInitialOnlineSolveSessionState(runtime),
         stage: code === 'cancelled' ? 'cancelled' : 'failed',
         progress: 100,
         errorCode: code,
         errorMessage: message,
         cancelled: code === 'cancelled',
+        message,
       };
-      commitSession(finalSession);
       const errorResult = createErrorResult('astrometry.net', `[${code}] ${message}`);
+
+      updateOnlineSession(fallbackSession);
       setResult(errorResult);
-      pushOnlineHistory(errorResult, 0, code, code === 'cancelled');
-    };
-
-    if (!onlineApiKey) {
-      failImmediately(
-        'missing_api_key',
-        t('plateSolving.needApiKey') || 'API key required for online solving'
-      );
-      return;
-    }
-
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      failImmediately(
-        'offline',
-        t('plateSolving.offlineCannotSolve') || 'Network is offline. Online solving unavailable.'
-      );
-      return;
-    }
-
-    if (isDesktop) {
-      try {
-        await secretVaultApi.setPlateSolverApiKey(onlineApiKey);
-      } catch (error) {
-        failImmediately(
-          'auth_failed',
-          error instanceof Error ? error.message : (t('plateSolving.needApiKey') || 'API key required for online solving')
-        );
-        return;
-      }
-    }
-
-    setSolving(true);
-    setResult(null);
-    commitSession({
-      ...session,
-      stage: 'preflight',
-      progress: 5,
-      maxAttempts,
-      message: t('plateSolving.preflight') || 'Checking requirements...',
-      errorCode: null,
-      errorMessage: null,
-      cancelled: false,
-    });
-
-    try {
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        let unlistenProgress: (() => void) | null = null;
-        let cleanup: undefined | (() => Promise<void>);
-        const attemptCount = attempt + 1;
-        commitSession({
-          ...session,
-          attempt: attemptCount,
-          maxAttempts,
-          stage: 'authenticating',
-          progress: 10,
-          message: t('plateSolving.authenticating') || 'Authenticating...',
-          errorCode: null,
-          errorMessage: null,
-          cancelled: false,
-        });
-
-        try {
-          const effectiveOptions = { ...options };
-          if (effectiveRaHint !== undefined && effectiveDecHint !== undefined) {
-            effectiveOptions.centerRa = effectiveRaHint;
-            effectiveOptions.centerDec = effectiveDecHint;
-            effectiveOptions.radius = config?.search_radius ?? 30;
-          }
-          if (attempt > 0 && effectiveOptions.downsampleFactor) {
-            effectiveOptions.downsampleFactor = Math.min(effectiveOptions.downsampleFactor + attempt, 4);
-          }
-
-          if (isDesktop) {
-            const operationId = `${Date.now()}-${attemptCount}`;
-            const { listen } = await import('@tauri-apps/api/event');
-            unlistenProgress = await listen<{
-              stage: string;
-              progress: number;
-              message: string;
-              sub_id: number | null;
-              job_id: number | null;
-              operation_id: string | null;
-            }>('astrometry-progress', (event) => {
-              commitSession(mapTauriProgressToOnlineSession(event.payload, session));
-            });
-
-            const persisted = await persistFileForLocalSolve(file);
-            cleanup = persisted.cleanup;
-
-            const onlineResult = await solveOnline({
-              api_key: onlineApiKey,
-              image_path: persisted.filePath,
-              operation_id: operationId,
-              ra_hint: effectiveOptions.centerRa,
-              dec_hint: effectiveOptions.centerDec,
-              radius: effectiveOptions.radius,
-              scale_units: effectiveOptions.scaleUnits,
-              scale_lower: effectiveOptions.scaleLower,
-              scale_upper: effectiveOptions.scaleUpper,
-              scale_est: effectiveOptions.scaleEst,
-              scale_err: effectiveOptions.scaleErr,
-              downsample_factor: effectiveOptions.downsampleFactor,
-              tweak_order: effectiveOptions.tweakOrder,
-              crpix_center: effectiveOptions.crpixCenter,
-              parity: effectiveOptions.parity,
-              timeout_seconds: config?.timeout_seconds,
-              publicly_visible: effectiveOptions.publiclyVisible === 'y',
-            });
-
-            const solveResult = toLegacyOnlineResult(onlineResult);
-            const errorCode = onlineResult.error_code ?? null;
-            const errorMessage = onlineResult.error_message ?? null;
-            const nextSession: OnlineSolveSessionState = {
-              ...session,
-              operationId: onlineResult.operation_id ?? operationId,
-              jobId: onlineResult.job_id ?? session.jobId,
-              progress: 100,
-              stage: solveResult.success
-                ? 'success'
-                : (errorCode === 'cancelled' ? 'cancelled' : 'failed'),
-              errorCode,
-              errorMessage,
-              cancelled: errorCode === 'cancelled',
-            };
-            commitSession(nextSession);
-
-            if (solveResult.success) {
-              setResult(solveResult);
-              pushOnlineHistory(solveResult, attemptCount, null, false);
-              onSolveComplete?.(solveResult);
-              break;
-            }
-
-            const retryable = errorCode ? isRetryableOnlineError(errorCode) : false;
-            const canRetry = retryable && attemptCount < maxAttempts;
-            if (!canRetry) {
-              const enrichedMessage = `${solveResult.errorMessage ?? (t('plateSolving.failed') || 'Failed')} (Attempt ${attemptCount}/${maxAttempts})`;
-              const finalResult = createErrorResult('astrometry.net', enrichedMessage);
-              setResult(finalResult);
-              pushOnlineHistory(finalResult, attemptCount, errorCode, errorCode === 'cancelled');
-              break;
-            }
-          } else {
-            const client = new AstrometryApiClient({ apiKey: onlineApiKey });
-            cancelClientRef.current = client;
-            const solveResult = await client.solve(
-              file,
-              effectiveOptions,
-              (payload: SolveProgress) => commitSession(mapWebProgressToOnlineSession(payload, session))
-            );
-
-            if (solveResult.success) {
-              commitSession({
-                ...session,
-                stage: 'success',
-                progress: 100,
-                errorCode: null,
-                errorMessage: null,
-                cancelled: false,
-              });
-              setResult(solveResult);
-              pushOnlineHistory(solveResult, attemptCount, null, false);
-              onSolveComplete?.(solveResult);
-              break;
-            }
-
-            const { code, message } = classifyOnlineSolveError(
-              solveResult.errorMessage ?? (t('plateSolving.failed') || 'Online solve failed')
-            );
-            commitSession({
-              ...session,
-              stage: code === 'cancelled' ? 'cancelled' : 'failed',
-              progress: 100,
-              errorCode: code,
-              errorMessage: message,
-              cancelled: code === 'cancelled',
-            });
-
-            const retryable = isRetryableOnlineError(code);
-            const canRetry = retryable && attemptCount < maxAttempts;
-            if (!canRetry) {
-              const enrichedMessage = `${solveResult.errorMessage ?? message} (Attempt ${attemptCount}/${maxAttempts})`;
-              const finalResult = createErrorResult('astrometry.net', enrichedMessage);
-              setResult(finalResult);
-              pushOnlineHistory(finalResult, attemptCount, code, code === 'cancelled');
-              break;
-            }
-          }
-
-          await new Promise(r => setTimeout(r, 2000 * attemptCount));
-          commitSession({
-            ...session,
-            stage: 'uploading',
-            progress: 0,
-            message: t('plateSolving.retrying') || `Retrying (${attemptCount + 1}/${maxAttempts})...`,
-            errorCode: null,
-            errorMessage: null,
-            cancelled: false,
-          });
-        } catch (error) {
-          const { code, message } = classifyOnlineSolveError(error);
-          commitSession({
-            ...session,
-            stage: code === 'cancelled' ? 'cancelled' : 'failed',
-            progress: 100,
-            errorCode: code,
-            errorMessage: message,
-            cancelled: code === 'cancelled',
-          });
-
-          const canRetry = isRetryableOnlineError(code) && attemptCount < maxAttempts;
-          if (!canRetry) {
-            const finalResult = createErrorResult(
-              'astrometry.net',
-              `[${code}] ${message} (Attempt ${attemptCount}/${maxAttempts})`
-            );
-            setResult(finalResult);
-            pushOnlineHistory(finalResult, attemptCount, code, code === 'cancelled');
-            break;
-          }
-
-          await new Promise(r => setTimeout(r, 2000 * attemptCount));
-          commitSession({
-            ...session,
-            stage: 'uploading',
-            progress: 0,
-            message: t('plateSolving.retrying') || `Retrying (${attemptCount + 1}/${maxAttempts})...`,
-            errorCode: null,
-            errorMessage: null,
-            cancelled: false,
-          });
-        } finally {
-          unlistenProgress?.();
-          if (cleanup) {
-            cleanup().catch(() => {});
-          }
-        }
-      }
+      addToHistory({
+        imageName: file.name,
+        solveMode: 'online',
+        result: errorResult,
+        diagnostics: {
+          runtime,
+          attemptCount: 0,
+          maxAttempts: config?.retry_on_failure ? (config.max_retries + 1) : 1,
+          terminalErrorCode: code,
+          cancelled: code === 'cancelled',
+          submissionId: null,
+          jobId: null,
+          operationId: null,
+          artifactSummary: null,
+        },
+      });
     } finally {
       cancelClientRef.current = null;
       setSolving(false);

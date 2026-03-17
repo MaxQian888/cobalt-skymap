@@ -67,7 +67,7 @@ pub fn parse_ra_hms(ra_str: String) -> Result<f64, String> {
 
     // Try decimal degrees
     let deg = ra_str.trim().parse::<f64>().map_err(|e| e.to_string())?;
-    if deg < 0.0 || deg >= 360.0 {
+    if !(0.0..360.0).contains(&deg) {
         return Err(format!("RA out of range [0, 360): {}", deg));
     }
     Ok(deg)
@@ -104,7 +104,7 @@ pub fn parse_dec_dms(dec_str: String) -> Result<f64, String> {
         let sign = if d_str.starts_with('-') { -1.0 } else { 1.0 };
         let result = sign * (d.abs() + m / 60.0 + s / 3600.0);
 
-        if result < -90.0 || result > 90.0 {
+        if !(-90.0..=90.0).contains(&result) {
             return Err(format!("Dec out of range [-90, 90]: {}", result));
         }
         return Ok(result);
@@ -112,7 +112,7 @@ pub fn parse_dec_dms(dec_str: String) -> Result<f64, String> {
 
     // Try decimal degrees
     let deg = dec_str.trim().parse::<f64>().map_err(|e| e.to_string())?;
-    if deg < -90.0 || deg > 90.0 {
+    if !(-90.0..=90.0).contains(&deg) {
         return Err(format!("Dec out of range [-90, 90]: {}", deg));
     }
     Ok(deg)

@@ -129,6 +129,11 @@ describe('SolverSettings', () => {
         max_retries: 2,
       },
       onlineApiKey: '',
+      onlineServiceStatus: {
+        status: 'unknown',
+        checkedAt: null,
+        message: null,
+      },
     });
     jest.clearAllMocks();
   });
@@ -400,7 +405,27 @@ describe('SolverSettings', () => {
 
     render(<SolverSettings />);
 
-    expect(screen.getByText('plateSolving.needApiKey')).toBeInTheDocument();
+    expect(screen.getAllByText('API key required for online solving')).toHaveLength(2);
+  });
+
+  it('should show readiness reason when online service is unreachable', () => {
+    usePlateSolverStore.setState({
+      ...usePlateSolverStore.getState(),
+      config: {
+        ...usePlateSolverStore.getState().config,
+        solver_type: 'astrometry_net_online',
+      },
+      onlineApiKey: 'test-key',
+      onlineServiceStatus: {
+        status: 'unreachable',
+        checkedAt: Date.now(),
+        message: 'Astrometry.net probe failed',
+      },
+    });
+
+    render(<SolverSettings />);
+
+    expect(screen.getAllByText('Astrometry.net probe failed')).toHaveLength(2);
   });
 
   it('should show cannot-solve alert for unavailable local solver', () => {

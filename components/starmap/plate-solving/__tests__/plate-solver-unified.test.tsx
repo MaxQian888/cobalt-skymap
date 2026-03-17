@@ -318,6 +318,7 @@ jest.mock('@/lib/plate-solving', () => ({
   })),
   getProgressText: jest.fn(() => ''),
   getProgressPercent: jest.fn(() => 0),
+  executeOnlineSolve: jest.fn(),
 }));
 
 const renderWithProviders = (ui: React.ReactElement) => {
@@ -1091,22 +1092,65 @@ describe('PlateSolverUnified', () => {
       mockIsTauri.mockReturnValue(false);
     });
 
-    it('should trigger online solve via AstrometryApiClient in web mode', async () => {
-      const mockAstrometryClient = jest.requireMock('@/lib/plate-solving').AstrometryApiClient;
-      const mockSolve = jest.fn().mockResolvedValue({
-        success: true,
-        coordinates: { ra: 180.1, dec: 45.05, raHMS: '12h00m24s', decDMS: '+45d03m' },
-        positionAngle: 12.5,
-        pixelScale: 1.2,
-        fov: { width: 2.5, height: 1.8 },
-        flipped: false,
-        solverName: 'astrometry.net',
-        solveTime: 1200,
+    it('should delegate online solves to the shared dispatcher', async () => {
+      const mockExecuteOnlineSolve = jest.requireMock('@/lib/plate-solving').executeOnlineSolve;
+      mockExecuteOnlineSolve.mockResolvedValue({
+        result: {
+          success: true,
+          coordinates: { ra: 180.1, dec: 45.05, raHMS: '12h00m24s', decDMS: '+45d03m' },
+          positionAngle: 12.5,
+          pixelScale: 1.2,
+          fov: { width: 2.5, height: 1.8 },
+          flipped: false,
+          solverName: 'Astrometry.net (Online)',
+          solveTime: 1200,
+          onlineSolve: {
+            runtime: 'web',
+            operationId: null,
+            submissionId: 42,
+            jobId: 77,
+            objectsInField: ['M31'],
+            annotations: [],
+            wcs: null,
+            frameSize: { width: 3000, height: 2000 },
+            diagnostics: { annotations: 'complete', wcs: 'missing', issues: [] },
+            errorCode: null,
+            errorMessage: null,
+          },
+        },
+        diagnostics: {
+          runtime: 'web',
+          attemptCount: 1,
+          maxAttempts: 1,
+          terminalErrorCode: null,
+          cancelled: false,
+          submissionId: 42,
+          jobId: 77,
+          operationId: null,
+          artifactSummary: {
+            objectsInFieldCount: 1,
+            annotationCount: 0,
+            hasWcs: false,
+            annotations: 'complete',
+            wcs: 'missing',
+            issues: [],
+          },
+        },
+        session: {
+          stage: 'success',
+          runtime: 'web',
+          progress: 100,
+          attempt: 1,
+          maxAttempts: 1,
+          message: '',
+          errorCode: null,
+          errorMessage: null,
+          cancelled: false,
+          subId: 42,
+          jobId: 77,
+          operationId: null,
+        },
       });
-      mockAstrometryClient.mockImplementation(() => ({
-        solve: mockSolve,
-        cancel: jest.fn(),
-      }));
 
       usePlateSolverStore.setState({
         ...usePlateSolverStore.getState(),
@@ -1126,17 +1170,113 @@ describe('PlateSolverUnified', () => {
       await triggerImageCapture(file);
 
       await waitFor(() => {
-        expect(mockSolve).toHaveBeenCalled();
+        expect(mockExecuteOnlineSolve).toHaveBeenCalled();
+      });
+    });
+
+    it('should trigger online solve via AstrometryApiClient in web mode', async () => {
+      const mockExecuteOnlineSolve = jest.requireMock('@/lib/plate-solving').executeOnlineSolve;
+      mockExecuteOnlineSolve.mockResolvedValue({
+        result: {
+          success: true,
+          coordinates: { ra: 180.1, dec: 45.05, raHMS: '12h00m24s', decDMS: '+45d03m' },
+          positionAngle: 12.5,
+          pixelScale: 1.2,
+          fov: { width: 2.5, height: 1.8 },
+          flipped: false,
+          solverName: 'astrometry.net',
+          solveTime: 1200,
+        },
+        diagnostics: {
+          runtime: 'web',
+          attemptCount: 1,
+          maxAttempts: 1,
+          terminalErrorCode: null,
+          cancelled: false,
+          submissionId: 42,
+          jobId: 77,
+          operationId: null,
+          artifactSummary: null,
+        },
+        session: {
+          stage: 'success',
+          runtime: 'web',
+          progress: 100,
+          attempt: 1,
+          maxAttempts: 1,
+          message: '',
+          errorCode: null,
+          errorMessage: null,
+          cancelled: false,
+          subId: 42,
+          jobId: 77,
+          operationId: null,
+        },
+      });
+
+      usePlateSolverStore.setState({
+        ...usePlateSolverStore.getState(),
+        onlineApiKey: 'test-key',
+      });
+
+      renderWithProviders(<PlateSolverUnified />);
+
+      const triggerButton = screen.getByRole('button');
+      fireEvent.click(triggerButton);
+
+      await waitFor(() => {
+        expect(capturedOnImageCapture).not.toBeNull();
+      });
+
+      const file = new File(['test'], 'star.jpg', { type: 'image/jpeg' });
+      await triggerImageCapture(file);
+
+      await waitFor(() => {
+        expect(mockExecuteOnlineSolve).toHaveBeenCalled();
         expect(screen.getByTestId('solve-result')).toBeInTheDocument();
       });
     });
 
     it('should handle online solve error in web mode', async () => {
-      const mockAstrometryClient = jest.requireMock('@/lib/plate-solving').AstrometryApiClient;
-      mockAstrometryClient.mockImplementation(() => ({
-        solve: jest.fn().mockRejectedValue(new Error('Network error')),
-        cancel: jest.fn(),
-      }));
+      const mockExecuteOnlineSolve = jest.requireMock('@/lib/plate-solving').executeOnlineSolve;
+      mockExecuteOnlineSolve.mockResolvedValue({
+        result: {
+          success: false,
+          coordinates: null,
+          positionAngle: 0,
+          pixelScale: 0,
+          fov: { width: 0, height: 0 },
+          flipped: false,
+          solverName: 'astrometry.net',
+          solveTime: 500,
+          errorMessage: '[network] Network error (Attempt 1/1)',
+        },
+        diagnostics: {
+          runtime: 'web',
+          attemptCount: 1,
+          maxAttempts: 1,
+          terminalErrorCode: 'network',
+          cancelled: false,
+          submissionId: null,
+          jobId: null,
+          operationId: null,
+          artifactSummary: null,
+        },
+        session: {
+          stage: 'failed',
+          runtime: 'web',
+          progress: 100,
+          attempt: 1,
+          maxAttempts: 1,
+          message: 'Network error',
+          errorCode: 'network',
+          errorMessage: 'Network error',
+          cancelled: false,
+          subId: null,
+          jobId: null,
+          operationId: null,
+        },
+      });
 
       usePlateSolverStore.setState({
         ...usePlateSolverStore.getState(),
@@ -1156,6 +1296,7 @@ describe('PlateSolverUnified', () => {
       await triggerImageCapture(file);
 
       await waitFor(() => {
+        expect(mockExecuteOnlineSolve).toHaveBeenCalled();
         expect(screen.getByTestId('solve-result')).toBeInTheDocument();
       });
     });

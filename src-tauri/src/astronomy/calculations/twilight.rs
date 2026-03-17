@@ -223,7 +223,7 @@ mod tests {
         assert!(result.is_ok());
         // At 70°N on summer solstice, expect polar day
         let twilight = result.unwrap();
-        assert!(twilight.is_polar_day || twilight.is_polar_night == false);
+        assert!(twilight.is_polar_day || !twilight.is_polar_night);
     }
 
     #[test]

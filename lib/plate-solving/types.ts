@@ -9,6 +9,8 @@
 // Plate Solver Types
 // ============================================================================
 
+import type { OnlineSolveArtifact } from './online-solve-types';
+
 export interface PlateSolveResult {
   success: boolean;
   coordinates: {
@@ -28,6 +30,9 @@ export interface PlateSolveResult {
   // Solver info
   solverName: string;
   solveTime: number;     // Milliseconds
+
+  // Optional online solve metadata
+  onlineSolve?: OnlineSolveArtifact | null;
   
   // Error info
   errorMessage?: string;
@@ -43,6 +48,7 @@ export function createErrorResult(solverName: string, errorMessage: string): Pla
     flipped: false,
     solverName,
     solveTime: 0,
+    onlineSolve: null,
     errorMessage,
   };
 }

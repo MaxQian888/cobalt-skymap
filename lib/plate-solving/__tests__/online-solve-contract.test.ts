@@ -1,6 +1,7 @@
 import {
   classifyOnlineSolveError,
   createInitialOnlineSolveSessionState,
+  deriveOnlineSolverReadiness,
   isRetryableOnlineError,
   mapTauriProgressToOnlineSession,
   mapWebProgressToOnlineSession,
@@ -189,6 +190,7 @@ describe('online-solve-contract', () => {
     [{ stage: 'uploading', progress: 12 }, 'uploading', 12],
     [{ stage: 'queued', subid: 42 }, 'queued', 30],
     [{ stage: 'processing', jobId: 77 }, 'solving', 60],
+    [{ stage: 'fetching', jobId: 77, progress: 82 }, 'fetching', 82],
     [{ stage: 'success', result: successSolveResult }, 'success', 100],
   ] as const)('maps web %s progress to a normalized session', (payload, expectedStage, expectedProgress) => {
     const mapped = mapWebProgressToOnlineSession(
@@ -260,5 +262,88 @@ describe('online-solve-contract', () => {
     expect(isRetryableOnlineError('network')).toBe(true);
     expect(isRetryableOnlineError('service_failed')).toBe(true);
     expect(isRetryableOnlineError('auth_failed')).toBe(false);
+  });
+
+  describe('deriveOnlineSolverReadiness', () => {
+    it('blocks readiness when API key is missing', () => {
+      expect(deriveOnlineSolverReadiness({
+        apiKey: '',
+        networkAvailable: true,
+        serviceStatus: {
+          status: 'reachable',
+          checkedAt: 123,
+          message: null,
+        },
+      })).toEqual(expect.objectContaining({
+        state: 'blocked',
+        reason: 'missing_api_key',
+        canStart: false,
+      }));
+    });
+
+    it('blocks readiness when runtime is offline', () => {
+      expect(deriveOnlineSolverReadiness({
+        apiKey: 'test-key',
+        networkAvailable: false,
+        serviceStatus: {
+          status: 'reachable',
+          checkedAt: 456,
+          message: null,
+        },
+      })).toEqual(expect.objectContaining({
+        state: 'blocked',
+        reason: 'offline',
+        canStart: false,
+      }));
+    });
+
+    it('surfaces degraded readiness while service health is still unknown', () => {
+      expect(deriveOnlineSolverReadiness({
+        apiKey: 'test-key',
+        networkAvailable: true,
+        serviceStatus: {
+          status: 'unknown',
+          checkedAt: null,
+          message: null,
+        },
+      })).toEqual(expect.objectContaining({
+        state: 'degraded',
+        reason: 'checking',
+        canStart: true,
+      }));
+    });
+
+    it('blocks readiness when latest service probe is unreachable', () => {
+      expect(deriveOnlineSolverReadiness({
+        apiKey: 'test-key',
+        networkAvailable: true,
+        serviceStatus: {
+          status: 'unreachable',
+          checkedAt: 789,
+          message: 'Astrometry.net probe failed',
+        },
+      })).toEqual(expect.objectContaining({
+        state: 'blocked',
+        reason: 'service_unreachable',
+        message: 'Astrometry.net probe failed',
+        canStart: false,
+      }));
+    });
+
+    it('returns ready readiness when credentials and service health pass', () => {
+      expect(deriveOnlineSolverReadiness({
+        apiKey: 'test-key',
+        networkAvailable: true,
+        serviceStatus: {
+          status: 'reachable',
+          checkedAt: 999,
+          message: null,
+        },
+      })).toEqual(expect.objectContaining({
+        state: 'ready',
+        reason: 'ready',
+        canStart: true,
+      }));
+    });
   });
 });

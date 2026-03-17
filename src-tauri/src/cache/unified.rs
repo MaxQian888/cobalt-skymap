@@ -971,8 +971,10 @@ mod tests {
 
     #[test]
     fn test_cache_index_with_cleanup_timestamp() {
-        let mut index = CacheIndex::default();
-        index.last_cleanup = Some(Utc::now());
+        let index = CacheIndex {
+            last_cleanup: Some(Utc::now()),
+            ..Default::default()
+        };
 
         let json = serde_json::to_string(&index).unwrap();
         let back: CacheIndex = serde_json::from_str(&json).unwrap();

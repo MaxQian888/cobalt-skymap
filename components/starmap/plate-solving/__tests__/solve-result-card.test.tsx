@@ -88,6 +88,34 @@ describe('SolveResultCard', () => {
       render(<SolveResultCard result={successResult} />);
       expect(screen.queryByText('plateSolving.goToPosition')).not.toBeInTheDocument();
     });
+
+    it('should preserve successful online solve presentation when artifact metadata exists', () => {
+      render(<SolveResultCard result={{
+        ...successResult,
+        solverName: 'Astrometry.net (Online)',
+        onlineSolve: {
+          runtime: 'web',
+          operationId: null,
+          submissionId: 42,
+          jobId: 77,
+          objectsInField: ['M31', 'NGC 224'],
+          annotations: [{ names: ['M31'], annotationType: 'galaxy', pixelX: 100, pixelY: 200, radius: 30 }],
+          wcs: null,
+          frameSize: { width: 3000, height: 2000 },
+          diagnostics: {
+            annotations: 'complete',
+            wcs: 'missing',
+            issues: [],
+          },
+          errorCode: null,
+          errorMessage: null,
+        },
+      }} />);
+
+      expect(screen.getByText('plateSolving.solveSuccess')).toBeInTheDocument();
+      expect(screen.getByText(/Astrometry\.net \(Online\)/i)).toBeInTheDocument();
+      expect(screen.getByText(/12h02m00s/)).toBeInTheDocument();
+    });
   });
 
   describe('failed result', () => {

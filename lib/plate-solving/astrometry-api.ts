@@ -5,8 +5,14 @@
  * Reference: https://astrometry.net/doc/net/api.html
  */
 
-import { createErrorResult, type PlateSolveResult } from './types';
+import { createErrorResult, type PlateSolveResult, type WorldCoordinateSystem } from './types';
+import { parseFITSHeader, type WCSInfo } from './fits-parser';
 import { formatRA, formatDec } from '@/lib/astronomy/coordinates/formats';
+import {
+  createEmptyOnlineSolveArtifact,
+  type NormalizedOnlineAnnotation,
+  type OnlineSolveDetailedResult,
+} from './online-solve-types';
 
 // ============================================================================
 // Types
@@ -64,8 +70,38 @@ export type SolveProgress =
   | { stage: 'uploading'; progress: number }
   | { stage: 'queued'; subid: number }
   | { stage: 'processing'; jobId: number }
+  | { stage: 'fetching'; jobId: number; progress: number }
   | { stage: 'success'; result: PlateSolveResult }
   | { stage: 'failed'; error: string };
+
+function toWorldCoordinateSystem(wcs?: WCSInfo): WorldCoordinateSystem | null {
+  if (!wcs?.cdMatrix) {
+    return null;
+  }
+
+  return {
+    referencePixel: wcs.referencePixel,
+    referenceCoordinates: wcs.referenceCoordinates,
+    cdMatrix: [
+      wcs.cdMatrix.cd1_1,
+      wcs.cdMatrix.cd1_2,
+      wcs.cdMatrix.cd2_1,
+      wcs.cdMatrix.cd2_2,
+    ],
+    pixelScale: wcs.pixelScale,
+    rotation: wcs.rotation,
+  };
+}
+
+function normalizeAnnotations(annotations: AnnotationObject[]): NormalizedOnlineAnnotation[] {
+  return annotations.map((annotation) => ({
+    names: [...annotation.names],
+    annotationType: annotation.type,
+    pixelX: annotation.pixelx,
+    pixelY: annotation.pixely,
+    radius: annotation.radius,
+  }));
+}
 
 // ============================================================================
 // API Client
@@ -288,6 +324,32 @@ export class AstrometryApiClient {
     return data.annotations || [];
   }
 
+  async getWcsMetadata(jobId: number): Promise<{
+    wcs: WorldCoordinateSystem | null;
+    frameSize: { width: number; height: number } | null;
+  }> {
+    const response = await fetch(
+      `${this.config.baseUrl}/wcs_file/${jobId}`,
+      { signal: this.abortController?.signal }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to get WCS metadata: HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const file = new File([blob], `astrometry-${jobId}.fits`, {
+      type: blob.type || 'application/fits',
+    });
+    const metadata = await parseFITSHeader(file);
+
+    return {
+      wcs: toWorldCoordinateSystem(metadata.wcs),
+      frameSize: metadata.image
+        ? { width: metadata.image.width, height: metadata.image.height }
+        : null,
+    };
+  }
+
   /**
    * Solve an image file with progress updates
    */
@@ -296,8 +358,18 @@ export class AstrometryApiClient {
     options: Partial<UploadOptions> = {},
     onProgress?: (progress: SolveProgress) => void
   ): Promise<PlateSolveResult> {
+    const detailed = await this.solveDetailed(file, options, onProgress);
+    return detailed.solveResult;
+  }
+
+  async solveDetailed(
+    file: File | Blob,
+    options: Partial<UploadOptions> = {},
+    onProgress?: (progress: SolveProgress) => void
+  ): Promise<OnlineSolveDetailedResult> {
     this.abortController = new AbortController();
     const startTime = Date.now();
+    const artifact = createEmptyOnlineSolveArtifact('web');
 
     try {
       // Upload the file
@@ -306,6 +378,7 @@ export class AstrometryApiClient {
       if (!submission.subid) {
         throw new Error('No submission ID returned');
       }
+      artifact.submissionId = submission.subid;
 
       onProgress?.({ stage: 'queued', subid: submission.subid });
 
@@ -321,6 +394,7 @@ export class AstrometryApiClient {
         
         if (status.jobs && status.jobs.length > 0) {
           jobId = status.jobs[0];
+          artifact.jobId = jobId;
         }
       }
 
@@ -343,8 +417,43 @@ export class AstrometryApiClient {
       }
 
       // Get results
+      onProgress?.({ stage: 'fetching', jobId, progress: 85 });
       const calibration = await this.getCalibration(jobId);
       const objects = await this.getObjectsInField(jobId);
+      artifact.objectsInField = objects;
+
+      try {
+        const annotations = await this.getAnnotations(jobId);
+        artifact.annotations = normalizeAnnotations(annotations);
+        artifact.diagnostics.annotations = 'complete';
+      } catch (error) {
+        artifact.diagnostics.annotations = 'missing';
+        artifact.diagnostics.issues.push({
+          artifact: 'annotations',
+          message: error instanceof Error ? error.message : 'Failed to fetch annotations',
+        });
+      }
+
+      try {
+        const wcsMetadata = await this.getWcsMetadata(jobId);
+        artifact.wcs = wcsMetadata.wcs;
+        artifact.frameSize = wcsMetadata.frameSize;
+        if (wcsMetadata.wcs) {
+          artifact.diagnostics.wcs = 'complete';
+        } else {
+          artifact.diagnostics.wcs = 'missing';
+          artifact.diagnostics.issues.push({
+            artifact: 'wcs',
+            message: 'WCS metadata missing from response',
+          });
+        }
+      } catch (error) {
+        artifact.diagnostics.wcs = 'missing';
+        artifact.diagnostics.issues.push({
+          artifact: 'wcs',
+          message: error instanceof Error ? error.message : 'Failed to fetch WCS metadata',
+        });
+      }
 
       // Extract image dimensions for accurate FOV calculation
       let imageWidth: number | undefined;
@@ -362,10 +471,14 @@ export class AstrometryApiClient {
         imageWidth,
         imageHeight
       );
+      result.onlineSolve = artifact;
 
       onProgress?.({ stage: 'success', result });
 
-      return result;
+      return {
+        solveResult: result,
+        artifact,
+      };
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -373,7 +486,12 @@ export class AstrometryApiClient {
       
       const result = createErrorResult('astrometry.net', errorMessage);
       result.solveTime = Date.now() - startTime;
-      return result;
+      artifact.errorMessage = errorMessage;
+      result.onlineSolve = artifact;
+      return {
+        solveResult: result,
+        artifact,
+      };
     } finally {
       this.abortController = null;
     }

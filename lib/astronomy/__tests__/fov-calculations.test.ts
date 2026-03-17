@@ -10,6 +10,7 @@ const {
   calculateImageScale,
   calculateSensorResolution,
   calculateMosaicCoverage,
+  buildResolvedMosaicPlan,
   parseAngularSizeArcmin,
   evaluateTargetFit,
   evaluateTargetFitFromSize,
@@ -225,9 +226,105 @@ describe('validateMosaicSettings', () => {
       cols: 6,
       overlap: 10,
       overlapUnit: 'percent',
+      layoutMode: 'rectangular',
+      panelOrder: 'row-major',
     });
 
     expect(result.issues.some((i) => i.code === 'panel_count_extreme')).toBe(true);
+  });
+
+  it('fills advanced planner defaults for legacy mosaic payloads', () => {
+    const result = validateMosaicSettings({
+      enabled: true,
+      rows: 2,
+      cols: 3,
+      overlap: 15,
+      overlapUnit: 'percent',
+    } as unknown as Parameters<typeof validateMosaicSettings>[0]);
+
+    expect(result.sanitized.layoutMode).toBe('rectangular');
+    expect(result.sanitized.panelOrder).toBe('row-major');
+  });
+});
+
+describe('buildResolvedMosaicPlan', () => {
+  it('builds rectangular plans with row-major ordering', () => {
+    const plan = buildResolvedMosaicPlan(2, 1, {
+      enabled: true,
+      rows: 2,
+      cols: 2,
+      overlap: 10,
+      overlapUnit: 'percent',
+      layoutMode: 'rectangular',
+      panelOrder: 'row-major',
+    }, { width: 4000, height: 3000 });
+
+    expect(plan).not.toBeNull();
+    expect(plan?.totalPanels).toBe(4);
+    expect(plan?.width).toBeCloseTo(3.8);
+    expect(plan?.height).toBeCloseTo(1.9);
+    expect(plan?.panels.map((panel) => panel.sequence)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('offsets alternate rows for staggered layouts', () => {
+    const plan = buildResolvedMosaicPlan(2, 1, {
+      enabled: true,
+      rows: 2,
+      cols: 3,
+      overlap: 10,
+      overlapUnit: 'percent',
+      layoutMode: 'staggered',
+      panelOrder: 'row-major',
+    }, { width: 4000, height: 3000 });
+
+    expect(plan).not.toBeNull();
+    expect(plan?.panels.find((panel) => panel.row === 1 && panel.col === 0)?.x).toBeGreaterThan(0);
+    expect(plan?.width).toBeGreaterThan(5.6);
+  });
+
+  it('reorders acquisition sequence for serpentine and center-out modes', () => {
+    const serpentine = buildResolvedMosaicPlan(2, 1, {
+      enabled: true,
+      rows: 2,
+      cols: 3,
+      overlap: 10,
+      overlapUnit: 'percent',
+      layoutMode: 'rectangular',
+      panelOrder: 'serpentine',
+    }, { width: 4000, height: 3000 });
+    const centerOut = buildResolvedMosaicPlan(2, 1, {
+      enabled: true,
+      rows: 3,
+      cols: 3,
+      overlap: 10,
+      overlapUnit: 'percent',
+      layoutMode: 'rectangular',
+      panelOrder: 'center-out',
+    }, { width: 4000, height: 3000 });
+
+    const serpentineSecondRow = serpentine?.panels
+      .filter((panel) => panel.row === 1)
+      .sort((a, b) => a.col - b.col)
+      .map((panel) => panel.sequence);
+    const centerPanel = centerOut?.panels.find((panel) => panel.isCenter);
+
+    expect(serpentineSecondRow).toEqual([6, 5, 4]);
+    expect(centerPanel?.sequence).toBe(1);
+  });
+
+  it('estimates imaging time when per-panel exposure time is available', () => {
+    const plan = buildResolvedMosaicPlan(2, 1, {
+      enabled: true,
+      rows: 2,
+      cols: 2,
+      overlap: 10,
+      overlapUnit: 'percent',
+      layoutMode: 'rectangular',
+      panelOrder: 'row-major',
+    }, { width: 4000, height: 3000 }, 45);
+
+    expect(plan?.estimatedPanelMinutes).toBe(45);
+    expect(plan?.estimatedTotalMinutes).toBe(180);
   });
 });
 

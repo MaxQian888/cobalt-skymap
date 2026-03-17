@@ -3,8 +3,6 @@
  * Pure functions for camera FOV, mosaic coverage, and overlay dimension calculations
  */
 
-import type { MosaicSettings } from '@/lib/stores';
-
 // ============================================================================
 // Camera FOV Calculations
 // ============================================================================
@@ -55,6 +53,59 @@ export interface MosaicCoverage {
   totalPanels: number;
 }
 
+export type MosaicLayoutMode = 'rectangular' | 'staggered';
+export type MosaicPanelOrder = 'row-major' | 'serpentine' | 'center-out';
+
+export interface MosaicSettings {
+  enabled: boolean;
+  rows: number;
+  cols: number;
+  overlap: number;
+  overlapUnit?: 'percent' | 'pixels';
+  layoutMode?: MosaicLayoutMode;
+  panelOrder?: MosaicPanelOrder;
+}
+
+export interface NormalizedMosaicSettings extends MosaicSettings {
+  overlapUnit: 'percent' | 'pixels';
+  layoutMode: MosaicLayoutMode;
+  panelOrder: MosaicPanelOrder;
+}
+
+export interface ResolvedMosaicPanel {
+  id: string;
+  row: number;
+  col: number;
+  x: number;
+  y: number;
+  centerOffsetX: number;
+  centerOffsetY: number;
+  sequence: number;
+  isCenter: boolean;
+}
+
+export interface ResolvedMosaicPlan {
+  layoutMode: MosaicLayoutMode;
+  panelOrder: MosaicPanelOrder;
+  totalPanels: number;
+  width: number;
+  height: number;
+  overlapFactor: number;
+  estimatedPanelMinutes: number | null;
+  estimatedTotalMinutes: number | null;
+  panels: ResolvedMosaicPanel[];
+  warnings: MosaicValidationIssue[];
+}
+
+export interface MosaicExposurePlanInput {
+  totalExposure?: number;
+  advanced?: {
+    stackEstimate?: {
+      estimatedTotalMinutes?: number;
+    };
+  };
+}
+
 export interface FramePlacement {
   x: number;
   y: number;
@@ -82,7 +133,9 @@ export type MosaicValidationIssueCode =
   | 'overlap_clamped'
   | 'panel_count_high'
   | 'panel_count_extreme'
-  | 'overlap_high';
+  | 'overlap_high'
+  | 'estimated_time_high'
+  | 'estimated_time_extreme';
 
 export interface MosaicValidationIssue {
   code: MosaicValidationIssueCode;
@@ -93,7 +146,7 @@ export interface MosaicValidationIssue {
 }
 
 export interface MosaicValidationResult {
-  sanitized: MosaicSettings;
+  sanitized: NormalizedMosaicSettings;
   issues: MosaicValidationIssue[];
 }
 
@@ -105,9 +158,140 @@ const MOSAIC_OVERLAP_PERCENT_MAX = 50;
 const MOSAIC_OVERLAP_PIXELS_MAX = 500;
 const MOSAIC_PANEL_COUNT_WARN = 16;
 const MOSAIC_PANEL_COUNT_EXTREME = 36;
+const DEFAULT_MOSAIC_OVERLAP_UNIT: NormalizedMosaicSettings['overlapUnit'] = 'percent';
+const DEFAULT_MOSAIC_LAYOUT_MODE: MosaicLayoutMode = 'rectangular';
+const DEFAULT_MOSAIC_PANEL_ORDER: MosaicPanelOrder = 'row-major';
+const MOSAIC_ESTIMATED_TIME_WARN_MINUTES = 240;
+const MOSAIC_ESTIMATED_TIME_EXTREME_MINUTES = 480;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function isMosaicOverlapUnit(value: unknown): value is NormalizedMosaicSettings['overlapUnit'] {
+  return value === 'percent' || value === 'pixels';
+}
+
+function isMosaicLayoutMode(value: unknown): value is MosaicLayoutMode {
+  return value === 'rectangular' || value === 'staggered';
+}
+
+function isMosaicPanelOrder(value: unknown): value is MosaicPanelOrder {
+  return value === 'row-major' || value === 'serpentine' || value === 'center-out';
+}
+
+function resolveMosaicOverlapFactor(
+  mosaic: NormalizedMosaicSettings,
+  resolution: { width: number; height: number }
+): number {
+  if (mosaic.overlapUnit === 'pixels') {
+    const resolutionWidth = Math.max(resolution.width, 1);
+    return clamp(1 - mosaic.overlap / resolutionWidth, 0, 1);
+  }
+
+  return clamp(1 - mosaic.overlap / 100, 0, 1);
+}
+
+interface RawMosaicPanel {
+  row: number;
+  col: number;
+  x: number;
+  y: number;
+}
+
+function calculateMosaicPanelGeometry(
+  panelWidth: number,
+  panelHeight: number,
+  stepX: number,
+  stepY: number,
+  mosaic: NormalizedMosaicSettings
+): {
+  panels: RawMosaicPanel[];
+  width: number;
+  height: number;
+  centerX: number;
+  centerY: number;
+} {
+  const rawPanels: RawMosaicPanel[] = [];
+
+  for (let row = 0; row < mosaic.rows; row++) {
+    const rowOffsetX = mosaic.layoutMode === 'staggered' && row % 2 === 1
+      ? stepX / 2
+      : 0;
+
+    for (let col = 0; col < mosaic.cols; col++) {
+      rawPanels.push({
+        row,
+        col,
+        x: rowOffsetX + col * stepX,
+        y: row * stepY,
+      });
+    }
+  }
+
+  if (rawPanels.length === 0) {
+    return {
+      panels: [],
+      width: panelWidth,
+      height: panelHeight,
+      centerX: panelWidth / 2,
+      centerY: panelHeight / 2,
+    };
+  }
+
+  const minX = Math.min(...rawPanels.map((panel) => panel.x));
+  const minY = Math.min(...rawPanels.map((panel) => panel.y));
+  const maxX = Math.max(...rawPanels.map((panel) => panel.x + panelWidth));
+  const maxY = Math.max(...rawPanels.map((panel) => panel.y + panelHeight));
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const centerX = width / 2;
+  const centerY = height / 2;
+
+  return {
+    panels: rawPanels.map((panel) => ({
+      ...panel,
+      x: panel.x - minX,
+      y: panel.y - minY,
+    })),
+    width,
+    height,
+    centerX,
+    centerY,
+  };
+}
+
+function buildPanelSequence(
+  panels: RawMosaicPanel[],
+  panelWidth: number,
+  panelHeight: number,
+  centerX: number,
+  centerY: number,
+  order: MosaicPanelOrder
+): Map<string, number> {
+  const sortable = panels.map((panel) => ({
+    ...panel,
+    key: `${panel.row}-${panel.col}`,
+    centerOffsetX: panel.x + panelWidth / 2 - centerX,
+    centerOffsetY: panel.y + panelHeight / 2 - centerY,
+  }));
+
+  if (order === 'row-major') {
+    sortable.sort((a, b) => a.row - b.row || a.col - b.col);
+  } else if (order === 'serpentine') {
+    sortable.sort((a, b) => {
+      if (a.row !== b.row) return a.row - b.row;
+      return a.row % 2 === 0 ? a.col - b.col : b.col - a.col;
+    });
+  } else {
+    sortable.sort((a, b) => {
+      const aDistance = Math.hypot(a.centerOffsetX, a.centerOffsetY);
+      const bDistance = Math.hypot(b.centerOffsetX, b.centerOffsetY);
+      return aDistance - bDistance || a.row - b.row || a.col - b.col;
+    });
+  }
+
+  return new Map(sortable.map((panel, index) => [panel.key, index + 1]));
 }
 
 /**
@@ -245,7 +429,17 @@ export function validateMosaicSettings(mosaic: MosaicSettings): MosaicValidation
     issues.push({ code: 'cols_clamped', severity: 'error', actual: mosaic.cols, min: MOSAIC_COLS_MIN, max: MOSAIC_COLS_MAX });
   }
 
-  const overlapMax = mosaic.overlapUnit === 'percent'
+  const overlapUnit = isMosaicOverlapUnit(mosaic.overlapUnit)
+    ? mosaic.overlapUnit
+    : DEFAULT_MOSAIC_OVERLAP_UNIT;
+  const layoutMode = isMosaicLayoutMode(mosaic.layoutMode)
+    ? mosaic.layoutMode
+    : DEFAULT_MOSAIC_LAYOUT_MODE;
+  const panelOrder = isMosaicPanelOrder(mosaic.panelOrder)
+    ? mosaic.panelOrder
+    : DEFAULT_MOSAIC_PANEL_ORDER;
+
+  const overlapMax = overlapUnit === 'percent'
     ? MOSAIC_OVERLAP_PERCENT_MAX
     : MOSAIC_OVERLAP_PIXELS_MAX;
   const overlap = clamp(mosaic.overlap, 0, overlapMax);
@@ -260,7 +454,7 @@ export function validateMosaicSettings(mosaic: MosaicSettings): MosaicValidation
     issues.push({ code: 'panel_count_high', severity: 'warning', actual: totalPanels, max: MOSAIC_PANEL_COUNT_WARN });
   }
 
-  const highOverlapThreshold = mosaic.overlapUnit === 'percent' ? 40 : 400;
+  const highOverlapThreshold = overlapUnit === 'percent' ? 40 : 400;
   if (overlap > highOverlapThreshold) {
     issues.push({ code: 'overlap_high', severity: 'warning', actual: overlap, max: highOverlapThreshold });
   }
@@ -271,8 +465,159 @@ export function validateMosaicSettings(mosaic: MosaicSettings): MosaicValidation
       rows,
       cols,
       overlap,
+      overlapUnit,
+      layoutMode,
+      panelOrder,
     },
     issues,
+  };
+}
+
+export function buildResolvedMosaicPlan(
+  panelWidth: number,
+  panelHeight: number,
+  mosaic: MosaicSettings,
+  resolution: { width: number; height: number },
+  estimatedPanelMinutes?: number | null
+): ResolvedMosaicPlan | null {
+  if (!mosaic.enabled) return null;
+
+  const validation = validateMosaicSettings(mosaic);
+  const sanitized = validation.sanitized;
+  const overlapFactor = resolveMosaicOverlapFactor(sanitized, resolution);
+  const stepX = panelWidth * overlapFactor;
+  const stepY = panelHeight * overlapFactor;
+  const geometry = calculateMosaicPanelGeometry(panelWidth, panelHeight, stepX, stepY, sanitized);
+  const sequenceMap = buildPanelSequence(
+    geometry.panels,
+    panelWidth,
+    panelHeight,
+    geometry.centerX,
+    geometry.centerY,
+    sanitized.panelOrder
+  );
+  const centerSequence = Math.min(...sequenceMap.values());
+
+  const panels: ResolvedMosaicPanel[] = geometry.panels.map((panel) => {
+    const centerOffsetX = panel.x + panelWidth / 2 - geometry.centerX;
+    const centerOffsetY = panel.y + panelHeight / 2 - geometry.centerY;
+    const sequence = sequenceMap.get(`${panel.row}-${panel.col}`) ?? Number.MAX_SAFE_INTEGER;
+    const distance = Math.hypot(centerOffsetX, centerOffsetY);
+    const nearestDistance = Math.min(
+      ...geometry.panels.map((candidate) => {
+        const candidateOffsetX = candidate.x + panelWidth / 2 - geometry.centerX;
+        const candidateOffsetY = candidate.y + panelHeight / 2 - geometry.centerY;
+        return Math.hypot(candidateOffsetX, candidateOffsetY);
+      })
+    );
+
+    return {
+      id: `panel-r${panel.row + 1}-c${panel.col + 1}`,
+      row: panel.row,
+      col: panel.col,
+      x: panel.x,
+      y: panel.y,
+      centerOffsetX,
+      centerOffsetY,
+      sequence,
+      isCenter: Math.abs(distance - nearestDistance) < 1e-6 && sequence === centerSequence,
+    };
+  });
+
+  const normalizedEstimatedPanelMinutes = typeof estimatedPanelMinutes === 'number' && Number.isFinite(estimatedPanelMinutes) && estimatedPanelMinutes > 0
+    ? estimatedPanelMinutes
+    : null;
+  const estimatedTotalMinutes = normalizedEstimatedPanelMinutes === null
+    ? null
+    : normalizedEstimatedPanelMinutes * panels.length;
+  const warnings = [...validation.issues];
+
+  if (estimatedTotalMinutes !== null) {
+    if (estimatedTotalMinutes > MOSAIC_ESTIMATED_TIME_EXTREME_MINUTES) {
+      warnings.push({
+        code: 'estimated_time_extreme',
+        severity: 'warning',
+        actual: estimatedTotalMinutes,
+        max: MOSAIC_ESTIMATED_TIME_EXTREME_MINUTES,
+      });
+    } else if (estimatedTotalMinutes > MOSAIC_ESTIMATED_TIME_WARN_MINUTES) {
+      warnings.push({
+        code: 'estimated_time_high',
+        severity: 'warning',
+        actual: estimatedTotalMinutes,
+        max: MOSAIC_ESTIMATED_TIME_WARN_MINUTES,
+      });
+    }
+  }
+
+  return {
+    layoutMode: sanitized.layoutMode,
+    panelOrder: sanitized.panelOrder,
+    totalPanels: panels.length,
+    width: geometry.width,
+    height: geometry.height,
+    overlapFactor,
+    estimatedPanelMinutes: normalizedEstimatedPanelMinutes,
+    estimatedTotalMinutes,
+    panels: panels.sort((a, b) => a.row - b.row || a.col - b.col),
+    warnings,
+  };
+}
+
+export function resolveEstimatedPanelMinutes(
+  exposurePlan?: MosaicExposurePlanInput | null
+): number | null {
+  if (!exposurePlan) return null;
+
+  const stackEstimateMinutes = exposurePlan.advanced?.stackEstimate?.estimatedTotalMinutes;
+  if (typeof stackEstimateMinutes === 'number' && Number.isFinite(stackEstimateMinutes) && stackEstimateMinutes > 0) {
+    return stackEstimateMinutes;
+  }
+
+  if (typeof exposurePlan.totalExposure === 'number' && Number.isFinite(exposurePlan.totalExposure) && exposurePlan.totalExposure > 0) {
+    return exposurePlan.totalExposure;
+  }
+
+  return null;
+}
+
+export function applyEstimatedPanelMinutesToPlan(
+  plan: ResolvedMosaicPlan,
+  estimatedPanelMinutes?: number | null
+): ResolvedMosaicPlan {
+  const normalizedEstimatedPanelMinutes = typeof estimatedPanelMinutes === 'number' && Number.isFinite(estimatedPanelMinutes) && estimatedPanelMinutes > 0
+    ? estimatedPanelMinutes
+    : null;
+  const estimatedTotalMinutes = normalizedEstimatedPanelMinutes === null
+    ? null
+    : normalizedEstimatedPanelMinutes * plan.totalPanels;
+  const warnings = plan.warnings.filter(
+    (warning) => warning.code !== 'estimated_time_high' && warning.code !== 'estimated_time_extreme'
+  );
+
+  if (estimatedTotalMinutes !== null) {
+    if (estimatedTotalMinutes > MOSAIC_ESTIMATED_TIME_EXTREME_MINUTES) {
+      warnings.push({
+        code: 'estimated_time_extreme',
+        severity: 'warning',
+        actual: estimatedTotalMinutes,
+        max: MOSAIC_ESTIMATED_TIME_EXTREME_MINUTES,
+      });
+    } else if (estimatedTotalMinutes > MOSAIC_ESTIMATED_TIME_WARN_MINUTES) {
+      warnings.push({
+        code: 'estimated_time_high',
+        severity: 'warning',
+        actual: estimatedTotalMinutes,
+        max: MOSAIC_ESTIMATED_TIME_WARN_MINUTES,
+      });
+    }
+  }
+
+  return {
+    ...plan,
+    estimatedPanelMinutes: normalizedEstimatedPanelMinutes,
+    estimatedTotalMinutes,
+    warnings,
   };
 }
 
@@ -285,15 +630,13 @@ export function calculateMosaicCoverage(
   mosaic: MosaicSettings,
   resolution: { width: number; height: number }
 ): MosaicCoverage | null {
-  if (!mosaic.enabled) return null;
-  const validated = validateMosaicSettings(mosaic).sanitized;
-  const overlapFactor = validated.overlapUnit === 'percent'
-    ? (1 - validated.overlap / 100)
-    : (1 - validated.overlap / (resolution.width / validated.cols));
+  const plan = buildResolvedMosaicPlan(fovWidth, fovHeight, mosaic, resolution);
+  if (!plan) return null;
+
   return {
-    width: fovWidth * validated.cols * overlapFactor + fovWidth * (1 - overlapFactor),
-    height: fovHeight * validated.rows * overlapFactor + fovHeight * (1 - overlapFactor),
-    totalPanels: validated.rows * validated.cols,
+    width: plan.width,
+    height: plan.height,
+    totalPanels: plan.totalPanels,
   };
 }
 
@@ -372,16 +715,22 @@ export function calculateOverlayDimensions(
   let overlapFactor: number;
   if (validatedMosaic.overlapUnit === 'pixels' && pixelSize && pixelSize > 0) {
     const resolutionWidth = Math.round((sensorWidth * 1000) / pixelSize);
-    overlapFactor = 1 - validatedMosaic.overlap / (resolutionWidth / mosaicCols);
+    overlapFactor = resolveMosaicOverlapFactor(validatedMosaic, { width: resolutionWidth, height: Math.round((sensorHeight * 1000) / pixelSize) });
   } else {
-    overlapFactor = 1 - validatedMosaic.overlap / 100;
+    overlapFactor = resolveMosaicOverlapFactor(validatedMosaic, { width: 1, height: 1 });
   }
 
   const panelWidthPx = overlayWidthPx;
   const panelHeightPx = overlayHeightPx;
-
-  const totalMosaicWidthPx = panelWidthPx * (1 + (mosaicCols - 1) * overlapFactor);
-  const totalMosaicHeightPx = panelHeightPx * (1 + (mosaicRows - 1) * overlapFactor);
+  const geometry = calculateMosaicPanelGeometry(
+    panelWidthPx,
+    panelHeightPx,
+    panelWidthPx * overlapFactor,
+    panelHeightPx * overlapFactor,
+    validatedMosaic
+  );
+  const totalMosaicWidthPx = geometry.width;
+  const totalMosaicHeightPx = geometry.height;
 
   // Check if FOV is too large to display
   const isTooLarge = totalMosaicWidthPx > containerWidth || totalMosaicHeightPx > containerHeight;

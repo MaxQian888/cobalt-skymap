@@ -2,12 +2,19 @@
  * Tests for astrometry-api.ts
  */
 
+jest.mock('../fits-parser', () => ({
+  parseFITSHeader: jest.fn(),
+}));
+
 import { AstrometryApiClient } from '../astrometry-api';
 import { createErrorResult } from '../types';
+import { parseFITSHeader } from '../fits-parser';
 
 // Mock fetch globally
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
+
+const mockParseFITSHeader = parseFITSHeader as jest.MockedFunction<typeof parseFITSHeader>;
 
 // Mock URL.createObjectURL/revokeObjectURL for getImageDimensions
 global.URL.createObjectURL = jest.fn(() => 'blob:mock');
@@ -16,6 +23,7 @@ global.URL.revokeObjectURL = jest.fn();
 describe('AstrometryApiClient', () => {
   beforeEach(() => {
     mockFetch.mockClear();
+    mockParseFITSHeader.mockReset();
   });
 
   describe('constructor', () => {
@@ -502,6 +510,148 @@ describe('AstrometryApiClient', () => {
 
       expect(result.success).toBe(false);
       expect(result.errorMessage).toContain('Timeout');
+    });
+  });
+
+  describe('solveDetailed flow', () => {
+    it('returns normalized online metadata including submission, job, annotations, and WCS-derived framing', async () => {
+      mockParseFITSHeader.mockResolvedValueOnce({
+        header: {},
+        image: { width: 3000, height: 2000, bitpix: 16, naxis: 2, bzero: 0, bscale: 1 },
+        wcs: {
+          referencePixel: { x: 1500.5, y: 1000.5 },
+          referenceCoordinates: { ra: 180.5, dec: -30.2 },
+          pixelScale: 1.2,
+          rotation: 45,
+          cdMatrix: {
+            cd1_1: -0.000333,
+            cd1_2: 0,
+            cd2_1: 0,
+            cd2_2: 0.000333,
+          },
+          projectionType: 'TAN',
+        },
+        rawCards: [],
+      });
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'success', session: 'sess' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'success', subid: 1001 }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ jobs: [2001], job_calibrations: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'success' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            ra: 180.5,
+            dec: -30.2,
+            orientation: 45.0,
+            pixscale: 1.2,
+            radius: 0.5,
+            parity: 1,
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ objects_in_field: ['NGC 1234'] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            annotations: [{ radius: 0.2, type: 'galaxy', names: ['NGC 1234'], pixelx: 100, pixely: 200 }],
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['fits-bytes'], { type: 'application/fits' })),
+        });
+
+      const client = new AstrometryApiClient({
+        apiKey: 'test-key',
+        timeout: 60000,
+        pollInterval: 10,
+      });
+
+      const detailed = await client.solveDetailed(new Blob(['fake-image'], { type: 'image/jpeg' }));
+
+      expect(detailed.solveResult.success).toBe(true);
+      expect(detailed.artifact.submissionId).toBe(1001);
+      expect(detailed.artifact.jobId).toBe(2001);
+      expect(detailed.artifact.objectsInField).toEqual(['NGC 1234']);
+      expect(detailed.artifact.annotations).toHaveLength(1);
+      expect(detailed.artifact.wcs?.referenceCoordinates.ra).toBeCloseTo(180.5);
+      expect(detailed.artifact.frameSize).toEqual({ width: 3000, height: 2000 });
+      expect(detailed.artifact.diagnostics.annotations).toBe('complete');
+      expect(detailed.artifact.diagnostics.wcs).toBe('complete');
+    });
+
+    it('keeps the solve successful when artifact enrichment partially fails', async () => {
+      mockParseFITSHeader.mockRejectedValueOnce(new Error('bad fits header'));
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'success', session: 'sess' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'success', subid: 1001 }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ jobs: [2001], job_calibrations: [] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ status: 'success' }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            ra: 180.5,
+            dec: -30.2,
+            orientation: 45.0,
+            pixscale: 1.2,
+            radius: 0.5,
+            parity: 1,
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ objects_in_field: ['NGC 1234'] }),
+        })
+        .mockRejectedValueOnce(new Error('annotation endpoint failed'))
+        .mockResolvedValueOnce({
+          ok: true,
+          blob: () => Promise.resolve(new Blob(['fits-bytes'], { type: 'application/fits' })),
+        });
+
+      const client = new AstrometryApiClient({
+        apiKey: 'test-key',
+        timeout: 60000,
+        pollInterval: 10,
+      });
+
+      const detailed = await client.solveDetailed(new Blob(['fake-image'], { type: 'image/jpeg' }));
+
+      expect(detailed.solveResult.success).toBe(true);
+      expect(detailed.artifact.diagnostics.annotations).toBe('missing');
+      expect(detailed.artifact.diagnostics.wcs).toBe('missing');
+      expect(detailed.artifact.diagnostics.issues).toEqual([
+        expect.objectContaining({ artifact: 'annotations' }),
+        expect.objectContaining({ artifact: 'wcs' }),
+      ]);
     });
   });
 });

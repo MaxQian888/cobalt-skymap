@@ -33,6 +33,7 @@ import {
   usePlateSolverStore,
   selectActiveSolver,
   selectCanSolve,
+  selectDetectedSolversWithReadiness,
 } from '@/lib/stores/plate-solver-store';
 import type { SolverType, SolverInfo } from '@/lib/tauri/plate-solver-api';
 import type { SolverSettingsProps } from '@/types/starmap/plate-solving';
@@ -83,7 +84,6 @@ function SliderField({ label, value, displayValue, onChange, min, max, step }: {
 export function SolverSettings({ onClose, className }: SolverSettingsProps) {
   const t = useTranslations();
   const {
-    detectedSolvers,
     isDetecting,
     detectionError,
     config,
@@ -94,6 +94,7 @@ export function SolverSettings({ onClose, className }: SolverSettingsProps) {
     loadConfig,
     setOnlineApiKey,
   } = usePlateSolverStore();
+  const detectedSolvers = usePlateSolverStore(selectDetectedSolversWithReadiness);
 
   const activeSolver = usePlateSolverStore(selectActiveSolver);
   const canSolve = usePlateSolverStore(selectCanSolve);
@@ -563,7 +564,11 @@ export function SolverSettings({ onClose, className }: SolverSettingsProps) {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             {config.solver_type === 'astrometry_net_online'
-              ? t('plateSolving.needApiKey') || 'API key required for online solving'
+              ? (
+                activeSolver?.availability_reason
+                ?? t('plateSolving.needApiKey')
+                ?? 'API key required for online solving'
+              )
               : t('plateSolving.solverNotReady') ||
                 'Solver is not ready. Check installation and index files.'}
           </AlertDescription>

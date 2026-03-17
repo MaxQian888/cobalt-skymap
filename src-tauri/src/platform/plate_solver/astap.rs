@@ -83,7 +83,7 @@ pub(super) async fn solve_with_astap_enhanced(
                 }
             }
         }
-        PlateSolverError::LocalInvocation(LocalInvocationDiagnostics {
+        PlateSolverError::LocalInvocation(Box::new(LocalInvocationDiagnostics {
             error_code: "timeout".to_string(),
             profile_id,
             executable_path: Some(executable_path.clone()),
@@ -92,7 +92,7 @@ pub(super) async fn solve_with_astap_enhanced(
             availability_reason: astap.availability_reason.clone(),
             stdout_excerpt: None,
             stderr_excerpt: None,
-        })
+        }))
     })?
     .map_err(|e| PlateSolverError::SolveFailed(format!("Task join error: {}", e)))?
     .map_err(PlateSolverError::Io)?;
@@ -138,7 +138,7 @@ pub(super) async fn solve_with_astap_enhanced(
         }
         Ok(result)
     } else {
-        Err(PlateSolverError::LocalInvocation(
+        Err(PlateSolverError::LocalInvocation(Box::new(
             LocalInvocationDiagnostics {
                 error_code: if output.status.success() {
                     "result_missing".to_string()
@@ -153,7 +153,7 @@ pub(super) async fn solve_with_astap_enhanced(
                 stdout_excerpt: excerpt_output(&output.stdout),
                 stderr_excerpt: excerpt_output(&output.stderr),
             },
-        ))
+        )))
     }
 }
 
@@ -605,21 +605,19 @@ fn is_astap_database_dir(name: &str) -> bool {
 
 fn get_astap_db_scale_range(name: &str) -> (f64, f64) {
     // FOV ranges for ASTAP databases (in degrees)
-    if name.starts_with("d80") {
-        (0.3, 10.0)
-    } else if name.starts_with("d50") {
-        (0.3, 10.0)
-    } else if name.starts_with("d20") {
+    if ["d80", "d50", "d20"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+    {
         (0.3, 10.0)
     } else if name.starts_with("d05") {
         (0.2, 5.0)
-    } else if name.starts_with("g05") {
+    } else if ["g05", "g17", "g18"]
+        .iter()
+        .any(|prefix| name.starts_with(prefix))
+    {
         (0.1, 2.0)
-    } else if name.starts_with("g17") || name.starts_with("g18") {
-        (0.1, 2.0)
-    } else if name.starts_with("w08") {
-        (0.5, 20.0)
-    } else if name.starts_with("v17") {
+    } else if ["w08", "v17"].iter().any(|prefix| name.starts_with(prefix)) {
         (0.5, 20.0)
     } else if name.starts_with("h17") || name.starts_with("h18") {
         (0.1, 5.0)

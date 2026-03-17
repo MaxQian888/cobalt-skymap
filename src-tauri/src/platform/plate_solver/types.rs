@@ -19,7 +19,7 @@ pub enum PlateSolverError {
     #[error("Download failed: {0}")]
     DownloadFailed(String),
     #[error("Local invocation failed: {0:?}")]
-    LocalInvocation(LocalInvocationDiagnostics),
+    LocalInvocation(Box<LocalInvocationDiagnostics>),
 }
 
 impl Serialize for PlateSolverError {
