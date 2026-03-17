@@ -21,12 +21,15 @@ export interface ARCameraProfileLayerInput {
   userOverrides?: Partial<ARCameraProfile>;
   adaptiveAdjustments?: Partial<ARCameraProfile>;
   remoteHints?: Partial<ARCameraProfile>;
+  sessionDefaults?: Partial<ARCameraProfile>;
   capabilities?: ARCameraCapabilityMap | null;
 }
 
+export type ARCameraProfileSource = 'base' | 'remote' | 'session' | 'adaptive' | 'user';
+
 export interface ARCameraProfileLayerResolution {
   profile: ARCameraProfile;
-  sourceByField: Partial<Record<keyof ARCameraProfile, 'base' | 'user' | 'adaptive' | 'remote'>>;
+  sourceByField: Partial<Record<keyof ARCameraProfile, ARCameraProfileSource>>;
   clampedFields: Array<keyof ARCameraProfile>;
   fallbackReason: string | null;
 }
@@ -279,9 +282,9 @@ export function validateAndClampARCameraProfile(
 function mergeLayer(
   target: ARCameraProfile,
   source: Partial<ARCameraProfile> | undefined,
-  sourceLabel: 'base' | 'user' | 'adaptive' | 'remote',
-  sourceByField: Partial<Record<keyof ARCameraProfile, 'base' | 'user' | 'adaptive' | 'remote'>>,
-  allowOverwrite: (field: keyof ARCameraProfile, existing: 'base' | 'user' | 'adaptive' | 'remote' | undefined) => boolean,
+  sourceLabel: ARCameraProfileSource,
+  sourceByField: Partial<Record<keyof ARCameraProfile, ARCameraProfileSource>>,
+  allowOverwrite: (field: keyof ARCameraProfile, existing: ARCameraProfileSource | undefined) => boolean,
 ): void {
   if (!source) return;
   const keys = Object.keys(source) as Array<keyof ARCameraProfile>;
@@ -300,7 +303,7 @@ export function resolveARCameraProfileLayers(
   input: ARCameraProfileLayerInput,
 ): ARCameraProfileLayerResolution {
   const base = { ...DEFAULT_AR_CAMERA_PROFILE_BY_PRESET[input.basePreset] };
-  const sourceByField: Partial<Record<keyof ARCameraProfile, 'base' | 'user' | 'adaptive' | 'remote'>> = {
+  const sourceByField: Partial<Record<keyof ARCameraProfile, ARCameraProfileSource>> = {
     preset: 'base',
     facingMode: 'base',
     resolutionTier: 'base',
@@ -313,9 +316,10 @@ export function resolveARCameraProfileLayers(
     torchPreferred: 'base',
   };
 
-  mergeLayer(base, input.userOverrides, 'user', sourceByField, () => true);
+  mergeLayer(base, input.remoteHints, 'remote', sourceByField, (_, existing) => existing === 'base');
+  mergeLayer(base, input.sessionDefaults, 'session', sourceByField, (_, existing) => existing !== 'adaptive' && existing !== 'user');
   mergeLayer(base, input.adaptiveAdjustments, 'adaptive', sourceByField, (_, existing) => existing !== 'user');
-  mergeLayer(base, input.remoteHints, 'remote', sourceByField, (_, existing) => existing !== 'user' && existing !== 'adaptive');
+  mergeLayer(base, input.userOverrides, 'user', sourceByField, () => true);
 
   const capabilities = input.capabilities ?? createConservativeARCameraCapabilities();
   const validated = validateAndClampARCameraProfile(base, capabilities);

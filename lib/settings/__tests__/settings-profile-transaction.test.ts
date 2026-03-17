@@ -137,6 +137,13 @@ const themeStoreState = {
     fontSize: 'default',
     animationsEnabled: true,
     activePreset: null,
+    componentStyle: {
+      preset: 'default',
+      density: 'comfortable',
+      transparency: 'balanced',
+      border: 'medium',
+      elevation: 'raised',
+    },
     customColors: { light: {}, dark: {} },
   },
   userPresets: [],
@@ -299,6 +306,13 @@ describe('settings-profile-transaction', () => {
     settingsStoreState.aladinDisplay = { showGrid: false };
     mountStoreState.profileInfo = { AstrometrySettings: { Latitude: 0, Longitude: 0, Elevation: 0 } };
     themeStoreState.customization.radius = 0.5;
+    themeStoreState.customization.componentStyle = {
+      preset: 'default',
+      density: 'comfortable',
+      transparency: 'balanced',
+      border: 'medium',
+      elevation: 'raised',
+    };
     themeStoreState.userPresets = [];
     keybindingStoreState.customBindings = {};
     globalShortcutStoreState.enabled = false;
@@ -398,7 +412,16 @@ describe('settings-profile-transaction', () => {
       exportedAt: '2026-01-01T00:00:00.000Z',
       metadata: { schemaVersion: 6, domains: ['theme', 'eventSources'] },
       themeMode: 'dark',
-      theme: { radius: 0.8 },
+      theme: {
+        radius: 0.8,
+        componentStyle: {
+          preset: 'floating',
+          density: 'compact',
+          transparency: 'high',
+          border: 'soft',
+          elevation: 'floating',
+        },
+      },
       eventSources: [{
         id: 'astronomyapi',
         name: 'Astronomy API',
@@ -420,7 +443,53 @@ describe('settings-profile-transaction', () => {
 
     expect(restoreResult.success).toBe(true);
     expect(themeStoreState.customization.radius).toBe(0.5);
+    expect(themeStoreState.customization.componentStyle).toEqual({
+      preset: 'default',
+      density: 'comfortable',
+      transparency: 'balanced',
+      border: 'medium',
+      elevation: 'raised',
+    });
     expect(eventSourcesStoreState.sources[0].apiKey).toBe('previous-secret');
+  });
+
+  it('applies imported component style customization as part of the theme domain', async () => {
+    const result = await applySettingsProfileImport({
+      version: 7,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      metadata: { schemaVersion: 7, domains: ['theme'] },
+      themeMode: 'dark',
+      theme: {
+        componentStyle: {
+          preset: 'observatory',
+          density: 'compact',
+          transparency: 'solid',
+          border: 'strong',
+          elevation: 'flat',
+        },
+      },
+    } as unknown as SettingsProfileData, {
+      domains: ['theme'],
+      applyThemeMode: mockApplyThemeMode,
+    });
+
+    expect(result.success).toBe(true);
+    expect(themeStoreState.setCustomization).toHaveBeenCalledWith(expect.objectContaining({
+      componentStyle: {
+        preset: 'observatory',
+        density: 'compact',
+        transparency: 'solid',
+        border: 'strong',
+        elevation: 'flat',
+      },
+    }));
+    expect(themeStoreState.customization.componentStyle).toEqual({
+      preset: 'observatory',
+      density: 'compact',
+      transparency: 'solid',
+      border: 'strong',
+      elevation: 'flat',
+    });
   });
 
   it('applies keybindings, shortcuts, equipment, event sources, and daily knowledge without persisting a restore point', async () => {

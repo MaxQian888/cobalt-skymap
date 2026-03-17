@@ -8,9 +8,11 @@ import {
 } from '@/lib/stores';
 import type { EventSourceConfig } from '@/lib/stores';
 import {
+  defaultComponentStyle,
   useThemeStore,
   isValidThemeColorValue,
   sanitizeThemePresets,
+  sanitizeThemeComponentStyle,
   type ThemePreset,
 } from '@/lib/stores/theme-store';
 import { useKeybindingStore } from '@/lib/stores/keybinding-store';
@@ -20,8 +22,8 @@ import { isTauri } from '@/lib/storage/platform';
 
 export type SettingsThemeMode = 'light' | 'dark' | 'system';
 
-export const SETTINGS_PROFILE_SCHEMA_VERSION = 6;
-export const SUPPORTED_SETTINGS_PROFILE_VERSIONS = new Set([3, 4, 5, 6]);
+export const SETTINGS_PROFILE_SCHEMA_VERSION = 7;
+export const SUPPORTED_SETTINGS_PROFILE_VERSIONS = new Set([3, 4, 5, 6, 7]);
 export const SETTINGS_PROFILE_DOMAINS = [
   'settings',
   'theme',
@@ -255,6 +257,7 @@ function sanitizeThemeDomain(theme: unknown): SettingsProfileData['theme'] | und
   const fontSize = theme.fontSize;
   const animationsEnabled = theme.animationsEnabled;
   const activePreset = theme.activePreset;
+  const componentStyle = theme.componentStyle;
   const customColors = theme.customColors;
   const userPresets = theme.userPresets;
 
@@ -263,6 +266,7 @@ function sanitizeThemeDomain(theme: unknown): SettingsProfileData['theme'] | und
   if (fontSize !== undefined && !['small', 'default', 'large'].includes(String(fontSize))) return undefined;
   if (animationsEnabled !== undefined && typeof animationsEnabled !== 'boolean') return undefined;
   if (activePreset !== undefined && activePreset !== null && typeof activePreset !== 'string') return undefined;
+  if (componentStyle !== undefined && !isRecord(componentStyle)) return undefined;
   if (customColors !== undefined) {
     if (!isRecord(customColors)) return undefined;
     for (const mode of ['light', 'dark'] as const) {
@@ -282,6 +286,7 @@ function sanitizeThemeDomain(theme: unknown): SettingsProfileData['theme'] | und
 
   return {
     ...(theme as SettingsProfileData['theme']),
+    componentStyle: sanitizeThemeComponentStyle(componentStyle, defaultComponentStyle),
     ...(userPresets !== undefined ? { userPresets: sanitizeThemePresets(userPresets) } : {}),
   };
 }

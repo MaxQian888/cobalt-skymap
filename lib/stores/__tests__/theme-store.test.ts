@@ -3,7 +3,7 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
-import { getResolvedThemeColors, useThemeStore, themePresets } from '../theme-store';
+import { defaultComponentStyle, getResolvedThemeColors, useThemeStore, themePresets } from '../theme-store';
 
 describe('useThemeStore', () => {
   // Mock requestAnimationFrame to execute callbacks synchronously
@@ -359,6 +359,7 @@ describe('useThemeStore', () => {
           fontSize: 'default',
           animationsEnabled: true,
           activePreset: 'ocean',
+          componentStyle: defaultComponentStyle,
           customColors: {
             light: {
               primary: '#123456',
@@ -381,6 +382,7 @@ describe('useThemeStore', () => {
           fontSize: 'default',
           animationsEnabled: true,
           activePreset: null,
+          componentStyle: defaultComponentStyle,
           customColors: {
             light: {
               primary: '#abcdef',

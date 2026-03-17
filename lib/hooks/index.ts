@@ -188,6 +188,8 @@ export {
   type UseMountOverlayReturn,
 } from './use-mount-overlay';
 
+export { useMountOperations } from './use-mount-operations';
+
 // Object astronomical data (shared by InfoPanel & ObjectDetailDrawer)
 export {
   useAstroEnvironment,

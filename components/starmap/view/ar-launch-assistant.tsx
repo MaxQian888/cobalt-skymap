@@ -8,6 +8,8 @@ import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/lib/stores/settings-store';
 import { useOnboardingBridgeStore } from '@/lib/stores';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
+import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
+import { getARSurfaceLayoutTokens, withSafeAreaInset } from '@/lib/constants/ar-layout';
 import { executeARRecoveryAction, type ARRecoveryActionHandlers } from '@/lib/core/ar-recovery-actions';
 import type { ARRecoveryAction } from '@/lib/core/ar-session';
 
@@ -37,6 +39,8 @@ function getActionFailureNoticeKey(action: ARRecoveryAction): string {
 
 export function ARLaunchAssistant() {
   const t = useTranslations();
+  const adaptation = useARAdaptation();
+  const layoutTokens = getARSurfaceLayoutTokens('assistant', adaptation.assistantMode);
   const setStellariumSetting = useSettingsStore((state) => state.setStellariumSetting);
   const openSettingsDrawer = useOnboardingBridgeStore((state) => state.openSettingsDrawer);
   const cameraRuntime = useARRuntimeStore((state) => state.camera);
@@ -133,13 +137,36 @@ export function ARLaunchAssistant() {
       : launchAssistant.outcome === 'blocked'
         ? 'settings.arLaunchBlockedTitle'
         : 'settings.arLaunchTitle';
+  const adaptationNoticeKey = adaptation.sensorPath === 'camera-primary'
+    ? 'settings.arAdaptationCameraFirst'
+    : adaptation.sensorPath === 'manual-only'
+      ? 'settings.arAdaptationManualOnly'
+      : null;
 
   return (
     <div
-      className="absolute inset-x-0 top-[calc(0.5rem+var(--safe-area-top))] z-40 flex justify-center px-3"
+      className={cn(
+        'absolute inset-x-0 z-40 flex',
+        layoutTokens.align === 'center' ? 'justify-center' : 'justify-stretch',
+      )}
+      style={{
+        top: withSafeAreaInset('top', layoutTokens.topOffsetRem),
+        paddingLeft: withSafeAreaInset('left', layoutTokens.sideInsetRem),
+        paddingRight: withSafeAreaInset('right', layoutTokens.sideInsetRem),
+      }}
       data-testid="ar-launch-assistant"
+      data-ar-assistant-mode={adaptation.assistantMode}
+      data-ar-sensor-path={adaptation.sensorPath}
+      data-ar-sticky-actions={String(layoutTokens.stickyActions)}
     >
-      <div className="w-[min(96vw,40rem)] rounded-xl border border-white/20 bg-black/70 p-4 text-white shadow-xl backdrop-blur-md">
+      <div
+        className="w-full rounded-xl border border-white/20 bg-black/70 p-4 text-white shadow-xl backdrop-blur-md"
+        style={{
+          maxWidth: `min(calc(100vw - var(--safe-area-left) - var(--safe-area-right) - ${layoutTokens.sideInsetRem * 2}rem), ${layoutTokens.maxWidthRem}rem)`,
+          maxHeight: 'calc(100dvh - var(--safe-area-top) - var(--safe-area-bottom) - 1rem)',
+          overflowY: 'auto',
+        }}
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold">{t(titleKey)}</p>
@@ -191,6 +218,12 @@ export function ARLaunchAssistant() {
           ))}
         </div>
 
+        {adaptationNoticeKey && (
+          <div className="mt-3 rounded-lg bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
+            {t(adaptationNoticeKey)}
+          </div>
+        )}
+
         {cameraRuntime.availableDevices.length > 1 && (
           <div className="mt-3 rounded-lg bg-white/5 p-3">
             <p className="mb-2 text-xs text-white/70">{t('settings.arLaunchCameraDevicePrompt')}</p>
@@ -219,7 +252,12 @@ export function ARLaunchAssistant() {
         )}
 
         {launchAssistant.summaryActions.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div
+            className={cn(
+              'mt-3 flex flex-wrap gap-2',
+              layoutTokens.stickyActions && 'sticky bottom-0 -mx-4 bg-black/90 px-4 pb-[calc(var(--safe-area-bottom)+0.25rem)] pt-2 backdrop-blur-sm',
+            )}
+          >
             {launchAssistant.summaryActions.map((action) => (
               <Button
                 key={action}

@@ -88,6 +88,16 @@ jest.mock('@/lib/hooks/use-equipment-fov-props', () => ({
   })),
 }));
 
+jest.mock('@/components/starmap/mount/slew-confirm-dialog', () => ({
+  SlewConfirmDialog: ({
+    open,
+    targetName,
+  }: {
+    open: boolean;
+    targetName: string;
+  }) => open ? <div data-testid="mount-target-dialog">{targetName}</div> : null,
+}));
+
 describe('CanvasContextMenu (Aladin mode)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -414,5 +424,35 @@ describe('CanvasContextMenu (Stellarium mode)', () => {
       />
     );
     expect(screen.getByText('actions.slewToObject')).toBeInTheDocument();
+  });
+
+  it('does not immediately fall back to framing when a connected mount action is chosen', () => {
+    const onSetFramingCoordinates = jest.fn();
+    render(
+      <CanvasContextMenu
+        open={true}
+        position={{ x: 10, y: 10 }}
+        coords={null}
+        selectedObject={{ names: ['M42'], ra: '05h35m', dec: '-05d23m', raDeg: 83.82, decDeg: -5.39 } as never}
+        mountConnected={true}
+        stellariumSettings={{ constellationsLinesVisible: false, equatorialLinesVisible: false, azimuthalLinesVisible: false, dsosVisible: false, surveyEnabled: false, atmosphereVisible: false }}
+        onOpenChange={jest.fn()}
+        onAddToTargetList={jest.fn()}
+        onNavigateToCoords={jest.fn()}
+        onOpenGoToDialog={jest.fn()}
+        onSetPendingMarkerCoords={jest.fn()}
+        onSetFramingCoordinates={onSetFramingCoordinates}
+        onZoomIn={jest.fn()}
+        onZoomOut={jest.fn()}
+        onSetFov={jest.fn()}
+        onToggleStellariumSetting={jest.fn()}
+        onToggleSearch={jest.fn()}
+        onResetView={jest.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByText('actions.slewToObject'));
+    expect(onSetFramingCoordinates).not.toHaveBeenCalled();
+    expect(screen.getByTestId('mount-target-dialog')).toHaveTextContent('M42');
   });
 });

@@ -17,7 +17,7 @@ export default function StarmapPage() {
   // Initialize unified cache system
   useCacheInit({ strategy: 'cache-first', enableInterception: true });
   
-  // Restore and persist window state (Tauri desktop)
+  // Restore desktop window state through the official Tauri plugin
   useWindowState();
 
   return (

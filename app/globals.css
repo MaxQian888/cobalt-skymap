@@ -122,6 +122,15 @@
   --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
   --tracking-normal: 0em;
+  --component-density-gap: 0.375rem;
+  --component-density-padding: 0.375rem;
+  --component-section-padding: 0.75rem;
+  --component-control-height: 2.25rem;
+  --component-surface-bg: color-mix(in oklch, var(--card) 84%, transparent);
+  --component-surface-strong-bg: color-mix(in oklch, var(--card) 90%, transparent);
+  --component-surface-border: color-mix(in oklch, var(--border) 46%, transparent);
+  --component-surface-shadow: 0 12px 28px -16px rgb(15 23 42 / 0.35);
+  --component-surface-blur: 12px;
 }
 
 .dark {
@@ -177,6 +186,15 @@
   --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
   --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+  --component-density-gap: 0.375rem;
+  --component-density-padding: 0.375rem;
+  --component-section-padding: 0.75rem;
+  --component-control-height: 2.25rem;
+  --component-surface-bg: color-mix(in oklch, var(--card) 84%, transparent);
+  --component-surface-strong-bg: color-mix(in oklch, var(--card) 90%, transparent);
+  --component-surface-border: color-mix(in oklch, var(--border) 46%, transparent);
+  --component-surface-shadow: 0 12px 28px -16px rgb(0 0 0 / 0.45);
+  --component-surface-blur: 12px;
 }
 
 @layer base {
@@ -614,6 +632,35 @@ html.no-transitions *::after {
   box-shadow: none;
 }
 
+.theme-surface-shell {
+  background: var(--component-surface-bg);
+  border-color: var(--component-surface-border);
+  box-shadow: var(--component-surface-shadow);
+  backdrop-filter: blur(var(--component-surface-blur));
+  -webkit-backdrop-filter: blur(var(--component-surface-blur));
+}
+
+.theme-surface-strong {
+  background: var(--component-surface-strong-bg);
+  border-color: var(--component-surface-border);
+  box-shadow: var(--component-surface-shadow);
+  backdrop-filter: blur(var(--component-surface-blur));
+  -webkit-backdrop-filter: blur(var(--component-surface-blur));
+}
+
+.theme-surface-group {
+  gap: var(--component-density-gap);
+  padding: var(--component-density-padding);
+}
+
+.theme-surface-section {
+  padding: var(--component-section-padding);
+}
+
+.theme-surface-control {
+  min-height: var(--component-control-height);
+}
+
 /* Mobile bottom bar safe area */
 .mobile-bottom-bar {
   padding-bottom: calc(0.5rem + var(--safe-area-bottom));
@@ -1043,87 +1090,6 @@ html.no-transitions *::after {
 
 .splash-fade-out {
   animation: splash-fade-out 0.4s ease-out forwards;
-}
-
-/* ============================================================================
-   Custom Titlebar Styles (Tauri Window Customization)
-   ============================================================================ */
-
-/* Titlebar drag region - enables window dragging */
-.titlebar [data-tauri-drag-region] {
-  -webkit-app-region: drag;
-  app-region: drag;
-  cursor: default;
-}
-
-/* Global drag region for frameless window - top bar area */
-[data-tauri-drag-region] {
-  -webkit-app-region: drag;
-  app-region: drag;
-  cursor: default;
-}
-
-/* Disable drag on all interactive elements within drag regions */
-[data-tauri-drag-region] button,
-[data-tauri-drag-region] a,
-[data-tauri-drag-region] input,
-[data-tauri-drag-region] select,
-[data-tauri-drag-region] [role="button"],
-[data-tauri-drag-region] [data-radix-collection-item],
-.toolbar-btn,
-.touch-target {
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-}
-
-/* Titlebar buttons - disable drag on interactive elements */
-.titlebar-button {
-  -webkit-app-region: no-drag;
-  app-region: no-drag;
-}
-
-/* Content offset when titlebar is present */
-.titlebar-offset {
-  padding-top: 2rem; /* 32px - matches titlebar height */
-}
-
-/* Titlebar hover effects */
-.titlebar-button:active {
-  transform: scale(0.95);
-}
-
-/* Ensure titlebar is always on top */
-.titlebar {
-  -webkit-app-region: drag;
-  app-region: drag;
-}
-
-/* Frameless window resize handles visual feedback */
-.window-resize-handle {
-  position: fixed;
-  z-index: 9999;
-  transition: background-color 0.2s ease;
-}
-
-.window-resize-handle:hover {
-  background-color: rgba(var(--primary), 0.1);
-}
-
-/* Always on top indicator glow */
-.window-pinned::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, hsl(var(--primary)), transparent);
-  animation: pinned-glow 2s ease-in-out infinite;
-}
-
-@keyframes pinned-glow {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.8; }
 }
 
 /* Hide Aladin Lite built-in UI chrome — we provide our own controls */

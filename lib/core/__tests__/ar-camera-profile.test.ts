@@ -85,6 +85,27 @@ describe('ar-camera-profile', () => {
     expect(resolved.sourceByField.overlayOpacity).toBe('remote');
   });
 
+  it('applies session defaults beneath user and adaptive overrides', () => {
+    const resolved = resolveARCameraProfileLayers({
+      basePreset: 'quality',
+      sessionDefaults: {
+        resolutionTier: '720p',
+        targetFps: 24,
+        torchPreferred: false,
+      },
+      userOverrides: { targetFps: 30 },
+      adaptiveAdjustments: { stabilizationStrength: 0.85 },
+      remoteHints: { overlayOpacity: 0.9 },
+      capabilities: createConservativeARCameraCapabilities(),
+    });
+
+    expect(resolved.profile.resolutionTier).toBe('720p');
+    expect(resolved.profile.targetFps).toBe(30);
+    expect(resolved.profile.stabilizationStrength).toBeCloseTo(0.85, 3);
+    expect(resolved.sourceByField.resolutionTier).toBe('session');
+    expect(resolved.sourceByField.targetFps).toBe('user');
+  });
+
   it('builds media constraints from profile', () => {
     const result = buildARCameraConstraints(
       {

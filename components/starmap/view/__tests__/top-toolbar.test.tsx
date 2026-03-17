@@ -52,7 +52,32 @@ jest.mock('@/components/ui/drawer', () => ({
   DrawerTrigger: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
 }));
 jest.mock('@/components/ui/scroll-area', () => ({ ScrollArea: ({ children }: React.PropsWithChildren) => <div>{children}</div> }));
-jest.mock('@/lib/tauri/app-control-api', () => ({ isTauri: jest.fn(() => false), quitApp: jest.fn(), toggleMaximizeWindow: jest.fn() }));
+const mockIsTauri = jest.fn(() => false);
+const mockToggleMaximizeWindow = jest.fn();
+const mockStartWindowDragging = jest.fn();
+const mockUseWindowControls = jest.fn(() => ({
+  isTauriEnv: false,
+  shell: {
+    platform: 'web',
+    mode: 'browser',
+    dragStrategy: 'none',
+    showsNativeWindowControls: false,
+    supportsManualDragging: false,
+    supportsDoubleClickMaximize: false,
+    titlebarInsets: { left: 0, right: 0, top: 0 },
+  },
+  handleMaximize: jest.fn(),
+  handleStartWindowDrag: mockStartWindowDragging,
+}));
+jest.mock('@/lib/tauri/app-control-api', () => ({
+  isTauri: () => mockIsTauri(),
+  quitApp: jest.fn(),
+  toggleMaximizeWindow: () => mockToggleMaximizeWindow(),
+  startWindowDragging: () => mockStartWindowDragging(),
+}));
+jest.mock('@/lib/hooks/use-window-controls', () => ({
+  useWindowControls: () => mockUseWindowControls(),
+}));
 jest.mock('@/components/common/toolbar-button', () => ({
   ToolbarButton: ({ children }: React.PropsWithChildren) => <button>{children}</button>,
   ToolbarGroup: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
@@ -104,6 +129,20 @@ const defaultProps = {
 describe('TopToolbar', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseWindowControls.mockReturnValue({
+      isTauriEnv: false,
+      shell: {
+        platform: 'web',
+        mode: 'browser',
+        dragStrategy: 'none',
+        showsNativeWindowControls: false,
+        supportsManualDragging: false,
+        supportsDoubleClickMaximize: false,
+        titlebarInsets: { left: 0, right: 0, top: 0 },
+      },
+      handleMaximize: jest.fn(),
+      handleStartWindowDrag: mockStartWindowDragging,
+    });
   });
 
   it('renders without crashing', () => {
@@ -134,5 +173,28 @@ describe('TopToolbar', () => {
 
   it('renders with showSessionPanel=true without crashing', () => {
     render(<TopToolbar {...defaultProps} showSessionPanel={true} />);
+  });
+
+  it('renders explicit drag handles instead of a full-width drag overlay', () => {
+    mockIsTauri.mockReturnValue(true);
+    mockUseWindowControls.mockReturnValue({
+      isTauriEnv: true,
+      shell: {
+        platform: 'windows',
+        mode: 'custom-frameless',
+        dragStrategy: 'manual',
+        showsNativeWindowControls: false,
+        supportsManualDragging: true,
+        supportsDoubleClickMaximize: true,
+        titlebarInsets: { left: 0, right: 0, top: 0 },
+      },
+      handleMaximize: jest.fn(),
+      handleStartWindowDrag: mockStartWindowDragging,
+    });
+
+    const { container } = render(<TopToolbar {...defaultProps} />);
+
+    expect(container.querySelector('[data-testid="window-drag-handle"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-tauri-drag-region]')).not.toBeInTheDocument();
   });
 });

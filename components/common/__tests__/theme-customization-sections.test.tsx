@@ -7,6 +7,7 @@ import userEvent from '@testing-library/user-event';
 import type { ThemeCustomization, ThemePreset } from '@/lib/stores/theme-store';
 import {
   ThemeAnimationsSection,
+  ThemeComponentStyleSection,
   ThemeModeSection,
   ThemePaletteEditor,
   ThemePresetSection,
@@ -27,6 +28,11 @@ const mockSetAnimationsEnabled = jest.fn();
 const mockSetActivePreset = jest.fn();
 const mockSetCustomColor = jest.fn();
 const mockClearCustomColor = jest.fn();
+const mockSetComponentStylePreset = jest.fn();
+const mockSetComponentStyleDensity = jest.fn();
+const mockSetComponentStyleTransparency = jest.fn();
+const mockSetComponentStyleBorder = jest.fn();
+const mockSetComponentStyleElevation = jest.fn();
 const mockResetCustomization = jest.fn();
 const mockSaveCurrentAsPreset = jest.fn();
 const mockDuplicatePreset = jest.fn();
@@ -40,6 +46,13 @@ const createCustomization = (): ThemeCustomization => ({
   fontSize: 'default',
   animationsEnabled: true,
   activePreset: 'custom-night',
+  componentStyle: {
+    preset: 'default',
+    density: 'comfortable',
+    transparency: 'balanced',
+    border: 'medium',
+    elevation: 'raised',
+  },
   customColors: {
     light: {
       primary: '#fafafa',
@@ -75,6 +88,11 @@ const mockStoreState = {
   setActivePreset: mockSetActivePreset,
   setCustomColor: mockSetCustomColor,
   clearCustomColor: mockClearCustomColor,
+  setComponentStylePreset: mockSetComponentStylePreset,
+  setComponentStyleDensity: mockSetComponentStyleDensity,
+  setComponentStyleTransparency: mockSetComponentStyleTransparency,
+  setComponentStyleBorder: mockSetComponentStyleBorder,
+  setComponentStyleElevation: mockSetComponentStyleElevation,
   saveCurrentAsPreset: mockSaveCurrentAsPreset,
   duplicatePreset: mockDuplicatePreset,
   renameUserPreset: mockRenameUserPreset,
@@ -282,6 +300,11 @@ jest.mock('@/components/ui/select', () => {
 
 jest.mock('@/lib/stores/theme-store', () => ({
   useThemeStore: () => mockStoreState,
+  componentStylePresets: ['default', 'observatory', 'floating'],
+  componentStyleDensityValues: ['comfortable', 'compact'],
+  componentStyleTransparencyValues: ['solid', 'balanced', 'high'],
+  componentStyleBorderValues: ['soft', 'medium', 'strong'],
+  componentStyleElevationValues: ['flat', 'raised', 'floating'],
   customizableThemeColorKeys: ['primary', 'background'],
   getAvailableThemePresets: (userPresets: typeof mockStoreState.userPresets = []) => [
     {
@@ -377,6 +400,32 @@ jest.mock('@/lib/stores/theme-store', () => ({
       border: mode === 'light' ? '#cccccc' : '#333333',
       destructive: '#cc0000',
     },
+  }),
+  getComponentStylePreviewData: (_customization: unknown, mode: 'light' | 'dark') => ({
+    mode,
+    themeTokens: {
+      primary: mode === 'light' ? '#123456' : '#abcdef',
+      secondary: mode === 'light' ? '#ddeeff' : '#334455',
+      accent: mode === 'light' ? '#8899aa' : '#556677',
+      background: mode === 'light' ? '#ffffff' : '#050505',
+      foreground: mode === 'light' ? '#121212' : '#f5f5f5',
+      muted: mode === 'light' ? '#eeeeee' : '#222222',
+      card: mode === 'light' ? '#f6f6f6' : '#111111',
+      border: mode === 'light' ? '#cccccc' : '#333333',
+      destructive: '#cc0000',
+    },
+    surfaceTokens: {
+      densityGap: mode === 'light' ? '0.375rem' : '0.25rem',
+      densityPadding: mode === 'light' ? '0.375rem' : '0.25rem',
+      sectionPadding: mode === 'light' ? '0.75rem' : '0.625rem',
+      controlHeight: mode === 'light' ? '2.25rem' : '2rem',
+      surfaceBackground: mode === 'light' ? 'rgba(255,255,255,0.84)' : 'rgba(17,17,17,0.72)',
+      surfaceStrongBackground: mode === 'light' ? 'rgba(255,255,255,0.90)' : 'rgba(17,17,17,0.80)',
+      surfaceBorder: mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)',
+      surfaceShadow: mode === 'light' ? '0 12px 28px -16px rgb(15 23 42 / 0.35)' : '0 20px 44px -18px rgb(0 0 0 / 0.4)',
+      surfaceBlur: mode === 'light' ? '12px' : '18px',
+    },
+    componentStyle: mockStoreState.customization.componentStyle,
   }),
   isValidThemeColorValue: (value: string) => /^#[0-9a-f]{6}$/i.test(value),
 }));
@@ -569,6 +618,39 @@ describe('theme-customization-sections', () => {
     expect(mockSetRadius).toHaveBeenCalledWith(0.8);
     expect(mockSetAnimationsEnabled).toHaveBeenCalledWith(false);
     expect(screen.getByText('0.50rem')).toBeInTheDocument();
+  });
+
+  it('renders component style controls and representative shell previews', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ThemeComponentStyleSection
+        customization={mockStoreState.customization}
+        userPresets={mockStoreState.userPresets}
+        initialPreviewMode="light"
+        setComponentStylePreset={mockSetComponentStylePreset}
+        setComponentStyleDensity={mockSetComponentStyleDensity}
+        setComponentStyleTransparency={mockSetComponentStyleTransparency}
+        setComponentStyleBorder={mockSetComponentStyleBorder}
+        setComponentStyleElevation={mockSetComponentStyleElevation}
+      />
+    );
+
+    const selects = screen.getAllByRole('combobox');
+    await user.selectOptions(selects[0], 'floating');
+    await user.selectOptions(selects[1], 'compact');
+    await user.selectOptions(selects[2], 'high');
+    await user.selectOptions(selects[3], 'strong');
+    await user.selectOptions(selects[4], 'flat');
+
+    expect(mockSetComponentStylePreset).toHaveBeenCalledWith('floating');
+    expect(mockSetComponentStyleDensity).toHaveBeenCalledWith('compact');
+    expect(mockSetComponentStyleTransparency).toHaveBeenCalledWith('high');
+    expect(mockSetComponentStyleBorder).toHaveBeenCalledWith('strong');
+    expect(mockSetComponentStyleElevation).toHaveBeenCalledWith('flat');
+    expect(screen.getByText('theme.componentPreviewToolbar')).toBeInTheDocument();
+    expect(screen.getByText('theme.componentPreviewPanel')).toBeInTheDocument();
+    expect(screen.getByText('theme.componentPreviewSection')).toBeInTheDocument();
   });
 
   it('updates font family and font size from the typography section', async () => {

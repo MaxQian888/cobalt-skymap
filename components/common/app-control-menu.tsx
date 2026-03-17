@@ -72,6 +72,7 @@ export function AppControlMenu({ className, variant = "dropdown" }: AppControlMe
     isFullscreen,
     isPinned,
     isTrayReady,
+    shell,
     handleMinimize,
     handleMaximize,
     handleCloseWithSave: handleClose,
@@ -162,46 +163,6 @@ export function AppControlMenu({ className, variant = "dropdown" }: AppControlMe
           </TooltipContent>
         </Tooltip>
 
-        {/* Minimize */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent"
-              onClick={handleMinimize}
-              aria-label={t("minimize")}
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>{t("minimize")}</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Maximize/Restore */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent"
-              onClick={handleMaximize}
-              aria-label={isMaximized ? t("restore") : t("maximize")}
-            >
-              {isMaximized ? (
-                <Copy className="h-4 w-4" />
-              ) : (
-                <Square className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>{isMaximized ? t("restore") : t("maximize")}</p>
-          </TooltipContent>
-        </Tooltip>
-
         {/* Fullscreen */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -224,23 +185,67 @@ export function AppControlMenu({ className, variant = "dropdown" }: AppControlMe
           </TooltipContent>
         </Tooltip>
 
-        {/* Close */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent"
-              onClick={handleClose}
-              aria-label={t("close")}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>{t("close")}</p>
-          </TooltipContent>
-        </Tooltip>
+        {!shell.showsNativeWindowControls && (
+          <>
+            {/* Minimize */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent"
+                  onClick={handleMinimize}
+                  aria-label={t("minimize")}
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{t("minimize")}</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Maximize/Restore */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent"
+                  onClick={handleMaximize}
+                  aria-label={isMaximized ? t("restore") : t("maximize")}
+                >
+                  {isMaximized ? (
+                    <Copy className="h-4 w-4" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{isMaximized ? t("restore") : t("maximize")}</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Close */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent"
+                  onClick={handleClose}
+                  aria-label={t("close")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{t("close")}</p>
+              </TooltipContent>
+            </Tooltip>
+          </>
+        )}
       </div>
     );
   }
@@ -324,18 +329,22 @@ export function AppControlMenu({ className, variant = "dropdown" }: AppControlMe
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleMinimize}>
-              <Minus className="mr-2 h-4 w-4" />
-              {t("minimize")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleMaximize}>
-              {isMaximized ? (
-                <Copy className="mr-2 h-4 w-4" />
-              ) : (
-                <Square className="mr-2 h-4 w-4" />
-              )}
-              {isMaximized ? t("restore") : t("maximize")}
-            </DropdownMenuItem>
+            {!shell.showsNativeWindowControls && (
+              <>
+                <DropdownMenuItem onClick={handleMinimize}>
+                  <Minus className="mr-2 h-4 w-4" />
+                  {t("minimize")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleMaximize}>
+                  {isMaximized ? (
+                    <Copy className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Square className="mr-2 h-4 w-4" />
+                  )}
+                  {isMaximized ? t("restore") : t("maximize")}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem onClick={handleToggleFullscreen}>
               {isFullscreen ? (
                 <Minimize2 className="mr-2 h-4 w-4" />
@@ -344,11 +353,28 @@ export function AppControlMenu({ className, variant = "dropdown" }: AppControlMe
               )}
               {isFullscreen ? t("exitFullscreen") : t("fullscreen")}
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleClose}>
-              <X className="mr-2 h-4 w-4" />
-              {t("close")}
-            </DropdownMenuItem>
+            {!shell.showsNativeWindowControls && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleMinimize}>
+                  <Minus className="mr-2 h-4 w-4" />
+                  {t("minimize")}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleMaximize}>
+                  {isMaximized ? (
+                    <Copy className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Square className="mr-2 h-4 w-4" />
+                  )}
+                  {isMaximized ? t("restore") : t("maximize")}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleClose}>
+                  <X className="mr-2 h-4 w-4" />
+                  {t("close")}
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem
               onClick={handleQuit}
               className="text-destructive focus:text-destructive"

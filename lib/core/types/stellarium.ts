@@ -427,6 +427,35 @@ export interface MountActionAvailability {
   abortSlew: boolean;
 }
 
+export type MountCommandAction = Exclude<keyof MountActionAvailability, 'connect' | 'discover'>;
+
+export type MountBlockedReason =
+  | 'disconnected'
+  | 'unsupported'
+  | 'parked'
+  | 'already-parked'
+  | 'not-parked'
+  | 'tracking-disabled'
+  | 'not-slewing'
+  | 'slewing';
+
+export type MountBlockedReasonMap = Partial<Record<MountCommandAction, MountBlockedReason>>;
+
+export interface MountTargetAction {
+  action: Extract<MountCommandAction, 'slew' | 'sync'>;
+  targetName: string;
+  ra: number;
+  dec: number;
+  source: string;
+  requestedAt: string;
+}
+
+export interface MountCommandFailure {
+  action: MountCommandAction;
+  message: string;
+  at: string;
+}
+
 export interface MountInfo {
   Connected: boolean;
   Coordinates: {

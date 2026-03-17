@@ -1,5 +1,6 @@
 import type {
   MountActionAvailability,
+  MountBlockedReasonMap,
   MountCapabilities,
   MountProtocol,
   SupportedMountDevice,
@@ -76,4 +77,88 @@ export function createMountActionAvailability(input: {
     moveAxis: connected && Boolean(input.capabilities.canMoveAxis) && !parked,
     abortSlew: connected && slewing,
   };
+}
+
+export function createMountActionBlockReasons(input: {
+  connected: boolean;
+  capabilities: Partial<MountCapabilities>;
+  tracking?: boolean;
+  parked?: boolean;
+  slewing?: boolean;
+}): MountBlockedReasonMap {
+  if (!input.connected) {
+    return {
+      slew: 'disconnected',
+      sync: 'disconnected',
+      park: 'disconnected',
+      unpark: 'disconnected',
+      tracking: 'disconnected',
+      trackingRate: 'disconnected',
+      moveAxis: 'disconnected',
+      abortSlew: 'disconnected',
+    };
+  }
+
+  const reasons: MountBlockedReasonMap = {};
+  const parked = Boolean(input.parked);
+  const slewing = Boolean(input.slewing);
+  const tracking = Boolean(input.tracking);
+  const canSlew = Boolean(input.capabilities.canSlew || input.capabilities.canSlewAsync);
+  const canSync = Boolean(input.capabilities.canSync);
+  const canPark = Boolean(input.capabilities.canPark);
+  const canUnpark = Boolean(input.capabilities.canUnpark);
+  const canSetTracking = Boolean(input.capabilities.canSetTracking);
+  const canMoveAxis = Boolean(input.capabilities.canMoveAxis);
+
+  if (!canSlew) {
+    reasons.slew = 'unsupported';
+  } else if (parked) {
+    reasons.slew = 'parked';
+  } else if (slewing) {
+    reasons.slew = 'slewing';
+  }
+
+  if (!canSync) {
+    reasons.sync = 'unsupported';
+  } else if (parked) {
+    reasons.sync = 'parked';
+  } else if (slewing) {
+    reasons.sync = 'slewing';
+  }
+
+  if (!canPark) {
+    reasons.park = 'unsupported';
+  } else if (parked) {
+    reasons.park = 'already-parked';
+  }
+
+  if (!canUnpark) {
+    reasons.unpark = 'unsupported';
+  } else if (!parked) {
+    reasons.unpark = 'not-parked';
+  }
+
+  if (!canSetTracking) {
+    reasons.tracking = 'unsupported';
+    reasons.trackingRate = 'unsupported';
+  } else if (parked) {
+    reasons.tracking = 'parked';
+    reasons.trackingRate = 'parked';
+  } else if (!tracking) {
+    reasons.trackingRate = 'tracking-disabled';
+  }
+
+  if (!canMoveAxis) {
+    reasons.moveAxis = 'unsupported';
+  } else if (parked) {
+    reasons.moveAxis = 'parked';
+  } else if (slewing) {
+    reasons.moveAxis = 'slewing';
+  }
+
+  if (!slewing) {
+    reasons.abortSlew = 'not-slewing';
+  }
+
+  return reasons;
 }

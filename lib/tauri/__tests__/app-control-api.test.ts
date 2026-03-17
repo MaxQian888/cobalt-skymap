@@ -13,6 +13,9 @@ import {
   minimizeWindow,
   toggleMaximizeWindow,
   isWindowMaximized,
+  saveWindowState,
+  restoreWindowState,
+  startWindowDragging,
 } from '../app-control-api';
 
 type TauriGlobal = typeof globalThis & { __TAURI__?: unknown };
@@ -29,6 +32,9 @@ const mockMinimize = jest.fn();
 const mockClose = jest.fn();
 const mockToggleMaximize = jest.fn();
 const mockIsMaximized = jest.fn();
+const mockStartDragging = jest.fn();
+const mockPluginSaveWindowState = jest.fn();
+const mockRestoreStateCurrent = jest.fn();
 
 jest.mock('@tauri-apps/api/window', () => ({
   getCurrentWindow: () => ({
@@ -36,7 +42,16 @@ jest.mock('@tauri-apps/api/window', () => ({
     close: mockClose,
     toggleMaximize: mockToggleMaximize,
     isMaximized: mockIsMaximized,
+    startDragging: mockStartDragging,
   }),
+}));
+
+jest.mock('@tauri-apps/plugin-window-state', () => ({
+  StateFlags: {
+    ALL: 'all',
+  },
+  saveWindowState: (...args: unknown[]) => mockPluginSaveWindowState(...args),
+  restoreStateCurrent: (...args: unknown[]) => mockRestoreStateCurrent(...args),
 }));
 
 describe('app-control-api', () => {
@@ -277,6 +292,32 @@ describe('app-control-api', () => {
       mockIsMaximized.mockRejectedValueOnce(new Error('Check failed'));
 
       await expect(isWindowMaximized()).rejects.toThrow('Check failed');
+    });
+  });
+
+  describe('window state plugin integration', () => {
+    it('should save window state through plugin-window-state', async () => {
+      mockPluginSaveWindowState.mockResolvedValueOnce(undefined);
+
+      await saveWindowState();
+
+      expect(mockPluginSaveWindowState).toHaveBeenCalledWith('all');
+    });
+
+    it('should restore window state through plugin-window-state', async () => {
+      mockRestoreStateCurrent.mockResolvedValueOnce(undefined);
+
+      await restoreWindowState();
+
+      expect(mockRestoreStateCurrent).toHaveBeenCalledWith('all');
+    });
+
+    it('should start dragging through the Tauri window API', async () => {
+      mockStartDragging.mockResolvedValueOnce(undefined);
+
+      await startWindowDragging();
+
+      expect(mockStartDragging).toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { Search, X, Menu, RotateCcw, PanelLeftClose, PanelLeft, LogOut, Compass, Power } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -52,7 +52,8 @@ import { ViewBookmarks } from '../controls/view-bookmarks';
 import { ObjectTypeLegend } from '../objects/object-type-legend';
 import { DailyKnowledgeButton } from '../knowledge/daily-knowledge-button';
 
-import { isTauri, quitApp, toggleMaximizeWindow } from '@/lib/tauri/app-control-api';
+import { isTauri, quitApp } from '@/lib/tauri/app-control-api';
+import { useWindowControls } from '@/lib/hooks/use-window-controls';
 import { useOnboardingBridgeStore, useSettingsStore, useStellariumStore } from '@/lib/stores';
 import {
   DEFAULT_MOBILE_PRIORITIZED_TOOLS,
@@ -75,6 +76,7 @@ export const TopToolbar = memo(function TopToolbar({
   onGoToCoordinates,
 }: TopToolbarProps) {
   const t = useTranslations();
+  const { isTauriEnv, shell, handleMaximize, handleStartWindowDrag } = useWindowControls();
   const skyEngine = useSettingsStore((state) => state.skyEngine);
   const openSearchRequestId = useOnboardingBridgeStore((state) => state.openSearchRequestId);
   const toggleSearchRequestId = useOnboardingBridgeStore((state) => state.toggleSearchRequestId);
@@ -129,27 +131,29 @@ export const TopToolbar = memo(function TopToolbar({
     }
   }, [closeTransientPanelsRequestId, isSearchOpen, onToggleSearch]);
 
+  const shellHorizontalPadding = isTauriEnv
+    ? {
+        paddingLeft: `calc(${shell.titlebarInsets.left}px + 0.5rem)`,
+        paddingRight: `calc(${shell.titlebarInsets.right}px + 0.5rem)`,
+      }
+    : undefined;
+
   return (
     <div
       className="absolute top-0 left-0 right-0 z-30 pointer-events-none safe-area-top animate-fade-in"
       style={{ paddingLeft: 'var(--safe-area-left)', paddingRight: 'var(--safe-area-right)' }}
     >
-      {/* Drag region layer - covers entire top bar area, double-click to maximize */}
-      <div
-        data-tauri-drag-region
-        className="absolute inset-0 h-12 pointer-events-auto"
-        style={{ zIndex: 0 }}
-        onDoubleClick={() => {
-          if (isTauri()) {
-            toggleMaximizeWindow();
-          }
-        }}
-      />
+      {isTauriEnv && shell.supportsManualDragging && (
+        <WindowDragHandle
+          onStartDrag={handleStartWindowDrag}
+          onToggleMaximize={shell.supportsDoubleClickMaximize ? handleMaximize : undefined}
+        />
+      )}
 
       <div
         data-starmap-ui-control="true"
         className="relative p-2 sm:p-3 flex items-center justify-between"
-        style={{ zIndex: 1 }}
+        style={{ zIndex: 1, ...shellHorizontalPadding }}
       >
         {/* Left: Menu, Search, Discovery & Navigation */}
         <div className="flex items-center gap-1.5 pointer-events-auto">
@@ -333,6 +337,34 @@ export const TopToolbar = memo(function TopToolbar({
   );
 });
 TopToolbar.displayName = 'TopToolbar';
+
+interface WindowDragHandleProps {
+  onStartDrag: () => Promise<void>;
+  onToggleMaximize?: () => Promise<void>;
+}
+
+function WindowDragHandle({ onStartDrag, onToggleMaximize }: WindowDragHandleProps) {
+  const handleMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    void onStartDrag();
+  };
+
+  const handleDoubleClick = () => {
+    if (!onToggleMaximize) return;
+    void onToggleMaximize();
+  };
+
+  return (
+    <div
+      data-testid="window-drag-handle"
+      className="pointer-events-auto absolute left-1/2 top-2 z-10 flex h-5 w-20 -translate-x-1/2 items-center justify-center rounded-full bg-card/55 backdrop-blur-md sm:w-28"
+      onMouseDown={handleMouseDown}
+      onDoubleClick={handleDoubleClick}
+    >
+      <div className="h-1.5 w-8 rounded-full bg-foreground/35 sm:w-10" />
+    </div>
+  );
+}
 
 // Mobile Menu Drawer Sub-component - memoized
 const MobileMenuDrawer = memo(function MobileMenuDrawer({

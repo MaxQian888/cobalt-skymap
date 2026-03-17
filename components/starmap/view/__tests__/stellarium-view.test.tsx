@@ -8,6 +8,9 @@ import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 const mockSetArMode = jest.fn();
 let mockArMode = true;
 let mockArSessionStatus: 'ready' | 'blocked' = 'blocked';
+let mockArLayoutTier: 'phone-compact' | 'phone' | 'tablet' | 'desktop' = 'phone-compact';
+let mockArRuntimeClass: 'browser-mobile' | 'browser-desktop' | 'tauri-desktop' = 'browser-mobile';
+let mockSensorPath: 'sensor-primary' | 'camera-primary' | 'manual-only' = 'sensor-primary';
 
 const createDivComponent = (testId: string) => {
   const Component = () => <div data-testid={testId} />;
@@ -52,6 +55,24 @@ jest.mock('@/components/starmap/view/use-mobile-shell', () => ({
   useMobileShell: () => ({
     isMobileShell: false,
     viewportHeight: 800,
+  }),
+}));
+
+jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
+  useARAdaptation: () => ({
+    assistantMode: 'edge-sheet',
+    recoveryMode: 'compact-strip',
+    cameraControlMode: 'compact-strip',
+    sensorPath: mockSensorPath,
+    runtimeClass: mockArRuntimeClass,
+    layoutTier: mockArLayoutTier,
+    controlDensity: 'compact',
+    capabilityTier: 'limited',
+    isLandscape: false,
+    isViewportReduced: false,
+    viewportWidth: 390,
+    viewportHeight: 844,
+    safeAreaInsets: { top: 24, right: 0, bottom: 34, left: 0 },
   }),
 }));
 
@@ -189,6 +210,9 @@ describe('StellariumView', () => {
     useARRuntimeStore.getState().resetRecoveryState();
     mockArMode = true;
     mockArSessionStatus = 'blocked';
+    mockArLayoutTier = 'phone-compact';
+    mockArRuntimeClass = 'browser-mobile';
+    mockSensorPath = 'sensor-primary';
   });
 
   it('exports the component correctly', async () => {
@@ -220,5 +244,17 @@ describe('StellariumView', () => {
     render(<viewModule.StellariumView />);
     fireEvent.click(screen.getByTestId('ar-recovery-action-disable-ar'));
     expect(mockSetArMode).toHaveBeenCalledWith('arMode', false);
+  });
+
+  it('exposes AR adaptation metadata from the main view container', async () => {
+    mockSensorPath = 'camera-primary';
+    mockArRuntimeClass = 'tauri-desktop';
+
+    const viewModule = await import('../stellarium-view');
+    render(<viewModule.StellariumView />);
+
+    expect(screen.getByTestId('stellarium-view-root')).toHaveAttribute('data-ar-layout-tier', 'phone-compact');
+    expect(screen.getByTestId('stellarium-view-root')).toHaveAttribute('data-ar-runtime-class', 'tauri-desktop');
+    expect(screen.getByTestId('stellarium-view-root')).toHaveAttribute('data-ar-sensor-path', 'camera-primary');
   });
 });

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, Check, Copy, Monitor, Moon, RotateCcw, Save, Sun, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Layers3, Monitor, Moon, RotateCcw, Save, Sun, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,12 @@ import { Switch } from '@/components/ui/switch';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import {
+  componentStyleBorderValues,
+  componentStyleElevationValues,
+  componentStylePresets,
+  componentStyleTransparencyValues,
+  componentStyleDensityValues,
+  getComponentStylePreviewData,
   customizableThemeColorKeys,
   getAvailableThemePresets,
   getFontPreview,
@@ -71,6 +77,11 @@ export function useThemeCustomizationBindings() {
   const {
     customization,
     userPresets,
+    setComponentStylePreset,
+    setComponentStyleDensity,
+    setComponentStyleTransparency,
+    setComponentStyleBorder,
+    setComponentStyleElevation,
     setRadius,
     setFontFamily,
     setFontSize,
@@ -92,6 +103,11 @@ export function useThemeCustomizationBindings() {
     resolvedTheme: (resolvedTheme === 'dark' ? 'dark' : 'light') as ThemeMode,
     customization,
     userPresets,
+    setComponentStylePreset,
+    setComponentStyleDensity,
+    setComponentStyleTransparency,
+    setComponentStyleBorder,
+    setComponentStyleElevation,
     setRadius,
     setFontFamily,
     setFontSize,
@@ -554,6 +570,270 @@ export function ThemePaletteEditor({
               </div>
             ))
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface ThemeComponentStyleSectionProps {
+  customization: ThemeCustomization;
+  userPresets: ThemePreset[];
+  initialPreviewMode: ThemeMode;
+  setComponentStylePreset: (preset: ThemeCustomization['componentStyle']['preset']) => void;
+  setComponentStyleDensity: (density: ThemeCustomization['componentStyle']['density']) => void;
+  setComponentStyleTransparency: (transparency: ThemeCustomization['componentStyle']['transparency']) => void;
+  setComponentStyleBorder: (border: ThemeCustomization['componentStyle']['border']) => void;
+  setComponentStyleElevation: (elevation: ThemeCustomization['componentStyle']['elevation']) => void;
+}
+
+function buildPreviewThemeVars(preview: ReturnType<typeof getComponentStylePreviewData>): CSSProperties {
+  return {
+    '--background': preview.themeTokens.background,
+    '--foreground': preview.themeTokens.foreground,
+    '--card': preview.themeTokens.card,
+    '--border': preview.themeTokens.border,
+    '--primary': preview.themeTokens.primary,
+    '--secondary': preview.themeTokens.secondary,
+    '--accent': preview.themeTokens.accent,
+    '--muted': preview.themeTokens.muted,
+    '--destructive': preview.themeTokens.destructive,
+  } as CSSProperties;
+}
+
+function buildSurfaceStyle(preview: ReturnType<typeof getComponentStylePreviewData>): CSSProperties {
+  return {
+    background: preview.surfaceTokens.surfaceBackground,
+    borderColor: preview.surfaceTokens.surfaceBorder,
+    boxShadow: preview.surfaceTokens.surfaceShadow,
+    backdropFilter: `blur(${preview.surfaceTokens.surfaceBlur})`,
+    WebkitBackdropFilter: `blur(${preview.surfaceTokens.surfaceBlur})`,
+    color: preview.themeTokens.foreground,
+  };
+}
+
+export function ThemeComponentStyleSection({
+  customization,
+  userPresets,
+  initialPreviewMode,
+  setComponentStylePreset,
+  setComponentStyleDensity,
+  setComponentStyleTransparency,
+  setComponentStyleBorder,
+  setComponentStyleElevation,
+}: ThemeComponentStyleSectionProps) {
+  const t = useTranslations();
+  const [previewMode, setPreviewMode] = useState<ThemeMode>(initialPreviewMode);
+  const preview = getComponentStylePreviewData(customization, previewMode, userPresets);
+  const previewThemeVars = buildPreviewThemeVars(preview);
+  const baseSurfaceStyle = buildSurfaceStyle(preview);
+
+  return (
+    <div className="space-y-4">
+      <Label>{t('theme.componentStyle')}</Label>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label>{t('theme.componentStylePreset')}</Label>
+          <Select
+            value={customization.componentStyle.preset}
+            onValueChange={(value) => setComponentStylePreset(value as ThemeCustomization['componentStyle']['preset'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {componentStylePresets.map((preset) => (
+                <SelectItem key={preset} value={preset}>
+                  {t(`theme.componentPreset${preset[0].toUpperCase()}${preset.slice(1)}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>{t('theme.componentDensity')}</Label>
+          <Select
+            value={customization.componentStyle.density}
+            onValueChange={(value) => setComponentStyleDensity(value as ThemeCustomization['componentStyle']['density'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {componentStyleDensityValues.map((density) => (
+                <SelectItem key={density} value={density}>
+                  {t(`theme.componentDensity${density[0].toUpperCase()}${density.slice(1)}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>{t('theme.componentTransparency')}</Label>
+          <Select
+            value={customization.componentStyle.transparency}
+            onValueChange={(value) => setComponentStyleTransparency(value as ThemeCustomization['componentStyle']['transparency'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {componentStyleTransparencyValues.map((transparency) => (
+                <SelectItem key={transparency} value={transparency}>
+                  {t(`theme.componentTransparency${transparency[0].toUpperCase()}${transparency.slice(1)}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>{t('theme.componentBorder')}</Label>
+          <Select
+            value={customization.componentStyle.border}
+            onValueChange={(value) => setComponentStyleBorder(value as ThemeCustomization['componentStyle']['border'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {componentStyleBorderValues.map((border) => (
+                <SelectItem key={border} value={border}>
+                  {t(`theme.componentBorder${border[0].toUpperCase()}${border.slice(1)}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
+          <Label>{t('theme.componentElevation')}</Label>
+          <Select
+            value={customization.componentStyle.elevation}
+            onValueChange={(value) => setComponentStyleElevation(value as ThemeCustomization['componentStyle']['elevation'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {componentStyleElevationValues.map((elevation) => (
+                <SelectItem key={elevation} value={elevation}>
+                  {t(`theme.componentElevation${elevation[0].toUpperCase()}${elevation.slice(1)}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-border/70 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Layers3 className="h-4 w-4 text-primary" />
+            <Label>{t('theme.componentStyle')}</Label>
+          </div>
+          <ToggleGroup
+            type="single"
+            value={previewMode}
+            onValueChange={(value) => {
+              if (value === 'light' || value === 'dark') {
+                setPreviewMode(value);
+              }
+            }}
+            className="gap-1"
+          >
+            <ToggleGroupItem value="light" size="sm" className="h-7 px-2 text-xs">
+              {t('theme.previewLight')}
+            </ToggleGroupItem>
+            <ToggleGroupItem value="dark" size="sm" className="h-7 px-2 text-xs">
+              {t('theme.previewDark')}
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+
+        <div
+          className="space-y-3 rounded-lg border p-3"
+          style={{
+            ...previewThemeVars,
+            background: preview.themeTokens.background,
+            borderColor: preview.themeTokens.border,
+            color: preview.themeTokens.foreground,
+          }}
+        >
+          <div
+            className="flex items-center justify-between rounded-lg border"
+            style={{
+              ...baseSurfaceStyle,
+              padding: preview.surfaceTokens.densityPadding,
+              gap: preview.surfaceTokens.densityGap,
+            }}
+          >
+            <span className="text-sm font-medium">{t('theme.componentPreviewToolbar')}</span>
+            <div className="flex items-center" style={{ gap: preview.surfaceTokens.densityGap }}>
+              <span
+                className="rounded-md border px-3 text-xs"
+                style={{
+                  ...baseSurfaceStyle,
+                  background: preview.surfaceTokens.surfaceStrongBackground,
+                  minHeight: preview.surfaceTokens.controlHeight,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                {t('theme.preview')}
+              </span>
+              <span
+                className="rounded-md border px-3 text-xs"
+                style={{
+                  ...baseSurfaceStyle,
+                  background: preview.surfaceTokens.surfaceStrongBackground,
+                  minHeight: preview.surfaceTokens.controlHeight,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                {t('theme.componentStylePreset')}
+              </span>
+            </div>
+          </div>
+
+          <div
+            className="rounded-lg border"
+            style={{
+              ...baseSurfaceStyle,
+              padding: preview.surfaceTokens.sectionPadding,
+            }}
+          >
+            <div className="text-sm font-medium">{t('theme.componentPreviewPanel')}</div>
+            <p className="mt-1 text-xs text-muted-foreground">{t('theme.customizeDescription')}</p>
+          </div>
+
+          <div
+            className="rounded-lg border"
+            style={{
+              ...baseSurfaceStyle,
+              padding: preview.surfaceTokens.sectionPadding,
+            }}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-medium">{t('theme.componentPreviewSection')}</span>
+              <span
+                className="rounded-md border px-3 text-xs"
+                style={{
+                  ...baseSurfaceStyle,
+                  background: preview.surfaceTokens.surfaceStrongBackground,
+                  minHeight: preview.surfaceTokens.controlHeight,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                }}
+              >
+                {preview.componentStyle.density}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

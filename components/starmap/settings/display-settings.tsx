@@ -43,6 +43,7 @@ import {
   buildARAdaptiveRecommendationSummary,
   deriveARAdaptiveAdjustments,
 } from '@/lib/core/ar-adaptive-learner';
+import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
 import { AladinCatalogSettings } from './aladin-catalog-settings';
 import { AladinOverlaySettings } from './aladin-overlay-settings';
 import { AladinMocSettings } from './aladin-moc-settings';
@@ -96,6 +97,7 @@ export function DisplaySettings() {
   const setShowSatelliteOrbits = useSatelliteStore((state) => state.setShowOrbits);
   const arCameraRuntime = useARRuntimeStore((state) => state.camera);
   const openLaunchAssistant = useARRuntimeStore((state) => state.openLaunchAssistant);
+  const arAdaptation = useARAdaptation();
 
   const adaptiveRecommendation = useMemo(
     () => deriveARAdaptiveAdjustments(stellarium.arAdaptiveLearnerState, {
@@ -763,6 +765,19 @@ export function DisplaySettings() {
                   ].filter(Boolean).join(' · ')}
                 </p>
               )}
+
+              <div className="space-y-1 rounded-md border border-border/50 bg-background/60 px-2 py-2 text-[11px] text-muted-foreground">
+                <p className="font-medium text-foreground">{t('settings.arAdaptationSummary')}</p>
+                {arAdaptation.sensorPath === 'camera-primary' && (
+                  <p>{t('settings.arAdaptationCameraFirst')}</p>
+                )}
+                {arAdaptation.sensorPath === 'manual-only' && (
+                  <p>{t('settings.arAdaptationManualOnly')}</p>
+                )}
+                {arAdaptation.capabilityTier !== 'full' && (
+                  <p>{t('settings.arAdaptationLimitedProfile')}</p>
+                )}
+              </div>
 
               <Button
                 variant="outline"

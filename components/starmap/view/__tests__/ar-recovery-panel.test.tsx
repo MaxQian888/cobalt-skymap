@@ -7,6 +7,7 @@ import { ARRecoveryPanel } from '../ar-recovery-panel';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 
 const mockSetStellariumSetting = jest.fn();
+let mockRecoveryMode: 'floating-card' | 'edge-sheet' | 'compact-strip' = 'compact-strip';
 
 jest.mock('@/lib/stores', () => ({
   useSettingsStore: (selector: (state: { setStellariumSetting: (key: string, value: unknown) => void }) => unknown) =>
@@ -19,9 +20,28 @@ jest.mock('@/lib/stores', () => ({
     }),
 }));
 
+jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
+  useARAdaptation: () => ({
+    assistantMode: 'edge-sheet',
+    recoveryMode: mockRecoveryMode,
+    cameraControlMode: 'compact-strip',
+    sensorPath: 'sensor-primary',
+    runtimeClass: 'browser-mobile',
+    layoutTier: 'phone-compact',
+    controlDensity: 'compact',
+    capabilityTier: 'limited',
+    isLandscape: false,
+    isViewportReduced: false,
+    viewportWidth: 390,
+    viewportHeight: 844,
+    safeAreaInsets: { top: 24, right: 0, bottom: 34, left: 0 },
+  }),
+}));
+
 describe('ARRecoveryPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRecoveryMode = 'compact-strip';
     useARRuntimeStore.getState().resetRecoveryState();
   });
 
@@ -147,5 +167,17 @@ describe('ARRecoveryPanel', () => {
     const lastFired = useARRuntimeStore.getState().recoveryActionLastFiredAt['retry-camera'];
     expect(lastFired).toBeGreaterThanOrEqual(before);
     expect(lastFired).toBeLessThanOrEqual(after);
+  });
+
+  it('exposes adaptation metadata for compact recovery presentation', () => {
+    render(
+      <ARRecoveryPanel
+        status="blocked"
+        recoveryActions={['retry-camera']}
+      />
+    );
+
+    expect(screen.getByTestId('ar-recovery-panel')).toHaveAttribute('data-ar-recovery-mode', 'compact-strip');
+    expect(screen.getByTestId('ar-recovery-panel')).toHaveAttribute('data-ar-sticky-actions', 'true');
   });
 });

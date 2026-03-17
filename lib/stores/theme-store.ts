@@ -25,12 +25,27 @@ export interface ThemePreset {
   };
 }
 
+export type ComponentStylePreset = 'default' | 'observatory' | 'floating';
+export type ComponentStyleDensity = 'comfortable' | 'compact';
+export type ComponentStyleTransparency = 'solid' | 'balanced' | 'high';
+export type ComponentStyleBorder = 'soft' | 'medium' | 'strong';
+export type ComponentStyleElevation = 'flat' | 'raised' | 'floating';
+
+export interface ThemeComponentStyle {
+  preset: ComponentStylePreset;
+  density: ComponentStyleDensity;
+  transparency: ComponentStyleTransparency;
+  border: ComponentStyleBorder;
+  elevation: ComponentStyleElevation;
+}
+
 export interface ThemeCustomization {
   radius: number;
   fontFamily: 'default' | 'serif' | 'mono' | 'system';
   fontSize: 'small' | 'default' | 'large';
   animationsEnabled: boolean;
   activePreset: string | null;
+  componentStyle: ThemeComponentStyle;
   customColors: {
     light: Partial<ThemeColors>;
     dark: Partial<ThemeColors>;
@@ -53,6 +68,25 @@ export interface ThemeContrastWarning {
   threshold: number;
 }
 
+export interface ResolvedComponentStyleTokens {
+  densityGap: string;
+  densityPadding: string;
+  sectionPadding: string;
+  controlHeight: string;
+  surfaceBackground: string;
+  surfaceStrongBackground: string;
+  surfaceBorder: string;
+  surfaceShadow: string;
+  surfaceBlur: string;
+}
+
+export interface ComponentStylePreviewData {
+  mode: ThemeMode;
+  themeTokens: ThemeColors;
+  surfaceTokens: ResolvedComponentStyleTokens;
+  componentStyle: ThemeComponentStyle;
+}
+
 export interface ThemeStorePersistedState {
   customization: ThemeCustomization;
   userPresets: ThemePreset[];
@@ -60,6 +94,11 @@ export interface ThemeStorePersistedState {
 
 interface ThemeStore extends ThemeStorePersistedState {
   setCustomization: (customization: Partial<ThemeCustomization>) => void;
+  setComponentStylePreset: (preset: ComponentStylePreset) => void;
+  setComponentStyleDensity: (density: ComponentStyleDensity) => void;
+  setComponentStyleTransparency: (transparency: ComponentStyleTransparency) => void;
+  setComponentStyleBorder: (border: ComponentStyleBorder) => void;
+  setComponentStyleElevation: (elevation: ComponentStyleElevation) => void;
   setRadius: (radius: number) => void;
   setFontFamily: (font: ThemeCustomization['fontFamily']) => void;
   setFontSize: (size: ThemeCustomization['fontSize']) => void;
@@ -77,18 +116,32 @@ interface ThemeStore extends ThemeStorePersistedState {
   applyCustomization: () => void;
 }
 
+export const defaultComponentStyle: ThemeComponentStyle = {
+  preset: 'default',
+  density: 'comfortable',
+  transparency: 'balanced',
+  border: 'medium',
+  elevation: 'raised',
+};
+
 const defaultCustomization: ThemeCustomization = {
   radius: 0.5,
   fontFamily: 'default',
   fontSize: 'default',
   animationsEnabled: true,
   activePreset: null,
+  componentStyle: defaultComponentStyle,
   customColors: {
     light: {},
     dark: {},
   },
 };
 
+const componentStylePresetOptions = ['default', 'observatory', 'floating'] as const;
+const componentStyleDensityOptions = ['comfortable', 'compact'] as const;
+const componentStyleTransparencyOptions = ['solid', 'balanced', 'high'] as const;
+const componentStyleBorderOptions = ['soft', 'medium', 'strong'] as const;
+const componentStyleElevationOptions = ['flat', 'raised', 'floating'] as const;
 const fontFamilyOptions = ['default', 'serif', 'mono', 'system'] as const;
 const fontSizeOptions = ['small', 'default', 'large'] as const;
 const themeColorKeys: (keyof ThemeColors)[] = [
@@ -140,7 +193,87 @@ const defaultThemeTokens: Record<ThemeMode, ThemeColors> = {
   },
 };
 
+const componentStylePresetDefaults: Record<ComponentStylePreset, ThemeComponentStyle> = {
+  default: defaultComponentStyle,
+  observatory: {
+    preset: 'observatory',
+    density: 'comfortable',
+    transparency: 'solid',
+    border: 'strong',
+    elevation: 'flat',
+  },
+  floating: {
+    preset: 'floating',
+    density: 'compact',
+    transparency: 'high',
+    border: 'soft',
+    elevation: 'floating',
+  },
+};
+
+const componentDensityTokens: Record<ComponentStyleDensity, Pick<ResolvedComponentStyleTokens, 'densityGap' | 'densityPadding' | 'sectionPadding' | 'controlHeight'>> = {
+  comfortable: {
+    densityGap: '0.375rem',
+    densityPadding: '0.375rem',
+    sectionPadding: '0.75rem',
+    controlHeight: '2.25rem',
+  },
+  compact: {
+    densityGap: '0.25rem',
+    densityPadding: '0.25rem',
+    sectionPadding: '0.625rem',
+    controlHeight: '2rem',
+  },
+};
+
+const componentTransparencyTokens: Record<ComponentStyleTransparency, Pick<ResolvedComponentStyleTokens, 'surfaceBackground' | 'surfaceStrongBackground' | 'surfaceBlur'>> = {
+  solid: {
+    surfaceBackground: 'color-mix(in oklch, var(--card) 96%, transparent)',
+    surfaceStrongBackground: 'color-mix(in oklch, var(--card) 98%, transparent)',
+    surfaceBlur: '0px',
+  },
+  balanced: {
+    surfaceBackground: 'color-mix(in oklch, var(--card) 84%, transparent)',
+    surfaceStrongBackground: 'color-mix(in oklch, var(--card) 90%, transparent)',
+    surfaceBlur: '12px',
+  },
+  high: {
+    surfaceBackground: 'color-mix(in oklch, var(--card) 72%, transparent)',
+    surfaceStrongBackground: 'color-mix(in oklch, var(--card) 80%, transparent)',
+    surfaceBlur: '18px',
+  },
+};
+
+const componentBorderTokens: Record<ComponentStyleBorder, Pick<ResolvedComponentStyleTokens, 'surfaceBorder'>> = {
+  soft: {
+    surfaceBorder: 'color-mix(in oklch, var(--border) 28%, transparent)',
+  },
+  medium: {
+    surfaceBorder: 'color-mix(in oklch, var(--border) 46%, transparent)',
+  },
+  strong: {
+    surfaceBorder: 'color-mix(in oklch, var(--border) 68%, transparent)',
+  },
+};
+
+const componentElevationTokens: Record<ComponentStyleElevation, Pick<ResolvedComponentStyleTokens, 'surfaceShadow'>> = {
+  flat: {
+    surfaceShadow: 'none',
+  },
+  raised: {
+    surfaceShadow: '0 12px 28px -16px rgb(15 23 42 / 0.35)',
+  },
+  floating: {
+    surfaceShadow: '0 20px 44px -18px rgb(15 23 42 / 0.4)',
+  },
+};
+
 export const customizableThemeColorKeys = [...themeColorKeys] as const;
+export const componentStylePresets = [...componentStylePresetOptions] as const;
+export const componentStyleDensityValues = [...componentStyleDensityOptions] as const;
+export const componentStyleTransparencyValues = [...componentStyleTransparencyOptions] as const;
+export const componentStyleBorderValues = [...componentStyleBorderOptions] as const;
+export const componentStyleElevationValues = [...componentStyleElevationOptions] as const;
 
 export const themePresets: ThemePreset[] = [
   {
@@ -280,6 +413,35 @@ function sanitizeModeColors(value: unknown): Partial<ThemeColors> {
   return next;
 }
 
+export function sanitizeThemeComponentStyle(
+  value: unknown,
+  base: ThemeComponentStyle = defaultComponentStyle,
+): ThemeComponentStyle {
+  if (!value || typeof value !== 'object') {
+    return base;
+  }
+
+  const raw = value as Partial<Record<keyof ThemeComponentStyle, unknown>>;
+
+  return {
+    preset: componentStylePresetOptions.includes(raw.preset as ComponentStylePreset)
+      ? raw.preset as ComponentStylePreset
+      : base.preset,
+    density: componentStyleDensityOptions.includes(raw.density as ComponentStyleDensity)
+      ? raw.density as ComponentStyleDensity
+      : defaultComponentStyle.density,
+    transparency: componentStyleTransparencyOptions.includes(raw.transparency as ComponentStyleTransparency)
+      ? raw.transparency as ComponentStyleTransparency
+      : defaultComponentStyle.transparency,
+    border: componentStyleBorderOptions.includes(raw.border as ComponentStyleBorder)
+      ? raw.border as ComponentStyleBorder
+      : defaultComponentStyle.border,
+    elevation: componentStyleElevationOptions.includes(raw.elevation as ComponentStyleElevation)
+      ? raw.elevation as ComponentStyleElevation
+      : defaultComponentStyle.elevation,
+  };
+}
+
 function cloneThemePreset(preset: ThemePreset): ThemePreset {
   return {
     id: preset.id,
@@ -330,6 +492,19 @@ export function sanitizeThemePresets(input: unknown): ThemePreset[] {
 
 export function getAvailableThemePresets(userPresets: ThemePreset[] = []): ThemePreset[] {
   return [...themePresets, ...userPresets.map(cloneThemePreset)];
+}
+
+export function getResolvedComponentStyleTokens(
+  customization: Pick<ThemeCustomization, 'componentStyle'>,
+): ResolvedComponentStyleTokens {
+  const componentStyle = sanitizeThemeComponentStyle(customization.componentStyle, defaultComponentStyle);
+
+  return {
+    ...componentDensityTokens[componentStyle.density],
+    ...componentTransparencyTokens[componentStyle.transparency],
+    ...componentBorderTokens[componentStyle.border],
+    ...componentElevationTokens[componentStyle.elevation],
+  };
 }
 
 function findThemePreset(presetId: string | null | undefined, userPresets: ThemePreset[] = []): ThemePreset | undefined {
@@ -407,6 +582,11 @@ function sanitizeThemeCustomization(
 
   let lightColors = base.customColors.light;
   let darkColors = base.customColors.dark;
+  let componentStyle = base.componentStyle;
+
+  if (hasOwn(source, 'componentStyle')) {
+    componentStyle = sanitizeThemeComponentStyle(source.componentStyle, base.componentStyle);
+  }
 
   if (hasOwn(source, 'customColors')) {
     const incomingColors = source.customColors;
@@ -429,6 +609,7 @@ function sanitizeThemeCustomization(
     fontSize,
     animationsEnabled,
     activePreset,
+    componentStyle,
     customColors: {
       light: lightColors,
       dark: darkColors,
@@ -499,6 +680,19 @@ export function getThemePreviewData(
   return {
     mode,
     tokens: getEffectiveThemeColors(customization, mode, userPresets),
+  };
+}
+
+export function getComponentStylePreviewData(
+  customization: ThemeCustomization,
+  mode: ThemeMode,
+  userPresets: ThemePreset[] = [],
+): ComponentStylePreviewData {
+  return {
+    mode,
+    themeTokens: getEffectiveThemeColors(customization, mode, userPresets),
+    surfaceTokens: getResolvedComponentStyleTokens(customization),
+    componentStyle: sanitizeThemeComponentStyle(customization.componentStyle, defaultComponentStyle),
   };
 }
 
@@ -730,6 +924,17 @@ export function isValidThemeColorValue(value: string): boolean {
 
 // Batch DOM updates for better performance
 let pendingUpdate: number | null = null;
+const componentStyleVariableNames = [
+  '--component-density-gap',
+  '--component-density-padding',
+  '--component-section-padding',
+  '--component-control-height',
+  '--component-surface-bg',
+  '--component-surface-strong-bg',
+  '--component-surface-border',
+  '--component-surface-shadow',
+  '--component-surface-blur',
+] as const;
 
 function applyThemeToDOM(customization: ThemeCustomization, userPresets: ThemePreset[]) {
   if (pendingUpdate !== null) {
@@ -748,15 +953,29 @@ function applyThemeToDOM(customization: ThemeCustomization, userPresets: ThemePr
     themeColorKeys.forEach((key) => {
       root.style.removeProperty(`--${key}`);
     });
+    componentStyleVariableNames.forEach((key) => {
+      root.style.removeProperty(key);
+    });
 
     const isDark = root.classList.contains('dark');
     const mergedColors = getResolvedThemeColors(customization, isDark ? 'dark' : 'light', userPresets);
+    const componentStyleTokens = getResolvedComponentStyleTokens(customization);
 
     Object.entries(mergedColors).forEach(([key, value]) => {
       if (value) {
         styleUpdates.push([`--${key}`, value]);
       }
     });
+
+    styleUpdates.push(['--component-density-gap', componentStyleTokens.densityGap]);
+    styleUpdates.push(['--component-density-padding', componentStyleTokens.densityPadding]);
+    styleUpdates.push(['--component-section-padding', componentStyleTokens.sectionPadding]);
+    styleUpdates.push(['--component-control-height', componentStyleTokens.controlHeight]);
+    styleUpdates.push(['--component-surface-bg', componentStyleTokens.surfaceBackground]);
+    styleUpdates.push(['--component-surface-strong-bg', componentStyleTokens.surfaceStrongBackground]);
+    styleUpdates.push(['--component-surface-border', componentStyleTokens.surfaceBorder]);
+    styleUpdates.push(['--component-surface-shadow', componentStyleTokens.surfaceShadow]);
+    styleUpdates.push(['--component-surface-blur', componentStyleTokens.surfaceBlur]);
 
     styleUpdates.forEach(([prop, value]) => {
       root.style.setProperty(prop, value);
@@ -803,6 +1022,40 @@ export const useThemeStore = create<ThemeStore>()(
           customization: sanitizeThemeCustomization(customization, state.customization, state.userPresets),
         }));
         get().applyCustomization();
+      },
+
+      setComponentStylePreset: (preset) => {
+        get().setCustomization({
+          componentStyle: componentStylePresetDefaults[preset],
+        });
+      },
+
+      setComponentStyleDensity: (density) => {
+        const current = get().customization.componentStyle;
+        get().setCustomization({
+          componentStyle: { ...current, density },
+        });
+      },
+
+      setComponentStyleTransparency: (transparency) => {
+        const current = get().customization.componentStyle;
+        get().setCustomization({
+          componentStyle: { ...current, transparency },
+        });
+      },
+
+      setComponentStyleBorder: (border) => {
+        const current = get().customization.componentStyle;
+        get().setCustomization({
+          componentStyle: { ...current, border },
+        });
+      },
+
+      setComponentStyleElevation: (elevation) => {
+        const current = get().customization.componentStyle;
+        get().setCustomization({
+          componentStyle: { ...current, elevation },
+        });
       },
 
       setRadius: (radius) => {
@@ -967,6 +1220,9 @@ export const useThemeStore = create<ThemeStore>()(
         root.style.removeProperty('--font-size-scale');
         root.style.fontSize = '';
         root.classList.remove('reduce-motion');
+        componentStyleVariableNames.forEach((key) => {
+          root.style.removeProperty(key);
+        });
         themeColorKeys.forEach((key) => {
           root.style.removeProperty(`--${key}`);
         });
@@ -981,7 +1237,7 @@ export const useThemeStore = create<ThemeStore>()(
     {
       name: 'theme-customization',
       storage: getZustandStorage(),
-      version: 2,
+      version: 3,
       migrate: migrateThemeStoreState,
       partialize: (state) => ({
         customization: state.customization,

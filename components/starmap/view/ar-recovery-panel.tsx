@@ -8,6 +8,8 @@ import { executeARRecoveryAction, type ARRecoveryActionHandlers } from '@/lib/co
 import type { ARRecoveryAction, ARSessionStatus } from '@/lib/core/ar-session';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import { useOnboardingBridgeStore, useSettingsStore } from '@/lib/stores';
+import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
+import { getARSurfaceLayoutTokens, withSafeAreaInset } from '@/lib/constants/ar-layout';
 
 const RECOVERY_COOLDOWN_MS = 3000;
 
@@ -60,6 +62,8 @@ export function ARRecoveryPanel({
   className,
 }: ARRecoveryPanelProps) {
   const t = useTranslations();
+  const adaptation = useARAdaptation();
+  const layoutTokens = getARSurfaceLayoutTokens('recovery', adaptation.recoveryMode);
   const setStellariumSetting = useSettingsStore((state) => state.setStellariumSetting);
   const openSettingsDrawer = useOnboardingBridgeStore((state) => state.openSettingsDrawer);
   const requestRecoveryAction = useARRuntimeStore((state) => state.requestRecoveryAction);
@@ -138,10 +142,22 @@ export function ARRecoveryPanel({
   return (
     <div
       className={cn(
-        'absolute left-1/2 z-30 flex w-[min(94vw,36rem)] -translate-x-1/2 flex-col gap-2 rounded-lg border border-white/20 bg-black/55 px-3 py-2 text-white/95 shadow-lg backdrop-blur-sm',
+        'absolute z-30 flex flex-col gap-2 rounded-lg border border-white/20 bg-black/55 px-3 py-2 text-white/95 shadow-lg backdrop-blur-sm',
+        layoutTokens.align === 'center' ? 'left-1/2 -translate-x-1/2' : 'left-0 right-0',
         className
       )}
+      style={{
+        top: withSafeAreaInset('top', layoutTokens.topOffsetRem),
+        left: layoutTokens.align === 'center' ? undefined : withSafeAreaInset('left', layoutTokens.sideInsetRem),
+        right: layoutTokens.align === 'center' ? undefined : withSafeAreaInset('right', layoutTokens.sideInsetRem),
+        width: layoutTokens.align === 'center'
+          ? `min(calc(100vw - var(--safe-area-left) - var(--safe-area-right) - ${layoutTokens.sideInsetRem * 2}rem), ${layoutTokens.maxWidthRem}rem)`
+          : undefined,
+        maxWidth: layoutTokens.align === 'center' ? undefined : `${layoutTokens.maxWidthRem}rem`,
+      }}
       data-testid="ar-recovery-panel"
+      data-ar-recovery-mode={adaptation.recoveryMode}
+      data-ar-sticky-actions={String(layoutTokens.stickyActions)}
     >
       <p className="text-xs font-medium">{t(getStatusTextKey(status))}</p>
       {(cameraRuntime.acquisitionDiagnostics.activeDevice || cameraRuntime.acquisitionDiagnostics.lastFailureStage) && (

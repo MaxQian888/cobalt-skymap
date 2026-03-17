@@ -9,6 +9,8 @@ import { ARLaunchAssistant } from '../ar-launch-assistant';
 
 const mockSetStellariumSetting = jest.fn();
 const mockOpenSettingsDrawer = jest.fn();
+let mockAssistantMode: 'floating-card' | 'edge-sheet' | 'compact-strip' = 'edge-sheet';
+let mockSensorPath: 'sensor-primary' | 'camera-primary' | 'manual-only' = 'sensor-primary';
 
 jest.mock('@/lib/stores/settings-store', () => ({
   useSettingsStore: (selector: (state: { setStellariumSetting: (key: string, value: unknown) => void }) => unknown) =>
@@ -24,9 +26,29 @@ jest.mock('@/lib/stores', () => ({
     }),
 }));
 
+jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
+  useARAdaptation: () => ({
+    assistantMode: mockAssistantMode,
+    recoveryMode: 'compact-strip',
+    cameraControlMode: 'compact-strip',
+    sensorPath: mockSensorPath,
+    runtimeClass: 'browser-mobile',
+    layoutTier: 'phone-compact',
+    controlDensity: 'compact',
+    capabilityTier: 'limited',
+    isLandscape: false,
+    isViewportReduced: false,
+    viewportWidth: 390,
+    viewportHeight: 844,
+    safeAreaInsets: { top: 24, right: 0, bottom: 34, left: 0 },
+  }),
+}));
+
 describe('ARLaunchAssistant', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAssistantMode = 'edge-sheet';
+    mockSensorPath = 'sensor-primary';
     useARRuntimeStore.getState().resetRecoveryState();
     useARRuntimeStore.getState().openLaunchAssistant('enter-ar');
     useARRuntimeStore.setState((state) => ({
@@ -98,5 +120,17 @@ describe('ARLaunchAssistant', () => {
       groupId: 'g2',
     });
     expect(useARRuntimeStore.getState().recoveryRequestVersion['retry-camera']).toBe(1);
+  });
+
+  it('exposes adaptation metadata for compact launch presentation', () => {
+    mockAssistantMode = 'edge-sheet';
+    mockSensorPath = 'camera-primary';
+
+    render(<ARLaunchAssistant />);
+
+    expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-assistant-mode', 'edge-sheet');
+    expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-sensor-path', 'camera-primary');
+    expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-sticky-actions', 'true');
+    expect(screen.getByText('settings.arAdaptationCameraFirst')).toBeInTheDocument();
   });
 });

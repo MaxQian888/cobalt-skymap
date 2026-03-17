@@ -110,7 +110,15 @@ jest.mock('@/lib/stores', () => ({
 
 jest.mock('@/lib/stores/theme-store', () => ({
   useThemeStore: { getState: () => themeStoreState },
+  defaultComponentStyle: {
+    preset: 'default',
+    density: 'comfortable',
+    transparency: 'balanced',
+    border: 'medium',
+    elevation: 'raised',
+  },
   sanitizeThemePresets: (value: unknown) => value,
+  sanitizeThemeComponentStyle: (value: unknown, fallback: unknown) => value ?? fallback,
   isValidThemeColorValue: () => true,
 }));
 

@@ -140,6 +140,24 @@ jest.mock('@/components/starmap/objects/object-info-sources-config', () => ({
   ObjectInfoSourcesConfig: () => <div data-testid="object-info-sources-config">ObjectInfoSourcesConfig</div>,
 }));
 
+jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
+  useARAdaptation: () => ({
+    assistantMode: 'edge-sheet',
+    recoveryMode: 'compact-strip',
+    cameraControlMode: 'compact-strip',
+    sensorPath: 'camera-primary',
+    runtimeClass: 'tauri-desktop',
+    layoutTier: 'desktop',
+    controlDensity: 'comfortable',
+    capabilityTier: 'limited',
+    isLandscape: true,
+    isViewportReduced: false,
+    viewportWidth: 1440,
+    viewportHeight: 900,
+    safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
+  }),
+}));
+
 
 import { DisplaySettings } from '../display-settings';
 
@@ -242,4 +260,11 @@ it('renders AR camera device preference and diagnostics', () => {
 it('renders AR launch assistant entry in camera settings', () => {
   render(<DisplaySettings />);
   expect(screen.getByText('settings.arLaunchOpenAssistant')).toBeInTheDocument();
+});
+
+it('renders AR adaptation guidance inside camera settings', () => {
+  render(<DisplaySettings />);
+  expect(screen.getByText('settings.arAdaptationSummary')).toBeInTheDocument();
+  expect(screen.getByText('settings.arAdaptationCameraFirst')).toBeInTheDocument();
+  expect(screen.getByText('settings.arAdaptationLimitedProfile')).toBeInTheDocument();
 });

@@ -36,6 +36,7 @@ import { ARRecoveryPanel } from './ar-recovery-panel';
 import { ARLaunchAssistant } from './ar-launch-assistant';
 import { useMobileShell } from './use-mobile-shell';
 import { useARSessionStatus } from '@/lib/hooks/use-ar-session-status';
+import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import { cn } from '@/lib/utils';
 
@@ -135,6 +136,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
   const arOpacity = useSettingsStore((s) => s.stellarium.arOpacity);
   const arShowCompass = useSettingsStore((s) => s.stellarium.arShowCompass);
   const arSession = useARSessionStatus({ enabled: arMode });
+  const arAdaptation = useARAdaptation();
   const useCameraBlend = arMode && arSession.cameraLayerEnabled;
   const wasSessionPlannerOpenRef = useRef(sessionPlannerOpen);
   const wasSettingsDrawerOpenRef = useRef(settingsDrawerOpen);
@@ -363,6 +365,10 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
         ref={containerRef}
         className={cn('relative w-full h-full overflow-hidden', arMode ? 'bg-transparent' : 'bg-black')}
         data-tour-id="canvas"
+        data-testid="stellarium-view-root"
+        data-ar-layout-tier={arAdaptation.layoutTier}
+        data-ar-runtime-class={arAdaptation.runtimeClass}
+        data-ar-sensor-path={arAdaptation.sensorPath}
         style={mobileShellContainerStyle}
       >
         {/* Unified Onboarding (Welcome + Setup Wizard + Tour) */}
@@ -598,7 +604,6 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
     </TooltipProvider>
   );
 }
-
 
 
 

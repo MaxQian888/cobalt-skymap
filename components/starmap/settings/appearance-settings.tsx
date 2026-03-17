@@ -5,6 +5,7 @@ import { Circle, Paintbrush, Palette, Type, WandSparkles } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import {
   ThemeAnimationsSection,
+  ThemeComponentStyleSection,
   ThemeModeSection,
   ThemePaletteEditor,
   ThemePresetSection,
@@ -23,6 +24,11 @@ export function AppearanceSettings() {
     resolvedTheme,
     customization,
     userPresets,
+    setComponentStylePreset,
+    setComponentStyleDensity,
+    setComponentStyleTransparency,
+    setComponentStyleBorder,
+    setComponentStyleElevation,
     setRadius,
     setFontFamily,
     setFontSize,
@@ -82,6 +88,25 @@ export function AppearanceSettings() {
           initialEditingMode={resolvedTheme}
           setCustomColor={setCustomColor}
           clearCustomColor={clearCustomColor}
+        />
+      </SettingsSection>
+
+      <Separator />
+
+      <SettingsSection
+        title={t('theme.componentStyle')}
+        icon={<Palette className="h-4 w-4" />}
+        defaultOpen={false}
+      >
+        <ThemeComponentStyleSection
+          customization={customization}
+          userPresets={userPresets}
+          initialPreviewMode={resolvedTheme}
+          setComponentStylePreset={setComponentStylePreset}
+          setComponentStyleDensity={setComponentStyleDensity}
+          setComponentStyleTransparency={setComponentStyleTransparency}
+          setComponentStyleBorder={setComponentStyleBorder}
+          setComponentStyleElevation={setComponentStyleElevation}
         />
       </SettingsSection>
 

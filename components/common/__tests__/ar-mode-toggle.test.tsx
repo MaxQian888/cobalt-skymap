@@ -21,6 +21,7 @@ let mockSensorControl = false;
 let mockARSessionStatus: ARSessionStatus = 'ready';
 let mockIsSupported = true;
 let mockIsPermissionGranted = false;
+let mockSensorPath: 'sensor-primary' | 'camera-primary' | 'manual-only' = 'sensor-primary';
 
 interface SettingsState {
   stellarium: {
@@ -94,6 +95,24 @@ jest.mock('@/lib/hooks/use-device-orientation', () => ({
   }),
 }));
 
+jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
+  useARAdaptation: () => ({
+    assistantMode: 'edge-sheet',
+    recoveryMode: 'compact-strip',
+    cameraControlMode: 'compact-strip',
+    sensorPath: mockSensorPath,
+    runtimeClass: 'browser-mobile',
+    layoutTier: 'phone-compact',
+    controlDensity: 'compact',
+    capabilityTier: 'limited',
+    isLandscape: false,
+    isViewportReduced: false,
+    viewportWidth: 390,
+    viewportHeight: 844,
+    safeAreaInsets: { top: 24, right: 0, bottom: 34, left: 0 },
+  }),
+}));
+
 const messages = {
   settings: {
     arModeEnable: 'Enable AR sky overlay',
@@ -102,6 +121,7 @@ const messages = {
     arStatusDegradedCameraOnly: 'AR degraded: camera-only mode',
     arStatusDegradedSensorOnly: 'AR degraded: sensor-only mode',
     arStatusBlocked: 'AR blocked: action required',
+    arAdaptationCameraFirst: 'Camera-first AR guidance available',
   },
 };
 
@@ -124,6 +144,7 @@ describe('ARModeToggle', () => {
     mockARSessionStatus = 'ready';
     mockIsSupported = true;
     mockIsPermissionGranted = false;
+    mockSensorPath = 'sensor-primary';
   });
 
   it('renders a button with test id', () => {
@@ -177,5 +198,16 @@ describe('ARModeToggle', () => {
     expect(mockSetStellariumSetting).toHaveBeenCalledWith('arMode', true);
     expect(mockSetStellariumSetting).toHaveBeenCalledWith('sensorControl', false);
     expect(mockSetSensorRuntime).toHaveBeenCalled();
+  });
+
+  it('uses camera-first tooltip copy when blocked in camera-first path', () => {
+    mockArMode = true;
+    mockARSessionStatus = 'blocked';
+    mockSensorPath = 'camera-primary';
+
+    renderWithProviders(<ARModeToggle />);
+
+    expect(screen.getByTestId('ar-mode-toggle')).toHaveAttribute('aria-label', 'settings.arAdaptationCameraFirst');
+    expect(screen.getByTestId('ar-mode-toggle')).toHaveAttribute('data-ar-sensor-path', 'camera-primary');
   });
 });

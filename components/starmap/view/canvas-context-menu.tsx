@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useMemo, useSyncExternalStore } from 'react';
+import { memo, useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Copy,
@@ -39,6 +39,7 @@ import { degreesToHMS, degreesToDMS, rad2deg } from '@/lib/astronomy/starmap-uti
 import type { ClickCoords, SelectedObjectData } from '@/lib/core/types';
 import type { ContextMenuStellariumSettings } from '@/types/starmap/view';
 import { clipboardService } from '@/lib/services/clipboard-service';
+import { SlewConfirmDialog } from '@/components/starmap/mount/slew-confirm-dialog';
 
 interface CanvasContextMenuProps {
   open: boolean;
@@ -82,6 +83,11 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
   onResetView,
 }: CanvasContextMenuProps) {
   const t = useTranslations();
+  const [mountTargetAction, setMountTargetAction] = useState<{
+    name: string;
+    ra: number;
+    dec: number;
+  } | null>(null);
   const skyEngine = useSettingsStore((state) => state.skyEngine);
   const setSkyEngine = useSettingsStore((state) => state.setSkyEngine);
   const isStellarium = skyEngine === 'stellarium';
@@ -134,16 +140,24 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
   // Slew to object
   const handleSlewToObject = useCallback(() => {
     if (selectedObject) {
-      onSetFramingCoordinates({
-        ra: selectedObject.raDeg,
-        dec: selectedObject.decDeg,
-        raString: selectedObject.ra,
-        decString: selectedObject.dec,
-        name: selectedObject.names[0] || '',
-      });
+      if (mountConnected) {
+        setMountTargetAction({
+          name: selectedObject.names[0] || '',
+          ra: selectedObject.raDeg,
+          dec: selectedObject.decDeg,
+        });
+      } else {
+        onSetFramingCoordinates({
+          ra: selectedObject.raDeg,
+          dec: selectedObject.decDeg,
+          raString: selectedObject.ra,
+          decString: selectedObject.dec,
+          name: selectedObject.names[0] || '',
+        });
+      }
     }
     onOpenChange(false);
-  }, [selectedObject, onSetFramingCoordinates, onOpenChange]);
+  }, [mountConnected, onOpenChange, onSetFramingCoordinates, selectedObject]);
 
   // Add marker here
   const handleAddMarkerHere = useCallback(() => {
@@ -189,6 +203,7 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
   }, [isHydrated, position]);
 
   return (
+    <>
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       {/* Invisible trigger positioned at click location */}
       <DropdownMenuTrigger asChild>
@@ -551,6 +566,20 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    {mountTargetAction && (
+      <SlewConfirmDialog
+        open={true}
+        onOpenChange={(dialogOpen) => {
+          if (!dialogOpen) {
+            setMountTargetAction(null);
+          }
+        }}
+        targetName={mountTargetAction.name}
+        targetRa={mountTargetAction.ra}
+        targetDec={mountTargetAction.dec}
+      />
+    )}
+    </>
   );
 });
 CanvasContextMenu.displayName = 'CanvasContextMenu';

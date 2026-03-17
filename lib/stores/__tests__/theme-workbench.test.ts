@@ -4,6 +4,7 @@
 
 import { act } from '@testing-library/react';
 import {
+  getResolvedComponentStyleTokens,
   getThemeContrastWarnings,
   getThemePreviewData,
   migrateThemeStoreState,
@@ -163,5 +164,63 @@ describe('theme workbench helpers', () => {
     expect(migrated.userPresets).toEqual([]);
     expect(migrated.customization.activePreset).toBeNull();
     expect(migrated.customization.customColors.light.primary).toBe('#123456');
+    expect(migrated.customization.componentStyle).toEqual({
+      preset: 'default',
+      density: 'comfortable',
+      transparency: 'balanced',
+      border: 'medium',
+      elevation: 'raised',
+    });
+  });
+
+  it('resolves component surface tokens and applies them to the DOM when component styles change', () => {
+    act(() => {
+      useThemeStore.getState().setCustomization({
+        componentStyle: {
+          preset: 'floating',
+          density: 'compact',
+          transparency: 'high',
+          border: 'strong',
+          elevation: 'floating',
+        },
+      });
+    });
+
+    const tokens = getResolvedComponentStyleTokens(useThemeStore.getState().customization);
+
+    expect(tokens).toEqual(expect.objectContaining({
+      densityGap: '0.25rem',
+      densityPadding: '0.25rem',
+      controlHeight: '2rem',
+      surfaceBlur: '18px',
+    }));
+    expect(document.documentElement.style.getPropertyValue('--component-density-gap')).toBe('0.25rem');
+    expect(document.documentElement.style.getPropertyValue('--component-surface-blur')).toBe('18px');
+    expect(document.documentElement.style.getPropertyValue('--component-surface-shadow')).not.toBe('');
+  });
+
+  it('resets component style customization back to defaults', () => {
+    act(() => {
+      useThemeStore.getState().setCustomization({
+        componentStyle: {
+          preset: 'observatory',
+          density: 'compact',
+          transparency: 'solid',
+          border: 'strong',
+          elevation: 'flat',
+        },
+      });
+      useThemeStore.getState().resetCustomization();
+    });
+
+    expect(useThemeStore.getState().customization.componentStyle).toEqual({
+      preset: 'default',
+      density: 'comfortable',
+      transparency: 'balanced',
+      border: 'medium',
+      elevation: 'raised',
+    });
+    expect(document.documentElement.style.getPropertyValue('--component-density-gap')).toBe('');
+    expect(document.documentElement.style.getPropertyValue('--component-surface-blur')).toBe('');
   });
 });

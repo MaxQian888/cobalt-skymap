@@ -77,6 +77,13 @@ const themeStoreState = {
     fontSize: 'default',
     animationsEnabled: true,
     activePreset: null,
+    componentStyle: {
+      preset: 'default',
+      density: 'comfortable',
+      transparency: 'balanced',
+      border: 'medium',
+      elevation: 'raised',
+    },
     customColors: {
       light: { primary: '#223344' },
       dark: { primary: '#ddeeff' },
@@ -174,6 +181,33 @@ const mockSanitizeThemePresets = jest.fn((input: unknown) => {
     && typeof (item as { name?: unknown }).name === 'string'
   ));
 });
+function createDefaultMockComponentStyle() {
+  return {
+    preset: 'default',
+    density: 'comfortable',
+    transparency: 'balanced',
+    border: 'medium',
+    elevation: 'raised',
+  } as const;
+}
+
+type MockComponentStyle = ReturnType<typeof createDefaultMockComponentStyle>;
+
+const mockSanitizeThemeComponentStyle = jest.fn((input: unknown, base = createDefaultMockComponentStyle()) => {
+  if (!input || typeof input !== 'object') {
+    return base;
+  }
+
+  const raw = input as Partial<Record<keyof MockComponentStyle, unknown>>;
+
+  return {
+    preset: ['default', 'observatory', 'floating'].includes(String(raw.preset)) ? raw.preset as typeof base.preset : base.preset,
+    density: ['comfortable', 'compact'].includes(String(raw.density)) ? raw.density as typeof base.density : base.density,
+    transparency: ['solid', 'balanced', 'high'].includes(String(raw.transparency)) ? raw.transparency as typeof base.transparency : base.transparency,
+    border: ['soft', 'medium', 'strong'].includes(String(raw.border)) ? raw.border as typeof base.border : base.border,
+    elevation: ['flat', 'raised', 'floating'].includes(String(raw.elevation)) ? raw.elevation as typeof base.elevation : base.elevation,
+  };
+});
 
 jest.mock('@/lib/stores', () => ({
   useSettingsStore: { getState: () => settingsStoreState },
@@ -186,8 +220,12 @@ jest.mock('@/lib/stores', () => ({
 
 jest.mock('@/lib/stores/theme-store', () => ({
   useThemeStore: { getState: () => themeStoreState },
+  defaultComponentStyle: createDefaultMockComponentStyle(),
   isValidThemeColorValue: (value: string) => mockIsValidThemeColorValue(value),
   sanitizeThemePresets: (input: unknown) => mockSanitizeThemePresets(input),
+  sanitizeThemeComponentStyle: (input: unknown, base = createDefaultMockComponentStyle()) => (
+    mockSanitizeThemeComponentStyle(input, base)
+  ),
 }));
 
 jest.mock('@/lib/stores/keybinding-store', () => ({
@@ -226,6 +264,13 @@ describe('settings-profile', () => {
       fontSize: 'default',
       animationsEnabled: true,
       activePreset: null,
+      componentStyle: {
+        preset: 'default',
+        density: 'comfortable',
+        transparency: 'balanced',
+        border: 'medium',
+        elevation: 'raised',
+      },
       customColors: {
         light: { primary: '#223344' },
         dark: { primary: '#ddeeff' },
@@ -278,6 +323,21 @@ describe('settings-profile', () => {
         && typeof (item as { name?: unknown }).name === 'string'
       ));
     });
+    mockSanitizeThemeComponentStyle.mockImplementation((input: unknown, base = createDefaultMockComponentStyle()) => {
+      if (!input || typeof input !== 'object') {
+        return base;
+      }
+
+      const raw = input as Partial<Record<keyof MockComponentStyle, unknown>>;
+
+      return {
+        preset: ['default', 'observatory', 'floating'].includes(String(raw.preset)) ? raw.preset as typeof base.preset : base.preset,
+        density: ['comfortable', 'compact'].includes(String(raw.density)) ? raw.density as typeof base.density : base.density,
+        transparency: ['solid', 'balanced', 'high'].includes(String(raw.transparency)) ? raw.transparency as typeof base.transparency : base.transparency,
+        border: ['soft', 'medium', 'strong'].includes(String(raw.border)) ? raw.border as typeof base.border : base.border,
+        elevation: ['flat', 'raised', 'floating'].includes(String(raw.elevation)) ? raw.elevation as typeof base.elevation : base.elevation,
+      };
+    });
   });
 
   it('builds a profile with canonical domains and stripped event-source secrets by default', () => {
@@ -295,7 +355,16 @@ describe('settings-profile', () => {
     });
     expect(profile.settings?.connection).toEqual({ ip: 'localhost', port: '1888' });
     expect(profile.themeMode).toBe('dark');
-    expect(profile.theme?.userPresets).toEqual(themeStoreState.userPresets);
+    expect(profile.theme).toEqual(expect.objectContaining({
+      componentStyle: {
+        preset: 'default',
+        density: 'comfortable',
+        transparency: 'balanced',
+        border: 'medium',
+        elevation: 'raised',
+      },
+      userPresets: themeStoreState.userPresets,
+    }));
     expect(profile.eventSources?.[0]).toEqual(expect.objectContaining({
       apiKey: '',
       hasStoredSecret: true,
@@ -350,6 +419,13 @@ describe('settings-profile', () => {
       },
       theme: {
         radius: 0.8,
+        componentStyle: {
+          preset: 'floating',
+          density: 'compact',
+          transparency: 'mystery',
+          border: 'extreme',
+          elevation: 'floating',
+        },
         customColors: {
           light: { primary: '#112233' },
         },
@@ -400,6 +476,13 @@ describe('settings-profile', () => {
     expect(result.data?.themeMode).toBe('dark');
     expect(result.data?.theme).toEqual({
       radius: 0.8,
+      componentStyle: {
+        preset: 'floating',
+        density: 'compact',
+        transparency: 'balanced',
+        border: 'medium',
+        elevation: 'floating',
+      },
       customColors: {
         light: { primary: '#112233' },
       },
@@ -436,6 +519,39 @@ describe('settings-profile', () => {
     expect(result.skippedDomains).toEqual([
       { domain: 'theme', reason: 'invalidDomainPayload' },
     ]);
+  });
+
+  it('defaults missing component style data for legacy theme payloads', () => {
+    const result = parseSettingsProfile({
+      version: 6,
+      exportedAt: '2026-02-03T10:00:00.000Z',
+      theme: {
+        radius: 0.7,
+        customColors: {
+          light: { primary: '#112233' },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+
+    if (!result.ok) {
+      throw new Error('expected legacy theme payload to remain importable');
+    }
+
+    expect(result.data?.theme).toEqual({
+      radius: 0.7,
+      componentStyle: {
+        preset: 'default',
+        density: 'comfortable',
+        transparency: 'balanced',
+        border: 'medium',
+        elevation: 'raised',
+      },
+      customColors: {
+        light: { primary: '#112233' },
+      },
+    });
   });
 
   it('rejects unsupported profile versions', () => {

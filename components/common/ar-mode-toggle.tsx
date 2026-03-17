@@ -14,6 +14,7 @@ import { useIsClient } from '@/lib/hooks/use-is-client';
 import { useARSessionStatus } from '@/lib/hooks/use-ar-session-status';
 import { useDeviceOrientation } from '@/lib/hooks/use-device-orientation';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
+import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
 import { cn } from '@/lib/utils';
 
 interface ARModeToggleProps {
@@ -33,6 +34,7 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
   const isClient = useIsClient();
   const stellarium = useSettingsStore((s) => s.stellarium);
   const setStellariumSetting = useSettingsStore((s) => s.setStellariumSetting);
+  const adaptation = useARAdaptation();
   const setSensorRuntime = useARRuntimeStore((state) => state.setSensorRuntime);
   const openLaunchAssistant = useARRuntimeStore((state) => state.openLaunchAssistant);
   const closeLaunchAssistant = useARRuntimeStore((state) => state.closeLaunchAssistant);
@@ -146,6 +148,8 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
       ? t('settings.arModeDisable')
       : arSession.status === 'preflight'
         ? t('settings.arStatusPreflight')
+        : arSession.status === 'blocked' && adaptation.sensorPath === 'camera-primary'
+          ? t('settings.arAdaptationCameraFirst')
         : arSession.status === 'degraded-camera-only'
           ? t('settings.arStatusDegradedCameraOnly')
           : arSession.status === 'degraded-sensor-only'
@@ -161,6 +165,7 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
           aria-label={tooltipText}
           data-testid="ar-mode-toggle"
           data-ar-session-status={arSession.status}
+          data-ar-sensor-path={adaptation.sensorPath}
           className={cn(
             'relative h-9 w-9 backdrop-blur-sm transition-colors',
             arMode && arSession.status === 'ready'

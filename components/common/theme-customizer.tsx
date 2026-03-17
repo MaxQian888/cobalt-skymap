@@ -17,6 +17,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ThemeAnimationsSection,
+  ThemeComponentStyleSection,
   ThemeModeSection,
   ThemePaletteEditor,
   ThemePresetSection,
@@ -43,6 +44,11 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
     resolvedTheme,
     customization,
     userPresets,
+    setComponentStylePreset,
+    setComponentStyleDensity,
+    setComponentStyleTransparency,
+    setComponentStyleBorder,
+    setComponentStyleElevation,
     setRadius,
     setFontFamily,
     setFontSize,
@@ -119,6 +125,17 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
                 initialEditingMode={resolvedTheme}
                 setCustomColor={setCustomColor}
                 clearCustomColor={clearCustomColor}
+              />
+              <Separator />
+              <ThemeComponentStyleSection
+                customization={customization}
+                userPresets={userPresets}
+                initialPreviewMode={resolvedTheme}
+                setComponentStylePreset={setComponentStylePreset}
+                setComponentStyleDensity={setComponentStyleDensity}
+                setComponentStyleTransparency={setComponentStyleTransparency}
+                setComponentStyleBorder={setComponentStyleBorder}
+                setComponentStyleElevation={setComponentStyleElevation}
               />
               <Separator />
               <ThemeRadiusSection

@@ -10,6 +10,7 @@ import { createLogger } from '@/lib/logger';
 import {
   closeWindow,
   focusWindow,
+  getDesktopShell,
   minimizeWindow,
   toggleMaximizeWindow,
   isWindowMaximized,
@@ -23,6 +24,7 @@ import {
   isTrayPositioningReady,
   listenForTrayActivation,
   saveWindowState,
+  startWindowDragging,
   showWindow,
   centerWindow,
   unminimizeWindow,
@@ -32,6 +34,7 @@ import {
   TRAY_REVEAL_PRESET,
   type WindowPositionPreset,
 } from '@/lib/tauri/positioner-api';
+import { resolveDesktopShell, type DesktopShell } from '@/lib/tauri/window-shell';
 
 const logger = createLogger('use-window-controls');
 
@@ -41,6 +44,7 @@ export interface WindowControlsState {
   isFullscreen: boolean;
   isPinned: boolean;
   isTrayReady: boolean;
+  shell: DesktopShell;
 }
 
 export interface WindowControlsActions {
@@ -57,6 +61,7 @@ export interface WindowControlsActions {
   handleCenterWindow: () => Promise<void>;
   handleMoveWindow: (preset: WindowPositionPreset) => Promise<void>;
   handleRevealFromTray: () => Promise<void>;
+  handleStartWindowDrag: () => Promise<void>;
   handleWebReload: () => void;
 }
 
@@ -73,6 +78,7 @@ export function useWindowControls(): UseWindowControlsReturn {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPinned, setIsPinned] = useState(false);
   const [isTrayReady, setIsTrayReady] = useState(false);
+  const [shell, setShell] = useState<DesktopShell>(() => resolveDesktopShell(undefined, false));
   const isPinnedRef = useRef(false);
   useEffect(() => { isPinnedRef.current = isPinned; }, [isPinned]);
 
@@ -82,14 +88,16 @@ export function useWindowControls(): UseWindowControlsReturn {
       if (isTauri()) {
         setIsTauriEnv(true);
         try {
-          const [maximized, pinned, trayReady] = await Promise.all([
+          const [maximized, pinned, trayReady, desktopShell] = await Promise.all([
             isWindowMaximized(),
             isAlwaysOnTop(),
             isTrayPositioningReady(),
+            getDesktopShell(),
           ]);
           setIsMaximized(maximized);
           setIsPinned(pinned);
           setIsTrayReady(trayReady);
+          setShell(desktopShell);
         } catch (error) {
           logger.error('Failed to get window state', error);
         }
@@ -152,22 +160,31 @@ export function useWindowControls(): UseWindowControlsReturn {
     }
   }, []);
 
-  const handleCloseWithSave = useCallback(async () => {
+  const persistWindowState = useCallback(async (reason: 'close' | 'quit' | 'restart') => {
     try {
       await saveWindowState();
+    } catch (error) {
+      logger.error(`Failed to save window state before ${reason}`, error);
+    }
+  }, []);
+
+  const handleCloseWithSave = useCallback(async () => {
+    try {
+      await persistWindowState('close');
       await closeWindow();
     } catch (error) {
       logger.error('Failed to close', error);
     }
-  }, []);
+  }, [persistWindowState]);
 
   const handleRestart = useCallback(async () => {
     try {
+      await persistWindowState('restart');
       await restartApp();
     } catch (error) {
       logger.error('Failed to restart', error);
     }
-  }, []);
+  }, [persistWindowState]);
 
   const handleQuit = useCallback(async () => {
     try {
@@ -179,12 +196,12 @@ export function useWindowControls(): UseWindowControlsReturn {
 
   const handleQuitWithSave = useCallback(async () => {
     try {
-      await saveWindowState();
+      await persistWindowState('quit');
       await quitApp();
     } catch (error) {
       logger.error('Failed to quit', error);
     }
-  }, []);
+  }, [persistWindowState]);
 
   const handleTogglePin = useCallback(async () => {
     try {
@@ -232,6 +249,18 @@ export function useWindowControls(): UseWindowControlsReturn {
   const handleCenterWindow = useCallback(async () => {
     await handleMoveWindow('Center');
   }, [handleMoveWindow]);
+
+  const handleStartWindowDrag = useCallback(async () => {
+    if (!shell.supportsManualDragging) {
+      return;
+    }
+
+    try {
+      await startWindowDragging();
+    } catch (error) {
+      logger.error('Failed to start window dragging', error);
+    }
+  }, [shell.supportsManualDragging]);
 
   useEffect(() => {
     if (!isTauriEnv) return;
@@ -289,6 +318,7 @@ export function useWindowControls(): UseWindowControlsReturn {
     isFullscreen,
     isPinned,
     isTrayReady,
+    shell,
     handleMinimize,
     handleMaximize,
     handleClose,
@@ -302,6 +332,7 @@ export function useWindowControls(): UseWindowControlsReturn {
     handleCenterWindow,
     handleMoveWindow,
     handleRevealFromTray,
+    handleStartWindowDrag,
     handleWebReload,
   };
 }

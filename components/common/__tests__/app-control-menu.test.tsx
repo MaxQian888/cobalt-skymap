@@ -59,6 +59,8 @@ const mockIsWindowVisible = jest.fn();
 const mockIsWindowMinimized = jest.fn();
 const mockIsTrayPositioningReady = jest.fn();
 const mockListenForTrayActivation = jest.fn();
+const mockGetDesktopShell = jest.fn();
+const mockStartWindowDragging = jest.fn();
 
 jest.mock('@/lib/tauri/app-control-api', () => ({
   closeWindow: () => mockCloseWindow(),
@@ -82,6 +84,8 @@ jest.mock('@/lib/tauri/app-control-api', () => ({
   isWindowMinimized: () => mockIsWindowMinimized(),
   isTrayPositioningReady: () => mockIsTrayPositioningReady(),
   listenForTrayActivation: (...args: unknown[]) => mockListenForTrayActivation(...args),
+  getDesktopShell: () => mockGetDesktopShell(),
+  startWindowDragging: () => mockStartWindowDragging(),
 }));
 
 async function flushWindowControlEffects() {
@@ -118,6 +122,15 @@ describe('AppControlMenu', () => {
     mockIsWindowMinimized.mockResolvedValue(false);
     mockIsTrayPositioningReady.mockResolvedValue(false);
     mockListenForTrayActivation.mockResolvedValue(() => {});
+    mockGetDesktopShell.mockResolvedValue({
+      platform: 'windows',
+      mode: 'custom-frameless',
+      dragStrategy: 'manual',
+      showsNativeWindowControls: false,
+      supportsManualDragging: true,
+      supportsDoubleClickMaximize: true,
+      titlebarInsets: { left: 12, right: 12, top: 0 },
+    });
   });
 
   describe('dropdown variant', () => {
@@ -142,6 +155,28 @@ describe('AppControlMenu', () => {
       });
 
       expect(screen.queryByText('appControl.trayPositions')).not.toBeInTheDocument();
+    });
+
+    it('does not duplicate native window controls in macOS overlay shell mode', async () => {
+      mockGetDesktopShell.mockResolvedValue({
+        platform: 'macos',
+        mode: 'native-overlay',
+        dragStrategy: 'manual',
+        showsNativeWindowControls: true,
+        supportsManualDragging: true,
+        supportsDoubleClickMaximize: true,
+        titlebarInsets: { left: 72, right: 12, top: 0 },
+      });
+
+      await renderWithProviders(<AppControlMenu variant="dropdown" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('appControl.reload')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('appControl.minimize')).not.toBeInTheDocument();
+      expect(screen.queryByText('appControl.maximize')).not.toBeInTheDocument();
+      expect(screen.queryByText('appControl.close')).not.toBeInTheDocument();
     });
 
   });

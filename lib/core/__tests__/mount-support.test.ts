@@ -4,6 +4,7 @@
 
 import {
   BUILT_IN_SIMULATOR_MOUNT_ID,
+  createMountActionBlockReasons,
   buildSupportedMountDeviceId,
   createMountActionAvailability,
   createSimulatorMountDevice,
@@ -140,6 +141,87 @@ describe('mount-support', () => {
       expect(availability.unpark).toBe(true);
       expect(availability.moveAxis).toBe(false);
       expect(availability.abortSlew).toBe(false);
+    });
+  });
+
+  describe('createMountActionBlockReasons', () => {
+    it('explains why core controls are blocked while disconnected', () => {
+      expect(
+        createMountActionBlockReasons({
+          connected: false,
+          capabilities: {
+            canSlew: true,
+            canSync: true,
+            canPark: true,
+            canUnpark: true,
+            canSetTracking: true,
+            canMoveAxis: true,
+          },
+          tracking: false,
+          parked: false,
+          slewing: false,
+        }),
+      ).toMatchObject({
+        slew: 'disconnected',
+        sync: 'disconnected',
+        park: 'disconnected',
+        unpark: 'disconnected',
+        tracking: 'disconnected',
+        trackingRate: 'disconnected',
+        moveAxis: 'disconnected',
+        abortSlew: 'disconnected',
+      });
+    });
+
+    it('uses runtime mount state to describe supported but temporarily blocked actions', () => {
+      expect(
+        createMountActionBlockReasons({
+          connected: true,
+          capabilities: {
+            canSlewAsync: true,
+            canSync: true,
+            canPark: true,
+            canUnpark: true,
+            canSetTracking: true,
+            canMoveAxis: true,
+          },
+          tracking: false,
+          parked: true,
+          slewing: true,
+        }),
+      ).toMatchObject({
+        slew: 'parked',
+        sync: 'parked',
+        park: 'already-parked',
+        tracking: 'parked',
+        trackingRate: 'parked',
+        moveAxis: 'parked',
+      });
+    });
+
+    it('reports unsupported and state-specific reasons independently', () => {
+      expect(
+        createMountActionBlockReasons({
+          connected: true,
+          capabilities: {
+            canSlew: true,
+            canSync: false,
+            canPark: false,
+            canUnpark: true,
+            canSetTracking: true,
+            canMoveAxis: false,
+          },
+          tracking: false,
+          parked: false,
+          slewing: false,
+        }),
+      ).toMatchObject({
+        sync: 'unsupported',
+        park: 'unsupported',
+        trackingRate: 'tracking-disabled',
+        moveAxis: 'unsupported',
+        abortSlew: 'not-slewing',
+      });
     });
   });
 });

@@ -7,16 +7,42 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { createLogger } from '@/lib/logger';
+import type { SystemInfo } from './types';
+import { resolveDesktopShell, type DesktopShell } from './window-shell';
 
 const logger = createLogger('app-control-api');
 
 export const TRAY_ACTIVATED_EVENT = 'skymap-tray-activated';
+let desktopShellCache: DesktopShell | null = null;
 
 /**
  * Check if running in Tauri environment
  */
 export function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI__' in window;
+  return typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
+}
+
+/**
+ * Resolve the current desktop shell contract for the active runtime.
+ */
+export async function getDesktopShell(forceRefresh: boolean = false): Promise<DesktopShell> {
+  if (!isTauri()) {
+    return resolveDesktopShell(undefined, false);
+  }
+
+  if (!forceRefresh && desktopShellCache) {
+    return desktopShellCache;
+  }
+
+  try {
+    const info = await invoke<SystemInfo>('get_system_info');
+    desktopShellCache = resolveDesktopShell(info);
+  } catch (error) {
+    logger.warn('Failed to resolve desktop shell from system info, using safe fallback', error);
+    desktopShellCache = resolveDesktopShell({ os: 'unknown', platform: 'unknown' });
+  }
+
+  return desktopShellCache;
 }
 
 /**
@@ -147,6 +173,19 @@ export async function focusWindow(): Promise<void> {
   }
   const { getCurrentWindow } = await import('@tauri-apps/api/window');
   await getCurrentWindow().setFocus();
+}
+
+/**
+ * Start dragging the current window from an explicit shell drag surface.
+ */
+export async function startWindowDragging(): Promise<void> {
+  if (!isTauri()) {
+    logger.warn('startWindowDragging is only available in Tauri environment');
+    return;
+  }
+
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  await getCurrentWindow().startDragging();
 }
 
 /**
@@ -385,46 +424,28 @@ export async function getWindowState(): Promise<WindowState> {
 }
 
 /**
- * Save window state to localStorage
+ * Save window state through the official Tauri window-state plugin.
  */
 export async function saveWindowState(): Promise<void> {
+  if (!isTauri()) return;
+
   try {
-    const state = await getWindowState();
-    localStorage.setItem('skymap-window-state', JSON.stringify(state));
+    const plugin = await import('@tauri-apps/plugin-window-state');
+    await plugin.saveWindowState(plugin.StateFlags.ALL);
   } catch (error) {
     logger.error('Failed to save window state', error);
   }
 }
 
 /**
- * Load and restore window state from localStorage
+ * Restore current window state from the official window-state plugin store.
  */
 export async function restoreWindowState(): Promise<void> {
   if (!isTauri()) return;
-  
+
   try {
-    const savedState = localStorage.getItem('skymap-window-state');
-    if (!savedState) return;
-    
-    const state: WindowState = JSON.parse(savedState);
-    
-    // Restore position and size if not maximized/fullscreen
-    if (!state.isMaximized && !state.isFullscreen) {
-      await setWindowPosition(state.x, state.y);
-      await setWindowSize(state.width, state.height);
-    }
-    
-    // Restore maximized state
-    if (state.isMaximized) {
-      const { getCurrentWindow } = await import('@tauri-apps/api/window');
-      const appWindow = getCurrentWindow();
-      await appWindow.maximize();
-    }
-    
-    // Restore always on top
-    if (state.isAlwaysOnTop) {
-      await setAlwaysOnTop(true);
-    }
+    const plugin = await import('@tauri-apps/plugin-window-state');
+    await plugin.restoreStateCurrent(plugin.StateFlags.ALL);
   } catch (error) {
     logger.error('Failed to restore window state', error);
   }

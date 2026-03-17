@@ -27,6 +27,11 @@ const mockSetAnimationsEnabled = jest.fn();
 const mockSetActivePreset = jest.fn();
 const mockSetCustomColor = jest.fn();
 const mockClearCustomColor = jest.fn();
+const mockSetComponentStylePreset = jest.fn();
+const mockSetComponentStyleDensity = jest.fn();
+const mockSetComponentStyleTransparency = jest.fn();
+const mockSetComponentStyleBorder = jest.fn();
+const mockSetComponentStyleElevation = jest.fn();
 const mockResetCustomization = jest.fn();
 const mockSaveCurrentAsPreset = jest.fn();
 const mockDuplicatePreset = jest.fn();
@@ -42,6 +47,13 @@ jest.mock('@/lib/stores/theme-store', () => ({
       fontSize: 'default',
       animationsEnabled: true,
       activePreset: 'custom-night',
+      componentStyle: {
+        preset: 'default',
+        density: 'comfortable',
+        transparency: 'balanced',
+        border: 'medium',
+        elevation: 'raised',
+      },
       customColors: {
         light: { primary: '#fafafa' },
         dark: { primary: '#101010' },
@@ -64,6 +76,11 @@ jest.mock('@/lib/stores/theme-store', () => ({
     setActivePreset: mockSetActivePreset,
     setCustomColor: mockSetCustomColor,
     clearCustomColor: mockClearCustomColor,
+    setComponentStylePreset: mockSetComponentStylePreset,
+    setComponentStyleDensity: mockSetComponentStyleDensity,
+    setComponentStyleTransparency: mockSetComponentStyleTransparency,
+    setComponentStyleBorder: mockSetComponentStyleBorder,
+    setComponentStyleElevation: mockSetComponentStyleElevation,
     resetCustomization: mockResetCustomization,
     saveCurrentAsPreset: mockSaveCurrentAsPreset,
     duplicatePreset: mockDuplicatePreset,
@@ -71,6 +88,11 @@ jest.mock('@/lib/stores/theme-store', () => ({
     saveCurrentToUserPreset: mockSaveCurrentToUserPreset,
     deleteUserPreset: mockDeleteUserPreset,
   }),
+  componentStylePresets: ['default', 'observatory', 'floating'],
+  componentStyleDensityValues: ['comfortable', 'compact'],
+  componentStyleTransparencyValues: ['solid', 'balanced', 'high'],
+  componentStyleBorderValues: ['soft', 'medium', 'strong'],
+  componentStyleElevationValues: ['flat', 'raised', 'floating'],
   customizableThemeColorKeys: [
     'primary',
     'secondary',
@@ -119,6 +141,38 @@ jest.mock('@/lib/stores/theme-store', () => ({
       card: mode === 'light' ? '#f6f6f6' : '#111111',
       border: mode === 'light' ? '#cccccc' : '#333333',
       destructive: '#cc0000',
+    },
+  }),
+  getComponentStylePreviewData: (_customization: unknown, mode: 'light' | 'dark') => ({
+    mode,
+    themeTokens: {
+      primary: mode === 'light' ? '#123456' : '#abcdef',
+      secondary: mode === 'light' ? '#ddeeff' : '#334455',
+      accent: mode === 'light' ? '#8899aa' : '#556677',
+      background: mode === 'light' ? '#ffffff' : '#050505',
+      foreground: mode === 'light' ? '#121212' : '#f5f5f5',
+      muted: mode === 'light' ? '#eeeeee' : '#222222',
+      card: mode === 'light' ? '#f6f6f6' : '#111111',
+      border: mode === 'light' ? '#cccccc' : '#333333',
+      destructive: '#cc0000',
+    },
+    surfaceTokens: {
+      densityGap: '0.375rem',
+      densityPadding: '0.375rem',
+      sectionPadding: '0.75rem',
+      controlHeight: '2.25rem',
+      surfaceBackground: mode === 'light' ? 'rgba(255,255,255,0.84)' : 'rgba(17,17,17,0.72)',
+      surfaceStrongBackground: mode === 'light' ? 'rgba(255,255,255,0.90)' : 'rgba(17,17,17,0.80)',
+      surfaceBorder: mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.2)',
+      surfaceShadow: '0 12px 28px -16px rgb(15 23 42 / 0.35)',
+      surfaceBlur: mode === 'light' ? '12px' : '18px',
+    },
+    componentStyle: {
+      preset: 'default',
+      density: 'comfortable',
+      transparency: 'balanced',
+      border: 'medium',
+      elevation: 'raised',
     },
   }),
   getThemeContrastWarnings: (_customization: unknown, mode: 'light' | 'dark') => mode === 'light'
@@ -196,6 +250,29 @@ const messages = {
     accessibilityWarnings: 'Accessibility warnings',
     noAccessibilityWarnings: 'No accessibility warnings',
     warningPairForegroundBackground: 'Foreground vs background',
+    componentStyle: 'Component style',
+    componentStylePreset: 'Component style preset',
+    componentDensity: 'Density',
+    componentTransparency: 'Transparency',
+    componentBorder: 'Border emphasis',
+    componentElevation: 'Elevation',
+    componentPreviewToolbar: 'Toolbar preview',
+    componentPreviewPanel: 'Panel preview',
+    componentPreviewSection: 'Section preview',
+    componentPresetDefault: 'Default surface',
+    componentPresetObservatory: 'Observatory',
+    componentPresetFloating: 'Floating glass',
+    componentDensityComfortable: 'Comfortable',
+    componentDensityCompact: 'Compact',
+    componentTransparencySolid: 'Solid',
+    componentTransparencyBalanced: 'Balanced',
+    componentTransparencyHigh: 'High',
+    componentBorderSoft: 'Soft',
+    componentBorderMedium: 'Medium',
+    componentBorderStrong: 'Strong',
+    componentElevationFlat: 'Flat',
+    componentElevationRaised: 'Raised',
+    componentElevationFloating: 'Floating',
   },
   common: {
     reset: 'Reset',
@@ -298,6 +375,18 @@ describe('ThemeCustomizer', () => {
 
     expect(screen.getByText('settingsNew.appearance.themeMode')).toBeInTheDocument();
     expect(screen.getAllByPlaceholderText('theme.colorValuePlaceholder')).toHaveLength(9);
+  });
+
+  it('shows component style controls in the appearance tab', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<ThemeCustomizer open={true} />);
+
+    await user.click(screen.getByText('theme.appearance'));
+
+    expect(screen.getAllByText('theme.componentStylePreset').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('theme.componentPreviewToolbar').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('theme.componentPreviewPanel').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('theme.componentPreviewSection').length).toBeGreaterThan(0);
   });
 
   it('commits valid palette overrides from the quick customizer', async () => {
