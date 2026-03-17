@@ -32,7 +32,9 @@ function resetStore() {
     activePlanId: null,
     executions: [],
     activeExecutionId: null,
-  });
+    draftRecovery: null,
+    recentImports: [],
+  } as Partial<SessionPlanState> as SessionPlanState);
 }
 
 function makePlanInput(name = 'Test Plan') {
@@ -105,6 +107,16 @@ function makeExecutionPlanInput(name = 'Execution Plan') {
         order: 1,
       },
     ],
+  };
+}
+
+function makeImportDiagnostics() {
+  return {
+    format: 'csv' as const,
+    unmatchedTargets: ['missing-1'],
+    createdTargets: ['created-1'],
+    skippedRows: 2,
+    warnings: ['warning-1'],
   };
 }
 
@@ -563,6 +575,37 @@ describe('useSessionPlanStore', () => {
     });
   });
 
+  describe('renameTemplate', () => {
+    it('should rename a local template and update updatedAt', () => {
+      const draft = makeDraft();
+      let id = '';
+      act(() => { id = useSessionPlanStore.getState().saveTemplate({ name: 'Old Template', draft }); });
+
+      const originalUpdatedAt = useSessionPlanStore.getState().templates[0].updatedAt;
+      act(() => { useSessionPlanStore.getState().renameTemplate(id, 'New Template'); });
+
+      const template = useSessionPlanStore.getState().templates[0];
+      expect(template.name).toBe('New Template');
+      expect(template.updatedAt >= originalUpdatedAt).toBe(true);
+    });
+  });
+
+  describe('duplicateTemplate', () => {
+    it('should duplicate a template and make the copy newest', () => {
+      const draft = makeDraft();
+      let id = '';
+      act(() => { id = useSessionPlanStore.getState().saveTemplate({ name: 'Original Template', draft }); });
+
+      let newId: string | null = null;
+      act(() => { newId = useSessionPlanStore.getState().duplicateTemplate(id); });
+
+      expect(newId).toMatch(/^template_/);
+      expect(useSessionPlanStore.getState().templates).toHaveLength(2);
+      expect(useSessionPlanStore.getState().templates[0].id).toBe(newId);
+      expect(useSessionPlanStore.getState().templates[0].name).toBe('Original Template (copy)');
+    });
+  });
+
   describe('listTemplates', () => {
     it('should return all templates', () => {
       const draft = makeDraft();
@@ -572,6 +615,118 @@ describe('useSessionPlanStore', () => {
       });
       const list = useSessionPlanStore.getState().listTemplates();
       expect(list).toHaveLength(2);
+    });
+  });
+
+  describe('draft recovery', () => {
+    it('should persist a normalized recovery snapshot with metadata', () => {
+      const dirtyDraft = makeDraft({
+        planDate: 'invalid-date',
+        constraints: {
+          minAltitude: 999,
+          minImagingTime: -10,
+        },
+      });
+
+      act(() => {
+        useSessionPlanStore.getState().saveDraftRecovery(dirtyDraft, {
+          source: 'planner-close',
+          relatedPlanId: 'plan-1',
+          relatedPlanName: 'Plan 1',
+          dirtyFingerprint: 'fingerprint-1',
+        });
+      });
+
+      const recovery = useSessionPlanStore.getState().draftRecovery;
+      expect(recovery).not.toBeNull();
+      if (!recovery) {
+        throw new Error('Expected draft recovery snapshot to exist');
+      }
+      expect(recovery.source).toBe('planner-close');
+      expect(recovery.relatedPlanId).toBe('plan-1');
+      expect(recovery.dirtyFingerprint).toBe('fingerprint-1');
+      expect(recovery.draft.planDate).toContain('T');
+      expect(recovery.draft.constraints.minAltitude).toBe(90);
+      expect(recovery.draft.constraints.minImagingTime).toBe(1);
+    });
+
+    it('should clear the recovery snapshot explicitly', () => {
+      act(() => {
+        useSessionPlanStore.getState().saveDraftRecovery(makeDraft(), {
+          source: 'planner-close',
+        });
+        useSessionPlanStore.getState().clearDraftRecovery();
+      });
+
+      expect(useSessionPlanStore.getState().draftRecovery).toBeNull();
+    });
+  });
+
+  describe('recent imports', () => {
+    it('should retain recent import records with newest first', () => {
+      let firstId = '';
+      let secondId = '';
+
+      act(() => {
+        firstId = useSessionPlanStore.getState().addImportRecord({
+          source: 'file',
+          sourcePath: 'C:/imports/a.csv',
+          linkedPlanId: 'plan-a',
+          linkedPlanName: 'Plan A',
+          draft: makeDraft(),
+          diagnostics: makeImportDiagnostics(),
+        });
+        secondId = useSessionPlanStore.getState().addImportRecord({
+          source: 'cli',
+          sourcePath: 'C:/imports/b.csv',
+          linkedPlanId: 'plan-b',
+          linkedPlanName: 'Plan B',
+          draft: makeDraft(),
+          diagnostics: {
+            ...makeImportDiagnostics(),
+            format: 'json',
+          },
+        });
+      });
+
+      const recentImports = useSessionPlanStore.getState().recentImports;
+      expect(recentImports).toHaveLength(2);
+      expect(recentImports[0].id).toBe(secondId);
+      expect(recentImports[1].id).toBe(firstId);
+      expect(recentImports[0].linkedPlanName).toBe('Plan B');
+    });
+
+    it('should evict older import records past the retention limit', () => {
+      act(() => {
+        for (let index = 0; index < 12; index += 1) {
+          useSessionPlanStore.getState().addImportRecord({
+            source: 'file',
+            sourcePath: `C:/imports/${index}.csv`,
+            linkedPlanId: `plan-${index}`,
+            linkedPlanName: `Plan ${index}`,
+            draft: makeDraft(),
+            diagnostics: makeImportDiagnostics(),
+          });
+        }
+      });
+
+      expect(useSessionPlanStore.getState().recentImports).toHaveLength(10);
+    });
+
+    it('should remove a recent import record explicitly', () => {
+      let id = '';
+      act(() => {
+        id = useSessionPlanStore.getState().addImportRecord({
+          source: 'cli',
+          linkedPlanId: 'plan-1',
+          linkedPlanName: 'Plan 1',
+          draft: makeDraft(),
+          diagnostics: makeImportDiagnostics(),
+        });
+        useSessionPlanStore.getState().dismissImportRecord(id);
+      });
+
+      expect(useSessionPlanStore.getState().recentImports).toEqual([]);
     });
   });
 
@@ -626,6 +781,8 @@ describe('useSessionPlanStore', () => {
       expect(next.savedPlans?.[0].guideContext).toEqual(makeGuideContext());
       expect(next.templates?.[0].draft.planDate).toContain('T');
       expect(next.templates?.[0].draft.guideContext).toEqual(makeGuideContext());
+      expect(next.draftRecovery).toBeNull();
+      expect(next.recentImports).toEqual([]);
     });
   });
 });

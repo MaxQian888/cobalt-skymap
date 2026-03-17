@@ -75,6 +75,36 @@ export interface SavedSessionTemplate {
   draft: SessionDraftV2;
 }
 
+export type PlannerDraftRecoverySource = 'planner-close' | 'app-close' | 'seed-conflict';
+
+export interface PlannerDraftRecoverySnapshot {
+  draft: SessionDraftV2;
+  updatedAt: string;
+  source: PlannerDraftRecoverySource;
+  relatedPlanId?: string;
+  relatedPlanName?: string;
+  dirtyFingerprint?: string;
+}
+
+export interface PlannerImportDiagnostics {
+  format: 'json' | 'csv' | 'nina-xml' | 'sgp-csv';
+  unmatchedTargets: string[];
+  createdTargets: string[];
+  skippedRows: number;
+  warnings: string[];
+}
+
+export interface PlannerImportRecord {
+  id: string;
+  importedAt: string;
+  source: 'file' | 'cli';
+  sourcePath?: string;
+  linkedPlanId?: string;
+  linkedPlanName?: string;
+  draft: SessionDraftV2;
+  diagnostics: PlannerImportDiagnostics;
+}
+
 interface CreateExecutionContext {
   locationId?: string;
   locationName?: string;
@@ -129,6 +159,8 @@ export interface SessionPlanState {
   activePlanId: string | null;
   executions: PlannedSessionExecution[];
   activeExecutionId: string | null;
+  draftRecovery: PlannerDraftRecoverySnapshot | null;
+  recentImports: PlannerImportRecord[];
 
   // Actions
   savePlan: (plan: Omit<SavedSessionPlan, 'id' | 'createdAt' | 'updatedAt'>) => string;
@@ -142,8 +174,20 @@ export interface SessionPlanState {
   importPlanV2: (draft: SessionDraftV2, name?: string) => string;
   saveTemplate: (template: Omit<SessionTemplate, 'id' | 'createdAt' | 'updatedAt'>) => string;
   loadTemplate: (id: string) => SavedSessionTemplate | undefined;
+  renameTemplate: (id: string, name: string) => void;
+  duplicateTemplate: (id: string) => string | null;
   deleteTemplate: (id: string) => void;
   listTemplates: () => SavedSessionTemplate[];
+  saveDraftRecovery: (
+    draft: SessionDraftV2,
+    metadata?: Omit<Partial<PlannerDraftRecoverySnapshot>, 'draft' | 'updatedAt'>,
+  ) => void;
+  clearDraftRecovery: () => void;
+  addImportRecord: (record: Omit<PlannerImportRecord, 'id' | 'importedAt' | 'draft'> & {
+    draft: SessionDraftV2;
+  }) => string;
+  dismissImportRecord: (id: string) => void;
+  clearImportRecords: () => void;
   createExecutionFromPlan: (plan: SavedSessionPlan, context?: CreateExecutionContext) => string;
   setActiveExecution: (id: string | null) => void;
   getActiveExecution: () => PlannedSessionExecution | null;
@@ -170,6 +214,7 @@ export interface SessionPlanState {
 /** Maximum number of saved session plans to retain */
 const MAX_SAVED_PLANS = 50;
 const MAX_SAVED_TEMPLATES = 50;
+const MAX_RECENT_IMPORTS = 10;
 
 function generatePlanId(): string {
   return `plan_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -181,6 +226,67 @@ function generateTemplateId(): string {
 
 function generateExecutionId(): string {
   return `execution_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function generateImportRecordId(): string {
+  return `import_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function resolveDraftFallbackDate(planDate: string): Date {
+  const parsedPlanDate = new Date(planDate);
+  return Number.isFinite(parsedPlanDate.getTime()) ? parsedPlanDate : new Date();
+}
+
+function normalizeRecoveryDraft(draft: SessionDraftV2): SessionDraftV2 {
+  return normalizeSessionDraft(draft, {
+    fallbackDate: resolveDraftFallbackDate(draft.planDate),
+  });
+}
+
+function normalizeImportDiagnostics(
+  diagnostics: PlannerImportDiagnostics,
+): PlannerImportDiagnostics {
+  return {
+    format: diagnostics.format,
+    unmatchedTargets: Array.isArray(diagnostics.unmatchedTargets) ? diagnostics.unmatchedTargets : [],
+    createdTargets: Array.isArray(diagnostics.createdTargets) ? diagnostics.createdTargets : [],
+    skippedRows: Number.isFinite(diagnostics.skippedRows) ? diagnostics.skippedRows : 0,
+    warnings: Array.isArray(diagnostics.warnings) ? diagnostics.warnings : [],
+  };
+}
+
+function normalizeDraftRecoverySnapshot(
+  snapshot: PlannerDraftRecoverySnapshot | null | undefined,
+): PlannerDraftRecoverySnapshot | null {
+  if (!snapshot?.draft || !snapshot.updatedAt || !snapshot.source) {
+    return null;
+  }
+
+  return {
+    draft: normalizeRecoveryDraft(snapshot.draft),
+    updatedAt: snapshot.updatedAt,
+    source: snapshot.source,
+    relatedPlanId: snapshot.relatedPlanId,
+    relatedPlanName: snapshot.relatedPlanName,
+    dirtyFingerprint: snapshot.dirtyFingerprint,
+  };
+}
+
+function normalizeImportRecord(record: PlannerImportRecord | null | undefined): PlannerImportRecord | null {
+  if (!record?.id || !record?.importedAt || !record?.source || !record?.draft || !record?.diagnostics) {
+    return null;
+  }
+
+  return {
+    id: record.id,
+    importedAt: record.importedAt,
+    source: record.source,
+    sourcePath: record.sourcePath,
+    linkedPlanId: record.linkedPlanId,
+    linkedPlanName: record.linkedPlanName,
+    draft: normalizeRecoveryDraft(record.draft),
+    diagnostics: normalizeImportDiagnostics(record.diagnostics),
+  };
 }
 
 function createExecutionTargets(plan: SavedSessionPlan): PlannedSessionExecutionTarget[] {
@@ -346,6 +452,8 @@ export const useSessionPlanStore = create<SessionPlanState>()(
       activePlanId: null,
       executions: [],
       activeExecutionId: null,
+      draftRecovery: null,
+      recentImports: [],
 
       savePlan: (plan) => {
         const id = generatePlanId();
@@ -477,6 +585,34 @@ export const useSessionPlanStore = create<SessionPlanState>()(
         return get().templates.find((template) => template.id === id);
       },
 
+      renameTemplate: (id, name) => {
+        set((state) => ({
+          templates: state.templates.map((template) =>
+            template.id === id
+              ? { ...template, name, updatedAt: new Date().toISOString() }
+              : template
+          ),
+        }));
+      },
+
+      duplicateTemplate: (id) => {
+        const source = get().templates.find((template) => template.id === id);
+        if (!source) return null;
+        const nextId = generateTemplateId();
+        const now = new Date().toISOString();
+        const copy: SavedSessionTemplate = {
+          ...source,
+          id: nextId,
+          name: `${source.name} (copy)`,
+          createdAt: now,
+          updatedAt: now,
+        };
+        set((state) => ({
+          templates: [copy, ...state.templates].slice(0, MAX_SAVED_TEMPLATES),
+        }));
+        return nextId;
+      },
+
       deleteTemplate: (id) => {
         set((state) => ({
           templates: state.templates.filter((template) => template.id !== id),
@@ -484,6 +620,52 @@ export const useSessionPlanStore = create<SessionPlanState>()(
       },
 
       listTemplates: () => get().templates,
+
+      saveDraftRecovery: (draft, metadata = {}) => {
+        set({
+          draftRecovery: {
+            draft: normalizeRecoveryDraft(draft),
+            updatedAt: new Date().toISOString(),
+            source: metadata.source ?? 'planner-close',
+            relatedPlanId: metadata.relatedPlanId,
+            relatedPlanName: metadata.relatedPlanName,
+            dirtyFingerprint: metadata.dirtyFingerprint,
+          },
+        });
+      },
+
+      clearDraftRecovery: () => {
+        set({ draftRecovery: null });
+      },
+
+      addImportRecord: (record) => {
+        const nextRecord: PlannerImportRecord = {
+          id: generateImportRecordId(),
+          importedAt: new Date().toISOString(),
+          source: record.source,
+          sourcePath: record.sourcePath,
+          linkedPlanId: record.linkedPlanId,
+          linkedPlanName: record.linkedPlanName,
+          draft: normalizeRecoveryDraft(record.draft),
+          diagnostics: normalizeImportDiagnostics(record.diagnostics),
+        };
+
+        set((state) => ({
+          recentImports: [nextRecord, ...state.recentImports].slice(0, MAX_RECENT_IMPORTS),
+        }));
+
+        return nextRecord.id;
+      },
+
+      dismissImportRecord: (id) => {
+        set((state) => ({
+          recentImports: state.recentImports.filter((record) => record.id !== id),
+        }));
+      },
+
+      clearImportRecords: () => {
+        set({ recentImports: [] });
+      },
 
       createExecutionFromPlan: (plan, context = {}) => {
         const now = new Date().toISOString();
@@ -738,7 +920,7 @@ export const useSessionPlanStore = create<SessionPlanState>()(
     }),
     {
       name: 'skymap-session-plans',
-      version: 4,
+      version: 5,
       storage: getZustandStorage<Partial<SessionPlanState>>(),
       migrate: (persistedState: unknown, version: number) => {
         const state = (persistedState ?? {}) as Partial<SessionPlanState>;
@@ -778,6 +960,12 @@ export const useSessionPlanStore = create<SessionPlanState>()(
           .map((execution) => (execution ? normalizeExecutionStatuses(execution) : null))
           .filter((execution): execution is PlannedSessionExecution => Boolean(execution));
 
+        const normalizedDraftRecovery = normalizeDraftRecoverySnapshot(state.draftRecovery);
+        const normalizedRecentImports: PlannerImportRecord[] = (state.recentImports ?? [])
+          .map((record) => normalizeImportRecord(record))
+          .filter((record): record is PlannerImportRecord => Boolean(record))
+          .slice(0, MAX_RECENT_IMPORTS);
+
         if (version < 2) {
           return {
             savedPlans: normalizedPlans,
@@ -785,6 +973,8 @@ export const useSessionPlanStore = create<SessionPlanState>()(
             templates: normalizedTemplates,
             executions: [],
             activeExecutionId: null,
+            draftRecovery: null,
+            recentImports: [],
           } as Partial<SessionPlanState>;
         }
         if (version < 3) {
@@ -794,6 +984,8 @@ export const useSessionPlanStore = create<SessionPlanState>()(
             templates: normalizedTemplates,
             executions: [],
             activeExecutionId: null,
+            draftRecovery: null,
+            recentImports: [],
           } as Partial<SessionPlanState>;
         }
         if (version < 4) {
@@ -803,6 +995,19 @@ export const useSessionPlanStore = create<SessionPlanState>()(
             templates: normalizedTemplates,
             executions: normalizedExecutions,
             activeExecutionId: state.activeExecutionId ?? null,
+            draftRecovery: null,
+            recentImports: [],
+          } as Partial<SessionPlanState>;
+        }
+        if (version < 5) {
+          return {
+            savedPlans: normalizedPlans,
+            activePlanId: state.activePlanId ?? null,
+            templates: normalizedTemplates,
+            executions: normalizedExecutions,
+            activeExecutionId: state.activeExecutionId ?? null,
+            draftRecovery: null,
+            recentImports: [],
           } as Partial<SessionPlanState>;
         }
         return {
@@ -811,6 +1016,8 @@ export const useSessionPlanStore = create<SessionPlanState>()(
           templates: normalizedTemplates,
           executions: normalizedExecutions,
           activeExecutionId: state.activeExecutionId ?? null,
+          draftRecovery: normalizedDraftRecovery,
+          recentImports: normalizedRecentImports,
         } as Partial<SessionPlanState>;
       },
       partialize: (state) => ({
@@ -819,6 +1026,8 @@ export const useSessionPlanStore = create<SessionPlanState>()(
         templates: state.templates,
         executions: state.executions,
         activeExecutionId: state.activeExecutionId,
+        draftRecovery: state.draftRecovery,
+        recentImports: state.recentImports,
       }),
     }
   )

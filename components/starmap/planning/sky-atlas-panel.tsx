@@ -563,7 +563,10 @@ export function SkyAtlasPanel() {
           <Telescope className="h-4 w-4" />
         </Button>
       </DrawerTrigger>
-      <DrawerContent className="w-[85vw] max-w-[360px] sm:max-w-[420px] md:max-w-[480px] h-full p-0 flex flex-col">
+      <DrawerContent
+        data-starmap-ui-control="true"
+        className="w-[85vw] max-w-[360px] sm:max-w-[420px] md:max-w-[480px] h-full overflow-hidden p-0 flex flex-col"
+      >
         <DrawerHeader className="p-4 pb-2 border-b">
           <DrawerTitle className="flex items-center gap-2">
             <Telescope className="h-5 w-5" />
@@ -571,68 +574,73 @@ export function SkyAtlasPanel() {
           </DrawerTitle>
         </DrawerHeader>
         
-        <div className="flex-1 flex flex-col min-h-0">
-          {/* Location Info */}
-          {(latitude !== 0 || longitude !== 0) && (
-            <div className="px-4 py-2 text-xs text-muted-foreground flex items-center gap-1 border-b">
-              <MapPin className="h-3 w-3" />
-              {latitude.toFixed(2)}°, {longitude.toFixed(2)}°
-            </div>
-          )}
-          
-          {/* Nighttime Info */}
-          <div className="px-4 py-2 border-b">
-            <NighttimeInfo />
-          </div>
-          
-          {/* Filters */}
-          <div className="px-4 py-2 border-b">
-            <FilterPanel isOpen={showFilters} onToggle={() => setShowFilters(!showFilters)} />
-          </div>
-          
-          {/* Sort & Search Controls */}
-          <div className="px-4 py-2 border-b flex gap-2">
-            <Select
-              value={filters.orderByField}
-              onValueChange={(v) => setFilters({ orderByField: v as typeof filters.orderByField })}
-            >
-              <SelectTrigger className="flex-1 h-8 text-sm">
-                <ArrowUpDown className="h-3 w-3 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="imagingScore">{t('skyAtlas.sortByScore')}</SelectItem>
-                <SelectItem value="name">{t('skyAtlas.sortByName')}</SelectItem>
-                <SelectItem value="magnitude">{t('skyAtlas.sortByMagnitude')}</SelectItem>
-                <SelectItem value="size">{t('skyAtlas.sortBySize')}</SelectItem>
-                <SelectItem value="altitude">{t('skyAtlas.sortByAltitude')}</SelectItem>
-                <SelectItem value="transitTime">{t('skyAtlas.sortByTransit')}</SelectItem>
-                <SelectItem value="moonDistance">{t('skyAtlas.sortByMoonDistance')}</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              onClick={handleSearch}
-              disabled={isSearching}
-            >
-              {isSearching ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              {t('skyAtlas.search')}
-            </Button>
-          </div>
-          
-          {/* Tonight's Best */}
-          {tonightsBest.length > 0 && !searchResult && (
-            <div className="px-4 py-2 border-b">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm font-medium">{t('skyAtlas.tonightsBest')}</span>
+        <ScrollArea
+          data-testid="sky-atlas-panel-scroll-area"
+          data-starmap-ui-control="true"
+          data-starmap-scroll-surface="true"
+          className="flex-1 min-h-0 overscroll-contain"
+        >
+          <div className="flex flex-col">
+            {/* Location Info */}
+            {(latitude !== 0 || longitude !== 0) && (
+              <div className="px-4 py-2 text-xs text-muted-foreground flex items-center gap-1 border-b">
+                <MapPin className="h-3 w-3" />
+                {latitude.toFixed(2)}°, {longitude.toFixed(2)}°
               </div>
-              <ScrollArea className="h-[200px]">
-                <div className="space-y-2 pr-4">
+            )}
+            
+            {/* Nighttime Info */}
+            <div className="px-4 py-2 border-b">
+              <NighttimeInfo />
+            </div>
+            
+            {/* Filters */}
+            <div className="px-4 py-2 border-b">
+              <FilterPanel isOpen={showFilters} onToggle={() => setShowFilters(!showFilters)} />
+            </div>
+            
+            {/* Sort & Search Controls */}
+            <div className="px-4 py-2 border-b flex gap-2">
+              <Select
+                value={filters.orderByField}
+                onValueChange={(v) => setFilters({ orderByField: v as typeof filters.orderByField })}
+              >
+                <SelectTrigger className="flex-1 h-8 text-sm">
+                  <ArrowUpDown className="h-3 w-3 mr-2" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="imagingScore">{t('skyAtlas.sortByScore')}</SelectItem>
+                  <SelectItem value="name">{t('skyAtlas.sortByName')}</SelectItem>
+                  <SelectItem value="magnitude">{t('skyAtlas.sortByMagnitude')}</SelectItem>
+                  <SelectItem value="size">{t('skyAtlas.sortBySize')}</SelectItem>
+                  <SelectItem value="altitude">{t('skyAtlas.sortByAltitude')}</SelectItem>
+                  <SelectItem value="transitTime">{t('skyAtlas.sortByTransit')}</SelectItem>
+                  <SelectItem value="moonDistance">{t('skyAtlas.sortByMoonDistance')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                onClick={handleSearch}
+                disabled={isSearching}
+              >
+                {isSearching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4" />
+                )}
+                {t('skyAtlas.search')}
+              </Button>
+            </div>
+            
+            {/* Tonight's Best */}
+            {tonightsBest.length > 0 && !searchResult && (
+              <div className="px-4 py-2 border-b">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="h-4 w-4 text-yellow-500" />
+                  <span className="text-sm font-medium">{t('skyAtlas.tonightsBest')}</span>
+                </div>
+                <div className="space-y-2 pb-2">
                   {tonightsBest.slice(0, 5).map((obj) => (
                     <DSOCard
                       key={obj.id}
@@ -644,25 +652,23 @@ export function SkyAtlasPanel() {
                     />
                   ))}
                 </div>
-              </ScrollArea>
-            </div>
-          )}
-          
-          {/* Search Results */}
-          {searchResult && (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="px-4 py-2 text-xs text-muted-foreground border-b">
-                {t('skyAtlas.resultsCount', { count: searchResult.totalCount })}
-                {searchResult.totalPages > 1 && (
-                  <span className="ml-2">
-                    ({t('skyAtlas.pageInfo', { 
-                      current: searchResult.currentPage, 
-                      total: searchResult.totalPages 
-                    })})
-                  </span>
-                )}
               </div>
-              <ScrollArea className="flex-1">
+            )}
+            
+            {/* Search Results */}
+            {searchResult && (
+              <div className="flex flex-col">
+                <div className="px-4 py-2 text-xs text-muted-foreground border-b">
+                  {t('skyAtlas.resultsCount', { count: searchResult.totalCount })}
+                  {searchResult.totalPages > 1 && (
+                    <span className="ml-2">
+                      ({t('skyAtlas.pageInfo', { 
+                        current: searchResult.currentPage, 
+                        total: searchResult.totalPages 
+                      })})
+                    </span>
+                  )}
+                </div>
                 <div className="p-4 space-y-2">
                   {searchResult.objects.map((obj) => (
                     <DSOCard
@@ -675,28 +681,28 @@ export function SkyAtlasPanel() {
                     />
                   ))}
                 </div>
-              </ScrollArea>
-            </div>
-          )}
-          
-          {/* Empty State */}
-          {!searchResult && tonightsBest.length === 0 && !isSearching && (
-            <div className="flex-1 flex items-center justify-center p-8 text-center text-muted-foreground">
-              <div>
-                <Telescope className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="text-sm">{t('skyAtlas.emptyState')}</p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="mt-4"
-                  onClick={handleSearch}
-                >
-                  {t('skyAtlas.startSearch')}
-                </Button>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+            
+            {/* Empty State */}
+            {!searchResult && tonightsBest.length === 0 && !isSearching && (
+              <div className="flex min-h-[240px] items-center justify-center p-8 text-center text-muted-foreground">
+                <div>
+                  <Telescope className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm">{t('skyAtlas.emptyState')}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-4"
+                    onClick={handleSearch}
+                  >
+                    {t('skyAtlas.startSearch')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
       </DrawerContent>
     </Drawer>
   );

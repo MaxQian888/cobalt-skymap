@@ -7,7 +7,10 @@ import type {
   MountConnectionConfig,
   MountCapabilities,
   MountActionAvailability,
+  MountBlockedReasonMap,
   MountCapabilitySnapshot,
+  MountCommandFailure,
+  MountTargetAction,
   SupportedMountDevice,
 } from '@/lib/core/types';
 import {
@@ -17,6 +20,7 @@ import {
 import {
   BUILT_IN_SIMULATOR_MOUNT_ID,
   createMountActionAvailability,
+  createMountActionBlockReasons,
   createSimulatorMountDevice,
 } from '@/lib/core/mount-support';
 
@@ -41,6 +45,38 @@ const DEFAULT_CAPABILITIES: MountCapabilities = {
   equatorialSystem: '',
 };
 
+const DEFAULT_MOUNT_INFO: MountInfo = {
+  Connected: false,
+  Coordinates: {
+    RADegrees: 0,
+    Dec: 0,
+  },
+};
+
+function buildMountOperationFeedback(input: {
+  mountInfo: MountInfo;
+  capabilities: MountCapabilities;
+}): {
+  actionAvailability: MountActionAvailability;
+  blockedActionReasons: MountBlockedReasonMap;
+} {
+  return {
+    actionAvailability: createMountActionAvailability({
+      connected: input.mountInfo.Connected,
+      capabilities: input.capabilities,
+      parked: input.mountInfo.Parked,
+      slewing: input.mountInfo.Slewing,
+    }),
+    blockedActionReasons: createMountActionBlockReasons({
+      connected: input.mountInfo.Connected,
+      capabilities: input.capabilities,
+      tracking: input.mountInfo.Tracking,
+      parked: input.mountInfo.Parked,
+      slewing: input.mountInfo.Slewing,
+    }),
+  };
+}
+
 interface MountStoreState {
   mountInfo: MountInfo;
   profileInfo: ProfileInfo;
@@ -50,6 +86,9 @@ interface MountStoreState {
   selectedDevice: SupportedMountDevice | null;
   capabilitySnapshot: MountCapabilitySnapshot | null;
   actionAvailability: MountActionAvailability;
+  blockedActionReasons: MountBlockedReasonMap;
+  activeTargetAction: MountTargetAction | null;
+  latestCommandFailure: MountCommandFailure | null;
 
   // Connection & capabilities
   connectionConfig: MountConnectionConfig;
@@ -70,6 +109,10 @@ interface MountStoreState {
   setCapabilities: (caps: MountCapabilities) => void;
   setSelectedDevice: (device: SupportedMountDevice | null) => void;
   setCapabilitySnapshot: (snapshot: MountCapabilitySnapshot | null) => void;
+  setActiveTargetAction: (action: Omit<MountTargetAction, 'requestedAt'>) => void;
+  clearActiveTargetAction: () => void;
+  setLatestCommandFailure: (failure: MountCommandFailure | null) => void;
+  clearLatestCommandFailure: () => void;
 
   /** Batch-update mount info from a polling state snapshot */
   applyMountState: (state: {
@@ -92,13 +135,7 @@ interface MountStoreState {
 export const useMountStore = create<MountStoreState>()(
   persist(
     (set) => ({
-      mountInfo: {
-        Connected: false,
-        Coordinates: {
-          RADegrees: 0,
-          Dec: 0,
-        },
-      },
+      mountInfo: { ...DEFAULT_MOUNT_INFO },
       profileInfo: {
         AstrometrySettings: {
           Latitude: 0,
@@ -111,27 +148,44 @@ export const useMountStore = create<MountStoreState>()(
       safetyConfig: { ...DEFAULT_MOUNT_SAFETY_CONFIG },
       selectedDevice: createSimulatorMountDevice(),
       capabilitySnapshot: null,
-      actionAvailability: createMountActionAvailability({
-        connected: false,
+      ...buildMountOperationFeedback({
+        mountInfo: DEFAULT_MOUNT_INFO,
         capabilities: DEFAULT_CAPABILITIES,
       }),
+      activeTargetAction: null,
+      latestCommandFailure: null,
       connectionConfig: { ...DEFAULT_CONNECTION_CONFIG },
       capabilities: { ...DEFAULT_CAPABILITIES },
       
-      setMountInfo: (info) => set((state) => ({
-        mountInfo: { ...state.mountInfo, ...info }
-      })),
+      setMountInfo: (info) => set((state) => {
+        const mountInfo = { ...state.mountInfo, ...info };
+        return {
+          mountInfo,
+          ...buildMountOperationFeedback({
+            mountInfo,
+            capabilities: state.capabilities,
+          }),
+        };
+      }),
       
-      setMountCoordinates: (ra, dec) => set((state) => ({
-        mountInfo: {
+      setMountCoordinates: (ra, dec) => set((state) => {
+        const mountInfo = {
           ...state.mountInfo,
-          Coordinates: { RADegrees: ra, Dec: dec }
-        }
-      })),
+          Coordinates: { RADegrees: ra, Dec: dec },
+        };
+        return { mountInfo };
+      }),
       
-      setMountConnected: (Connected) => set((state) => ({
-        mountInfo: { ...state.mountInfo, Connected }
-      })),
+      setMountConnected: (Connected) => set((state) => {
+        const mountInfo = { ...state.mountInfo, Connected };
+        return {
+          mountInfo,
+          ...buildMountOperationFeedback({
+            mountInfo,
+            capabilities: state.capabilities,
+          }),
+        };
+      }),
       
       setProfileInfo: (info) => set((state) => ({
         profileInfo: { ...state.profileInfo, ...info }
@@ -165,11 +219,9 @@ export const useMountStore = create<MountStoreState>()(
           ...caps,
           capturedAt: new Date().toISOString(),
         },
-        actionAvailability: createMountActionAvailability({
-          connected: state.mountInfo.Connected,
+        ...buildMountOperationFeedback({
+          mountInfo: state.mountInfo,
           capabilities: caps,
-          parked: state.mountInfo.Parked,
-          slewing: state.mountInfo.Slewing,
         }),
       })),
 
@@ -183,8 +235,21 @@ export const useMountStore = create<MountStoreState>()(
 
       setCapabilitySnapshot: (capabilitySnapshot) => set({ capabilitySnapshot }),
 
-      applyMountState: (s) => set((state) => ({
-        mountInfo: {
+      setActiveTargetAction: (action) => set({
+        activeTargetAction: {
+          ...action,
+          requestedAt: new Date().toISOString(),
+        },
+      }),
+
+      clearActiveTargetAction: () => set({ activeTargetAction: null }),
+
+      setLatestCommandFailure: (latestCommandFailure) => set({ latestCommandFailure }),
+
+      clearLatestCommandFailure: () => set({ latestCommandFailure: null }),
+
+      applyMountState: (s) => set((state) => {
+        const mountInfo = {
           Connected: s.connected,
           Coordinates: { RADegrees: s.ra, Dec: s.dec },
           Tracking: s.tracking,
@@ -194,27 +259,27 @@ export const useMountStore = create<MountStoreState>()(
           AtHome: s.atHome,
           PierSide: s.pierSide,
           SlewRateIndex: s.slewRateIndex,
-        },
-        actionAvailability: createMountActionAvailability({
-          connected: s.connected,
-          capabilities: state.capabilities,
-          parked: s.parked,
-          slewing: s.slewing,
-        }),
-      })),
+        };
+        return {
+          mountInfo,
+          ...buildMountOperationFeedback({
+            mountInfo,
+            capabilities: state.capabilities,
+          }),
+        };
+      }),
 
       resetMountInfo: () => set((state) => ({
-        mountInfo: {
-          Connected: false,
-          Coordinates: { RADegrees: 0, Dec: 0 },
-        },
+        mountInfo: { ...DEFAULT_MOUNT_INFO },
         capabilities: { ...DEFAULT_CAPABILITIES },
-        actionAvailability: createMountActionAvailability({
-          connected: false,
+        ...buildMountOperationFeedback({
+          mountInfo: DEFAULT_MOUNT_INFO,
           capabilities: DEFAULT_CAPABILITIES,
         }),
         selectedDevice: state.selectedDevice,
         capabilitySnapshot: state.capabilitySnapshot,
+        activeTargetAction: null,
+        latestCommandFailure: null,
       })),
     }),
     {

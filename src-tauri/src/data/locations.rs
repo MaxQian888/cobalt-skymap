@@ -493,8 +493,10 @@ mod tests {
 
     #[test]
     fn test_locations_data_clone() {
-        let mut data = LocationsData::default();
-        data.current_location_id = Some("test-id".to_string());
+        let data = LocationsData {
+            current_location_id: Some("test-id".to_string()),
+            ..Default::default()
+        };
 
         let cloned = data.clone();
         assert_eq!(cloned.current_location_id, data.current_location_id);

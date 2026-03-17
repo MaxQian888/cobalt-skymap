@@ -133,6 +133,11 @@ function TargetDetailForm({ target, onOpenChange }: { target: TargetItem; onOpen
     }
   };
 
+  const formatMosaicPlanMinutes = (minutes: number | null | undefined) => {
+    if (typeof minutes !== 'number' || !Number.isFinite(minutes)) return null;
+    return `${Number.isInteger(minutes) ? minutes : minutes.toFixed(1)} min`;
+  };
+
   return (
       <ResponsiveDialogContent className="sm:max-w-[440px] bg-card border-border flex max-h-[92vh] max-h-[92dvh] flex-col overflow-hidden">
         <ResponsiveDialogHeader>
@@ -307,6 +312,25 @@ function TargetDetailForm({ target, onOpenChange }: { target: TargetItem; onOpen
               <Camera className="h-3 w-3" />
               <span>{target.focalLength}mm</span>
               {target.mosaic?.enabled && <span>• Mosaic {target.mosaic.cols}×{target.mosaic.rows}</span>}
+            </div>
+          )}
+
+          {target.mosaicPlan && (
+            <div className="rounded-md border bg-muted/40 px-3 py-2 text-[10px] text-muted-foreground">
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                <span>{t('targetDetail.mosaicPlanPanels')}</span>
+                <span>{target.mosaicPlan.totalPanels}</span>
+                <span>{t('targetDetail.mosaicPlanLayout')}</span>
+                <span>{target.mosaicPlan.layoutMode}</span>
+                <span>{t('targetDetail.mosaicPlanOrder')}</span>
+                <span>{target.mosaicPlan.panelOrder}</span>
+                {formatMosaicPlanMinutes(target.mosaicPlan.estimatedTotalMinutes) && (
+                  <>
+                    <span>{t('targetDetail.mosaicPlanTime')}</span>
+                    <span>{formatMosaicPlanMinutes(target.mosaicPlan.estimatedTotalMinutes)}</span>
+                  </>
+                )}
+              </div>
             </div>
           )}
 

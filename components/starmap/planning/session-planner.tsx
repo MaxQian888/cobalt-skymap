@@ -59,8 +59,6 @@ import {
   Eye,
   EyeOff,
   Save,
-  FolderOpen,
-  Trash2,
   GripVertical,
   Lock,
   Unlock,
@@ -117,6 +115,10 @@ import type { SavedSessionPlan, SavedSessionTemplate } from '@/lib/stores';
 import type { ObservingConditions, SafetyState } from '@/lib/tauri/mount-api';
 import type { DeviceType } from '@/lib/core/types/device';
 import { copyTextWithFeedback } from '@/lib/utils/clipboard-feedback';
+import { usePlannerWorkspaceModel, type PlannerWorkspaceEntry } from '@/lib/hooks/use-planner-workspace-model';
+import type { PlannerWorkspaceFilter } from '@/lib/stores/planning-ui-store';
+import { PlannerWorkspacePanel } from './planner-workspace-panel';
+import { PlannerDraftRecoveryPrompt } from './planner-draft-recovery-prompt';
 
 // ============================================================================
 // Timeline Component
@@ -535,6 +537,14 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const plannerDraftSeed = usePlanningUiStore((state) => state.plannerDraftSeed);
   const plannerDraftSeedRequestId = usePlanningUiStore((state) => state.plannerDraftSeedRequestId);
   const clearPlannerDraftSeed = usePlanningUiStore((state) => state.clearPlannerDraftSeed);
+  const plannerWorkspaceOpen = usePlanningUiStore((state) => state.plannerWorkspaceOpen);
+  const plannerWorkspaceFilter = usePlanningUiStore((state) => state.plannerWorkspaceFilter);
+  const selectedPlannerWorkspaceEntryId = usePlanningUiStore((state) => state.selectedPlannerWorkspaceEntryId);
+  const recoveryPromptVisible = usePlanningUiStore((state) => state.recoveryPromptVisible);
+  const setPlannerWorkspaceOpen = usePlanningUiStore((state) => state.setPlannerWorkspaceOpen);
+  const setPlannerWorkspaceFilter = usePlanningUiStore((state) => state.setPlannerWorkspaceFilter);
+  const setSelectedPlannerWorkspaceEntry = usePlanningUiStore((state) => state.setSelectedPlannerWorkspaceEntry);
+  const setRecoveryPromptVisible = usePlanningUiStore((state) => state.setRecoveryPromptVisible);
   const [strategy, setStrategy] = useState<OptimizationStrategy>('balanced');
   const [planningMode, setPlanningMode] = useState<'auto' | 'manual'>('auto');
   const [minAltitude, setMinAltitude] = useState(30);
@@ -562,6 +572,11 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [remoteTemplates, setRemoteTemplates] = useState<SavedSessionTemplate[]>([]);
   const [guideContext, setGuideContext] = useState<SessionDraftV2['guideContext']>(undefined);
+  const [workspaceOpen, setWorkspaceOpen] = useState(plannerWorkspaceOpen);
+  const [workspaceFilter, setWorkspaceFilterLocal] = useState<PlannerWorkspaceFilter>(plannerWorkspaceFilter);
+  const [workspaceQuery, setWorkspaceQuery] = useState('');
+  const [workspaceSelectedEntryId, setWorkspaceSelectedEntryId] = useState<string | null>(selectedPlannerWorkspaceEntryId);
+  const [workspaceRecoveryPromptVisible, setWorkspaceRecoveryPromptVisible] = useState(recoveryPromptVisible);
   
   const profileInfo = useMountStore((state) => state.profileInfo);
   const mountConnected = useMountStore((state) => state.mountInfo.Connected ?? false);
@@ -576,24 +591,33 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const savedPlans = useSessionPlanStore((state) => state.savedPlans);
   const savePlan = useSessionPlanStore((state) => state.savePlan);
   const updateSavedPlan = useSessionPlanStore((state) => state.updatePlan);
+  const getSavedPlanById = useSessionPlanStore((state) => state.getPlanById);
+  const renameSavedPlan = useSessionPlanStore((state) => state.renamePlan);
+  const duplicateSavedPlan = useSessionPlanStore((state) => state.duplicatePlan);
   const templates = useSessionPlanStore((state) => state.templates);
   const saveTemplate = useSessionPlanStore((state) => state.saveTemplate);
-  const loadTemplate = useSessionPlanStore((state) => state.loadTemplate);
+  const renameTemplate = useSessionPlanStore((state) => state.renameTemplate);
+  const duplicateTemplate = useSessionPlanStore((state) => state.duplicateTemplate);
   const importPlanV2 = useSessionPlanStore((state) => state.importPlanV2);
   const cliImportRequestId = useCliBridgeStore((state) => state.sessionPlanImportRequestId);
   const cliImportContent = useCliBridgeStore((state) => state.sessionPlanImportContent);
   const cliImportSourcePath = useCliBridgeStore((state) => state.sessionPlanImportSourcePath);
   const deleteSavedPlan = useSessionPlanStore((state) => state.deletePlan);
+  const deleteTemplate = useSessionPlanStore((state) => state.deleteTemplate);
   const executions = useSessionPlanStore((state) => state.executions);
   const activeExecutionId = useSessionPlanStore((state) => state.activeExecutionId);
+  const draftRecovery = useSessionPlanStore((state) => state.draftRecovery);
+  const recentImports = useSessionPlanStore((state) => state.recentImports);
+  const saveDraftRecovery = useSessionPlanStore((state) => state.saveDraftRecovery);
+  const clearDraftRecovery = useSessionPlanStore((state) => state.clearDraftRecovery);
+  const addImportRecord = useSessionPlanStore((state) => state.addImportRecord);
+  const dismissImportRecord = useSessionPlanStore((state) => state.dismissImportRecord);
   const syncExecutionFromObservationSession = useSessionPlanStore((state) => state.syncExecutionFromObservationSession);
   const setActiveExecution = useSessionPlanStore((state) => state.setActiveExecution);
   const createExecutionFromPlan = useSessionPlanStore((state) => state.createExecutionFromPlan);
   const updateExecutionTarget = useSessionPlanStore((state) => state.updateExecutionTarget);
   const completeExecution = useSessionPlanStore((state) => state.completeExecution);
   const archiveExecution = useSessionPlanStore((state) => state.archiveExecution);
-  const [showSavedPlans, setShowSavedPlans] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false);
   const handledPlannerSeedRef = useRef(0);
   const lastSyncedGuideOrderRef = useRef('');
   
@@ -658,6 +682,22 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       setActiveSessionProfileIds([]);
     }
   }, [activeExecutionId, setActiveSessionProfileIds]);
+
+  useEffect(() => {
+    setWorkspaceOpen(plannerWorkspaceOpen);
+  }, [plannerWorkspaceOpen]);
+
+  useEffect(() => {
+    setWorkspaceFilterLocal(plannerWorkspaceFilter);
+  }, [plannerWorkspaceFilter]);
+
+  useEffect(() => {
+    setWorkspaceSelectedEntryId(selectedPlannerWorkspaceEntryId);
+  }, [selectedPlannerWorkspaceEntryId]);
+
+  useEffect(() => {
+    setWorkspaceRecoveryPromptVisible(recoveryPromptVisible);
+  }, [recoveryPromptVisible]);
   
   // Calculate FOV
   const fovWidth = sensorWidth && focalLength ? (sensorWidth / focalLength) * 57.3 : 0;
@@ -708,16 +748,38 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     return undefined;
   }, [deviceWeather, weatherInput]);
 
-  const availableTemplates = useMemo<SavedSessionTemplate[]>(() => {
-    if (remoteTemplates.length === 0) return templates;
-    const byId = new Map<string, SavedSessionTemplate>();
-    for (const template of [...templates, ...remoteTemplates]) {
-      byId.set(template.id, template);
+  const workspaceModel = usePlannerWorkspaceModel({
+    savedPlans,
+    executions,
+    localTemplates: templates,
+    remoteTemplates,
+    recentImports,
+    draftRecovery,
+    query: workspaceQuery,
+    filter: workspaceFilter,
+  });
+  const workspaceEntryCount = workspaceModel.counts.plans
+    + workspaceModel.counts.templates
+    + workspaceModel.counts.imports
+    + workspaceModel.counts.recovery;
+
+  useEffect(() => {
+    if (workspaceModel.entries.length === 0) {
+      setWorkspaceSelectedEntryId(null);
+      setSelectedPlannerWorkspaceEntry(null);
+      return;
     }
-    return Array.from(byId.values()).sort(
-      (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
-    );
-  }, [remoteTemplates, templates]);
+
+    const hasSelectedEntry = workspaceSelectedEntryId
+      ? workspaceModel.entries.some((entry) => entry.id === workspaceSelectedEntryId)
+      : false;
+
+    if (!hasSelectedEntry) {
+      const nextId = workspaceModel.entries[0].id;
+      setWorkspaceSelectedEntryId(nextId);
+      setSelectedPlannerWorkspaceEntry(nextId);
+    }
+  }, [setSelectedPlannerWorkspaceEntry, workspaceModel.entries, workspaceSelectedEntryId]);
 
   const constraints = useMemo<SessionConstraintSet>(() => ({
     minAltitude,
@@ -747,8 +809,14 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     useExposurePlanDuration,
   ]);
 
+  const baselineDraftFingerprintRef = useRef<string | null>(null);
+  const setBaselineDraftFingerprint = useCallback((draft: SessionDraftV2) => {
+    baselineDraftFingerprintRef.current = JSON.stringify(normalizeSessionDraft(draft));
+  }, []);
+
   const applyDraft = useCallback((draftInput: SessionDraftV2) => {
     const normalized = normalizeSessionDraft(draftInput);
+    setBaselineDraftFingerprint(normalized);
     setPlanDate(new Date(normalized.planDate));
     setStrategy(normalized.strategy);
     setMinAltitude(normalized.constraints.minAltitude);
@@ -781,7 +849,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     }
     setGuideContext(normalized.guideContext);
     setPlanningMode(normalized.manualEdits.length > 0 ? 'manual' : 'auto');
-  }, []);
+  }, [setBaselineDraftFingerprint]);
 
   useEffect(() => {
     if (
@@ -1157,6 +1225,15 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   ]);
 
   const normalizedDraft = plannerDraftValidation.draft;
+  const currentDraftFingerprint = useMemo(
+    () => JSON.stringify(normalizedDraft),
+    [normalizedDraft],
+  );
+  useEffect(() => {
+    if (baselineDraftFingerprintRef.current === null) {
+      baselineDraftFingerprintRef.current = currentDraftFingerprint;
+    }
+  }, [currentDraftFingerprint]);
   const normalizedExcludedIds = useMemo(
     () => new Set(normalizedDraft.excludedTargetIds),
     [normalizedDraft.excludedTargetIds],
@@ -1256,6 +1333,21 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     lastSyncedGuideOrderRef.current = signature;
     useMessierMarathonStore.getState().rewriteRemainingOrder(catalogOrder);
   }, [displayedPlan.targets, guideContext]);
+
+  useEffect(() => {
+    if (!open) {
+      setWorkspaceRecoveryPromptVisible(false);
+      setRecoveryPromptVisible(false);
+      return;
+    }
+    if (draftRecovery) {
+      setWorkspaceRecoveryPromptVisible(true);
+      setRecoveryPromptVisible(true);
+      return;
+    }
+    setWorkspaceRecoveryPromptVisible(false);
+    setRecoveryPromptVisible(false);
+  }, [draftRecovery, open, setRecoveryPromptVisible]);
 
   const relatedSavedPlan = useMemo(
     () => savedPlans.find((saved) => (
@@ -1415,9 +1507,17 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     if (validation.warningIssues.length > 0) {
       toast.warning(validation.warningIssues[0].message);
     }
+    setBaselineDraftFingerprint({
+      ...normalizedDraft,
+      guideContext: nextGuideContext,
+    });
+    clearDraftRecovery();
+    setWorkspaceRecoveryPromptVisible(false);
+    setRecoveryPromptVisible(false);
     toast.success(t('sessionPlanner.planSaved'));
     return savedPlanId;
   }, [
+    clearDraftRecovery,
     constraints,
     displayedPlan,
     excludedIds,
@@ -1429,6 +1529,8 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     planningMode,
     savePlan,
     sessionNotes,
+    setBaselineDraftFingerprint,
+    setRecoveryPromptVisible,
     strategy,
     t,
     updateSavedPlan,
@@ -1781,13 +1883,12 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     guideContext,
   ]);
 
-  const handleLoadTemplate = useCallback((templateId: string) => {
-    const template = availableTemplates.find((item) => item.id === templateId) ?? loadTemplate(templateId);
-    if (!template) return;
+  const handleLoadTemplate = useCallback((template: SavedSessionTemplate) => {
     applyDraft(template.draft);
-    setShowTemplates(false);
+    setWorkspaceOpen(false);
+    setPlannerWorkspaceOpen(false);
     toast.success(t('sessionPlanner.templateLoaded'));
-  }, [applyDraft, availableTemplates, loadTemplate, t]);
+  }, [applyDraft, setPlannerWorkspaceOpen, t]);
   
   const handleLoadPlan = useCallback((saved: SavedSessionPlan) => {
     const report = validateSessionDraft({
@@ -1810,8 +1911,157 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     if (report.warningIssues.length > 0) {
       toast.warning(report.warningIssues[0].message);
     }
-    setShowSavedPlans(false);
-  }, [activeTargets, applyDraft]);
+    setWorkspaceOpen(false);
+    setPlannerWorkspaceOpen(false);
+  }, [activeTargets, applyDraft, setPlannerWorkspaceOpen]);
+
+  const handleWorkspaceOpen = useCallback(() => {
+    setWorkspaceOpen(true);
+    setPlannerWorkspaceOpen(true);
+  }, [setPlannerWorkspaceOpen]);
+
+  const handleWorkspaceClose = useCallback(() => {
+    setWorkspaceOpen(false);
+    setPlannerWorkspaceOpen(false);
+    setWorkspaceQuery('');
+  }, [setPlannerWorkspaceOpen]);
+
+  const handleWorkspaceFilterChange = useCallback((value: PlannerWorkspaceFilter) => {
+    setWorkspaceFilterLocal(value);
+    setPlannerWorkspaceFilter(value);
+  }, [setPlannerWorkspaceFilter]);
+
+  const handleWorkspaceSelectEntry = useCallback((entryId: string) => {
+    setWorkspaceSelectedEntryId(entryId);
+    setSelectedPlannerWorkspaceEntry(entryId);
+  }, [setSelectedPlannerWorkspaceEntry]);
+
+  const handleWorkspaceLoad = useCallback((entry: PlannerWorkspaceEntry) => {
+    if (entry.type === 'plan') {
+      handleLoadPlan(entry.plan);
+      return;
+    }
+    if (entry.type === 'template') {
+      handleLoadTemplate(entry.template);
+      return;
+    }
+    if (entry.type === 'import') {
+      applyDraft(entry.importRecord.draft);
+      handleWorkspaceClose();
+      return;
+    }
+    applyDraft(entry.recovery.draft);
+    clearDraftRecovery();
+    setWorkspaceRecoveryPromptVisible(false);
+    setRecoveryPromptVisible(false);
+    handleWorkspaceClose();
+  }, [
+    applyDraft,
+    clearDraftRecovery,
+    handleLoadPlan,
+    handleLoadTemplate,
+    handleWorkspaceClose,
+    setRecoveryPromptVisible,
+  ]);
+
+  const handleWorkspaceRename = useCallback((entry: PlannerWorkspaceEntry) => {
+    const currentName = entry.title;
+    const nextName = window.prompt?.(t('sessionPlanner.workspaceRenamePrompt'), currentName)?.trim();
+    if (!nextName || nextName === currentName) return;
+    if (entry.type === 'plan') {
+      renameSavedPlan(entry.plan.id, nextName);
+      return;
+    }
+    if (entry.type === 'template' && entry.source === 'local-template') {
+      renameTemplate(entry.template.id, nextName);
+    }
+  }, [renameSavedPlan, renameTemplate, t]);
+
+  const handleWorkspaceDuplicate = useCallback((entry: PlannerWorkspaceEntry) => {
+    if (entry.type === 'plan') {
+      duplicateSavedPlan(entry.plan.id);
+      return;
+    }
+    if (entry.type === 'template' && entry.source === 'local-template') {
+      duplicateTemplate(entry.template.id);
+    }
+  }, [duplicateSavedPlan, duplicateTemplate]);
+
+  const handleWorkspaceDelete = useCallback((entry: PlannerWorkspaceEntry) => {
+    if (!window.confirm?.(t('sessionPlanner.workspaceDeleteConfirm'))) return;
+    if (entry.type === 'plan') {
+      deleteSavedPlan(entry.plan.id);
+      return;
+    }
+    if (entry.type === 'template' && entry.source === 'local-template') {
+      deleteTemplate(entry.template.id);
+    }
+  }, [deleteSavedPlan, deleteTemplate, t]);
+
+  const handleWorkspaceResumeExecution = useCallback((entry: PlannerWorkspaceEntry) => {
+    if (entry.type !== 'plan') return;
+    const execution = executions.find((item) => item.sourcePlanId === entry.plan.id && item.status !== 'archived');
+    if (!execution) return;
+    setActiveExecution(execution.id);
+    handleLoadPlan(entry.plan);
+  }, [executions, handleLoadPlan, setActiveExecution]);
+
+  const handleWorkspaceReviewExecution = useCallback((entry: PlannerWorkspaceEntry) => {
+    if (entry.type !== 'plan') return;
+    const execution = executions.find((item) => item.sourcePlanId === entry.plan.id && item.status !== 'archived');
+    if (execution) {
+      setActiveExecution(execution.id);
+    }
+    handleLoadPlan(entry.plan);
+  }, [executions, handleLoadPlan, setActiveExecution]);
+
+  const handleWorkspaceRestoreDraft = useCallback((entry: PlannerWorkspaceEntry) => {
+    if (entry.type !== 'recovery') return;
+    applyDraft(entry.recovery.draft);
+    clearDraftRecovery();
+    setWorkspaceRecoveryPromptVisible(false);
+    setRecoveryPromptVisible(false);
+    handleWorkspaceClose();
+  }, [applyDraft, clearDraftRecovery, handleWorkspaceClose, setRecoveryPromptVisible]);
+
+  const handleWorkspaceDismiss = useCallback((entry: PlannerWorkspaceEntry) => {
+    if (entry.type === 'import') {
+      dismissImportRecord(entry.importRecord.id);
+      return;
+    }
+    if (entry.type === 'recovery') {
+      clearDraftRecovery();
+      setWorkspaceRecoveryPromptVisible(false);
+      setRecoveryPromptVisible(false);
+    }
+  }, [clearDraftRecovery, dismissImportRecord, setRecoveryPromptVisible]);
+
+  const handlePlannerOpenChange = useCallback((nextOpen: boolean) => {
+    if (!nextOpen && open) {
+      const hasUnsavedChanges = baselineDraftFingerprintRef.current !== currentDraftFingerprint;
+      if (hasUnsavedChanges) {
+        saveDraftRecovery(normalizedDraft, {
+          source: 'planner-close',
+          relatedPlanId: relatedSavedPlan?.id,
+          relatedPlanName: relatedSavedPlan?.name,
+          dirtyFingerprint: currentDraftFingerprint,
+        });
+      }
+      setWorkspaceRecoveryPromptVisible(false);
+      setRecoveryPromptVisible(false);
+    }
+
+    setOpen(nextOpen);
+  }, [
+    currentDraftFingerprint,
+    normalizedDraft,
+    open,
+    relatedSavedPlan?.id,
+    relatedSavedPlan?.name,
+    saveDraftRecovery,
+    setOpen,
+    setRecoveryPromptVisible,
+  ]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -1828,14 +2078,14 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   }, []);
 
   const handleQuickOpenRecommendations = useCallback(() => {
-    setOpen(false);
+    handlePlannerOpenChange(false);
     openTonightRecommendations();
-  }, [openTonightRecommendations, setOpen]);
+  }, [handlePlannerOpenChange, openTonightRecommendations]);
 
   const handleQuickOpenShotList = useCallback(() => {
-    setOpen(false);
+    handlePlannerOpenChange(false);
     openShotList();
-  }, [openShotList, setOpen]);
+  }, [handlePlannerOpenChange, openShotList]);
 
   const toInputTime = useCallback((value: Date) => value.toTimeString().slice(0, 5), []);
 
@@ -1897,8 +2147,19 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
         return;
       }
       const { draft, diagnostics } = parsed;
-      importPlanV2(draft);
+      const linkedPlanId = importPlanV2(draft);
+      const linkedPlan = getSavedPlanById(linkedPlanId);
+      addImportRecord({
+        source: 'file',
+        linkedPlanId,
+        linkedPlanName: linkedPlan?.name,
+        draft,
+        diagnostics,
+      });
       applyDraft(draft);
+      clearDraftRecovery();
+      setWorkspaceRecoveryPromptVisible(false);
+      setRecoveryPromptVisible(false);
       const details: string[] = [];
       if (diagnostics.unmatchedTargets.length > 0) {
         details.push(`unmatched: ${diagnostics.unmatchedTargets.length}`);
@@ -1919,7 +2180,16 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     } catch {
       toast.error(t('sessionPlanner.importFailed'));
     }
-  }, [applyDraft, importPlanV2, parseImportedDraft, t]);
+  }, [
+    addImportRecord,
+    applyDraft,
+    clearDraftRecovery,
+    getSavedPlanById,
+    importPlanV2,
+    parseImportedDraft,
+    setRecoveryPromptVisible,
+    t,
+  ]);
 
   useEffect(() => {
     if (
@@ -1940,18 +2210,34 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       return;
     }
 
-    importPlanV2(parsed.draft);
+    const linkedPlanId = importPlanV2(parsed.draft);
+    const linkedPlan = getSavedPlanById(linkedPlanId);
+    addImportRecord({
+      source: 'cli',
+      sourcePath: cliImportSourcePath ?? undefined,
+      linkedPlanId,
+      linkedPlanName: linkedPlan?.name,
+      draft: parsed.draft,
+      diagnostics: parsed.diagnostics,
+    });
     applyDraft(parsed.draft);
+    clearDraftRecovery();
+    setWorkspaceRecoveryPromptVisible(false);
+    setRecoveryPromptVisible(false);
 
     setOpen(true);
     toast.success(t('cli.notifications.importSessionPlanReady'));
   }, [
+    addImportRecord,
     applyDraft,
     cliImportContent,
     cliImportRequestId,
     cliImportSourcePath,
+    clearDraftRecovery,
+    getSavedPlanById,
     importPlanV2,
     parseImportedDraft,
+    setRecoveryPromptVisible,
     setOpen,
     t,
   ]);
@@ -1963,7 +2249,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     : t('sessionPlanner.weatherSourceNone');
   
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handlePlannerOpenChange}>
       {showTrigger && (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -2399,6 +2685,45 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
           />
         </div>
 
+        <PlannerDraftRecoveryPrompt
+          recovery={draftRecovery}
+          visible={workspaceRecoveryPromptVisible}
+          onRestore={() => {
+            if (!draftRecovery) return;
+            applyDraft(draftRecovery.draft);
+            clearDraftRecovery();
+            setWorkspaceRecoveryPromptVisible(false);
+            setRecoveryPromptVisible(false);
+          }}
+          onDiscard={() => {
+            clearDraftRecovery();
+            setWorkspaceRecoveryPromptVisible(false);
+            setRecoveryPromptVisible(false);
+          }}
+        />
+
+        {workspaceOpen && (
+          <PlannerWorkspacePanel
+            model={workspaceModel}
+            query={workspaceQuery}
+            filter={workspaceFilter}
+            selectedEntryId={workspaceSelectedEntryId}
+            onQueryChange={setWorkspaceQuery}
+            onFilterChange={handleWorkspaceFilterChange}
+            onSelectEntry={handleWorkspaceSelectEntry}
+            onSaveTemplate={handleSaveTemplate}
+            onClose={handleWorkspaceClose}
+            onLoad={handleWorkspaceLoad}
+            onRename={handleWorkspaceRename}
+            onDuplicate={handleWorkspaceDuplicate}
+            onDelete={handleWorkspaceDelete}
+            onResumeExecution={handleWorkspaceResumeExecution}
+            onReviewExecution={handleWorkspaceReviewExecution}
+            onRestoreDraft={handleWorkspaceRestoreDraft}
+            onDismiss={handleWorkspaceDismiss}
+          />
+        )}
+
         <Separator />
         
         {/* Plan Summary */}
@@ -2663,83 +2988,17 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
                 {t('sessionPlanner.startExecution')}
               </Button>
             )}
-            {savedPlans.length > 0 && (
-              <Popover open={showSavedPlans} onOpenChange={setShowSavedPlans}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
-                    {t('sessionPlanner.loadPlan')}
-                    <Badge variant="secondary" className="ml-1.5 text-[10px]">{savedPlans.length}</Badge>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 p-2" align="start">
-                  <ScrollArea className="max-h-48">
-                    <div className="space-y-1">
-                      {savedPlans.map(saved => (
-                        <div
-                          key={saved.id}
-                          className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 cursor-pointer group"
-                        >
-                          <button
-                            className="flex-1 text-left"
-                            onClick={() => handleLoadPlan(saved)}
-                          >
-                            <div className="text-sm font-medium truncate">{saved.name}</div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {new Date(saved.planDate).toLocaleDateString()} 路 {saved.targets.length} {t('sessionPlanner.targets').toLowerCase()}
-                            </div>
-                          </button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive"
-                            onClick={(e) => { e.stopPropagation(); deleteSavedPlan(saved.id); }}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={workspaceOpen ? handleWorkspaceClose : handleWorkspaceOpen}
+            >
+              {t('sessionPlanner.workspace')}
+              <Badge variant="secondary" className="ml-1.5 text-[10px]">{workspaceEntryCount}</Badge>
+            </Button>
             <Button data-testid="session-planner-import-button" variant="outline" size="sm" onClick={() => void handleImportPlan()}>
               {t('sessionPlanner.importPlan')}
             </Button>
-            <Popover open={showTemplates} onOpenChange={setShowTemplates}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm">
-                  {t('sessionPlanner.templates')}
-                  <Badge variant="secondary" className="ml-1.5 text-[10px]">{availableTemplates.length}</Badge>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-72 p-2" align="start" data-testid="session-template-list">
-                <div className="space-y-2">
-                  <Button size="sm" variant="secondary" className="w-full" onClick={handleSaveTemplate}>
-                    {t('sessionPlanner.saveTemplate')}
-                  </Button>
-                  <ScrollArea className="max-h-40">
-                    <div className="space-y-1">
-                      {availableTemplates.length === 0 && (
-                        <div className="text-xs text-muted-foreground p-2">{t('sessionPlanner.noTemplates')}</div>
-                      )}
-                      {availableTemplates.map((template) => (
-                        <Button
-                          key={template.id}
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start text-xs"
-                          onClick={() => handleLoadTemplate(template.id)}
-                        >
-                          {template.name}
-                        </Button>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
-              </PopoverContent>
-            </Popover>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" disabled={displayedPlan.targets.length === 0}>
@@ -2761,7 +3020,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
               </PopoverContent>
             </Popover>
           </div>
-          <Button data-testid="session-planner-close-button" variant="outline" onClick={() => setOpen(false)}>
+          <Button data-testid="session-planner-close-button" variant="outline" onClick={() => handlePlannerOpenChange(false)}>
             {t('common.close')}
           </Button>
         </DialogFooter>

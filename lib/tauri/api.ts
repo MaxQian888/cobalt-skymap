@@ -6,6 +6,10 @@
 import { isTauri } from '@/lib/storage/platform';
 import { mapKeysApi } from './map-keys-api';
 import { positionerApi } from './positioner-api';
+import {
+  restoreWindowState as restorePluginWindowState,
+  saveWindowState as savePluginWindowState,
+} from './app-control-api';
 import type {
   EquipmentData,
   Telescope,
@@ -348,13 +352,11 @@ export const appSettingsApi = {
   },
 
   async saveWindowState(): Promise<void> {
-    const invoke = await getInvoke();
-    return invoke('save_window_state');
+    return savePluginWindowState();
   },
 
   async restoreWindowState(): Promise<void> {
-    const invoke = await getInvoke();
-    return invoke('restore_window_state');
+    return restorePluginWindowState();
   },
 
   async addRecentFile(path: string, fileType: string): Promise<void> {

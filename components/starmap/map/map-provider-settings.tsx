@@ -51,12 +51,21 @@ import { PROVIDER_REQUIRES_KEY } from '@/lib/constants/map';
 interface MapProviderSettingsProps {
   trigger?: React.ReactNode;
   onSettingsChange?: (config: MapConfiguration) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 
-export function MapProviderSettings({ trigger, onSettingsChange }: MapProviderSettingsProps) {
+export function MapProviderSettings({
+  trigger,
+  onSettingsChange,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: MapProviderSettingsProps) {
   const t = useTranslations();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = controlledOnOpenChange ?? setInternalOpen;
 
   // Dynamic provider info with i18n
   const PROVIDER_INFO = useMemo(() => ({

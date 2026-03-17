@@ -19,7 +19,7 @@ import {
   SearchMoonQuarter,
   SearchRelativeLongitude,
 } from 'astronomy-engine';
-import tzLookup from 'tz-lookup';
+import { resolveTimezoneFromCoordinates } from '@/lib/utils/observer-timezone';
 
 const logger = createLogger('astro-data-sources');
 
@@ -245,16 +245,6 @@ function sourceIdFromEvent(eventSource: string): string {
   return normalized;
 }
 
-function isValidTimezone(timezone?: string | null): timezone is string {
-  if (!timezone) return false;
-  try {
-    Intl.DateTimeFormat(undefined, { timeZone: timezone });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function getLocalDateParts(date: Date, timezone: string): { year: string; month: string; day: string } {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
@@ -274,61 +264,8 @@ function getLocalDateKey(date: Date, timezone: string): string {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function guessTimezoneFromLongitude(longitude: number): string | null {
-  if (!Number.isFinite(longitude)) return null;
-  const utcOffset = Math.round(longitude / 15);
-  if (utcOffset < -12 || utcOffset > 14) return null;
-  if (utcOffset === 0) return 'Etc/UTC';
-  // IANA Etc/GMT uses reversed sign: Etc/GMT+5 = UTC-5
-  const ianaOffset = utcOffset > 0 ? `Etc/GMT-${utcOffset}` : `Etc/GMT+${Math.abs(utcOffset)}`;
-  return isValidTimezone(ianaOffset) ? ianaOffset : null;
-}
-
-function lookupTimezoneFromObserver(observer: AstroObserver): string | null {
-  if (!Number.isFinite(observer.latitude) || !Number.isFinite(observer.longitude)) {
-    return null;
-  }
-
-  try {
-    const timezone = tzLookup(observer.latitude, observer.longitude);
-    return isValidTimezone(timezone) ? timezone : null;
-  } catch (error) {
-    logger.debug('Failed to resolve observer timezone with tz-lookup', {
-      latitude: observer.latitude,
-      longitude: observer.longitude,
-      error,
-    });
-    return null;
-  }
-}
-
 function resolveObserverTimezone(observer: AstroObserver, explicitTimezone?: string): string {
-  if (isValidTimezone(explicitTimezone)) {
-    return explicitTimezone;
-  }
-
-  const coordinateLookup = lookupTimezoneFromObserver(observer);
-  if (coordinateLookup) {
-    return coordinateLookup;
-  }
-
-  const guessed = guessTimezoneFromLongitude(observer.longitude);
-  if (guessed) {
-    logger.warn('Using longitude-based timezone approximation for observer', {
-      longitude: observer.longitude,
-      timezone: guessed,
-    });
-    return guessed;
-  }
-
-  const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (isValidTimezone(systemTimezone)) {
-    logger.warn('Falling back to system timezone for observer', { systemTimezone });
-    return systemTimezone;
-  }
-
-  logger.warn('Falling back to Etc/UTC for observer timezone');
-  return 'Etc/UTC';
+  return resolveTimezoneFromCoordinates(observer, { explicitTimezone });
 }
 
 function parseGsfcDate(dateToken: string, timeToken: string): Date | null {

@@ -80,7 +80,7 @@ pub async fn export_session_plan(
             .file()
             .set_title("Export Session Plan")
             .add_filter("Session Plan", &[ext])
-            .set_file_name(&format!("session-plan.{}", ext))
+            .set_file_name(format!("session-plan.{}", ext))
             .blocking_save_file();
 
         match file_path {

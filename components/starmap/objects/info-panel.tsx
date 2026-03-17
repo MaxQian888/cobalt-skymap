@@ -26,6 +26,7 @@ import {
 import { AltitudeChartCompact } from './altitude-chart-compact';
 import { RiseTransitSetGrid } from './rise-transit-set-grid';
 import { FeasibilityBadge } from '../planning/feasibility-badge';
+import { SlewConfirmDialog } from '../mount/slew-confirm-dialog';
 import { useMountStore } from '@/lib/stores';
 import { useCelestialName, useCelestialNames, useAdaptivePosition, useAstroEnvironment, useTargetAstroData, useObjectActions } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
@@ -58,7 +59,15 @@ export const InfoPanel = memo(function InfoPanel({
   const longitude = profileInfo.AstrometrySettings.Longitude || 0;
 
   // Shared object actions
-  const { handleSlew, handleAddToList, mountConnected } = useObjectActions({
+  const {
+    handleSlew,
+    handleAddToList,
+    mountConnected,
+    slewDialogOpen,
+    slewDialogTarget,
+    setSlewDialogOpen,
+    handleTargetActionStarted,
+  } = useObjectActions({
     selectedObject,
     onSetFramingCoordinates,
   });
@@ -428,6 +437,16 @@ export const InfoPanel = memo(function InfoPanel({
           </div>
         </ScrollArea>
       </Card>
+      {slewDialogTarget && (
+        <SlewConfirmDialog
+          open={slewDialogOpen}
+          onOpenChange={setSlewDialogOpen}
+          targetName={slewDialogTarget.name}
+          targetRa={slewDialogTarget.ra}
+          targetDec={slewDialogTarget.dec}
+          onSlewStarted={handleTargetActionStarted}
+        />
+      )}
     </TooltipProvider>
   );
 });

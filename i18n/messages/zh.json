@@ -262,6 +262,15 @@
     "enableMosaic": "启用拼接",
     "simulator": "视场模拟器",
     "fovSimulator": "视场模拟器",
+    "setupPresets": "配置预设",
+    "selectSetupPreset": "选择配置预设",
+    "noSetupSelected": "未选择预设",
+    "setupNamePlaceholder": "输入预设名称",
+    "saveSetup": "保存预设",
+    "renameSetup": "重命名预设",
+    "deleteSetup": "删除预设",
+    "targetFraming": "目标构图",
+    "noTargetSelected": "未选择目标",
     "cameraTab": "相机",
     "opticsTab": "光学",
     "mosaicTab": "拼接",
@@ -612,6 +621,10 @@
     "arCameraTorchPreferred": "优先开启闪光灯",
     "arCameraCapabilitiesDetected": "已检测到相机能力",
     "arCameraCapabilitiesPending": "正在检测相机能力…",
+    "arAdaptationSummary": "当前 AR 适配",
+    "arAdaptationCameraFirst": "当前运行环境会优先走相机优先的 AR 引导路径。",
+    "arAdaptationManualOnly": "这里无法使用传感器指向，AR 引导将以手动导航为主。",
+    "arAdaptationLimitedProfile": "已针对当前设备能力启用更保守的会话配置。",
     "arAdaptiveTitle": "自适应优化",
     "arAdaptiveLearningEnabled": "自适应学习",
     "arNetworkOptimizationEnabled": "网络优化",
@@ -794,7 +807,11 @@
     "totalExposure": "总计 (分)",
     "subFrames": "子帧数",
     "filter": "滤镜",
-    "minutesTotal": "分钟总计"
+    "minutesTotal": "分钟总计",
+    "mosaicPlanPanels": "拼接面板",
+    "mosaicPlanLayout": "布局方式",
+    "mosaicPlanOrder": "拍摄顺序",
+    "mosaicPlanTime": "预计总时长"
   },
   "observationLog": {
     "title": "观测日志",
@@ -1378,6 +1395,7 @@
     "goTo": "前往标注",
     "show": "显示",
     "hide": "隐藏",
+    "hideGroup": "隐藏分组",
     "showAll": "显示所有标注",
     "hideAll": "隐藏所有标注",
     "addMarkerHere": "在此添加标注",
@@ -1728,7 +1746,9 @@
     "added": "地点已添加",
     "deleted": "地点已删除",
     "setCurrent": "已设为当前地点",
+    "setDefault": "已设为默认地点",
     "setAsCurrent": "设为当前",
+    "setAsDefault": "设为默认",
     "gpsNotSupported": "不支持 GPS",
     "gpsAcquired": "已获取 GPS 位置",
     "locationPermissionDenied": "定位权限被拒绝",
@@ -1738,8 +1758,18 @@
     "manualInput": "手动输入",
     "mapSelection": "地图选点",
     "updated": "地点已更新",
+    "searchPlaceholder": "搜索地点...",
+    "noSearchResults": "没有符合搜索条件的地点",
+    "timezone": "时区",
+    "timezonePlaceholder": "例如：Asia/Shanghai",
+    "notes": "备注",
+    "notesPlaceholder": "可选备注",
     "deleteConfirmTitle": "删除地点？",
     "deleteConfirmDescription": "确定要删除「{name}」吗？此操作无法撤销。",
+    "duplicateTitle": "发现可能重复的地点",
+    "duplicateDescription": "已存在相似地点“{name}”。要更新现有地点，还是两个都保留？",
+    "keepBoth": "全部保留",
+    "updateExisting": "更新现有地点",
     "bortlePlaceholder": "选择...",
     "bortle1": "极佳暗天空",
     "bortle2": "典型暗天空",
@@ -1747,14 +1777,21 @@
     "bortle4": "乡村/郊区过渡",
     "bortle5": "郊区天空",
     "bortle6": "明亮郊区天空",
-    "bortle7": "郊区/城区过渡",
-    "bortle8": "城市天空",
-    "bortle9": "市中心天空",
-    "validation": {
-      "latitudeRange": "纬度必须在 -90 至 90 之间",
-      "longitudeRange": "经度必须在 -180 至 180 之间",
-      "altitudeRange": "海拔必须在 -500 至 9,000 m 之间",
-      "bortleRange": "波特尔等级必须在 1 至 9 之间"
+      "bortle7": "郊区/城区过渡",
+      "bortle8": "城市天空",
+      "bortle9": "市中心天空",
+      "metadataStatusTitle": "草稿元数据",
+      "metadataLoading": "刷新中...",
+      "metadataManual": "手动",
+      "metadataDerived": "自动补全",
+      "metadataPersisted": "已保存",
+      "metadataUnresolved": "未解析",
+      "metadataNeedsAttention": "部分元数据无法自动解析，请检查或手动补充。",
+      "validation": {
+        "latitudeRange": "纬度必须在 -90 至 90 之间",
+        "longitudeRange": "经度必须在 -180 至 180 之间",
+        "altitudeRange": "海拔必须在 -500 至 9,000 m 之间",
+        "bortleRange": "波特尔等级必须在 1 至 9 之间"
     }
   },
   "map": {
@@ -1784,6 +1821,7 @@
     "locationRequestFailed": "获取当前位置失败",
     "searchFailed": "搜索失败",
     "providerUnavailable": "地图服务不可用",
+    "layerUnavailableShort": "不可用",
     "layers": "图层",
     "lightPollution": "光污染叠加层",
     "latitude": "纬度",
@@ -1807,6 +1845,17 @@
     "cacheDuration": "缓存时长",
     "hours": "小时",
     "minutes": "分钟",
+    "policyMode": "策略模式",
+    "policyModes": {
+      "strict": "严格",
+      "balanced": "平衡",
+      "legacy": "兼容旧版"
+    },
+    "searchBehaviorWhenNoAutocomplete": "无自动补全时的搜索行为",
+    "searchFallback": {
+      "submitOnly": "仅提交搜索",
+      "disabled": "禁用"
+    },
     "offlineMode": "离线模式",
     "offlineModeDescription": "离线时使用缓存数据",
     "healthCheckInterval": "健康检查间隔",
@@ -1826,9 +1875,12 @@
     "healthyCount": "健康数",
     "totalErrors": "错误数",
     "lastUpdated": "最后更新",
-    "healthyProviders": "健康提供商",
-    "avgResponseTime": "平均响应时间",
-    "apiKeys": "API 密钥",
+      "healthyProviders": "健康提供商",
+      "avgResponseTime": "平均响应时间",
+      "metadataLoading": "正在刷新位置元数据...",
+      "metadataNeedsAttention": "部分位置元数据无法自动解析。",
+      "metadataResolveFailed": "位置元数据刷新失败，您可以重试或继续手动填写。",
+      "apiKeys": "API 密钥",
     "apiKeyManager": "API 密钥管理器",
     "apiKeyManagerDescription": "管理地图提供商的 API 密钥。密钥安全存储在本地。",
     "securityNotice": "安全提示",
@@ -1991,6 +2043,8 @@
     "skip": "跳过",
     "finish": "完成",
     "restartTour": "重新开始引导",
+    "restartAllDescription": "可从头重新开始完整的新手设置与功能导览。",
+    "moduleRestartDescription": "可随时重新进入模块导览，复习对应功能流程。",
     "transition": {
       "description": "设置已完成！要来一个快速的界面导览吗？",
       "startTour": "继续功能导览",
@@ -2365,6 +2419,29 @@
     "previewWorkspace": "预览工作台",
     "previewLight": "预览浅色",
     "previewDark": "预览深色",
+    "componentStyle": "组件风格",
+    "componentStylePreset": "表面预设",
+    "componentDensity": "密度",
+    "componentTransparency": "透明度",
+    "componentBorder": "边框强调",
+    "componentElevation": "层次阴影",
+    "componentPreviewToolbar": "工具栏预览",
+    "componentPreviewPanel": "面板预览",
+    "componentPreviewSection": "区块预览",
+    "componentPresetDefault": "默认表面",
+    "componentPresetObservatory": "观测站",
+    "componentPresetFloating": "悬浮玻璃",
+    "componentDensityComfortable": "舒适",
+    "componentDensityCompact": "紧凑",
+    "componentTransparencySolid": "实心",
+    "componentTransparencyBalanced": "均衡",
+    "componentTransparencyHigh": "高透明",
+    "componentBorderSoft": "柔和",
+    "componentBorderMedium": "中等",
+    "componentBorderStrong": "强烈",
+    "componentElevationFlat": "扁平",
+    "componentElevationRaised": "抬升",
+    "componentElevationFloating": "悬浮",
     "accessibilityWarnings": "可读性提醒",
     "noAccessibilityWarnings": "当前预览未发现可读性风险。",
     "warningPairForegroundBackground": "前景色与背景色",
@@ -3208,7 +3285,57 @@
       "nina-xml": "NINA 序列 XML",
       "csv": "CSV",
       "sgp-csv": "SGP CSV"
-    }
+    },
+    "workspace": "工作区",
+    "workspaceDescription": "在一个视图中查看已保存计划、模板、导入记录与可恢复草稿。",
+    "workspaceSearchPlaceholder": "搜索工作区内容",
+    "workspaceFilter": {
+      "all": "全部",
+      "plans": "计划",
+      "templates": "模板",
+      "imports": "导入",
+      "recovery": "恢复"
+    },
+    "workspaceType": {
+      "plan": "计划",
+      "template": "模板",
+      "import": "导入",
+      "recovery": "恢复"
+    },
+    "workspaceSource": {
+      "savedPlan": "已保存计划",
+      "localTemplate": "本地模板",
+      "desktopTemplate": "桌面模板",
+      "fileImport": "文件导入",
+      "cliImport": "CLI 导入",
+      "recovery": "恢复草稿"
+    },
+    "workspaceEmptySelection": "请选择一项以预览详细信息。",
+    "workspaceDesktopTemplateHint": "桌面模板可在此加载，但需要从桌面同步源管理。",
+    "workspaceLocalTemplateHint": "本地模板可直接在当前规划器工作区中编辑。",
+    "workspaceImportFormat": "格式",
+    "workspaceImportCreated": "已创建",
+    "workspaceImportUnmatched": "未匹配",
+    "workspaceImportSkipped": "已跳过",
+    "workspaceActionLoad": "加载",
+    "workspaceActionRename": "重命名",
+    "workspaceActionDuplicate": "复制",
+    "workspaceActionDelete": "删除",
+    "workspaceActionResume": "继续",
+    "workspaceActionReview": "查看",
+    "workspaceActionRestore": "恢复",
+    "workspaceActionDismiss": "忽略",
+    "workspaceRenamePrompt": "请输入新的名称",
+    "workspaceDeleteConfirm": "要从工作区删除这一项吗？",
+    "workspaceRecoverySource": {
+      "planner-close": "上次关闭规划器时检测到未保存改动，已恢复为草稿。",
+      "app-close": "上次关闭应用时检测到未保存改动，已恢复为草稿。",
+      "seed-conflict": "导入种子草稿前保留了当前未保存内容。"
+    },
+    "recoveryPromptTitle": "发现可恢复的草稿",
+    "recoveryPromptFallback": "有一份恢复出来的规划草稿可供查看。",
+    "recoveryPromptRestore": "恢复草稿",
+    "recoveryPromptDiscard": "丢弃草稿"
   },
   "messierMarathon": {
     "title": "梅西耶马拉松",
@@ -3695,7 +3822,11 @@
     "last15min": "15 分钟",
     "last1hr": "1 小时",
     "allTime": "全部",
-    "groupDuplicates": "合并重复日志"
+    "groupDuplicates": "合并重复日志",
+    "suppressionEnabled": "抑制重复日志",
+    "effectiveLevel": "生效级别",
+    "suppressed": "已抑制",
+    "dropped": "已丢弃"
   },
   "landing": {
     "nav": {
@@ -3925,19 +4056,39 @@
       },
       "sourceStatus": {
         "nasa-apod": {
-          "error": "NASA APOD 当前暂不可用。"
+          "empty": "NASA APOD 今天没有返回可用的天文条目。",
+          "error": "NASA APOD 当前暂不可用。",
+          "invalid": "NASA APOD 返回了无法规范化的数据。",
+          "offline": "当前处于离线状态，已跳过 NASA APOD。",
+          "disabled": "NASA APOD 在线增强已关闭。"
         },
         "wikimedia": {
-          "error": "Wikimedia 增强内容当前暂不可用。"
+          "empty": "Wikimedia 当前没有匹配到可用的增强内容。",
+          "error": "Wikimedia 增强内容当前暂不可用。",
+          "invalid": "Wikimedia 返回了无法规范化的数据。",
+          "offline": "当前处于离线状态，已跳过 Wikimedia 增强。",
+          "disabled": "Wikimedia 在线增强已关闭。"
         },
         "nasa-image-library": {
-          "error": "NASA 图像库当前未返回可用条目。"
+          "empty": "NASA 图像库当前未返回可用条目。",
+          "error": "NASA 图像库当前未返回可用条目。",
+          "invalid": "NASA 图像库返回了无法规范化的数据。",
+          "offline": "当前处于离线状态，已跳过 NASA 图像库。",
+          "disabled": "NASA 图像库在线增强已关闭。"
         },
         "nasa-photojournal": {
-          "error": "NASA 图片日志订阅当前暂不可用。"
+          "empty": "NASA 图片日志订阅当前没有返回可用的天文条目。",
+          "error": "NASA 图片日志订阅当前暂不可用。",
+          "invalid": "NASA 图片日志返回了无法规范化的数据。",
+          "offline": "当前处于离线状态，已跳过 NASA 图片日志。",
+          "disabled": "NASA 图片日志在线增强已关闭。"
         },
         "esa-science": {
-          "error": "ESA 空间科学订阅当前暂不可用。"
+          "empty": "ESA 空间科学订阅当前没有返回可用的天文条目。",
+          "error": "ESA 空间科学订阅当前暂不可用。",
+          "invalid": "ESA 空间科学返回了无法规范化的数据。",
+          "offline": "当前处于离线状态，已跳过 ESA 空间科学。",
+          "disabled": "ESA 空间科学在线增强已关闭。"
         }
       },
       "sourceBadge": {

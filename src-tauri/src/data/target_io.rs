@@ -9,6 +9,7 @@ use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 use super::storage::StorageError;
+use super::targets::{MosaicPlan, MosaicSettings};
 
 /// Static compiled regex for RA parsing (HMS format)
 static RA_REGEX: Lazy<regex_lite::Regex> =
@@ -35,6 +36,8 @@ pub struct TargetExportItem {
     pub notes: Option<String>,
     pub priority: Option<String>,
     pub tags: Option<String>,
+    pub mosaic: Option<MosaicSettings>,
+    pub mosaic_plan: Option<MosaicPlan>,
 }
 
 /// Import result
@@ -326,6 +329,8 @@ fn import_csv(content: &str) -> ImportTargetsResult {
                 .get(11)
                 .map(|s| s.to_string())
                 .filter(|s| !s.is_empty()),
+            mosaic: None,
+            mosaic_plan: None,
         });
     }
     ImportTargetsResult {
@@ -401,6 +406,8 @@ fn import_stellarium(content: &str) -> ImportTargetsResult {
                 priority: None,
                 tags: None,
                 notes: None,
+                mosaic: None,
+                mosaic_plan: None,
             }),
             None => {
                 errors.push(format!("Line {}: invalid coords", i + 1));
@@ -482,7 +489,7 @@ fn parse_coordinates(ra_str: &str, dec_str: &str) -> Option<(f64, f64)> {
 fn validate_coordinates(ra: f64, dec: f64) -> Option<(f64, f64)> {
     // RA: 0-360 degrees (allow slightly negative for wrap-around)
     // Dec: -90 to +90 degrees
-    if ra >= -0.001 && ra < 360.001 && dec >= -90.0 && dec <= 90.0 {
+    if (-0.001..360.001).contains(&ra) && (-90.0..=90.0).contains(&dec) {
         // Normalize RA to 0-360 range
         let normalized_ra = if ra < 0.0 {
             ra + 360.0
@@ -772,6 +779,8 @@ mod tests {
             notes: None,
             priority: Some("high".to_string()),
             tags: Some("galaxy".to_string()),
+            mosaic: None,
+            mosaic_plan: None,
         }];
 
         let json = export_json(&targets);
@@ -817,6 +826,8 @@ mod tests {
             notes: None,
             priority: None,
             tags: None,
+            mosaic: None,
+            mosaic_plan: None,
         }];
 
         let csv = export_csv(&targets);
@@ -842,6 +853,8 @@ mod tests {
             notes: None,
             priority: None,
             tags: None,
+            mosaic: None,
+            mosaic_plan: None,
         }];
 
         let csv = export_csv(&targets);
@@ -868,6 +881,8 @@ mod tests {
             notes: None,
             priority: None,
             tags: None,
+            mosaic: None,
+            mosaic_plan: None,
         }];
 
         let stellarium = export_stellarium(&targets);
@@ -894,6 +909,8 @@ mod tests {
             notes: None,
             priority: None,
             tags: None,
+            mosaic: None,
+            mosaic_plan: None,
         }];
 
         let result = export_mosaic(&targets);
@@ -956,6 +973,8 @@ mod tests {
             notes: None,
             priority: None,
             tags: None,
+            mosaic: None,
+            mosaic_plan: None,
         };
         assert_eq!(item.name, "Test");
         assert!(item.object_type.is_none());

@@ -2,9 +2,21 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getZustandStorage } from '@/lib/storage';
 import { isTauri } from '@/lib/storage/platform';
-import { targetListApi, type ExposurePlan as TauriExposurePlan } from '@/lib/tauri/target-list-api';
+import {
+  targetListApi,
+  type ExposurePlan as TauriExposurePlan,
+  type MosaicSettings as TauriMosaicSettings,
+  type MosaicPlan as TauriMosaicPlan,
+} from '@/lib/tauri/target-list-api';
 import { createLogger } from '@/lib/logger';
 import type { RecommendationProfile } from '@/lib/core/types';
+import {
+  validateMosaicSettings,
+  type MosaicSettings,
+  type MosaicValidationIssue,
+  type MosaicValidationIssueCode,
+  type ResolvedMosaicPlan,
+} from '@/lib/astronomy/fov-calculations';
 import type {
   CreateTargetListInput,
   MergeTargetListsInput,
@@ -71,12 +83,8 @@ export interface TargetItem {
   sensorHeight?: number;
   focalLength?: number;
   rotationAngle?: number;
-  mosaic?: {
-    enabled: boolean;
-    rows: number;
-    cols: number;
-    overlap: number;
-  };
+  mosaic?: MosaicSettings;
+  mosaicPlan?: ResolvedMosaicPlan;
   exposurePlan?: TargetExposurePlan;
   notes?: string;
   addedAt: number;
@@ -220,6 +228,7 @@ const toTargetItem = (entry: TargetEntry): TargetItem => {
 
 const toTargetEntry = (listId: string, target: TargetInput, addedAt = Date.now()): TargetEntry => ({
   ...target,
+  mosaic: target.mosaic ? validateMosaicSettings(target.mosaic).sanitized : undefined,
   id: generateId(),
   listId,
   addedAt,
@@ -308,6 +317,126 @@ function toTauriExposurePlan(exposurePlan?: TargetExposurePlan): TauriExposurePl
   };
 }
 
+function toTauriMosaicSettings(mosaic?: MosaicSettings): TauriMosaicSettings | undefined {
+  if (!mosaic) return undefined;
+
+  const normalized = validateMosaicSettings(mosaic).sanitized;
+  return {
+    enabled: normalized.enabled,
+    rows: normalized.rows,
+    cols: normalized.cols,
+    overlap: normalized.overlap,
+    overlap_unit: normalized.overlapUnit,
+    layout_mode: normalized.layoutMode,
+    panel_order: normalized.panelOrder,
+  };
+}
+
+function fromTauriMosaicSettings(mosaic?: TauriMosaicSettings): MosaicSettings | undefined {
+  if (!mosaic) return undefined;
+
+  return validateMosaicSettings({
+    enabled: mosaic.enabled,
+    rows: mosaic.rows,
+    cols: mosaic.cols,
+    overlap: mosaic.overlap,
+    overlapUnit: mosaic.overlap_unit,
+    layoutMode: mosaic.layout_mode,
+    panelOrder: mosaic.panel_order,
+  }).sanitized;
+}
+
+const MOSAIC_VALIDATION_ISSUE_CODES = [
+  'rows_clamped',
+  'cols_clamped',
+  'overlap_clamped',
+  'panel_count_high',
+  'panel_count_extreme',
+  'overlap_high',
+  'estimated_time_high',
+  'estimated_time_extreme',
+] as const satisfies readonly MosaicValidationIssueCode[];
+
+function isMosaicValidationIssueCode(value: string): value is MosaicValidationIssueCode {
+  return (MOSAIC_VALIDATION_ISSUE_CODES as readonly string[]).includes(value);
+}
+
+function fromTauriMosaicWarnings(
+  warnings: TauriMosaicPlan['warnings'] | undefined,
+): MosaicValidationIssue[] {
+  return (warnings ?? []).flatMap((warning) => (
+    isMosaicValidationIssueCode(warning.code)
+      ? [{
+          code: warning.code,
+          severity: warning.severity,
+          actual: warning.actual,
+          min: warning.min,
+          max: warning.max,
+        }]
+      : []
+  ));
+}
+
+function toTauriMosaicPlan(plan?: ResolvedMosaicPlan): TauriMosaicPlan | undefined {
+  if (!plan) return undefined;
+
+  return {
+    layout_mode: plan.layoutMode,
+    panel_order: plan.panelOrder,
+    total_panels: plan.totalPanels,
+    width: plan.width,
+    height: plan.height,
+    overlap_factor: plan.overlapFactor,
+    estimated_panel_minutes: plan.estimatedPanelMinutes,
+    estimated_total_minutes: plan.estimatedTotalMinutes,
+    panels: plan.panels.map((panel) => ({
+      id: panel.id,
+      row: panel.row,
+      col: panel.col,
+      x: panel.x,
+      y: panel.y,
+      center_offset_x: panel.centerOffsetX,
+      center_offset_y: panel.centerOffsetY,
+      sequence: panel.sequence,
+      is_center: panel.isCenter,
+    })),
+    warnings: plan.warnings.map((warning) => ({
+      code: warning.code,
+      severity: warning.severity,
+      actual: warning.actual,
+      min: warning.min,
+      max: warning.max,
+    })),
+  };
+}
+
+function fromTauriMosaicPlan(plan?: TauriMosaicPlan): ResolvedMosaicPlan | undefined {
+  if (!plan) return undefined;
+
+  return {
+    layoutMode: plan.layout_mode,
+    panelOrder: plan.panel_order,
+    totalPanels: plan.total_panels,
+    width: plan.width,
+    height: plan.height,
+    overlapFactor: plan.overlap_factor,
+    estimatedPanelMinutes: plan.estimated_panel_minutes ?? null,
+    estimatedTotalMinutes: plan.estimated_total_minutes ?? null,
+    panels: plan.panels.map((panel) => ({
+      id: panel.id,
+      row: panel.row,
+      col: panel.col,
+      x: panel.x,
+      y: panel.y,
+      centerOffsetX: panel.center_offset_x,
+      centerOffsetY: panel.center_offset_y,
+      sequence: panel.sequence,
+      isCenter: panel.is_center,
+    })),
+    warnings: fromTauriMosaicWarnings(plan.warnings),
+  };
+}
+
 function fromTauriExposurePlan(exposurePlan?: TauriExposurePlan): TargetExposurePlan | undefined {
   if (!exposurePlan) return undefined;
 
@@ -364,7 +493,8 @@ const mapLegacyTauriTarget = (entry: Record<string, unknown>, listId: string): T
   sensorHeight: entry.sensor_height as number | undefined,
   focalLength: entry.focal_length as number | undefined,
   rotationAngle: entry.rotation_angle as number | undefined,
-  mosaic: entry.mosaic as TargetEntry['mosaic'],
+  mosaic: fromTauriMosaicSettings(entry.mosaic as TauriMosaicSettings | undefined),
+  mosaicPlan: fromTauriMosaicPlan(entry.mosaic_plan as TauriMosaicPlan | undefined),
   exposurePlan: fromTauriExposurePlan(entry.exposure_plan as TauriExposurePlan | undefined),
   notes: entry.notes as string | undefined,
   addedAt: Number(entry.added_at ?? Date.now()),
@@ -536,6 +666,8 @@ export const useTargetListStore = create<TargetListState>()(
               sensor_height: entry.sensorHeight,
               focal_length: entry.focalLength,
               rotation_angle: entry.rotationAngle,
+              mosaic: toTauriMosaicSettings(entry.mosaic),
+              mosaic_plan: toTauriMosaicPlan(entry.mosaicPlan),
               exposure_plan: toTauriExposurePlan(entry.exposurePlan),
             }).catch((error) => logger.error('Failed to add target entry to Tauri', error));
           }
@@ -570,6 +702,8 @@ export const useTargetListStore = create<TargetListState>()(
             if (updates.tags !== undefined) tauriUpdates.tags = updates.tags;
             if (updates.isFavorite !== undefined) tauriUpdates.is_favorite = updates.isFavorite;
             if (updates.isArchived !== undefined) tauriUpdates.is_archived = updates.isArchived;
+            if (updates.mosaic !== undefined) tauriUpdates.mosaic = toTauriMosaicSettings(updates.mosaic);
+            if (updates.mosaicPlan !== undefined) tauriUpdates.mosaic_plan = toTauriMosaicPlan(updates.mosaicPlan);
             if (updates.exposurePlan !== undefined) {
               tauriUpdates.exposure_plan = toTauriExposurePlan(updates.exposurePlan);
             }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Crosshair, AlertTriangle, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 
@@ -17,7 +17,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
 
 import { useMountStore } from '@/lib/stores';
-import { mountApi } from '@/lib/tauri/mount-api';
+import { useMountOperations } from '@/lib/hooks/use-mount-operations';
 import { checkTargetSafety } from '@/lib/astronomy/mount-safety';
 import { degreesToHMS, degreesToDMS } from '@/lib/astronomy/starmap-utils';
 import { isTauri } from '@/lib/tauri/app-control-api';
@@ -43,13 +43,16 @@ export function SlewConfirmDialog({
   onSlewStarted,
 }: SlewConfirmDialogProps) {
   const t = useTranslations('mount');
-  const [slewing, setSlewing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'slew' | 'sync' | null>(null);
   const [error, setError] = useState('');
 
   const safetyConfig = useMountStore((s) => s.safetyConfig);
   const profileInfo = useMountStore((s) => s.profileInfo);
+  const canSync = useMountStore((s) => Boolean(s.capabilities.canSync));
   const connected = useMountStore((s) => s.mountInfo.Connected);
   const parked = useMountStore((s) => s.mountInfo.Parked);
+  const blockedActionReasons = useMountStore((s) => s.blockedActionReasons);
+  const { queueTargetAction, clearTargetAction, executeTargetAction } = useMountOperations();
 
   const latitude = profileInfo.AstrometrySettings.Latitude || 0;
   const longitude = profileInfo.AstrometrySettings.Longitude || 0;
@@ -76,28 +79,62 @@ export function SlewConfirmDialog({
   const warnings = safetyResult?.issues.filter((i) => i.severity === 'warning') ?? [];
   const hasDanger = dangers.length > 0;
 
-  const handleSlew = useCallback(async () => {
+  useEffect(() => {
+    if (!open) {
+      clearTargetAction();
+      setError('');
+      setPendingAction(null);
+      return;
+    }
+
+    queueTargetAction({
+      action: 'slew',
+      targetName,
+      ra: targetRa,
+      dec: targetDec,
+      source: 'slew-confirm-dialog',
+    });
+  }, [clearTargetAction, open, queueTargetAction, targetDec, targetName, targetRa]);
+
+  const handleAction = useCallback(async (action: 'slew' | 'sync') => {
     if (!isTauri() || !connected) return;
 
-    setSlewing(true);
+    setPendingAction(action);
     setError('');
 
     try {
-      await mountApi.slewTo(targetRa, targetDec);
-      logger.info('Slew started', { target: targetName, ra: targetRa, dec: targetDec });
+      queueTargetAction({
+        action,
+        targetName,
+        ra: targetRa,
+        dec: targetDec,
+        source: 'slew-confirm-dialog',
+      });
+      const failure = await executeTargetAction({
+        action,
+        targetName,
+        ra: targetRa,
+        dec: targetDec,
+        source: 'slew-confirm-dialog',
+        requestedAt: new Date().toISOString(),
+      });
+      if (failure) {
+        setError(failure.message);
+        logger.error('Target action failed', { action, error: failure.message });
+        return;
+      }
+      logger.info('Target action started', { action, target: targetName, ra: targetRa, dec: targetDec });
       onSlewStarted?.();
       onOpenChange(false);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setError(msg);
-      logger.error('Slew failed', { error: msg });
     } finally {
-      setSlewing(false);
+      setPendingAction(null);
     }
-  }, [connected, targetRa, targetDec, targetName, onSlewStarted, onOpenChange]);
+  }, [connected, executeTargetAction, onOpenChange, onSlewStarted, queueTargetAction, targetDec, targetName, targetRa]);
 
   const raDisplay = degreesToHMS(((targetRa % 360) + 360) % 360);
   const decDisplay = degreesToDMS(targetDec);
+  const slewDisabled = !connected || !!parked || !!blockedActionReasons.slew;
+  const syncDisabled = !connected || !!parked || !!blockedActionReasons.sync;
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange} tier="compact-confirmation">
@@ -177,12 +214,23 @@ export function SlewConfirmDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('cancel')}
           </Button>
+          {canSync && (
+            <Button
+              onClick={() => void handleAction('sync')}
+              disabled={pendingAction !== null || syncDisabled}
+              variant="secondary"
+            >
+              {pendingAction === 'sync' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Crosshair className="h-4 w-4 mr-2" />
+              {t('syncMount')}
+            </Button>
+          )}
           <Button
-            onClick={handleSlew}
-            disabled={slewing || !connected || !!parked}
+            onClick={() => void handleAction('slew')}
+            disabled={pendingAction !== null || slewDisabled}
             variant={hasDanger ? 'destructive' : 'default'}
           >
-            {slewing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {pendingAction === 'slew' && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             <Crosshair className="h-4 w-4 mr-2" />
             {hasDanger ? t('slewAnyway') : t('startSlew')}
           </Button>

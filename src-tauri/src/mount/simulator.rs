@@ -39,6 +39,12 @@ pub struct MountSimulator {
     last_tick: Instant,
 }
 
+impl Default for MountSimulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MountSimulator {
     pub fn new() -> Self {
         Self {

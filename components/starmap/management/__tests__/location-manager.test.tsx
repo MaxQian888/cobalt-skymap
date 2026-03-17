@@ -38,6 +38,101 @@ jest.mock('@/lib/services/geocoding-service', () => ({
   },
 }));
 
+const mockResolveDraftMetadata = jest.fn();
+const mockCreatePendingDraftMetadata = jest.fn((input: unknown) => {
+  const typedInput = input as { coordinates: { latitude: number; longitude: number }; source: string };
+  return {
+    requestId: 1,
+    stale: false,
+    summaryStatus: 'loading',
+    coordinates: typedInput.coordinates,
+    source: typedInput.source,
+    displayName: null,
+    address: null,
+    fields: {
+      name: { status: 'loading', source: 'unresolved', value: null },
+      timezone: { status: 'loading', source: 'unresolved', value: null },
+      elevation: { status: 'loading', source: 'unresolved', value: null },
+    },
+    issues: [],
+  };
+});
+
+jest.mock('@/lib/services/location-draft-metadata', () => ({
+  LocationDraftMetadataResolver: jest.fn().mockImplementation(() => {
+    let requestId = 0;
+
+    return {
+      resolve: async (input: unknown) => {
+        const activeRequestId = ++requestId;
+        const result = await mockResolveDraftMetadata(input);
+
+        if (activeRequestId !== requestId) {
+          return {
+            ...result,
+            stale: true,
+            summaryStatus: 'stale',
+          };
+        }
+
+        return result;
+      },
+      invalidatePending: () => {
+        requestId += 1;
+      },
+    };
+  }),
+  createPendingLocationDraftMetadata: (input: unknown) => mockCreatePendingDraftMetadata(input),
+}));
+
+jest.mock('@/components/starmap/map', () => ({
+  MapLocationPicker: ({
+    onLocationSelect,
+    onRetryMetadata,
+  }: {
+    onLocationSelect?: (location: { coordinates: { latitude: number; longitude: number }; address?: string; displayName?: string }) => void;
+    onRetryMetadata?: () => void;
+  }) => (
+    <div data-testid="mock-map-location-picker">
+      <button
+        type="button"
+        data-testid="map-picker-select"
+        onClick={() => {
+          const coordinates = { latitude: 35.6762, longitude: 139.6503 };
+          onLocationSelect?.({
+            coordinates,
+            address: 'Tokyo, Japan',
+            displayName: 'Tokyo, Japan',
+          });
+        }}
+      >
+        select-location
+      </button>
+      <button
+        type="button"
+        data-testid="map-picker-coordinate-change"
+        onClick={() => {
+          onLocationSelect?.({
+            coordinates: { latitude: 34.0522, longitude: -118.2437 },
+            address: '',
+            displayName: '',
+          });
+        }}
+      >
+        change-coordinates
+      </button>
+      <button
+        type="button"
+        data-testid="map-picker-retry"
+        onClick={() => onRetryMetadata?.()}
+      >
+        retry-metadata
+      </button>
+    </div>
+  ),
+  MapProviderSettings: () => <div data-testid="mock-map-provider-settings" />,
+}));
+
 // Import mocked modules
 import { useLocations, tauriApi } from '@/lib/tauri';
 import { acquireCurrentLocation } from '@/lib/services/location-acquisition';
@@ -188,6 +283,65 @@ jest.mock('@/components/ui/select', () => ({
   SelectValue: () => null,
 }));
 
+jest.mock('@/components/ui/tabs', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const TabsContext = React.createContext<{
+    value?: string;
+    onValueChange?: (value: string) => void;
+  }>({});
+
+  return {
+    Tabs: ({
+      children,
+      value,
+      onValueChange,
+    }: {
+      children: React.ReactNode;
+      value?: string;
+      onValueChange?: (value: string) => void;
+      className?: string;
+    }) => (
+      <TabsContext.Provider value={{ value, onValueChange }}>
+        <div data-testid="tabs-root">{children}</div>
+      </TabsContext.Provider>
+    ),
+    TabsList: ({ children }: { children: React.ReactNode; className?: string }) => (
+      <div data-testid="tabs-list">{children}</div>
+    ),
+    TabsTrigger: ({
+      children,
+      value,
+    }: {
+      children: React.ReactNode;
+      value: string;
+      className?: string;
+    }) => {
+      const context = React.useContext(TabsContext);
+      return (
+        <button
+          type="button"
+          data-testid={`tab-trigger-${value}`}
+          onClick={() => context.onValueChange?.(value)}
+        >
+          {children}
+        </button>
+      );
+    },
+    TabsContent: ({
+      children,
+      value,
+    }: {
+      children: React.ReactNode;
+      value: string;
+      className?: string;
+    }) => {
+      const context = React.useContext(TabsContext);
+      if (context.value !== value) return null;
+      return <div data-testid={`tab-content-${value}`}>{children}</div>;
+    },
+  };
+});
+
 jest.mock('@/components/ui/scroll-area', () => ({
   ScrollArea: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="scroll-area">{children}</div>
@@ -240,6 +394,21 @@ describe('LocationManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useWebLocationStore.setState({ locations: [] });
+    mockResolveDraftMetadata.mockResolvedValue({
+      requestId: 1,
+      stale: false,
+      summaryStatus: 'ready',
+      coordinates: { latitude: 51.5074, longitude: -0.1278 },
+      source: 'gps',
+      displayName: 'London, UK',
+      address: 'London, UK',
+      fields: {
+        name: { status: 'ready', source: 'derived', value: 'London, UK' },
+        timezone: { status: 'ready', source: 'derived', value: 'Europe/London' },
+        elevation: { status: 'ready', source: 'derived', value: 50 },
+      },
+      issues: [],
+    });
     mockUseLocations.mockReturnValue({
       locations: { locations: [] },
       currentLocation: null,
@@ -1160,6 +1329,224 @@ describe('LocationManager', () => {
       });
 
       expect(mockToast.error).toHaveBeenCalledWith('locations.locationUnavailable');
+    });
+  });
+
+  describe('Draft Metadata Workflow', () => {
+    it('routes GPS metadata enrichment through the shared draft resolver', async () => {
+      render(<LocationManager />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.addLocation/));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.useGPS/));
+      });
+
+      await waitFor(() => {
+        expect(mockResolveDraftMetadata).toHaveBeenCalledWith({
+          coordinates: { latitude: 51.5074, longitude: -0.1278 },
+          source: 'gps',
+        });
+      });
+    });
+
+    it('preserves map-derived draft values across input-mode switches', async () => {
+      mockResolveDraftMetadata.mockResolvedValueOnce({
+        requestId: 2,
+        stale: false,
+        summaryStatus: 'ready',
+        coordinates: { latitude: 35.6762, longitude: 139.6503 },
+        source: 'search',
+        displayName: 'Tokyo, Japan',
+        address: 'Tokyo, Japan',
+        fields: {
+          name: { status: 'ready', source: 'derived', value: 'Tokyo, Japan' },
+          timezone: { status: 'ready', source: 'derived', value: 'Asia/Tokyo' },
+          elevation: { status: 'ready', source: 'derived', value: 44 },
+        },
+        issues: [],
+      });
+
+      render(<LocationManager />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.addLocation/));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.mapSelection|Map Selection/));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('map-picker-select'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Tokyo, Japan')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('Asia/Tokyo')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('44')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.manualInput|Manual Input/));
+      });
+
+      expect(screen.getByDisplayValue('Tokyo, Japan')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Asia/Tokyo')).toBeInTheDocument();
+      expect(screen.getAllByText(/locations\.metadataDerived|Derived/).length).toBeGreaterThan(0);
+    });
+
+    it('shows unresolved metadata guidance and allows retry without overwriting notes', async () => {
+      mockResolveDraftMetadata
+        .mockResolvedValueOnce({
+          requestId: 3,
+          stale: false,
+          summaryStatus: 'partial',
+          coordinates: { latitude: 35.6762, longitude: 139.6503 },
+          source: 'search',
+          displayName: 'Tokyo, Japan',
+          address: 'Tokyo, Japan',
+          fields: {
+            name: { status: 'ready', source: 'derived', value: 'Tokyo, Japan' },
+            timezone: { status: 'error', source: 'unresolved', value: null, message: 'Timezone unavailable' },
+            elevation: { status: 'error', source: 'unresolved', value: null, message: 'Elevation unavailable' },
+          },
+          issues: [
+            { field: 'timezone', reason: 'timezone_unavailable', message: 'Timezone unavailable' },
+            { field: 'elevation', reason: 'elevation_unavailable', message: 'Elevation unavailable' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          requestId: 4,
+          stale: false,
+          summaryStatus: 'ready',
+          coordinates: { latitude: 35.6762, longitude: 139.6503 },
+          source: 'search',
+          displayName: 'Tokyo, Japan',
+          address: 'Tokyo, Japan',
+          fields: {
+            name: { status: 'ready', source: 'derived', value: 'Tokyo, Japan' },
+            timezone: { status: 'ready', source: 'derived', value: 'Asia/Tokyo' },
+            elevation: { status: 'ready', source: 'derived', value: 44 },
+          },
+          issues: [],
+        });
+
+      render(<LocationManager />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.addLocation/));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.mapSelection|Map Selection/));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('map-picker-select'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/locations\.metadataUnresolved|Unresolved/).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/common\.retry|Retry/).length).toBeGreaterThan(0);
+      });
+
+      const notesInput = screen.getByPlaceholderText(/locations\.notesPlaceholder|Optional notes/) as HTMLTextAreaElement;
+      await act(async () => {
+        fireEvent.change(notesInput, { target: { value: 'Keep this note' } });
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/common\.retry|Retry/));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Asia/Tokyo')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('44')).toBeInTheDocument();
+      });
+
+      expect(notesInput.value).toBe('Keep this note');
+    });
+
+    it('ignores late metadata responses after the add form is cancelled', async () => {
+      let resolveMetadata!: (value: {
+        requestId: number;
+        stale: boolean;
+        summaryStatus: 'ready';
+        coordinates: { latitude: number; longitude: number };
+        source: 'search';
+        displayName: string;
+        address: string;
+        fields: {
+          name: { status: 'ready'; source: 'derived'; value: string };
+          timezone: { status: 'ready'; source: 'derived'; value: string };
+          elevation: { status: 'ready'; source: 'derived'; value: number };
+        };
+        issues: [];
+      }) => void;
+      const pendingMetadata = new Promise<{
+        requestId: number;
+        stale: boolean;
+        summaryStatus: 'ready';
+        coordinates: { latitude: number; longitude: number };
+        source: 'search';
+        displayName: string;
+        address: string;
+        fields: {
+          name: { status: 'ready'; source: 'derived'; value: string };
+          timezone: { status: 'ready'; source: 'derived'; value: string };
+          elevation: { status: 'ready'; source: 'derived'; value: number };
+        };
+        issues: [];
+      }>((resolve) => {
+        resolveMetadata = resolve;
+      });
+      mockResolveDraftMetadata.mockReturnValueOnce(pendingMetadata);
+
+      render(<LocationManager />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.addLocation/));
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.mapSelection|Map Selection/));
+      });
+
+      fireEvent.click(screen.getByTestId('map-picker-select'));
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/common\.cancel/));
+      });
+
+      await act(async () => {
+        resolveMetadata({
+          requestId: 9,
+          stale: false,
+          summaryStatus: 'ready',
+          coordinates: { latitude: 35.6762, longitude: 139.6503 },
+          source: 'search',
+          displayName: 'Tokyo, Japan',
+          address: 'Tokyo, Japan',
+          fields: {
+            name: { status: 'ready', source: 'derived', value: 'Tokyo, Japan' },
+            timezone: { status: 'ready', source: 'derived', value: 'Asia/Tokyo' },
+            elevation: { status: 'ready', source: 'derived', value: 44 },
+          },
+          issues: [],
+        });
+        await pendingMetadata;
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText(/locations\.addLocation/));
+      });
+
+      expect(screen.queryByDisplayValue('Tokyo, Japan')).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue('Asia/Tokyo')).not.toBeInTheDocument();
+      expect(screen.queryByDisplayValue('44')).not.toBeInTheDocument();
     });
   });
 

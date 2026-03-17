@@ -277,6 +277,48 @@ export interface ObservationStats {
 // ============================================================================
 // Target Import/Export Types
 // ============================================================================
+export interface TargetExportMosaicSettings {
+  enabled: boolean;
+  rows: number;
+  cols: number;
+  overlap: number;
+  overlap_unit?: 'percent' | 'pixels';
+  layout_mode?: 'rectangular' | 'staggered';
+  panel_order?: 'row-major' | 'serpentine' | 'center-out';
+}
+
+export interface TargetExportMosaicWarning {
+  code: string;
+  severity: 'error' | 'warning';
+  actual?: number;
+  min?: number;
+  max?: number;
+}
+
+export interface TargetExportMosaicPanel {
+  id: string;
+  row: number;
+  col: number;
+  x: number;
+  y: number;
+  center_offset_x: number;
+  center_offset_y: number;
+  sequence: number;
+  is_center: boolean;
+}
+
+export interface TargetExportMosaicPlan {
+  layout_mode: 'rectangular' | 'staggered';
+  panel_order: 'row-major' | 'serpentine' | 'center-out';
+  total_panels: number;
+  width: number;
+  height: number;
+  overlap_factor: number;
+  estimated_panel_minutes?: number | null;
+  estimated_total_minutes?: number | null;
+  panels: TargetExportMosaicPanel[];
+  warnings: TargetExportMosaicWarning[];
+}
 
 export interface TargetExportItem {
   name: string;
@@ -291,6 +333,8 @@ export interface TargetExportItem {
   notes?: string;
   priority?: string;
   tags?: string;
+  mosaic?: TargetExportMosaicSettings;
+  mosaic_plan?: TargetExportMosaicPlan;
 }
 
 export interface ImportTargetsResult {

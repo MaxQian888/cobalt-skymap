@@ -24,6 +24,7 @@ export interface UseObjectActionsReturn {
   slewDialogOpen: boolean;
   slewDialogTarget: { name: string; ra: number; dec: number } | null;
   setSlewDialogOpen: (open: boolean) => void;
+  handleTargetActionStarted: () => void;
 }
 
 /**
@@ -42,8 +43,15 @@ export function useObjectActions({
   const mountConnected = useMountStore((state) => state.mountInfo.Connected);
   const addTarget = useTargetListStore((state) => state.addTarget);
 
-  const [slewDialogOpen, setSlewDialogOpen] = useState(false);
+  const [slewDialogOpen, setSlewDialogOpenState] = useState(false);
   const [slewDialogTarget, setSlewDialogTarget] = useState<{ name: string; ra: number; dec: number } | null>(null);
+
+  const setSlewDialogOpen = useCallback((open: boolean) => {
+    setSlewDialogOpenState(open);
+    if (!open) {
+      setSlewDialogTarget(null);
+    }
+  }, []);
 
   const handleSlew = useCallback(() => {
     if (!selectedObject) return;
@@ -67,7 +75,12 @@ export function useObjectActions({
       });
       onAfterSlew?.();
     }
-  }, [selectedObject, mountConnected, onSetFramingCoordinates, onAfterSlew]);
+  }, [selectedObject, mountConnected, onSetFramingCoordinates, onAfterSlew, setSlewDialogOpen]);
+
+  const handleTargetActionStarted = useCallback(() => {
+    setSlewDialogOpen(false);
+    onAfterSlew?.();
+  }, [onAfterSlew, setSlewDialogOpen]);
 
   const handleAddToList = useCallback(() => {
     if (!selectedObject) return;
@@ -88,5 +101,6 @@ export function useObjectActions({
     slewDialogOpen,
     slewDialogTarget,
     setSlewDialogOpen,
+    handleTargetActionStarted,
   };
 }

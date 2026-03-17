@@ -60,6 +60,8 @@ describe('useEquipmentStore', () => {
       expect(state.mosaic.cols).toBe(2);
       expect(state.mosaic.overlap).toBe(20);
       expect(state.mosaic.overlapUnit).toBe('percent');
+      expect(state.mosaic.layoutMode).toBe('rectangular');
+      expect(state.mosaic.panelOrder).toBe('row-major');
     });
 
     it('should have default FOV display settings', () => {
@@ -232,12 +234,16 @@ describe('useEquipmentStore', () => {
           cols: 4,
           overlap: 30,
           overlapUnit: 'percent',
+          layoutMode: 'staggered',
+          panelOrder: 'serpentine',
         });
       });
       
       expect(result.current.mosaic.enabled).toBe(true);
       expect(result.current.mosaic.rows).toBe(3);
       expect(result.current.mosaic.cols).toBe(4);
+      expect(result.current.mosaic.layoutMode).toBe('staggered');
+      expect(result.current.mosaic.panelOrder).toBe('serpentine');
     });
 
     it('should toggle mosaic enabled', () => {
@@ -375,6 +381,8 @@ describe('useEquipmentStore', () => {
           cols: 2,
           overlap: 20,
           overlapUnit: 'percent',
+          layoutMode: 'staggered',
+          panelOrder: 'center-out',
         });
         result.current.setFOVDisplay({
           enabled: true,
@@ -395,6 +403,8 @@ describe('useEquipmentStore', () => {
       expect(result.current.selectedFovSetupId).toBe(savedId);
       expect(result.current.fovSetups[0].sensorWidth).toBe(30);
       expect(result.current.fovSetups[0].mosaic.rows).toBe(3);
+      expect(result.current.fovSetups[0].mosaic.layoutMode).toBe('staggered');
+      expect(result.current.fovSetups[0].mosaic.panelOrder).toBe('center-out');
       expect(result.current.fovSetups[0].fovDisplay.gridType).toBe('thirds');
     });
 
@@ -442,6 +452,8 @@ describe('useEquipmentStore', () => {
       expect(result.current.selectedFovSetupId).toBe(savedId);
       expect(result.current.fovInputMode).toBe('manual');
       expect(result.current.selectedBarlowReducerId).toBeNull();
+      expect(result.current.mosaic.layoutMode).toBe('rectangular');
+      expect(result.current.mosaic.panelOrder).toBe('row-major');
     });
 
     it('should rename and remove setup', () => {
@@ -497,6 +509,10 @@ describe('useEquipmentStore', () => {
       expect(migratedState.fovInputMode).toBe('manual');
       expect(migratedState.selectedBarlowReducerId).toBeNull();
       expect(migratedState.framePlacement).toEqual({ x: 0, y: 0 });
+      expect(migratedState.mosaic).toMatchObject({
+        layoutMode: 'rectangular',
+        panelOrder: 'row-major',
+      });
     });
 
     it('migration should clear invalid workflow references and clamp frame placement', () => {
@@ -517,6 +533,56 @@ describe('useEquipmentStore', () => {
 
       expect(migratedState.selectedBarlowReducerId).toBeNull();
       expect(migratedState.framePlacement).toEqual({ x: 1, y: -1 });
+    });
+
+    it('migration should normalize advanced mosaic planner fields', () => {
+      const migrate = useEquipmentStore.persist?.getOptions().migrate;
+      expect(typeof migrate).toBe('function');
+      if (!migrate) return;
+
+      const migrated = migrate({
+        mosaic: {
+          enabled: true,
+          rows: 2,
+          cols: 3,
+          overlap: 15,
+          overlapUnit: 'percent',
+          layoutMode: 'bad-layout',
+          panelOrder: 'bad-order',
+        },
+        fovSetups: [{
+          id: 'setup-1',
+          name: 'Legacy Setup',
+          sensorWidth: 23.5,
+          sensorHeight: 15.6,
+          focalLength: 400,
+          pixelSize: 3.76,
+          rotationAngle: 0,
+          mosaic: {
+            enabled: true,
+            rows: 2,
+            cols: 2,
+            overlap: 10,
+          },
+          fovDisplay: {},
+          createdAt: 1,
+          updatedAt: 2,
+        }],
+      } as Record<string, unknown>, 5);
+
+      const migratedState = migrated as Record<string, unknown> & {
+        mosaic?: { layoutMode?: string; panelOrder?: string };
+        fovSetups?: Array<{ mosaic?: { layoutMode?: string; panelOrder?: string } }>;
+      };
+
+      expect(migratedState.mosaic).toMatchObject({
+        layoutMode: 'rectangular',
+        panelOrder: 'row-major',
+      });
+      expect(migratedState.fovSetups?.[0]?.mosaic).toMatchObject({
+        layoutMode: 'rectangular',
+        panelOrder: 'row-major',
+      });
     });
   });
 

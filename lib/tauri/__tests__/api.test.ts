@@ -13,6 +13,13 @@ jest.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }));
 
+const mockSaveWindowState = jest.fn();
+const mockRestoreWindowState = jest.fn();
+jest.mock('../app-control-api', () => ({
+  saveWindowState: (...args: unknown[]) => mockSaveWindowState(...args),
+  restoreWindowState: (...args: unknown[]) => mockRestoreWindowState(...args),
+}));
+
 import { isTauri } from '@/lib/storage/platform';
 import {
   equipmentApi,
@@ -515,19 +522,19 @@ describe('appSettingsApi', () => {
   });
 
   it('should save window state', async () => {
-    mockInvoke.mockResolvedValue(undefined);
+    mockSaveWindowState.mockResolvedValue(undefined);
 
     await appSettingsApi.saveWindowState();
 
-    expect(mockInvoke).toHaveBeenCalledWith('save_window_state');
+    expect(mockSaveWindowState).toHaveBeenCalled();
   });
 
   it('should restore window state', async () => {
-    mockInvoke.mockResolvedValue(undefined);
+    mockRestoreWindowState.mockResolvedValue(undefined);
 
     await appSettingsApi.restoreWindowState();
 
-    expect(mockInvoke).toHaveBeenCalledWith('restore_window_state');
+    expect(mockRestoreWindowState).toHaveBeenCalled();
   });
 
   it('should add recent file', async () => {

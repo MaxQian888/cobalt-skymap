@@ -22,6 +22,7 @@ let mockHasMultipleCameras = false;
 let mockTorchOn = false;
 let mockCapabilities: { torch?: boolean } = {};
 let mockSessionStatus: ARSessionStatus = 'ready';
+let mockCameraControlMode: 'floating-card' | 'edge-sheet' | 'compact-strip' = 'compact-strip';
 let mockDevices: Array<{ deviceId: string; label: string; groupId: string }> = [];
 let mockLastKnownGoodAcquisition: {
   deviceId: string | null;
@@ -147,6 +148,24 @@ jest.mock('@/lib/hooks/use-ar-session-status', () => ({
   }),
 }));
 
+jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
+  useARAdaptation: () => ({
+    assistantMode: 'edge-sheet',
+    recoveryMode: 'compact-strip',
+    cameraControlMode: mockCameraControlMode,
+    sensorPath: 'sensor-primary',
+    runtimeClass: 'browser-mobile',
+    layoutTier: 'phone-compact',
+    controlDensity: 'compact',
+    capabilityTier: 'limited',
+    isLandscape: false,
+    isViewportReduced: false,
+    viewportWidth: 390,
+    viewportHeight: 844,
+    safeAreaInsets: { top: 24, right: 0, bottom: 34, left: 0 },
+  }),
+}));
+
 // jsdom has no MediaStream, create a minimal mock
 class MockMediaStream {
   getTracks() { return []; }
@@ -171,6 +190,7 @@ describe('ARCameraBackground', () => {
     mockTorchOn = false;
     mockCapabilities = {};
     mockSessionStatus = 'ready';
+    mockCameraControlMode = 'compact-strip';
     mockDevices = [];
     mockLastKnownGoodAcquisition = null;
     mockAcquisitionDiagnostics = {
@@ -252,6 +272,13 @@ describe('ARCameraBackground', () => {
     expect(screen.getByLabelText('Torch')).toBeInTheDocument();
   });
 
+  it('exposes adaptation metadata for camera controls', () => {
+    mockStream = new MockMediaStream() as unknown as MediaStream;
+    mockHasMultipleCameras = true;
+    renderComponent(<ARCameraBackground enabled={true} />);
+    expect(screen.getByTestId('ar-camera-controls')).toHaveAttribute('data-ar-camera-controls-mode', 'compact-strip');
+  });
+
   it('does not render camera controls when no stream', () => {
     mockHasMultipleCameras = true;
     mockCapabilities = { torch: true };
@@ -271,6 +298,19 @@ describe('ARCameraBackground', () => {
     mockStream = new MockMediaStream() as unknown as MediaStream;
     renderComponent(<ARCameraBackground enabled={true} />);
     expect(screen.getByText('settings.arStatusPreflight')).toBeInTheDocument();
+  });
+
+  it('passes session-scoped adaptation defaults into camera profile layers', () => {
+    renderComponent(<ARCameraBackground enabled={true} />);
+
+    expect(mockStart).toHaveBeenCalledWith(expect.objectContaining({
+      profileLayers: expect.objectContaining({
+        sessionDefaults: expect.objectContaining({
+          resolutionTier: '720p',
+          targetFps: 24,
+        }),
+      }),
+    }));
   });
 
   it('retries camera start when recovery retry action is requested', () => {

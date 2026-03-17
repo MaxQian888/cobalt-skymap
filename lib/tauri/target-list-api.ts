@@ -26,6 +26,42 @@ export interface MosaicSettings {
   rows: number;
   cols: number;
   overlap: number;
+  overlap_unit?: 'percent' | 'pixels';
+  layout_mode?: 'rectangular' | 'staggered';
+  panel_order?: 'row-major' | 'serpentine' | 'center-out';
+}
+
+export interface MosaicPlanWarning {
+  code: string;
+  severity: 'error' | 'warning';
+  actual?: number;
+  min?: number;
+  max?: number;
+}
+
+export interface MosaicPlanPanel {
+  id: string;
+  row: number;
+  col: number;
+  x: number;
+  y: number;
+  center_offset_x: number;
+  center_offset_y: number;
+  sequence: number;
+  is_center: boolean;
+}
+
+export interface MosaicPlan {
+  layout_mode: 'rectangular' | 'staggered';
+  panel_order: 'row-major' | 'serpentine' | 'center-out';
+  total_panels: number;
+  width: number;
+  height: number;
+  overlap_factor: number;
+  estimated_panel_minutes?: number | null;
+  estimated_total_minutes?: number | null;
+  panels: MosaicPlanPanel[];
+  warnings: MosaicPlanWarning[];
 }
 
 export interface ExposurePlan {
@@ -82,6 +118,7 @@ export interface TargetItem {
   focal_length?: number;
   rotation_angle?: number;
   mosaic?: MosaicSettings;
+  mosaic_plan?: MosaicPlan;
   exposure_plan?: ExposurePlan;
   notes?: string;
   added_at: number;
@@ -110,6 +147,7 @@ export interface TargetInput {
   focal_length?: number;
   rotation_angle?: number;
   mosaic?: MosaicSettings;
+  mosaic_plan?: MosaicPlan;
   exposure_plan?: ExposurePlan;
   notes?: string;
   priority?: TargetPriority;

@@ -39,6 +39,7 @@ import { ObjectImageGallery } from './object-image-gallery';
 import { RiseTransitSetGrid } from './rise-transit-set-grid';
 import { FeasibilityBadge } from '../planning/feasibility-badge';
 import { AltitudeChartCompact } from './altitude-chart-compact';
+import { SlewConfirmDialog } from '../mount/slew-confirm-dialog';
 import { openExternalUrl } from '@/lib/tauri/app-control-api';
 import { useMountStore } from '@/lib/stores';
 import { useCelestialName, useAstroEnvironment, useTargetAstroData, useObjectActions } from '@/lib/hooks';
@@ -90,7 +91,15 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
   const translatedName = useCelestialName(selectedObject?.names[0]);
 
   // Shared object actions
-  const { handleSlew, handleAddToList, mountConnected } = useObjectActions({
+  const {
+    handleSlew,
+    handleAddToList,
+    mountConnected,
+    slewDialogOpen,
+    slewDialogTarget,
+    setSlewDialogOpen,
+    handleTargetActionStarted,
+  } = useObjectActions({
     selectedObject,
     onSetFramingCoordinates,
     onAfterSlew: () => onOpenChange(false),
@@ -622,6 +631,16 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
           </div>
         </div>
       </DrawerContent>
+      {slewDialogTarget && (
+        <SlewConfirmDialog
+          open={slewDialogOpen}
+          onOpenChange={setSlewDialogOpen}
+          targetName={slewDialogTarget.name}
+          targetRa={slewDialogTarget.ra}
+          targetDec={slewDialogTarget.dec}
+          onSlewStarted={handleTargetActionStarted}
+        />
+      )}
     </Drawer>
   );
 });

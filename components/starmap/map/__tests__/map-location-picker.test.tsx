@@ -73,6 +73,12 @@ jest.mock('../leaflet-map', () => ({
   LeafletMap: (props: MockLeafletProps) => mockRenderLeafletMap(props),
 }));
 
+jest.mock('../map-health-monitor', () => ({
+  MapHealthMonitor: ({ compact }: { compact?: boolean }) => (
+    <div data-testid="map-health-monitor" data-compact={String(Boolean(compact))} />
+  ),
+}));
+
 // Mock geocoding service
 jest.mock('@/lib/services/geocoding-service', () => ({
   geocodingService: {
@@ -625,6 +631,60 @@ describe('MapLocationPicker', () => {
       await waitFor(() => {
         expect(screen.getByTestId('leaflet-map')).toHaveAttribute('data-tile-layer', 'openstreetmap');
       });
+    });
+
+    it('shows recovery actions for matching draft metadata without clearing coordinates', () => {
+      const mockRetryMetadata = jest.fn();
+      const mockOpenSettings = jest.fn();
+
+      render((
+        <MapLocationPicker
+          onLocationChange={mockOnLocationChange}
+          initialLocation={{ latitude: 10, longitude: 20 }}
+          draftMetadataState={{
+            coordinates: { latitude: 10, longitude: 20 },
+            summaryStatus: 'partial',
+            issues: [
+              { field: 'timezone', reason: 'timezone_unavailable', message: 'Timezone unavailable' },
+            ],
+          }}
+          onRetryMetadata={mockRetryMetadata}
+          onOpenProviderSettings={mockOpenSettings}
+        />
+      ) as React.ReactElement);
+
+      const latInput = screen.getAllByTestId('input').find(input => input.getAttribute('min') === '-90');
+      expect(latInput).toHaveValue(10);
+      expect(screen.getByText('Timezone unavailable')).toBeInTheDocument();
+      expect(screen.getByTestId('map-health-monitor')).toHaveAttribute('data-compact', 'true');
+
+      fireEvent.click(screen.getByText(/common\.retry|Retry/));
+      fireEvent.click(screen.getByText(/map\.providerSettings|Map Settings/));
+
+      expect(mockRetryMetadata).toHaveBeenCalledTimes(1);
+      expect(mockOpenSettings).toHaveBeenCalledTimes(1);
+      expect(latInput).toHaveValue(10);
+      expect(mockOnLocationChange).not.toHaveBeenCalled();
+    });
+
+    it('ignores stale draft metadata when coordinates no longer match current location', () => {
+      render((
+        <MapLocationPicker
+          onLocationChange={mockOnLocationChange}
+          initialLocation={{ latitude: 10, longitude: 20 }}
+          draftMetadataState={{
+            coordinates: { latitude: 30, longitude: 40 },
+            summaryStatus: 'partial',
+            issues: [
+              { field: 'timezone', reason: 'timezone_unavailable', message: 'Timezone unavailable' },
+            ],
+          }}
+        />
+      ) as React.ReactElement);
+
+      expect(screen.queryByText('Timezone unavailable')).not.toBeInTheDocument();
+      expect(screen.queryByText(/common\.retry|Retry/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId('map-health-monitor')).not.toBeInTheDocument();
     });
   });
 

@@ -555,9 +555,11 @@ mod tests {
 
     #[test]
     fn test_markers_data_clone() {
-        let mut data = MarkersData::default();
-        data.show_markers = true;
-        data.show_markers_updated_at = 1704067200000;
+        let mut data = MarkersData {
+            show_markers: true,
+            show_markers_updated_at: 1704067200000,
+            ..Default::default()
+        };
         data.groups.push("Test".to_string());
 
         let cloned = data.clone();

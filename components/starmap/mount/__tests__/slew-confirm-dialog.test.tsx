@@ -11,6 +11,16 @@ let mountState = {
     Parked: false,
     Slewing: false,
   },
+  capabilities: {
+    canSync: false,
+  },
+  blockedActionReasons: {},
+  activeTargetAction: null,
+  latestCommandFailure: null,
+  setActiveTargetAction: jest.fn(),
+  clearActiveTargetAction: jest.fn(),
+  setLatestCommandFailure: jest.fn(),
+  clearLatestCommandFailure: jest.fn(),
   profileInfo: {
     AstrometrySettings: { Latitude: 40, Longitude: -74, Elevation: 0 },
   },
@@ -65,7 +75,11 @@ jest.mock('@/lib/astronomy/starmap-utils', () => ({
 jest.mock('@/lib/tauri/mount-api', () => ({
   mountApi: {
     slewTo: jest.fn().mockResolvedValue(undefined),
+    syncTo: jest.fn().mockResolvedValue(undefined),
     unpark: jest.fn().mockResolvedValue(undefined),
+    abortSlew: jest.fn().mockResolvedValue(undefined),
+    setTracking: jest.fn().mockResolvedValue(undefined),
+    park: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -111,8 +125,18 @@ describe('SlewConfirmDialog', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const { isTauri } = jest.requireMock('@/lib/tauri/app-control-api');
+    isTauri.mockReturnValue(true);
     mountState = {
       mountInfo: { Connected: true, Parked: false, Slewing: false },
+      capabilities: { canSync: false },
+      blockedActionReasons: {},
+      activeTargetAction: null,
+      latestCommandFailure: null,
+      setActiveTargetAction: jest.fn(),
+      clearActiveTargetAction: jest.fn(),
+      setLatestCommandFailure: jest.fn(),
+      clearLatestCommandFailure: jest.fn(),
       profileInfo: {
         AstrometrySettings: { Latitude: 40, Longitude: -74, Elevation: 0 },
       },
@@ -403,5 +427,39 @@ describe('SlewConfirmDialog', () => {
 
     fireEvent.click(cancelBtn);
     expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('shows sync action when the active mount supports sync', () => {
+    mountState.capabilities.canSync = true;
+    const { getByTestId } = render(
+      <SlewConfirmDialog {...defaultProps} />
+    );
+
+    expect(getByTestId('dialog').textContent).toContain('syncMount');
+  });
+
+  it('executes sync through mountApi.syncTo when the sync action is chosen', async () => {
+    mountState.capabilities.canSync = true;
+    const { mountApi } = jest.requireMock('@/lib/tauri/mount-api');
+    const mockOnOpenChange = jest.fn();
+
+    const { getByTestId } = render(
+      <SlewConfirmDialog {...defaultProps} onOpenChange={mockOnOpenChange} />
+    );
+    const footer = getByTestId('dialog-footer');
+    const syncBtn = Array.from(footer.querySelectorAll('button')).find((button) => (
+      button.textContent?.includes('syncMount')
+    ));
+
+    expect(syncBtn).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(syncBtn!);
+    });
+
+    await waitFor(() => {
+      expect(mountApi.syncTo).toHaveBeenCalledWith(180, 45);
+      expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+    });
   });
 });

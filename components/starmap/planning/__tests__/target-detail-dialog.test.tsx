@@ -243,6 +243,45 @@ describe('TargetDetailDialog', () => {
     expect(screen.getByText('• Mosaic 2×3')).toBeInTheDocument();
   });
 
+  it('renders advanced mosaic planning summary when available', () => {
+    const target = {
+      ...baseTarget,
+      focalLength: 500,
+      mosaic: {
+        enabled: true,
+        cols: 2,
+        rows: 3,
+        overlap: 10,
+        overlapUnit: 'percent' as const,
+        layoutMode: 'staggered' as const,
+        panelOrder: 'center-out' as const,
+      },
+      mosaicPlan: {
+        layoutMode: 'staggered' as const,
+        panelOrder: 'center-out' as const,
+        totalPanels: 6,
+        width: 4.5,
+        height: 2.2,
+        overlapFactor: 0.9,
+        estimatedPanelMinutes: 30,
+        estimatedTotalMinutes: 180,
+        panels: [],
+        warnings: [],
+      },
+    };
+
+    render(<TargetDetailDialog target={target} open={true} onOpenChange={jest.fn()} />);
+
+    expect(screen.getByText('targetDetail.mosaicPlanPanels')).toBeInTheDocument();
+    expect(screen.getByText('6')).toBeInTheDocument();
+    expect(screen.getByText('targetDetail.mosaicPlanLayout')).toBeInTheDocument();
+    expect(screen.getByText('staggered')).toBeInTheDocument();
+    expect(screen.getByText('targetDetail.mosaicPlanOrder')).toBeInTheDocument();
+    expect(screen.getByText('center-out')).toBeInTheDocument();
+    expect(screen.getByText('targetDetail.mosaicPlanTime')).toBeInTheDocument();
+    expect(screen.getByText('180 min')).toBeInTheDocument();
+  });
+
   it('saves without exposure plan when fields are empty', () => {
     render(<TargetDetailDialog target={baseTarget} open={true} onOpenChange={jest.fn()} />);
     fireEvent.click(screen.getByText('common.save'));

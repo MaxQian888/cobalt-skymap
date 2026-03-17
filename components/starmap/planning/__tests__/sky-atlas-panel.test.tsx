@@ -122,7 +122,14 @@ jest.mock('@/components/ui/input', () => ({
 }));
 
 jest.mock('@/components/ui/scroll-area', () => ({
-  ScrollArea: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  ScrollArea: ({
+    children,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="scroll-area" {...props}>
+      {children}
+    </div>
+  ),
 }));
 
 jest.mock('@/components/ui/badge', () => ({
@@ -237,6 +244,16 @@ describe('SkyAtlasPanel', () => {
   it('renders filter section', () => {
     render(<SkyAtlasPanel />);
     expect(screen.getByText('skyAtlas.filters')).toBeInTheDocument();
+  });
+
+  it('renders a dedicated scroll surface for the drawer body', () => {
+    render(<SkyAtlasPanel />);
+
+    const scrollSurface = screen.getByTestId('sky-atlas-panel-scroll-area');
+    expect(scrollSurface).toHaveAttribute('data-starmap-scroll-surface', 'true');
+    expect(scrollSurface).toHaveClass('flex-1');
+    expect(scrollSurface).toHaveClass('min-h-0');
+    expect(scrollSurface).toHaveTextContent('skyAtlas.filters');
   });
 });
 

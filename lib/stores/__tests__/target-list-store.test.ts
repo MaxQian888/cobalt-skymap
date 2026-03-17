@@ -1469,4 +1469,62 @@ describe('target-list Tauri paths', () => {
     act(() => { useTargetListStore.getState().removeTargetsBatch([id]); });
     expect(targetListApi.removeTargetsBatch).toHaveBeenCalledWith([id]);
   });
+
+  it('syncWithTauri keeps only supported mosaic warning codes', async () => {
+    (isTauri as jest.Mock).mockReturnValue(true);
+    targetListApi.load.mockResolvedValue({
+      targets: [{
+        id: 'target-1',
+        name: 'M31',
+        ra: 10.684,
+        dec: 41.269,
+        ra_string: '00h 42m 44s',
+        dec_string: '+41d 16m 09s',
+        added_at: 1,
+        priority: 'high',
+        status: 'planned',
+        tags: [],
+        is_favorite: false,
+        is_archived: false,
+        mosaic_plan: {
+          layout_mode: 'rectangular',
+          panel_order: 'row-major',
+          total_panels: 4,
+          width: 2,
+          height: 2,
+          overlap_factor: 0.9,
+          estimated_panel_minutes: 30,
+          estimated_total_minutes: 120,
+          panels: [{
+            id: 'panel-r1-c1',
+            row: 0,
+            col: 0,
+            x: 0,
+            y: 0,
+            center_offset_x: 0,
+            center_offset_y: 0,
+            sequence: 1,
+            is_center: true,
+          }],
+          warnings: [
+            { code: 'panel_count_high', severity: 'warning', actual: 20, max: 16 },
+            { code: 'unsupported_warning', severity: 'warning', actual: 1 },
+          ],
+        },
+      }],
+      available_tags: [],
+      active_target_id: 'target-1',
+    });
+
+    await act(async () => {
+      await useTargetListStore.getState().syncWithTauri();
+    });
+
+    expect(useTargetListStore.getState().targets[0].mosaicPlan?.warnings).toEqual([
+      expect.objectContaining({
+        code: 'panel_count_high',
+        severity: 'warning',
+      }),
+    ]);
+  });
 });

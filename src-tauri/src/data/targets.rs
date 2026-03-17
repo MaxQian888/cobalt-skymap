@@ -49,6 +49,50 @@ pub struct MosaicSettings {
     pub rows: u32,
     pub cols: u32,
     pub overlap: f64,
+    #[serde(default)]
+    pub overlap_unit: Option<String>,
+    #[serde(default)]
+    pub layout_mode: Option<String>,
+    #[serde(default)]
+    pub panel_order: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MosaicPlanWarning {
+    pub code: String,
+    pub severity: String,
+    pub actual: Option<f64>,
+    pub min: Option<f64>,
+    pub max: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MosaicPlanPanel {
+    pub id: String,
+    pub row: u32,
+    pub col: u32,
+    pub x: f64,
+    pub y: f64,
+    pub center_offset_x: f64,
+    pub center_offset_y: f64,
+    pub sequence: u32,
+    pub is_center: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MosaicPlan {
+    pub layout_mode: String,
+    pub panel_order: String,
+    pub total_panels: u32,
+    pub width: f64,
+    pub height: f64,
+    pub overlap_factor: f64,
+    pub estimated_panel_minutes: Option<f64>,
+    pub estimated_total_minutes: Option<f64>,
+    #[serde(default)]
+    pub panels: Vec<MosaicPlanPanel>,
+    #[serde(default)]
+    pub warnings: Vec<MosaicPlanWarning>,
 }
 
 /// Exposure plan for a target
@@ -115,6 +159,8 @@ pub struct TargetItem {
     pub rotation_angle: Option<f64>,
     // Mosaic settings
     pub mosaic: Option<MosaicSettings>,
+    #[serde(default)]
+    pub mosaic_plan: Option<MosaicPlan>,
     // Exposure plan
     pub exposure_plan: Option<ExposurePlan>,
     // Notes
@@ -155,6 +201,8 @@ pub struct TargetInput {
     pub focal_length: Option<f64>,
     pub rotation_angle: Option<f64>,
     pub mosaic: Option<MosaicSettings>,
+    #[serde(default)]
+    pub mosaic_plan: Option<MosaicPlan>,
     pub exposure_plan: Option<ExposurePlan>,
     pub notes: Option<String>,
     pub priority: Option<TargetPriority>,
@@ -256,6 +304,7 @@ pub async fn add_target(
         focal_length: target.focal_length,
         rotation_angle: target.rotation_angle,
         mosaic: target.mosaic,
+        mosaic_plan: target.mosaic_plan,
         exposure_plan: target.exposure_plan,
         notes: target.notes,
         added_at: Utc::now().timestamp_millis(),
@@ -296,6 +345,7 @@ pub async fn add_targets_batch(
             focal_length: None,
             rotation_angle: None,
             mosaic: None,
+            mosaic_plan: None,
             exposure_plan: None,
             notes: None,
             added_at: Utc::now().timestamp_millis(),
@@ -324,44 +374,92 @@ pub async fn update_target(
     let mut data = load_target_list(app.clone()).await?;
 
     if let Some(target) = data.targets.iter_mut().find(|t| t.id == target_id) {
-        // Apply updates from JSON
-        if let Some(name) = updates.get("name").and_then(|v| v.as_str()) {
-            target.name = name.to_string();
-        }
-        if let Some(notes) = updates.get("notes").and_then(|v| v.as_str()) {
-            target.notes = Some(notes.to_string());
-        }
-        if let Some(priority) = updates.get("priority").and_then(|v| v.as_str()) {
-            target.priority = match priority {
-                "low" => TargetPriority::Low,
-                "high" => TargetPriority::High,
-                _ => TargetPriority::Medium,
-            };
-        }
-        if let Some(status) = updates.get("status").and_then(|v| v.as_str()) {
-            target.status = match status {
-                "in_progress" => TargetStatus::InProgress,
-                "completed" => TargetStatus::Completed,
-                _ => TargetStatus::Planned,
-            };
-        }
-        if let Some(is_favorite) = updates.get("is_favorite").and_then(|v| v.as_bool()) {
-            target.is_favorite = is_favorite;
-        }
-        if let Some(is_archived) = updates.get("is_archived").and_then(|v| v.as_bool()) {
-            target.is_archived = is_archived;
-        }
-        if let Some(tags) = updates.get("tags").and_then(|v| v.as_array()) {
-            target.tags = tags
-                .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                .collect();
-        }
+        apply_target_updates(target, &updates);
     }
 
     save_target_list(app, data.clone()).await?;
 
     Ok(data)
+}
+
+fn apply_target_updates(target: &mut TargetItem, updates: &serde_json::Value) {
+    if let Some(name) = updates.get("name").and_then(|v| v.as_str()) {
+        target.name = name.to_string();
+    }
+    if let Some(ra) = updates.get("ra").and_then(|v| v.as_f64()) {
+        target.ra = ra;
+    }
+    if let Some(dec) = updates.get("dec").and_then(|v| v.as_f64()) {
+        target.dec = dec;
+    }
+    if let Some(ra_string) = updates.get("ra_string").and_then(|v| v.as_str()) {
+        target.ra_string = ra_string.to_string();
+    }
+    if let Some(dec_string) = updates.get("dec_string").and_then(|v| v.as_str()) {
+        target.dec_string = dec_string.to_string();
+    }
+    if let Some(sensor_width) = updates.get("sensor_width") {
+        target.sensor_width = sensor_width.as_f64();
+    }
+    if let Some(sensor_height) = updates.get("sensor_height") {
+        target.sensor_height = sensor_height.as_f64();
+    }
+    if let Some(focal_length) = updates.get("focal_length") {
+        target.focal_length = focal_length.as_f64();
+    }
+    if let Some(rotation_angle) = updates.get("rotation_angle") {
+        target.rotation_angle = rotation_angle.as_f64();
+    }
+    if let Some(notes) = updates.get("notes") {
+        target.notes = notes.as_str().map(|value| value.to_string());
+    }
+    if let Some(priority) = updates.get("priority").and_then(|v| v.as_str()) {
+        target.priority = match priority {
+            "low" => TargetPriority::Low,
+            "high" => TargetPriority::High,
+            _ => TargetPriority::Medium,
+        };
+    }
+    if let Some(status) = updates.get("status").and_then(|v| v.as_str()) {
+        target.status = match status {
+            "in_progress" => TargetStatus::InProgress,
+            "completed" => TargetStatus::Completed,
+            _ => TargetStatus::Planned,
+        };
+    }
+    if let Some(is_favorite) = updates.get("is_favorite").and_then(|v| v.as_bool()) {
+        target.is_favorite = is_favorite;
+    }
+    if let Some(is_archived) = updates.get("is_archived").and_then(|v| v.as_bool()) {
+        target.is_archived = is_archived;
+    }
+    if let Some(tags) = updates.get("tags").and_then(|v| v.as_array()) {
+        target.tags = tags
+            .iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
+    }
+    if let Some(mosaic) = updates.get("mosaic") {
+        target.mosaic = if mosaic.is_null() {
+            None
+        } else {
+            serde_json::from_value(mosaic.clone()).ok()
+        };
+    }
+    if let Some(mosaic_plan) = updates.get("mosaic_plan") {
+        target.mosaic_plan = if mosaic_plan.is_null() {
+            None
+        } else {
+            serde_json::from_value(mosaic_plan.clone()).ok()
+        };
+    }
+    if let Some(exposure_plan) = updates.get("exposure_plan") {
+        target.exposure_plan = if exposure_plan.is_null() {
+            None
+        } else {
+            serde_json::from_value(exposure_plan.clone()).ok()
+        };
+    }
 }
 
 /// Remove a target
@@ -775,6 +873,9 @@ mod tests {
             rows: 3,
             cols: 2,
             overlap: 15.0,
+            overlap_unit: None,
+            layout_mode: None,
+            panel_order: None,
         };
 
         let json = serde_json::to_string(&mosaic).unwrap();
@@ -918,6 +1019,7 @@ mod tests {
             focal_length: Some(400.0),
             rotation_angle: Some(0.0),
             mosaic: None,
+            mosaic_plan: None,
             exposure_plan: None,
             notes: Some("Andromeda Galaxy".to_string()),
             added_at: 1704067200000,
@@ -983,9 +1085,11 @@ mod tests {
 
     #[test]
     fn test_target_list_data_serialization() {
-        let mut data = TargetListData::default();
-        data.available_tags = vec!["galaxy".to_string(), "nebula".to_string()];
-        data.active_target_id = Some("target-1".to_string());
+        let data = TargetListData {
+            available_tags: vec!["galaxy".to_string(), "nebula".to_string()],
+            active_target_id: Some("target-1".to_string()),
+            ..Default::default()
+        };
 
         let json = serde_json::to_string(&data).unwrap();
         assert!(json.contains("targets"));
@@ -996,8 +1100,10 @@ mod tests {
 
     #[test]
     fn test_target_list_data_clone() {
-        let mut data = TargetListData::default();
-        data.active_target_id = Some("test".to_string());
+        let data = TargetListData {
+            active_target_id: Some("test".to_string()),
+            ..Default::default()
+        };
 
         let cloned = data.clone();
         assert_eq!(cloned.active_target_id, data.active_target_id);
@@ -1024,7 +1130,11 @@ mod tests {
                 rows: 2,
                 cols: 2,
                 overlap: 10.0,
+                overlap_unit: Some("percent".to_string()),
+                layout_mode: Some("rectangular".to_string()),
+                panel_order: Some("row-major".to_string()),
             }),
+            mosaic_plan: None,
             exposure_plan: None,
             notes: Some("Test target".to_string()),
             priority: Some(TargetPriority::High),
@@ -1035,6 +1145,159 @@ mod tests {
         assert!(json.contains("New Target"));
         assert!(json.contains("mosaic"));
         assert!(json.contains("high"));
+    }
+
+    #[test]
+    fn test_target_item_deserialization_with_advanced_mosaic_fields() {
+        let json = r##"{
+            "id": "t1",
+            "name": "Rosette",
+            "ra": 97.5,
+            "dec": 5.0,
+            "ra_string": "06h 30m 00s",
+            "dec_string": "+05 00",
+            "sensor_width": 22.3,
+            "sensor_height": 14.9,
+            "focal_length": 500.0,
+            "rotation_angle": 0.0,
+            "mosaic": {
+                "enabled": true,
+                "rows": 2,
+                "cols": 3,
+                "overlap": 10.0,
+                "overlap_unit": "percent",
+                "layout_mode": "staggered",
+                "panel_order": "center-out"
+            },
+            "mosaic_plan": {
+                "layout_mode": "staggered",
+                "panel_order": "center-out",
+                "total_panels": 6,
+                "width": 4.5,
+                "height": 2.2,
+                "overlap_factor": 0.9,
+                "estimated_panel_minutes": 30.0,
+                "estimated_total_minutes": 180.0,
+                "panels": [
+                    {
+                        "id": "panel-r1-c1",
+                        "row": 0,
+                        "col": 0,
+                        "x": 0.0,
+                        "y": 0.0,
+                        "center_offset_x": -1.0,
+                        "center_offset_y": 0.0,
+                        "sequence": 1,
+                        "is_center": true
+                    }
+                ],
+                "warnings": [
+                    {
+                        "code": "estimated_time_high",
+                        "severity": "warning",
+                        "actual": 180.0,
+                        "max": 240.0
+                    }
+                ]
+            },
+            "exposure_plan": null,
+            "notes": null,
+            "added_at": 1704067200000,
+            "priority": "medium",
+            "status": "planned",
+            "tags": ["nebula"],
+            "observable_window": null,
+            "is_favorite": false,
+            "is_archived": false
+        }"##;
+
+        let target: TargetItem = serde_json::from_str(json).unwrap();
+        assert_eq!(target.mosaic.as_ref().and_then(|mosaic| mosaic.layout_mode.as_deref()), Some("staggered"));
+        assert_eq!(target.mosaic_plan.as_ref().map(|plan| plan.total_panels), Some(6));
+        assert_eq!(
+            target
+                .mosaic_plan
+                .as_ref()
+                .and_then(|plan| plan.panels.first())
+                .map(|panel| panel.is_center),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn test_apply_target_updates_persists_advanced_mosaic_fields() {
+        let mut target = TargetItem {
+            id: "target-1".to_string(),
+            name: "M31".to_string(),
+            ra: 10.68,
+            dec: 41.27,
+            ra_string: "00h 42m 44s".to_string(),
+            dec_string: "+41 16".to_string(),
+            sensor_width: Some(23.2),
+            sensor_height: Some(15.5),
+            focal_length: Some(400.0),
+            rotation_angle: Some(0.0),
+            mosaic: None,
+            mosaic_plan: None,
+            exposure_plan: None,
+            notes: None,
+            added_at: 1704067200000,
+            priority: TargetPriority::Medium,
+            status: TargetStatus::Planned,
+            tags: vec![],
+            observable_window: None,
+            is_favorite: false,
+            is_archived: false,
+        };
+
+        let updates = serde_json::json!({
+            "mosaic": {
+                "enabled": true,
+                "rows": 2,
+                "cols": 2,
+                "overlap": 12.5,
+                "overlap_unit": "percent",
+                "layout_mode": "staggered",
+                "panel_order": "serpentine"
+            },
+            "mosaic_plan": {
+                "layout_mode": "staggered",
+                "panel_order": "serpentine",
+                "total_panels": 4,
+                "width": 3.8,
+                "height": 1.9,
+                "overlap_factor": 0.875,
+                "estimated_panel_minutes": 45.0,
+                "estimated_total_minutes": 180.0,
+                "panels": [
+                    {
+                        "id": "panel-r1-c1",
+                        "row": 0,
+                        "col": 0,
+                        "x": 0.0,
+                        "y": 0.0,
+                        "center_offset_x": -0.5,
+                        "center_offset_y": 0.0,
+                        "sequence": 1,
+                        "is_center": true
+                    }
+                ],
+                "warnings": []
+            }
+        });
+
+        apply_target_updates(&mut target, &updates);
+
+        assert_eq!(target.mosaic.as_ref().and_then(|mosaic| mosaic.panel_order.as_deref()), Some("serpentine"));
+        assert_eq!(target.mosaic_plan.as_ref().map(|plan| plan.total_panels), Some(4));
+        assert_eq!(
+            target
+                .mosaic_plan
+                .as_ref()
+                .and_then(|plan| plan.panels.first())
+                .map(|panel| panel.sequence),
+            Some(1)
+        );
     }
 
     // ------------------------------------------------------------------------
@@ -1133,7 +1396,11 @@ mod tests {
                 rows: 3,
                 cols: 3,
                 overlap: 20.0,
+                overlap_unit: Some("percent".to_string()),
+                layout_mode: Some("rectangular".to_string()),
+                panel_order: Some("row-major".to_string()),
             }),
+            mosaic_plan: None,
             exposure_plan: Some(ExposurePlan {
                 single_exposure: 600.0,
                 total_exposure: 300.0,
@@ -1180,6 +1447,7 @@ mod tests {
             focal_length: None,
             rotation_angle: None,
             mosaic: None,
+            mosaic_plan: None,
             exposure_plan: None,
             notes: None,
             added_at: 0,
@@ -1211,6 +1479,7 @@ mod tests {
             focal_length: None,
             rotation_angle: None,
             mosaic: None,
+            mosaic_plan: None,
             exposure_plan: None,
             notes: None,
             added_at: 0,

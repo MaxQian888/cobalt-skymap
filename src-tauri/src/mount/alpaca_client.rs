@@ -559,19 +559,14 @@ impl AlpacaClient {
         let mut buf = [0u8; 1024];
 
         let deadline = Duration::from_millis(timeout_ms);
-        loop {
-            match timeout(deadline, socket.recv_from(&mut buf)).await {
-                Ok(Ok((len, addr))) => {
-                    if let Ok(text) = std::str::from_utf8(&buf[..len]) {
-                        // Parse Alpaca discovery response: {"AlpacaPort": 11111}
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(text) {
-                            if let Some(port) = val.get("AlpacaPort").and_then(|v| v.as_u64()) {
-                                servers.insert((addr.ip().to_string(), port as u16));
-                            }
-                        }
+        while let Ok(Ok((len, addr))) = timeout(deadline, socket.recv_from(&mut buf)).await {
+            if let Ok(text) = std::str::from_utf8(&buf[..len]) {
+                // Parse Alpaca discovery response: {"AlpacaPort": 11111}
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(text) {
+                    if let Some(port) = val.get("AlpacaPort").and_then(|v| v.as_u64()) {
+                        servers.insert((addr.ip().to_string(), port as u16));
                     }
                 }
-                Ok(Err(_)) | Err(_) => break,
             }
         }
 

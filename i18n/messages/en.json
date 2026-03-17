@@ -262,6 +262,15 @@
     "enableMosaic": "Enable Mosaic",
     "simulator": "FOV Simulator",
     "fovSimulator": "FOV Simulator",
+    "setupPresets": "Setup Presets",
+    "selectSetupPreset": "Select a setup preset",
+    "noSetupSelected": "No setup selected",
+    "setupNamePlaceholder": "Enter setup name",
+    "saveSetup": "Save Setup",
+    "renameSetup": "Rename Setup",
+    "deleteSetup": "Delete Setup",
+    "targetFraming": "Target Framing",
+    "noTargetSelected": "No target selected",
     "cameraTab": "Camera",
     "opticsTab": "Optics",
     "mosaicTab": "Mosaic",
@@ -612,6 +621,10 @@
     "arCameraTorchPreferred": "Prefer flashlight on",
     "arCameraCapabilitiesDetected": "Camera capabilities detected",
     "arCameraCapabilitiesPending": "Detecting camera capabilities…",
+    "arAdaptationSummary": "Active AR adaptation",
+    "arAdaptationCameraFirst": "This runtime is using a camera-first AR guidance path.",
+    "arAdaptationManualOnly": "Sensor-driven pointing is unavailable here. AR guidance will stay manual-first.",
+    "arAdaptationLimitedProfile": "A conservative session profile is active for current device capabilities.",
     "arAdaptiveTitle": "Adaptive optimization",
     "arAdaptiveLearningEnabled": "Adaptive learning",
     "arNetworkOptimizationEnabled": "Network optimization",
@@ -794,7 +807,11 @@
     "totalExposure": "Total (min)",
     "subFrames": "Sub Frames",
     "filter": "Filter",
-    "minutesTotal": "min total"
+    "minutesTotal": "min total",
+    "mosaicPlanPanels": "Panels",
+    "mosaicPlanLayout": "Layout",
+    "mosaicPlanOrder": "Order",
+    "mosaicPlanTime": "Estimated Time"
   },
   "observationLog": {
     "title": "Observation Log",
@@ -1378,6 +1395,7 @@
     "goTo": "Go to marker",
     "show": "Show",
     "hide": "Hide",
+    "hideGroup": "Hide group",
     "showAll": "Show all markers",
     "hideAll": "Hide all markers",
     "addMarkerHere": "Add Marker Here",
@@ -1728,7 +1746,9 @@
     "added": "Location added",
     "deleted": "Location deleted",
     "setCurrent": "Location set as current",
+    "setDefault": "Location set as default",
     "setAsCurrent": "Set as current",
+    "setAsDefault": "Set as default",
     "gpsNotSupported": "GPS not supported",
     "gpsAcquired": "GPS location acquired",
     "locationPermissionDenied": "Location permission denied",
@@ -1738,8 +1758,18 @@
     "manualInput": "Manual Input",
     "mapSelection": "Map Selection",
     "updated": "Location updated",
+    "searchPlaceholder": "Search locations...",
+    "noSearchResults": "No locations match your search",
+    "timezone": "Timezone",
+    "timezonePlaceholder": "e.g. Asia/Shanghai",
+    "notes": "Notes",
+    "notesPlaceholder": "Optional notes",
     "deleteConfirmTitle": "Delete Location?",
     "deleteConfirmDescription": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+    "duplicateTitle": "Possible duplicate location",
+    "duplicateDescription": "A similar location \"{name}\" already exists. Update it or keep both?",
+    "keepBoth": "Keep both",
+    "updateExisting": "Update existing",
     "bortlePlaceholder": "Select...",
     "bortle1": "Excellent dark sky",
     "bortle2": "Typical dark sky",
@@ -1747,14 +1777,21 @@
     "bortle4": "Rural/suburban transition",
     "bortle5": "Suburban sky",
     "bortle6": "Bright suburban sky",
-    "bortle7": "Suburban/urban transition",
-    "bortle8": "City sky",
-    "bortle9": "Inner city sky",
-    "validation": {
-      "latitudeRange": "Latitude must be between -90 and 90",
-      "longitudeRange": "Longitude must be between -180 and 180",
-      "altitudeRange": "Altitude must be between -500 and 9,000 m",
-      "bortleRange": "Bortle class must be between 1 and 9"
+      "bortle7": "Suburban/urban transition",
+      "bortle8": "City sky",
+      "bortle9": "Inner city sky",
+      "metadataStatusTitle": "Draft metadata",
+      "metadataLoading": "Refreshing...",
+      "metadataManual": "Manual",
+      "metadataDerived": "Derived",
+      "metadataPersisted": "Saved",
+      "metadataUnresolved": "Unresolved",
+      "metadataNeedsAttention": "Some metadata could not be resolved. Review it or enter it manually.",
+      "validation": {
+        "latitudeRange": "Latitude must be between -90 and 90",
+        "longitudeRange": "Longitude must be between -180 and 180",
+        "altitudeRange": "Altitude must be between -500 and 9,000 m",
+        "bortleRange": "Bortle class must be between 1 and 9"
     }
   },
   "map": {
@@ -1784,6 +1821,7 @@
     "locationRequestFailed": "Failed to get current location",
     "searchFailed": "Search failed",
     "providerUnavailable": "Map provider unavailable",
+    "layerUnavailableShort": "Unavailable",
     "layers": "Layers",
     "lightPollution": "Light Pollution Overlay",
     "latitude": "Latitude",
@@ -1807,6 +1845,17 @@
     "cacheDuration": "Cache Duration",
     "hours": "hours",
     "minutes": "minutes",
+    "policyMode": "Policy Mode",
+    "policyModes": {
+      "strict": "Strict",
+      "balanced": "Balanced",
+      "legacy": "Legacy"
+    },
+    "searchBehaviorWhenNoAutocomplete": "Search Behavior Without Autocomplete",
+    "searchFallback": {
+      "submitOnly": "Submit only",
+      "disabled": "Disabled"
+    },
     "offlineMode": "Offline Mode",
     "offlineModeDescription": "Use cached data when offline",
     "healthCheckInterval": "Health Check Interval",
@@ -1826,9 +1875,12 @@
     "healthyCount": "Healthy",
     "totalErrors": "Errors",
     "lastUpdated": "Last updated",
-    "healthyProviders": "Healthy providers",
-    "avgResponseTime": "Avg response time",
-    "apiKeys": "API Keys",
+      "healthyProviders": "Healthy providers",
+      "avgResponseTime": "Avg response time",
+      "metadataLoading": "Refreshing location metadata...",
+      "metadataNeedsAttention": "Some location metadata could not be resolved automatically.",
+      "metadataResolveFailed": "Location metadata refresh failed. You can retry or continue manually.",
+      "apiKeys": "API Keys",
     "apiKeyManager": "API Key Manager",
     "apiKeyManagerDescription": "Manage API keys for map providers. Keys are stored securely in local storage.",
     "securityNotice": "Security Notice",
@@ -1991,6 +2043,8 @@
     "skip": "Skip",
     "finish": "Finish",
     "restartTour": "Restart Guide",
+    "restartAllDescription": "Restart the full onboarding setup and guided tour from the beginning.",
+    "moduleRestartDescription": "Reopen module guides anytime to revisit a specific workflow.",
     "transition": {
       "description": "Setup is complete! Would you like a quick tour of the interface?",
       "startTour": "Continue to Tour",
@@ -2365,6 +2419,29 @@
     "previewWorkspace": "Preview workspace",
     "previewLight": "Preview light",
     "previewDark": "Preview dark",
+    "componentStyle": "Component Style",
+    "componentStylePreset": "Surface Preset",
+    "componentDensity": "Density",
+    "componentTransparency": "Transparency",
+    "componentBorder": "Border Emphasis",
+    "componentElevation": "Elevation",
+    "componentPreviewToolbar": "Toolbar preview",
+    "componentPreviewPanel": "Panel preview",
+    "componentPreviewSection": "Section preview",
+    "componentPresetDefault": "Default surface",
+    "componentPresetObservatory": "Observatory",
+    "componentPresetFloating": "Floating glass",
+    "componentDensityComfortable": "Comfortable",
+    "componentDensityCompact": "Compact",
+    "componentTransparencySolid": "Solid",
+    "componentTransparencyBalanced": "Balanced",
+    "componentTransparencyHigh": "High",
+    "componentBorderSoft": "Soft",
+    "componentBorderMedium": "Medium",
+    "componentBorderStrong": "Strong",
+    "componentElevationFlat": "Flat",
+    "componentElevationRaised": "Raised",
+    "componentElevationFloating": "Floating",
     "accessibilityWarnings": "Accessibility warnings",
     "noAccessibilityWarnings": "No accessibility warnings for the current preview.",
     "warningPairForegroundBackground": "Foreground vs background",
@@ -3208,7 +3285,57 @@
       "nina-xml": "NINA Sequence XML",
       "csv": "CSV",
       "sgp-csv": "SGP CSV"
-    }
+    },
+    "workspace": "Workspace",
+    "workspaceDescription": "Review saved plans, templates, imports, and recoverable drafts in one place.",
+    "workspaceSearchPlaceholder": "Search workspace",
+    "workspaceFilter": {
+      "all": "All",
+      "plans": "Plans",
+      "templates": "Templates",
+      "imports": "Imports",
+      "recovery": "Recovery"
+    },
+    "workspaceType": {
+      "plan": "Plan",
+      "template": "Template",
+      "import": "Import",
+      "recovery": "Recovery"
+    },
+    "workspaceSource": {
+      "savedPlan": "Saved plan",
+      "localTemplate": "Local template",
+      "desktopTemplate": "Desktop template",
+      "fileImport": "File import",
+      "cliImport": "CLI import",
+      "recovery": "Recovered draft"
+    },
+    "workspaceEmptySelection": "Select an item to preview its details.",
+    "workspaceDesktopTemplateHint": "Desktop templates can be loaded here, but must be managed from the desktop sync source.",
+    "workspaceLocalTemplateHint": "Local templates stay editable inside this planner workspace.",
+    "workspaceImportFormat": "Format",
+    "workspaceImportCreated": "Created",
+    "workspaceImportUnmatched": "Unmatched",
+    "workspaceImportSkipped": "Skipped",
+    "workspaceActionLoad": "Load",
+    "workspaceActionRename": "Rename",
+    "workspaceActionDuplicate": "Duplicate",
+    "workspaceActionDelete": "Delete",
+    "workspaceActionResume": "Resume",
+    "workspaceActionReview": "Review",
+    "workspaceActionRestore": "Restore",
+    "workspaceActionDismiss": "Dismiss",
+    "workspaceRenamePrompt": "Rename this item",
+    "workspaceDeleteConfirm": "Delete this item from the workspace?",
+    "workspaceRecoverySource": {
+      "planner-close": "Recovered after the planner closed with unsaved changes.",
+      "app-close": "Recovered after the app closed with unsaved changes.",
+      "seed-conflict": "Recovered after a seeded draft replaced the current draft."
+    },
+    "recoveryPromptTitle": "Recovered draft available",
+    "recoveryPromptFallback": "A recovered planner draft is ready to review.",
+    "recoveryPromptRestore": "Restore Draft",
+    "recoveryPromptDiscard": "Discard Draft"
   },
   "messierMarathon": {
     "title": "Messier Marathon",
@@ -3695,7 +3822,11 @@
     "last15min": "15 min",
     "last1hr": "1 hour",
     "allTime": "All",
-    "groupDuplicates": "Group duplicates"
+    "groupDuplicates": "Group duplicates",
+    "suppressionEnabled": "Suppress repeated logs",
+    "effectiveLevel": "Effective level",
+    "suppressed": "Suppressed",
+    "dropped": "Dropped"
   },
   "landing": {
     "nav": {
@@ -3925,19 +4056,39 @@
       },
       "sourceStatus": {
         "nasa-apod": {
-          "error": "NASA APOD is temporarily unavailable."
+          "empty": "NASA APOD did not return a usable astronomy item for today.",
+          "error": "NASA APOD is temporarily unavailable.",
+          "invalid": "NASA APOD returned data that could not be normalized.",
+          "offline": "NASA APOD was skipped because the app is offline.",
+          "disabled": "NASA APOD enhancement is turned off."
         },
         "wikimedia": {
-          "error": "Wikimedia enrichment is temporarily unavailable."
+          "empty": "Wikimedia enrichment did not find a usable match right now.",
+          "error": "Wikimedia enrichment is temporarily unavailable.",
+          "invalid": "Wikimedia enrichment returned data that could not be normalized.",
+          "offline": "Wikimedia enrichment was skipped because the app is offline.",
+          "disabled": "Wikimedia enhancement is turned off."
         },
         "nasa-image-library": {
-          "error": "NASA Image Library returned no usable item right now."
+          "empty": "NASA Image Library returned no usable item right now.",
+          "error": "NASA Image Library returned no usable item right now.",
+          "invalid": "NASA Image Library returned data that could not be normalized.",
+          "offline": "NASA Image Library was skipped because the app is offline.",
+          "disabled": "NASA Image Library enhancement is turned off."
         },
         "nasa-photojournal": {
-          "error": "NASA Photojournal feed is currently unavailable."
+          "empty": "NASA Photojournal feed did not return a usable astronomy item right now.",
+          "error": "NASA Photojournal feed is currently unavailable.",
+          "invalid": "NASA Photojournal returned data that could not be normalized.",
+          "offline": "NASA Photojournal was skipped because the app is offline.",
+          "disabled": "NASA Photojournal enhancement is turned off."
         },
         "esa-science": {
-          "error": "ESA Space Science feed is currently unavailable."
+          "empty": "ESA Space Science feed did not return a usable astronomy item right now.",
+          "error": "ESA Space Science feed is currently unavailable.",
+          "invalid": "ESA Space Science returned data that could not be normalized.",
+          "offline": "ESA Space Science was skipped because the app is offline.",
+          "disabled": "ESA Space Science enhancement is turned off."
         }
       },
       "sourceBadge": {

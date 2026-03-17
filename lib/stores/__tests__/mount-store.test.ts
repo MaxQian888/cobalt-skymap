@@ -37,6 +37,23 @@ describe('useMountStore', () => {
       const { result } = renderHook(() => useMountStore());
       expect(result.current.currentTab).toBe('showSlew');
     });
+
+    it('should initialize operator feedback state', () => {
+      const { result } = renderHook(() => useMountStore());
+      expect((result.current as typeof result.current & {
+        activeTargetAction: unknown;
+        latestCommandFailure: unknown;
+        blockedActionReasons: Record<string, string | undefined>;
+      }).activeTargetAction).toBeNull();
+      expect((result.current as typeof result.current & {
+        activeTargetAction: unknown;
+        latestCommandFailure: unknown;
+        blockedActionReasons: Record<string, string | undefined>;
+      }).latestCommandFailure).toBeNull();
+      expect((result.current as typeof result.current & {
+        blockedActionReasons: Record<string, string | undefined>;
+      }).blockedActionReasons.slew).toBe('disconnected');
+    });
   });
 
   describe('setMountConnected', () => {
@@ -244,6 +261,115 @@ describe('useMountStore', () => {
       expect(result.current.mountInfo.Slewing).toBe(true);
       expect(result.current.mountInfo.PierSide).toBe('east');
     });
+
+    it('should refresh blocked action reasons from runtime mount state', () => {
+      const { result } = renderHook(() => useMountStore());
+      act(() => {
+        result.current.setCapabilities({
+          canSlew: true,
+          canSlewAsync: true,
+          canSync: true,
+          canPark: true,
+          canUnpark: true,
+          canSetTracking: true,
+          canMoveAxis: true,
+          canPulseGuide: false,
+          alignmentMode: 'GermanPolar',
+          equatorialSystem: 'J2000',
+        });
+        result.current.applyMountState({
+          connected: true,
+          ra: 12,
+          dec: 24,
+          tracking: false,
+          trackingRate: 'stopped',
+          slewing: false,
+          parked: true,
+          atHome: true,
+          pierSide: 'east',
+          slewRateIndex: 3,
+        });
+      });
+
+      expect((result.current as typeof result.current & {
+        blockedActionReasons: Record<string, string | undefined>;
+      }).blockedActionReasons.slew).toBe('parked');
+      expect((result.current as typeof result.current & {
+        blockedActionReasons: Record<string, string | undefined>;
+      }).blockedActionReasons.unpark).toBeUndefined();
+    });
+  });
+
+  describe('operator feedback state', () => {
+    it('should track active target actions and command failures', () => {
+      const { result } = renderHook(() => useMountStore());
+
+      act(() => {
+        (result.current as typeof result.current & {
+          setActiveTargetAction: (action: {
+            action: 'slew' | 'sync';
+            targetName: string;
+            ra: number;
+            dec: number;
+            source: string;
+          }) => void;
+          setLatestCommandFailure: (failure: {
+            action: string;
+            message: string;
+            at: string;
+          } | null) => void;
+        }).setActiveTargetAction({
+          action: 'sync',
+          targetName: 'M31',
+          ra: 10.68,
+          dec: 41.27,
+          source: 'info-panel',
+        });
+        (result.current as typeof result.current & {
+          setLatestCommandFailure: (failure: {
+            action: string;
+            message: string;
+            at: string;
+          } | null) => void;
+        }).setLatestCommandFailure({
+          action: 'sync',
+          message: 'Sync failed',
+          at: '2026-03-16T00:00:00.000Z',
+        });
+      });
+
+      expect((result.current as typeof result.current & {
+        activeTargetAction: { action: string; targetName: string };
+        latestCommandFailure: { action: string; message: string };
+      }).activeTargetAction).toMatchObject({
+        action: 'sync',
+        targetName: 'M31',
+      });
+      expect((result.current as typeof result.current & {
+        latestCommandFailure: { action: string; message: string };
+      }).latestCommandFailure).toMatchObject({
+        action: 'sync',
+        message: 'Sync failed',
+      });
+
+      act(() => {
+        (result.current as typeof result.current & {
+          clearActiveTargetAction: () => void;
+          clearLatestCommandFailure: () => void;
+        }).clearActiveTargetAction();
+        (result.current as typeof result.current & {
+          clearLatestCommandFailure: () => void;
+        }).clearLatestCommandFailure();
+      });
+
+      expect((result.current as typeof result.current & {
+        activeTargetAction: unknown;
+        latestCommandFailure: unknown;
+      }).activeTargetAction).toBeNull();
+      expect((result.current as typeof result.current & {
+        latestCommandFailure: unknown;
+      }).latestCommandFailure).toBeNull();
+    });
   });
 
   describe('resetMountInfo', () => {
@@ -274,6 +400,37 @@ describe('useMountStore', () => {
           alignmentMode: 'GermanPolar',
           equatorialSystem: 'J2000',
         });
+        (result.current as typeof result.current & {
+          setActiveTargetAction: (action: {
+            action: 'slew' | 'sync';
+            targetName: string;
+            ra: number;
+            dec: number;
+            source: string;
+          }) => void;
+          setLatestCommandFailure: (failure: {
+            action: string;
+            message: string;
+            at: string;
+          } | null) => void;
+        }).setActiveTargetAction({
+          action: 'slew',
+          targetName: 'NGC 7000',
+          ra: 312,
+          dec: 44,
+          source: 'context-menu',
+        });
+        (result.current as typeof result.current & {
+          setLatestCommandFailure: (failure: {
+            action: string;
+            message: string;
+            at: string;
+          } | null) => void;
+        }).setLatestCommandFailure({
+          action: 'slew',
+          message: 'Previous error',
+          at: '2026-03-16T00:00:00.000Z',
+        });
       });
       expect(result.current.mountInfo.Connected).toBe(true);
       expect(result.current.capabilities.canSlew).toBe(true);
@@ -285,6 +442,18 @@ describe('useMountStore', () => {
       expect(result.current.mountInfo.Coordinates.RADegrees).toBe(0);
       expect(result.current.mountInfo.Coordinates.Dec).toBe(0);
       expect(result.current.capabilities.canSlew).toBe(false);
+      expect((result.current as typeof result.current & {
+        activeTargetAction: unknown;
+        latestCommandFailure: unknown;
+        blockedActionReasons: Record<string, string | undefined>;
+      }).activeTargetAction).toBeNull();
+      expect((result.current as typeof result.current & {
+        latestCommandFailure: unknown;
+        blockedActionReasons: Record<string, string | undefined>;
+      }).latestCommandFailure).toBeNull();
+      expect((result.current as typeof result.current & {
+        blockedActionReasons: Record<string, string | undefined>;
+      }).blockedActionReasons.slew).toBe('disconnected');
     });
   });
 

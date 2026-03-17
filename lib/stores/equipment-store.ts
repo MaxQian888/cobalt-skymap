@@ -2,10 +2,21 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getZustandStorage } from '@/lib/storage';
 import { type GridType, type EyepiecePreset, type BarlowPreset, type OcularTelescopePreset } from '@/lib/constants/equipment-presets';
-import { clampFramePlacement, type FramePlacement } from '@/lib/astronomy/fov-calculations';
+import {
+  clampFramePlacement,
+  validateMosaicSettings,
+  type FramePlacement,
+  type MosaicSettings,
+} from '@/lib/astronomy/fov-calculations';
 
 // Re-export GridType for backward compatibility
 export type { GridType } from '@/lib/constants/equipment-presets';
+export type {
+  MosaicSettings,
+  MosaicLayoutMode,
+  MosaicPanelOrder,
+  ResolvedMosaicPlan,
+} from '@/lib/astronomy/fov-calculations';
 
 // ============================================================================
 // Types
@@ -14,14 +25,6 @@ export type BinningType = '1x1' | '2x2' | '3x3' | '4x4';
 export type TrackingType = 'none' | 'basic' | 'guided';
 export type TargetType = 'galaxy' | 'nebula' | 'cluster' | 'planetary';
 export type GainStrategy = 'unity' | 'max_dynamic_range' | 'manual';
-
-export interface MosaicSettings {
-  enabled: boolean;
-  rows: number;
-  cols: number;
-  overlap: number;
-  overlapUnit: 'percent' | 'pixels';
-}
 
 export interface CameraPreset {
   id: string;
@@ -257,6 +260,8 @@ const DEFAULT_MOSAIC: MosaicSettings = {
   cols: 2,
   overlap: 20,
   overlapUnit: 'percent',
+  layoutMode: 'rectangular',
+  panelOrder: 'row-major',
 };
 
 const DEFAULT_FOV_DISPLAY: FOVDisplaySettings = {
@@ -384,7 +389,7 @@ export const useEquipmentStore = create<EquipmentState>()(
       })),
       
       // Mosaic
-      setMosaic: (mosaic) => set({ mosaic }),
+      setMosaic: (mosaic) => set({ mosaic: validateMosaicSettings(mosaic).sanitized }),
       setMosaicEnabled: (enabled) => set((state) => ({
         mosaic: { ...state.mosaic, enabled },
       })),
@@ -428,7 +433,7 @@ export const useEquipmentStore = create<EquipmentState>()(
             focalLength: state.focalLength,
             pixelSize: state.pixelSize,
             rotationAngle: state.rotationAngle,
-            mosaic: { ...state.mosaic },
+            mosaic: validateMosaicSettings(state.mosaic).sanitized,
             fovDisplay: { ...state.fovDisplay },
             createdAt: now,
             updatedAt: now,
@@ -453,7 +458,7 @@ export const useEquipmentStore = create<EquipmentState>()(
           focalLength: setup.focalLength,
           pixelSize: setup.pixelSize,
           rotationAngle: setup.rotationAngle,
-          mosaic: { ...setup.mosaic },
+          mosaic: validateMosaicSettings(setup.mosaic).sanitized,
           fovDisplay: { ...setup.fovDisplay },
           fovInputMode: DEFAULT_FOV_INPUT_MODE,
           selectedBarlowReducerId: null,
@@ -667,6 +672,9 @@ export const useEquipmentStore = create<EquipmentState>()(
         const state = persistedState as Record<string, unknown>;
         const persistedExposureDefaults = state.exposureDefaults as Partial<ExposureDefaults> | undefined;
         const persistedOcularDisplay = state.ocularDisplay as Partial<OcularDisplaySettings> | undefined;
+        const persistedMosaic = (state.mosaic && typeof state.mosaic === 'object')
+          ? (state.mosaic as Partial<MosaicSettings>)
+          : DEFAULT_MOSAIC;
         const persistedFovSetups = Array.isArray(state.fovSetups)
           ? (state.fovSetups as Array<Record<string, unknown>>)
           : [];
@@ -717,10 +725,10 @@ export const useEquipmentStore = create<EquipmentState>()(
               focalLength: typeof item.focalLength === 'number' ? item.focalLength : 400,
               pixelSize: typeof item.pixelSize === 'number' ? item.pixelSize : 3.76,
               rotationAngle: typeof item.rotationAngle === 'number' ? item.rotationAngle : 0,
-              mosaic: {
+              mosaic: validateMosaicSettings({
                 ...DEFAULT_MOSAIC,
                 ...mosaic,
-              },
+              }).sanitized,
               fovDisplay: {
                 ...DEFAULT_FOV_DISPLAY,
                 ...fovDisplay,
@@ -744,6 +752,10 @@ export const useEquipmentStore = create<EquipmentState>()(
             ...DEFAULT_OCULAR_DISPLAY,
             ...(persistedOcularDisplay ?? {}),
           },
+          mosaic: validateMosaicSettings({
+            ...DEFAULT_MOSAIC,
+            ...persistedMosaic,
+          }).sanitized,
           fovSetups: normalizedFovSetups,
           selectedFovSetupId: hasSelectedSetup ? selectedFovSetupId : null,
           fovSimulatorLastTab,

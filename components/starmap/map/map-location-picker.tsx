@@ -25,9 +25,11 @@ import { cn } from '@/lib/utils';
 import { mapConfig } from '@/lib/services/map-config';
 import { geocodingService } from '@/lib/services/geocoding-service';
 import { TILE_LAYER_CONFIGS, type TileLayerType } from '@/lib/constants/map';
+import { MapHealthMonitor } from './map-health-monitor';
 import { LocationSearch } from './location-search';
 import type { Coordinates, LocationResult } from '@/types/starmap/map';
 import type { TileLayerFallbackEvent } from './leaflet-map';
+import type { LocationDraftMetadataIssue, LocationDraftSummaryStatus } from '@/lib/services/location-draft-metadata';
 
 // Lazy load LeafletMap to avoid SSR issues and improve initial load
 const LeafletMap = dynamic(() => import('./leaflet-map').then(mod => ({ default: mod.LeafletMap })), {
@@ -49,6 +51,13 @@ interface MapLocationPickerProps {
   tileLayer?: TileLayerType;
   compact?: boolean;
   commitMode?: 'immediate' | 'staged';
+  draftMetadataState?: {
+    coordinates: Coordinates;
+    summaryStatus: Extract<LocationDraftSummaryStatus, 'loading' | 'partial' | 'error' | 'ready' | 'stale'>;
+    issues: LocationDraftMetadataIssue[];
+  } | null;
+  onRetryMetadata?: () => void;
+  onOpenProviderSettings?: () => void;
 }
 
 interface TileLayerDropdownProps {
@@ -125,6 +134,9 @@ function MapLocationPickerComponent({
   tileLayer: initialTileLayer,
   compact = false,
   commitMode = 'immediate',
+  draftMetadataState = null,
+  onRetryMetadata,
+  onOpenProviderSettings,
 }: MapLocationPickerProps) {
   const t = useTranslations();
 
@@ -330,6 +342,30 @@ function MapLocationPickerComponent({
     );
   }, [fallbackEvent, tileLayerOptions, t]);
 
+  const activeDraftMetadata = useMemo(() => {
+    if (!draftMetadataState || draftMetadataState.summaryStatus === 'stale') {
+      return null;
+    }
+
+    return areCoordinatesEqual(draftMetadataState.coordinates, currentLocation)
+      ? draftMetadataState
+      : null;
+  }, [draftMetadataState, currentLocation]);
+
+  const draftMetadataStatusText = useMemo(() => {
+    if (!activeDraftMetadata) return null;
+    if (activeDraftMetadata.summaryStatus === 'loading') {
+      return t('map.metadataLoading') || 'Refreshing location metadata...';
+    }
+    if (activeDraftMetadata.summaryStatus === 'partial') {
+      return t('map.metadataNeedsAttention') || 'Some location metadata could not be resolved automatically.';
+    }
+    if (activeDraftMetadata.summaryStatus === 'error') {
+      return t('map.metadataResolveFailed') || 'Location metadata refresh failed. You can retry or continue manually.';
+    }
+    return null;
+  }, [activeDraftMetadata, t]);
+
   const mapContent = (
     <>
       {showSearch && (
@@ -350,6 +386,32 @@ function MapLocationPickerComponent({
         {fallbackText && (
           <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
             {fallbackText}
+          </div>
+        )}
+        {activeDraftMetadata && draftMetadataStatusText && (
+          <div
+            className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+            data-testid="map-draft-metadata-status"
+          >
+            <p>{draftMetadataStatusText}</p>
+            {activeDraftMetadata.issues.map((issue) => (
+              <p key={`${issue.field}-${issue.reason}`} className="mt-1">
+                {issue.message}
+              </p>
+            ))}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <MapHealthMonitor compact />
+              {onRetryMetadata && (
+                <Button type="button" size="sm" variant="outline" onClick={onRetryMetadata}>
+                  {t('common.retry') || 'Retry'}
+                </Button>
+              )}
+              {onOpenProviderSettings && (
+                <Button type="button" size="sm" variant="outline" onClick={onOpenProviderSettings}>
+                  {t('map.providerSettings') || 'Map Settings'}
+                </Button>
+              )}
+            </div>
           </div>
         )}
         {commitMode === 'staged' && hasPendingChanges && (

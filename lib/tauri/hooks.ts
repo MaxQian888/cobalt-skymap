@@ -258,20 +258,7 @@ export function useWindowState() {
     }
   }, []);
 
-  // Auto-save on window close
-  useEffect(() => {
-    if (!isTauri()) return;
-
-    const handleBeforeUnload = () => {
-      // Can't await in beforeunload, but we try anyway
-      tauriApi.appSettings.saveWindowState().catch(err => logger.error('Failed to auto-save window state', err));
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, []);
-
-  // Restore on mount
+  // Restore on mount; the plugin handles close-time persistence for us.
   useEffect(() => {
     restoreWindowState();
   }, [restoreWindowState]);

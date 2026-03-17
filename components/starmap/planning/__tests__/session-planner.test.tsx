@@ -4,6 +4,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SessionPlanner } from '../session-planner';
+import type { SessionPlanState } from '@/lib/stores/session-plan-store';
 
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -173,8 +174,44 @@ const mockEquipmentState = {
   customTelescopes: [],
 };
 
-const mockSessionPlanState = {
-  savedPlans: [] as Array<Record<string, unknown>>,
+type MockedStoreAction<T extends (...args: never[]) => unknown> = jest.MockedFunction<T>;
+
+const createStoreActionMock = <T extends (...args: never[]) => unknown>(
+  implementation?: (...args: Parameters<T>) => ReturnType<T>,
+): MockedStoreAction<T> => jest.fn(implementation) as unknown as MockedStoreAction<T>;
+
+type MockSessionPlanState = {
+  savedPlans: SessionPlanState['savedPlans'];
+  templates: SessionPlanState['templates'];
+  executions: SessionPlanState['executions'];
+  activeExecutionId: SessionPlanState['activeExecutionId'];
+  draftRecovery: SessionPlanState['draftRecovery'];
+  recentImports: SessionPlanState['recentImports'];
+  savePlan: MockedStoreAction<SessionPlanState['savePlan']>;
+  updatePlan: MockedStoreAction<SessionPlanState['updatePlan']>;
+  saveTemplate: MockedStoreAction<SessionPlanState['saveTemplate']>;
+  loadTemplate: MockedStoreAction<SessionPlanState['loadTemplate']>;
+  renamePlan: MockedStoreAction<SessionPlanState['renamePlan']>;
+  duplicatePlan: MockedStoreAction<SessionPlanState['duplicatePlan']>;
+  renameTemplate: MockedStoreAction<SessionPlanState['renameTemplate']>;
+  duplicateTemplate: MockedStoreAction<SessionPlanState['duplicateTemplate']>;
+  importPlanV2: MockedStoreAction<SessionPlanState['importPlanV2']>;
+  getPlanById: MockedStoreAction<SessionPlanState['getPlanById']>;
+  deletePlan: MockedStoreAction<SessionPlanState['deletePlan']>;
+  deleteTemplate: MockedStoreAction<SessionPlanState['deleteTemplate']>;
+  saveDraftRecovery: MockedStoreAction<SessionPlanState['saveDraftRecovery']>;
+  clearDraftRecovery: MockedStoreAction<SessionPlanState['clearDraftRecovery']>;
+  addImportRecord: MockedStoreAction<SessionPlanState['addImportRecord']>;
+  dismissImportRecord: MockedStoreAction<SessionPlanState['dismissImportRecord']>;
+  clearImportRecords: MockedStoreAction<SessionPlanState['clearImportRecords']>;
+  listTemplates: MockedStoreAction<SessionPlanState['listTemplates']>;
+  syncExecutionFromObservationSession: MockedStoreAction<SessionPlanState['syncExecutionFromObservationSession']>;
+  setActiveExecution: MockedStoreAction<SessionPlanState['setActiveExecution']>;
+  createExecutionFromPlan: MockedStoreAction<SessionPlanState['createExecutionFromPlan']>;
+};
+
+const mockSessionPlanState: MockSessionPlanState = {
+  savedPlans: [] as SessionPlanState['savedPlans'],
   templates: [{
     id: 'tpl-1',
     name: 'Template A',
@@ -191,17 +228,31 @@ const mockSessionPlanState = {
     createdAt: new Date('2025-01-01T00:00:00.000Z').toISOString(),
     updatedAt: new Date('2025-01-01T00:00:00.000Z').toISOString(),
   }],
-  executions: [] as Array<Record<string, unknown>>,
+  executions: [] as SessionPlanState['executions'],
   activeExecutionId: null as string | null,
-  savePlan: jest.fn(() => 'saved-plan-1'),
-  updatePlan: jest.fn(),
-  saveTemplate: jest.fn(),
-  loadTemplate: jest.fn(),
-  importPlanV2: jest.fn(),
-  deletePlan: jest.fn(),
-  syncExecutionFromObservationSession: jest.fn(),
-  setActiveExecution: jest.fn(),
-  createExecutionFromPlan: jest.fn(),
+  draftRecovery: null as SessionPlanState['draftRecovery'],
+  recentImports: [] as SessionPlanState['recentImports'],
+  savePlan: createStoreActionMock<SessionPlanState['savePlan']>(() => 'saved-plan-1'),
+  updatePlan: createStoreActionMock<SessionPlanState['updatePlan']>(),
+  saveTemplate: createStoreActionMock<SessionPlanState['saveTemplate']>(),
+  loadTemplate: createStoreActionMock<SessionPlanState['loadTemplate']>(),
+  renamePlan: createStoreActionMock<SessionPlanState['renamePlan']>(),
+  duplicatePlan: createStoreActionMock<SessionPlanState['duplicatePlan']>(() => 'saved-plan-copy'),
+  renameTemplate: createStoreActionMock<SessionPlanState['renameTemplate']>(),
+  duplicateTemplate: createStoreActionMock<SessionPlanState['duplicateTemplate']>(() => 'template-copy'),
+  importPlanV2: createStoreActionMock<SessionPlanState['importPlanV2']>(),
+  getPlanById: createStoreActionMock<SessionPlanState['getPlanById']>(),
+  deletePlan: createStoreActionMock<SessionPlanState['deletePlan']>(),
+  deleteTemplate: createStoreActionMock<SessionPlanState['deleteTemplate']>(),
+  saveDraftRecovery: createStoreActionMock<SessionPlanState['saveDraftRecovery']>(),
+  clearDraftRecovery: createStoreActionMock<SessionPlanState['clearDraftRecovery']>(),
+  addImportRecord: createStoreActionMock<SessionPlanState['addImportRecord']>(() => 'import-1'),
+  dismissImportRecord: createStoreActionMock<SessionPlanState['dismissImportRecord']>(),
+  clearImportRecords: createStoreActionMock<SessionPlanState['clearImportRecords']>(),
+  listTemplates: createStoreActionMock<SessionPlanState['listTemplates']>(() => []),
+  syncExecutionFromObservationSession: createStoreActionMock<SessionPlanState['syncExecutionFromObservationSession']>(),
+  setActiveExecution: createStoreActionMock<SessionPlanState['setActiveExecution']>(),
+  createExecutionFromPlan: createStoreActionMock<SessionPlanState['createExecutionFromPlan']>(),
 };
 
 const mockPlanningUiState = {
@@ -213,6 +264,18 @@ const mockPlanningUiState = {
   plannerDraftSeed: null as Record<string, unknown> | null,
   plannerDraftSeedRequestId: 0,
   clearPlannerDraftSeed: jest.fn(),
+  plannerWorkspaceOpen: false,
+  plannerWorkspaceTab: 'plans',
+  plannerWorkspaceFilter: 'all',
+  selectedPlannerWorkspaceEntryId: null as string | null,
+  recoveryPromptVisible: false,
+  openPlannerWorkspace: jest.fn(),
+  closePlannerWorkspace: jest.fn(),
+  setPlannerWorkspaceOpen: jest.fn(),
+  setPlannerWorkspaceTab: jest.fn(),
+  setPlannerWorkspaceFilter: jest.fn(),
+  setSelectedPlannerWorkspaceEntry: jest.fn(),
+  setRecoveryPromptVisible: jest.fn(),
 };
 
 const mockStoreSelectors = {
@@ -270,14 +333,31 @@ jest.mock('@/lib/stores/device-store', () => {
 describe('SessionPlanner', () => {
   const mockIsTauri = jest.requireMock('@/lib/storage/platform').isTauri as jest.Mock;
   const mockCreatePlannedSession = jest.requireMock('@/lib/tauri').tauriApi.observationLog.createPlannedSession as jest.Mock;
+  const mockLoadSessionTemplates = jest.requireMock('@/lib/tauri').tauriApi.sessionIo.loadSessionTemplates as jest.Mock;
+  const mockImportSessionPlan = jest.requireMock('@/lib/tauri').tauriApi.sessionIo.importSessionPlan as jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    const cliBridgeStore = jest.requireActual('@/lib/stores/cli-bridge-store') as typeof import('@/lib/stores/cli-bridge-store');
+    cliBridgeStore.useCliBridgeStore.setState({
+      sessionPlanImportRequestId: 0,
+      sessionPlanImportContent: null,
+      sessionPlanImportSourcePath: null,
+    });
     mockIsTauri.mockReturnValue(false);
     mockSessionPlanState.savedPlans = [];
     mockSessionPlanState.executions = [];
     mockSessionPlanState.activeExecutionId = null;
+    mockSessionPlanState.draftRecovery = null;
+    mockSessionPlanState.recentImports = [];
     mockSessionPlanState.savePlan.mockReturnValue('saved-plan-1');
+    mockLoadSessionTemplates.mockResolvedValue([]);
+    mockImportSessionPlan.mockResolvedValue('');
+    mockPlanningUiState.plannerWorkspaceOpen = false;
+    mockPlanningUiState.plannerWorkspaceTab = 'plans';
+    mockPlanningUiState.plannerWorkspaceFilter = 'all';
+    mockPlanningUiState.selectedPlannerWorkspaceEntryId = null;
+    mockPlanningUiState.recoveryPromptVisible = false;
     mockCreatePlannedSession.mockResolvedValue({
       id: 'session-1',
       date: '2025-06-15',
@@ -307,8 +387,259 @@ describe('SessionPlanner', () => {
   it('renders conflict banners and template entry points', () => {
     render(<SessionPlanner />);
     expect(screen.getByText('Cloud cover too high')).toBeInTheDocument();
-    expect(screen.getByText('sessionPlanner.templates')).toBeInTheDocument();
+    expect(screen.getByText('sessionPlanner.workspace')).toBeInTheDocument();
     expect(screen.getByText('sessionPlanner.importPlan')).toBeInTheDocument();
+  });
+
+  it('opens the dedicated workspace with mixed entries and query filtering', async () => {
+    mockIsTauri.mockReturnValue(true);
+    mockSessionPlanState.savedPlans = [{
+      id: 'saved-plan-1',
+      name: 'Saved Plan',
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      planDate: new Date().toISOString(),
+      latitude: 40,
+      longitude: -74,
+      strategy: 'balanced',
+      minAltitude: 30,
+      minImagingTime: 30,
+      targets: [],
+      excludedTargetIds: [],
+      totalImagingTime: 0,
+      nightCoverage: 0,
+      efficiency: 0,
+    }];
+    mockSessionPlanState.recentImports = [{
+      id: 'import-1',
+      importedAt: '2025-06-15T18:00:00.000Z',
+      source: 'cli',
+      linkedPlanId: 'saved-plan-2',
+      linkedPlanName: 'Imported Plan',
+      draft: {
+        planDate: '2025-06-15T00:00:00.000Z',
+        strategy: 'balanced',
+        constraints: { minAltitude: 20, minImagingTime: 30 },
+        excludedTargetIds: [],
+        manualEdits: [],
+      },
+      diagnostics: {
+        format: 'csv',
+        unmatchedTargets: ['missing-target'],
+        createdTargets: ['M31'],
+        skippedRows: 1,
+        warnings: ['warning-1'],
+      },
+    }];
+    mockSessionPlanState.draftRecovery = {
+      draft: {
+        planDate: '2025-06-15T00:00:00.000Z',
+        strategy: 'balanced',
+        constraints: { minAltitude: 20, minImagingTime: 30 },
+        excludedTargetIds: [],
+        manualEdits: [],
+      },
+      updatedAt: '2025-06-15T17:00:00.000Z',
+      source: 'planner-close',
+      relatedPlanName: 'Recovered Plan',
+    };
+    mockLoadSessionTemplates.mockResolvedValue([{
+      id: 'template-remote',
+      name: 'Remote Observatory Template',
+      draft: {
+        planDate: '2025-06-15T00:00:00.000Z',
+        strategy: 'balanced',
+        constraints: { minAltitude: 20, minImagingTime: 30 },
+        excludedTargetIds: [],
+        manualEdits: [],
+      },
+      created_at: '2025-06-15T16:00:00.000Z',
+      updated_at: '2025-06-15T16:30:00.000Z',
+    }]);
+
+    render(<SessionPlanner />);
+
+    fireEvent.click(screen.getByRole('button', { name: /sessionPlanner\.workspace/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('planner-workspace-panel')).toBeInTheDocument();
+      expect(screen.getAllByText('Saved Plan').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Imported Plan').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Recovered Plan').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Remote Observatory Template').length).toBeGreaterThan(0);
+    });
+
+    fireEvent.change(screen.getByTestId('planner-workspace-search'), {
+      target: { value: 'remote' },
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Remote Observatory Template').length).toBeGreaterThan(0);
+      expect(screen.queryAllByText('Saved Plan')).toHaveLength(0);
+    });
+  });
+
+  it('shows load-only actions for remote templates inside the workspace', async () => {
+    mockIsTauri.mockReturnValue(true);
+    mockLoadSessionTemplates.mockResolvedValue([{
+      id: 'template-remote',
+      name: 'Remote Observatory Template',
+      draft: {
+        planDate: '2025-06-15T00:00:00.000Z',
+        strategy: 'balanced',
+        constraints: { minAltitude: 20, minImagingTime: 30 },
+        excludedTargetIds: [],
+        manualEdits: [],
+      },
+      created_at: '2025-06-15T16:00:00.000Z',
+      updated_at: '2025-06-15T16:30:00.000Z',
+    }]);
+
+    render(<SessionPlanner />);
+
+    fireEvent.click(screen.getByRole('button', { name: /sessionPlanner\.workspace/ }));
+
+    const remoteTemplateLabel = await screen.findByText('Remote Observatory Template');
+    fireEvent.click(remoteTemplateLabel);
+
+    expect(screen.getByTestId('planner-workspace-action-load')).toBeInTheDocument();
+    expect(screen.queryByTestId('planner-workspace-action-rename')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('planner-workspace-action-duplicate')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('planner-workspace-action-delete')).not.toBeInTheDocument();
+  });
+
+  it('closes the planner dialog from the footer button', () => {
+    render(<SessionPlanner />);
+
+    fireEvent.change(screen.getByTestId('session-notes'), {
+      target: { value: 'Unsaved planner notes' },
+    });
+    fireEvent.click(screen.getByTestId('session-planner-close-button'));
+
+    expect(mockPlanningUiState.setSessionPlannerOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('shows a recovery prompt when a recoverable draft exists on reopen', () => {
+    mockPlanningUiState.recoveryPromptVisible = true;
+    mockSessionPlanState.draftRecovery = {
+      draft: {
+        planDate: '2025-06-15T00:00:00.000Z',
+        strategy: 'balanced',
+        constraints: { minAltitude: 20, minImagingTime: 30 },
+        excludedTargetIds: [],
+        manualEdits: [],
+      },
+      updatedAt: '2025-06-15T17:00:00.000Z',
+      source: 'planner-close',
+      relatedPlanName: 'Recovered Plan',
+    };
+
+    render(<SessionPlanner />);
+
+    expect(screen.getByTestId('planner-draft-recovery-prompt')).toBeInTheDocument();
+    expect(screen.getByText('Recovered Plan')).toBeInTheDocument();
+  });
+
+  it('applies CLI import payloads from the bridge store', async () => {
+    mockSessionPlanState.importPlanV2.mockReturnValue('saved-plan-2');
+    mockSessionPlanState.getPlanById = jest.fn((id: string) => id === 'saved-plan-2'
+      ? {
+          id: 'saved-plan-2',
+          name: 'CLI Imported Plan',
+          createdAt: '2025-06-15T19:00:00.000Z',
+          updatedAt: '2025-06-15T19:00:00.000Z',
+          planDate: '2025-06-15T00:00:00.000Z',
+          latitude: 40,
+          longitude: -74,
+          strategy: 'balanced',
+          minAltitude: 20,
+          minImagingTime: 30,
+          targets: [],
+          excludedTargetIds: [],
+          totalImagingTime: 0,
+          nightCoverage: 0,
+          efficiency: 0,
+        }
+      : undefined);
+    mockPlanningUiState.plannerDraftSeedRequestId = 0;
+    const cliBridgeStore = jest.requireActual('@/lib/stores/cli-bridge-store') as typeof import('@/lib/stores/cli-bridge-store');
+    cliBridgeStore.useCliBridgeStore.setState({
+      sessionPlanImportRequestId: 1,
+      sessionPlanImportContent: JSON.stringify({
+        planDate: '2025-06-15T00:00:00.000Z',
+        strategy: 'balanced',
+        constraints: { minAltitude: 20, minImagingTime: 30 },
+        excludedTargetIds: [],
+        manualEdits: [],
+        notes: 'Imported from CLI',
+      }),
+      sessionPlanImportSourcePath: 'D:/imports/cli-plan.json',
+    });
+
+    render(<SessionPlanner />);
+
+    await waitFor(() => {
+      expect(mockSessionPlanState.importPlanV2).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notes: 'Imported from CLI',
+        }),
+      );
+      expect(mockPlanningUiState.setSessionPlannerOpen).toHaveBeenCalledWith(true);
+    });
+
+    expect(screen.getByTestId('session-notes')).toHaveValue('Imported from CLI');
+  });
+
+  it('resumes an execution directly from a workspace plan entry', async () => {
+    mockSessionPlanState.savedPlans = [{
+      id: 'saved-plan-1',
+      name: 'Saved Plan',
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      planDate: new Date().toISOString(),
+      latitude: 40,
+      longitude: -74,
+      strategy: 'balanced',
+      minAltitude: 30,
+      minImagingTime: 30,
+      targets: [],
+      excludedTargetIds: [],
+      totalImagingTime: 0,
+      nightCoverage: 0,
+      efficiency: 0,
+    }];
+    mockSessionPlanState.executions = [{
+      id: 'session-1',
+      sourcePlanId: 'saved-plan-1',
+      sourcePlanName: 'Saved Plan',
+      status: 'active',
+      planDate: new Date().toISOString(),
+      createdAt: '2025-06-15T19:00:00.000Z',
+      updatedAt: '2025-06-15T19:00:00.000Z',
+      targets: [{
+        id: 'saved-plan-1-target-1',
+        targetId: 'target-1',
+        targetName: 'M31',
+        scheduledStart: '2025-06-15T20:30:00.000Z',
+        scheduledEnd: '2025-06-15T22:00:00.000Z',
+        scheduledDurationMinutes: 90,
+        order: 1,
+        status: 'planned',
+        observationIds: [],
+      }],
+    }];
+
+    render(<SessionPlanner />);
+
+    fireEvent.click(screen.getByRole('button', { name: /sessionPlanner\.workspace/ }));
+    fireEvent.click(screen.getAllByText('Saved Plan')[0]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('planner-workspace-action-resume')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('planner-workspace-action-resume'));
+    expect(mockSessionPlanState.setActiveExecution).toHaveBeenCalledWith('session-1');
   });
 
   it('toggles timeline gaps through showGaps switch', () => {

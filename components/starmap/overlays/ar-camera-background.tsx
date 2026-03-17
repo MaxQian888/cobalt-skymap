@@ -13,6 +13,7 @@ import {
   buildARAdaptiveTelemetryPayload,
   deriveARAdaptiveAdjustments,
 } from '@/lib/core/ar-adaptive-learner';
+import { deriveARSessionCameraDefaults } from '@/lib/core/ar-adaptation';
 import {
   fetchAROptimizationPack,
   syncARLearningTelemetry,
@@ -20,6 +21,8 @@ import {
 } from '@/lib/services/ar-optimization-pack-service';
 import { cn } from '@/lib/utils';
 import { createLogger } from '@/lib/logger';
+import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
+import { getARSurfaceLayoutTokens, withSafeAreaInset } from '@/lib/constants/ar-layout';
 
 const logger = createLogger('ar-camera-background');
 
@@ -30,6 +33,8 @@ interface ARCameraBackgroundProps {
 
 export function ARCameraBackground({ enabled, className }: ARCameraBackgroundProps) {
   const t = useTranslations();
+  const adaptation = useARAdaptation();
+  const cameraControlLayout = getARSurfaceLayoutTokens('camera-controls', adaptation.cameraControlMode);
   const videoRef = useRef<HTMLVideoElement>(null);
   const handledRetryRequestRef = useRef(0);
   const handledRevertProfileRequestRef = useRef(0);
@@ -46,9 +51,14 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
     }),
     [stellarium.arAdaptiveLearnerState, stellarium.arAdaptiveLearningEnabled],
   );
+  const sessionDefaults = useMemo(
+    () => deriveARSessionCameraDefaults(adaptation),
+    [adaptation],
+  );
 
   const profileLayers = useMemo(() => ({
     basePreset: stellarium.arCameraPreset ?? 'balanced',
+    sessionDefaults,
     userOverrides: {
       facingMode: stellarium.arCameraFacingMode ?? 'environment',
       resolutionTier: stellarium.arCameraResolutionTier ?? '1080p',
@@ -64,6 +74,7 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
     remoteHints: remotePack?.hints,
   }), [
     adaptiveAdjustments,
+    sessionDefaults,
     remotePack?.hints,
     stellarium.arCameraFacingMode,
     stellarium.arCameraPreset,
@@ -445,10 +456,13 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
       {/* Camera controls overlay */}
       {camera.stream && (
         <div
-          className="absolute flex flex-col gap-1.5 z-10"
+          className="absolute z-10 flex flex-col"
+          data-testid="ar-camera-controls"
+          data-ar-camera-controls-mode={adaptation.cameraControlMode}
           style={{
-            top: 'calc(3.5rem + var(--safe-area-top))',
-            right: 'calc(0.5rem + var(--safe-area-right))',
+            top: withSafeAreaInset('top', cameraControlLayout.topOffsetRem),
+            right: withSafeAreaInset('right', cameraControlLayout.sideInsetRem),
+            gap: `${cameraControlLayout.gapRem}rem`,
           }}
         >
           {camera.hasMultipleCameras && (

@@ -51,15 +51,21 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useLocations, tauriApi } from '@/lib/tauri';
-import { MapLocationPicker } from '@/components/starmap/map';
+import { MapLocationPicker, MapProviderSettings } from '@/components/starmap/map';
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
 import { findPotentialDuplicateLocation, validateLocationForm } from '@/lib/core/management-validators';
-import { fetchElevation } from '@/lib/utils/map-utils';
 import { useWebLocationStore } from '@/lib/stores/web-location-store';
 import { useShallow } from 'zustand/react/shallow';
-import { geocodingService } from '@/lib/services/geocoding-service';
 import { acquireCurrentLocation } from '@/lib/services/location-acquisition';
+import {
+  createPendingLocationDraftMetadata,
+  LocationDraftMetadataResolver,
+  type LocationDraftFieldSource,
+  type LocationDraftFieldStatus,
+  type LocationDraftMetadataState,
+  type ResolveLocationDraftMetadataInput,
+} from '@/lib/services/location-draft-metadata';
 import { syncObservationLocationToMountProfile } from '@/lib/services/observation-location-controller';
 import type { LocationManagerProps } from '@/types/starmap/management';
 
@@ -97,6 +103,58 @@ interface DuplicateLocationState {
   candidateId: string;
   candidateName: string;
   payload: LocationPayload;
+}
+
+type DraftTrackedField = 'name' | 'altitude' | 'timezone' | 'notes' | 'bortle_class';
+
+interface DraftFieldMeta {
+  source: LocationDraftFieldSource;
+  status: LocationDraftFieldStatus;
+  message?: string;
+}
+
+interface DraftFieldMetaState {
+  name: DraftFieldMeta;
+  altitude: DraftFieldMeta;
+  timezone: DraftFieldMeta;
+  notes: DraftFieldMeta;
+  bortle_class: DraftFieldMeta;
+}
+
+function createDraftFieldMeta(
+  source: LocationDraftFieldSource = 'unresolved',
+  status: LocationDraftFieldStatus = 'idle',
+  message?: string
+): DraftFieldMeta {
+  return { source, status, message };
+}
+
+function createEmptyDraftFieldMetaState(): DraftFieldMetaState {
+  return {
+    name: createDraftFieldMeta(),
+    altitude: createDraftFieldMeta(),
+    timezone: createDraftFieldMeta(),
+    notes: createDraftFieldMeta(),
+    bortle_class: createDraftFieldMeta(),
+  };
+}
+
+function createDraftFieldMetaStateFromLocation(location: LocationLike): DraftFieldMetaState {
+  return {
+    name: createDraftFieldMeta(location.name ? 'persisted' : 'unresolved', location.name ? 'ready' : 'idle'),
+    altitude: createDraftFieldMeta(Number.isFinite(location.altitude) ? 'persisted' : 'unresolved', 'ready'),
+    timezone: createDraftFieldMeta(location.timezone ? 'persisted' : 'unresolved', location.timezone ? 'ready' : 'idle'),
+    notes: createDraftFieldMeta(location.notes ? 'persisted' : 'unresolved', location.notes ? 'ready' : 'idle'),
+    bortle_class: createDraftFieldMeta(location.bortle_class ? 'persisted' : 'unresolved', location.bortle_class ? 'ready' : 'idle'),
+  };
+}
+
+function createLoadingDraftFieldMeta(previous: DraftFieldMeta, touched: boolean): DraftFieldMeta {
+  if (touched) {
+    return previous;
+  }
+
+  return createDraftFieldMeta('unresolved', 'loading');
 }
 
 function pickDeterministicCurrent<T extends LocationLike>(
@@ -167,6 +225,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [inputMethod, setInputMethod] = useState<'manual' | 'map'>('manual');
+  const [mapSettingsOpen, setMapSettingsOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [duplicateTarget, setDuplicateTarget] = useState<DuplicateLocationState | null>(null);
   
@@ -204,6 +263,10 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
     notes: false,
   });
   const fieldTouchedRef = useRef(fieldTouched);
+  const draftMetadataResolverRef = useRef(new LocationDraftMetadataResolver());
+  const lastDraftSelectionRef = useRef<ResolveLocationDraftMetadataInput | null>(null);
+  const [draftMetadata, setDraftMetadata] = useState<LocationDraftMetadataState | null>(null);
+  const [draftFieldMeta, setDraftFieldMeta] = useState<DraftFieldMetaState>(createEmptyDraftFieldMetaState());
 
   useEffect(() => {
     fieldTouchedRef.current = fieldTouched;
@@ -267,10 +330,119 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
       notes: loc.notes || '',
       bortle_class: loc.bortle_class?.toString() || '',
     });
-    setFieldTouched({ name: true, altitude: true, timezone: true, notes: true });
+    setFieldTouched({ name: false, altitude: false, timezone: false, notes: false });
+    setDraftFieldMeta(createDraftFieldMetaStateFromLocation(loc));
+    setDraftMetadata(null);
+    lastDraftSelectionRef.current = {
+      coordinates: {
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+      },
+      source: 'existing-record',
+    };
     setEditingId(loc.id);
     setAdding(true);
     setInputMethod('manual');
+  };
+
+  const setDraftFieldManual = (field: DraftTrackedField) => {
+    setDraftFieldMeta(prev => ({
+      ...prev,
+      [field]: createDraftFieldMeta('manual', 'ready'),
+    }));
+  };
+
+  const applyResolvedDraftMetadata = (
+    result: LocationDraftMetadataState,
+    options: {
+      fallbackName?: string;
+      fallbackElevation?: number | null;
+    } = {}
+  ) => {
+    const { fallbackName, fallbackElevation } = options;
+    const hasDerivedName = result.fields.name.status === 'ready' && !!result.fields.name.value;
+    const effectiveName = hasDerivedName ? result.fields.name.value : (fallbackName || null);
+    const effectiveNameMeta = effectiveName
+      ? createDraftFieldMeta('derived', 'ready')
+      : createDraftFieldMeta('unresolved', 'error', result.fields.name.message);
+    const effectiveAltitude = result.fields.elevation.status === 'ready'
+      ? result.fields.elevation.value
+      : fallbackElevation;
+    const effectiveAltitudeMeta = typeof effectiveAltitude === 'number'
+      ? createDraftFieldMeta('derived', 'ready')
+      : createDraftFieldMeta('unresolved', 'error', result.fields.elevation.message);
+
+    setDraftMetadata({
+      ...result,
+      displayName: effectiveName ?? result.displayName,
+    });
+    setDraftFieldMeta(prev => ({
+      ...prev,
+      name: fieldTouchedRef.current.name ? prev.name : effectiveNameMeta,
+      timezone: fieldTouchedRef.current.timezone
+        ? prev.timezone
+        : (
+          result.fields.timezone.status === 'ready'
+            ? createDraftFieldMeta('derived', 'ready')
+            : createDraftFieldMeta('unresolved', 'error', result.fields.timezone.message)
+        ),
+      altitude: fieldTouchedRef.current.altitude ? prev.altitude : effectiveAltitudeMeta,
+    }));
+    setForm(prev => ({
+      ...prev,
+      latitude: result.coordinates.latitude.toFixed(6),
+      longitude: result.coordinates.longitude.toFixed(6),
+      name: fieldTouchedRef.current.name
+        ? prev.name
+        : (effectiveName ?? prev.name),
+      timezone: fieldTouchedRef.current.timezone
+        ? prev.timezone
+        : (result.fields.timezone.status === 'ready' && result.fields.timezone.value
+          ? result.fields.timezone.value
+          : prev.timezone),
+      altitude: fieldTouchedRef.current.altitude
+        ? prev.altitude
+        : (typeof effectiveAltitude === 'number'
+          ? Math.round(effectiveAltitude).toString()
+          : prev.altitude),
+    }));
+  };
+
+  const resolveDraftSelection = async (
+    input: ResolveLocationDraftMetadataInput,
+    options: {
+      fallbackName?: string;
+      fallbackElevation?: number | null;
+    } = {}
+  ) => {
+    lastDraftSelectionRef.current = input;
+    setForm(prev => ({
+      ...prev,
+      latitude: input.coordinates.latitude.toFixed(6),
+      longitude: input.coordinates.longitude.toFixed(6),
+    }));
+    setDraftMetadata(createPendingLocationDraftMetadata(input));
+    setDraftFieldMeta(prev => ({
+      ...prev,
+      name: createLoadingDraftFieldMeta(prev.name, fieldTouchedRef.current.name),
+      timezone: createLoadingDraftFieldMeta(prev.timezone, fieldTouchedRef.current.timezone),
+      altitude: createLoadingDraftFieldMeta(prev.altitude, fieldTouchedRef.current.altitude),
+    }));
+
+    const result = await draftMetadataResolverRef.current.resolve(input);
+    if (result.stale) {
+      return;
+    }
+
+    applyResolvedDraftMetadata(result, options);
+  };
+
+  const retryDraftMetadata = async () => {
+    if (!lastDraftSelectionRef.current) {
+      return;
+    }
+
+    await resolveDraftSelection(lastDraftSelectionRef.current);
   };
 
   const toLocationPayload = (): LocationPayload => ({
@@ -490,14 +662,6 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
     }
   };
 
-  const getAutoTimezone = (): string => {
-    try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-    } catch {
-      return '';
-    }
-  };
-
   const handleUseGPS = async () => {
     const result = await acquireCurrentLocation({
       enableHighAccuracy: true,
@@ -525,64 +689,41 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
     }
 
     const { latitude, longitude, altitude } = result.location;
-    setForm(prev => ({
-      ...prev,
-      latitude: latitude.toFixed(6),
-      longitude: longitude.toFixed(6),
-      altitude: fieldTouchedRef.current.altitude
-        ? prev.altitude
-        : (altitude !== null ? altitude.toFixed(0) : prev.altitude),
-      timezone: fieldTouchedRef.current.timezone
-        ? prev.timezone
-        : (prev.timezone || getAutoTimezone()),
-    }));
-
-    if (!fieldTouchedRef.current.name) {
-      try {
-        const reverseResult = await geocodingService.reverseGeocode({ latitude, longitude });
-        setForm(prev => (fieldTouchedRef.current.name
-          ? prev
-          : {
-            ...prev,
-            name: reverseResult.displayName || reverseResult.address || prev.name,
-          }));
-      } catch {
-        setForm(prev => (fieldTouchedRef.current.name
-          ? prev
-          : {
-            ...prev,
-            name: prev.name || `Location ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-          }));
+    await resolveDraftSelection(
+      {
+        coordinates: { latitude, longitude },
+        source: 'gps',
+      },
+      {
+        fallbackElevation: altitude,
       }
-    }
+    );
 
     toast.success(t('locations.gpsAcquired') || 'GPS location acquired');
   };
 
-  const handleMapLocationSelect = (location: { coordinates: { latitude: number; longitude: number }; address?: string }) => {
-    const suggestedName = location.address || `Location ${location.coordinates.latitude.toFixed(4)}, ${location.coordinates.longitude.toFixed(4)}`;
+  const handleMapLocationSelect = async (location: {
+    coordinates: { latitude: number; longitude: number };
+    address?: string;
+    displayName?: string;
+  }) => {
+    const suggestedName = location.displayName
+      || location.address
+      || `Location ${location.coordinates.latitude.toFixed(4)}, ${location.coordinates.longitude.toFixed(4)}`;
 
-    setForm(prev => ({
-      ...prev,
-      latitude: location.coordinates.latitude.toFixed(6),
-      longitude: location.coordinates.longitude.toFixed(6),
-      name: fieldTouchedRef.current.name ? prev.name : suggestedName,
-      timezone: fieldTouchedRef.current.timezone
-        ? prev.timezone
-        : (prev.timezone || getAutoTimezone()),
-    }));
-
-    // Auto-fetch elevation for the selected location
-    fetchElevation(location.coordinates.latitude, location.coordinates.longitude).then(elevation => {
-      if (elevation !== null) {
-        setForm(prev => (fieldTouchedRef.current.altitude
-          ? prev
-          : { ...prev, altitude: Math.round(elevation).toString() }));
+    await resolveDraftSelection(
+      {
+        coordinates: location.coordinates,
+        source: location.displayName || location.address ? 'search' : 'map-click',
+      },
+      {
+        fallbackName: suggestedName,
       }
-    });
+    );
   };
 
   const resetForm = () => {
+    draftMetadataResolverRef.current.invalidatePending();
     setForm({
       name: '',
       latitude: '',
@@ -593,10 +734,42 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
       bortle_class: '',
     });
     setFieldTouched({ name: false, altitude: false, timezone: false, notes: false });
+    setDraftFieldMeta(createEmptyDraftFieldMetaState());
+    setDraftMetadata(null);
+    lastDraftSelectionRef.current = null;
     setInputMethod('manual');
     setEditingId(null);
     setDuplicateTarget(null);
   };
+
+  const getDraftMetaLabel = (meta: DraftFieldMeta): string => {
+    if (meta.status === 'loading') {
+      return t('locations.metadataLoading') || 'Refreshing...';
+    }
+
+    switch (meta.source) {
+      case 'manual':
+        return t('locations.metadataManual') || 'Manual';
+      case 'derived':
+        return t('locations.metadataDerived') || 'Derived';
+      case 'persisted':
+        return t('locations.metadataPersisted') || 'Saved';
+      case 'unresolved':
+      default:
+        return t('locations.metadataUnresolved') || 'Unresolved';
+    }
+  };
+
+  const hasRetryableDraftMetadata = draftMetadata?.summaryStatus === 'partial'
+    || draftMetadata?.summaryStatus === 'error';
+  const pickerDraftMetadataState = draftMetadata
+    && draftMetadata.summaryStatus !== 'idle'
+    ? {
+      coordinates: draftMetadata.coordinates,
+      summaryStatus: draftMetadata.summaryStatus,
+      issues: draftMetadata.issues,
+    }
+    : null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -752,6 +925,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                         value={form.name}
                         onChange={(e) => {
                           setFieldTouched(prev => ({ ...prev, name: true }));
+                          setDraftFieldManual('name');
                           setForm(prev => ({ ...prev, name: e.target.value }));
                         }}
                         placeholder={t('locations.namePlaceholder') || 'e.g. Backyard, Dark Site'}
@@ -787,12 +961,20 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                           value={form.altitude}
                           onChange={(e) => {
                             setFieldTouched(prev => ({ ...prev, altitude: true }));
+                            setDraftFieldManual('altitude');
                             setForm(prev => ({ ...prev, altitude: e.target.value }));
                           }}
                           placeholder="100"
                         />
                       </div>
-                      <BortleClassSelect value={form.bortle_class} onChange={(v) => setForm(prev => ({ ...prev, bortle_class: v }))} t={t} />
+                      <BortleClassSelect
+                        value={form.bortle_class}
+                        onChange={(v) => {
+                          setDraftFieldManual('bortle_class');
+                          setForm(prev => ({ ...prev, bortle_class: v }));
+                        }}
+                        t={t}
+                      />
                     </div>
                     <div>
                       <Label>{t('locations.timezone') || 'Timezone'}</Label>
@@ -800,6 +982,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                         value={form.timezone}
                         onChange={(e) => {
                           setFieldTouched(prev => ({ ...prev, timezone: true }));
+                          setDraftFieldManual('timezone');
                           setForm(prev => ({ ...prev, timezone: e.target.value }));
                         }}
                         placeholder={t('locations.timezonePlaceholder') || 'e.g. Asia/Shanghai'}
@@ -811,6 +994,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                         value={form.notes}
                         onChange={(e) => {
                           setFieldTouched(prev => ({ ...prev, notes: true }));
+                          setDraftFieldManual('notes');
                           setForm(prev => ({ ...prev, notes: e.target.value }));
                         }}
                         placeholder={t('locations.notesPlaceholder') || 'Optional notes for this observing site'}
@@ -829,12 +1013,13 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                     <div className="space-y-3">
                       <div>
                         <Label>{t('locations.name') || 'Name'}</Label>
-                        <Input
-                          value={form.name}
-                          onChange={(e) => {
-                            setFieldTouched(prev => ({ ...prev, name: true }));
-                            setForm(prev => ({ ...prev, name: e.target.value }));
-                          }}
+                      <Input
+                        value={form.name}
+                        onChange={(e) => {
+                          setFieldTouched(prev => ({ ...prev, name: true }));
+                          setDraftFieldManual('name');
+                          setForm(prev => ({ ...prev, name: e.target.value }));
+                        }}
                           placeholder={t('locations.namePlaceholder') || 'e.g. Backyard, Dark Site'}
                         />
                       </div>
@@ -845,11 +1030,10 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                           longitude: parseFloat(form.longitude) || 116.4074,
                         }}
                         onLocationChange={(coords: { latitude: number; longitude: number }) => {
-                          setForm(prev => ({
-                            ...prev,
-                            latitude: coords.latitude.toFixed(6),
-                            longitude: coords.longitude.toFixed(6),
-                          }));
+                          void resolveDraftSelection({
+                            coordinates: coords,
+                            source: 'map-click',
+                          });
                         }}
                         onLocationSelect={handleMapLocationSelect}
                         height={220}
@@ -857,6 +1041,9 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                         showControls={true}
                         commitMode="staged"
                         compact
+                        draftMetadataState={pickerDraftMetadataState}
+                        onRetryMetadata={() => void retryDraftMetadata()}
+                        onOpenProviderSettings={() => setMapSettingsOpen(true)}
                       />
                       
                       <div className="grid grid-cols-2 gap-2">
@@ -867,12 +1054,20 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                           value={form.altitude}
                           onChange={(e) => {
                             setFieldTouched(prev => ({ ...prev, altitude: true }));
+                            setDraftFieldManual('altitude');
                             setForm(prev => ({ ...prev, altitude: e.target.value }));
                           }}
                           placeholder="100"
                         />
                         </div>
-                        <BortleClassSelect value={form.bortle_class} onChange={(v) => setForm(prev => ({ ...prev, bortle_class: v }))} t={t} />
+                        <BortleClassSelect
+                          value={form.bortle_class}
+                          onChange={(v) => {
+                            setDraftFieldManual('bortle_class');
+                            setForm(prev => ({ ...prev, bortle_class: v }));
+                          }}
+                          t={t}
+                        />
                       </div>
                       <div>
                         <Label>{t('locations.timezone') || 'Timezone'}</Label>
@@ -880,6 +1075,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                           value={form.timezone}
                           onChange={(e) => {
                             setFieldTouched(prev => ({ ...prev, timezone: true }));
+                            setDraftFieldManual('timezone');
                             setForm(prev => ({ ...prev, timezone: e.target.value }));
                           }}
                           placeholder={t('locations.timezonePlaceholder') || 'e.g. Asia/Shanghai'}
@@ -891,6 +1087,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                           value={form.notes}
                           onChange={(e) => {
                             setFieldTouched(prev => ({ ...prev, notes: true }));
+                            setDraftFieldManual('notes');
                             setForm(prev => ({ ...prev, notes: e.target.value }));
                           }}
                           placeholder={t('locations.notesPlaceholder') || 'Optional notes for this observing site'}
@@ -900,6 +1097,45 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                     </div>
                   </TabsContent>
                 </Tabs>
+
+                <div className="rounded-md border bg-muted/30 p-3 space-y-2" data-testid="location-draft-metadata">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium">
+                      {t('locations.metadataStatusTitle') || 'Draft metadata'}
+                    </p>
+                    {hasRetryableDraftMetadata && (
+                      <Button size="sm" variant="outline" onClick={() => void retryDraftMetadata()}>
+                        {t('common.retry') || 'Retry'}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{t('locations.name') || 'Name'}</span>
+                      <span>{getDraftMetaLabel(draftFieldMeta.name)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{t('locations.timezone') || 'Timezone'}</span>
+                      <span>{getDraftMetaLabel(draftFieldMeta.timezone)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span>{t('locations.altitude') || 'Altitude (m)'}</span>
+                      <span>{getDraftMetaLabel(draftFieldMeta.altitude)}</span>
+                    </div>
+                  </div>
+                  {draftMetadata?.issues.length ? (
+                    <div className="space-y-1">
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        {t('locations.metadataNeedsAttention') || 'Some metadata could not be resolved. Review or enter it manually.'}
+                      </p>
+                      {draftMetadata.issues.map((issue) => (
+                        <p key={`${issue.field}-${issue.reason}`} className="text-[11px] text-muted-foreground">
+                          {issue.message}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="flex gap-2 pt-3 border-t">
                   <Button size="sm" onClick={handleAdd}>
@@ -975,6 +1211,12 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MapProviderSettings
+        open={mapSettingsOpen}
+        onOpenChange={setMapSettingsOpen}
+        trigger={<button type="button" className="hidden" aria-hidden="true" tabIndex={-1} />}
+      />
     </Dialog>
   );
 }

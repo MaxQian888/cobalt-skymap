@@ -15,6 +15,11 @@ beforeEach(() => {
       messierMarathonGuideOpen: false,
       plannerDraftSeed: null,
       plannerDraftSeedRequestId: 0,
+      plannerWorkspaceOpen: false,
+      plannerWorkspaceTab: 'plans',
+      plannerWorkspaceFilter: 'all',
+      selectedPlannerWorkspaceEntryId: null,
+      recoveryPromptVisible: false,
     });
   });
 });
@@ -26,6 +31,8 @@ describe('usePlanningUiStore', () => {
     expect(state.shotListOpen).toBe(false);
     expect(state.tonightRecommendationsOpen).toBe(false);
     expect(state.messierMarathonGuideOpen).toBe(false);
+    expect(state.plannerWorkspaceOpen).toBe(false);
+    expect(state.plannerWorkspaceTab).toBe('plans');
   });
 
   it('should open session planner', () => {
@@ -139,5 +146,38 @@ describe('usePlanningUiStore', () => {
     const state = usePlanningUiStore.getState();
     expect(state.sessionPlannerOpen).toBe(true);
     expect(state.plannerDraftSeed).toBeNull();
+  });
+
+  it('should open planner workspace with a specific tab', () => {
+    act(() => {
+      usePlanningUiStore.getState().openPlannerWorkspace('imports');
+    });
+
+    const state = usePlanningUiStore.getState();
+    expect(state.plannerWorkspaceOpen).toBe(true);
+    expect(state.plannerWorkspaceTab).toBe('imports');
+  });
+
+  it('should update workspace filter and selected entry independently', () => {
+    act(() => {
+      usePlanningUiStore.getState().setPlannerWorkspaceFilter('templates');
+      usePlanningUiStore.getState().setSelectedPlannerWorkspaceEntry('template-1');
+    });
+
+    const state = usePlanningUiStore.getState();
+    expect(state.plannerWorkspaceFilter).toBe('templates');
+    expect(state.selectedPlannerWorkspaceEntryId).toBe('template-1');
+  });
+
+  it('should show and hide the recovery prompt', () => {
+    act(() => {
+      usePlanningUiStore.getState().setRecoveryPromptVisible(true);
+    });
+    expect(usePlanningUiStore.getState().recoveryPromptVisible).toBe(true);
+
+    act(() => {
+      usePlanningUiStore.getState().setRecoveryPromptVisible(false);
+    });
+    expect(usePlanningUiStore.getState().recoveryPromptVisible).toBe(false);
   });
 });
