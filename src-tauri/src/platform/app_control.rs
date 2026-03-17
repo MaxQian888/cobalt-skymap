@@ -98,7 +98,10 @@ pub fn handle_tray_icon_event<R: Runtime>(app: &AppHandle<R>, event: &TrayIconEv
                 log::warn!("Failed to emit tray activation event: {error}");
             }
         }
-        TrayIconEvent::DoubleClick { button, .. } if matches!(button, MouseButton::Left) => {
+        TrayIconEvent::DoubleClick {
+            button: MouseButton::Left,
+            ..
+        } => {
             if let Err(error) = app.emit(TRAY_ACTIVATED_EVENT, ()) {
                 log::warn!("Failed to emit tray activation event on double click: {error}");
             }

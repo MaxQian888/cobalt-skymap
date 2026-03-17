@@ -8,7 +8,7 @@ import type { DependencyInfo } from '@/types/about';
 export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   {
     name: 'next',
-    version: '16.0.0',
+    version: '^16.1.7',
     type: 'framework',
     source: 'npm',
     runtime: 'shared',
@@ -304,7 +304,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'zustand',
-    version: '^5.0.11',
+    version: '^5.0.12',
     type: 'state',
     source: 'npm',
     runtime: 'shared',
@@ -440,7 +440,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'jest',
-    version: '^30.2.0',
+    version: '^30.3.0',
     type: 'testing',
     source: 'npm',
     runtime: 'shared',
@@ -448,7 +448,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'jest-environment-jsdom',
-    version: '^30.2.0',
+    version: '^30.3.0',
     type: 'testing',
     source: 'npm',
     runtime: 'shared',
@@ -504,7 +504,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'baseline-browser-mapping',
-    version: '^2.10.0',
+    version: '^2.10.8',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -536,7 +536,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'shadcn',
-    version: '^4.0.0',
+    version: '^4.0.8',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -576,7 +576,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'framer-motion',
-    version: '^12.35.1',
+    version: '^12.37.0',
     type: 'util',
     source: 'npm',
     runtime: 'shared',
@@ -592,7 +592,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tanstack/react-virtual',
-    version: '^3.13.21',
+    version: '^3.13.23',
     type: 'other',
     source: 'npm',
     runtime: 'shared',
@@ -736,7 +736,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-stronghold',
-    version: '^2.3.0',
+    version: '^2.3.1',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -745,6 +745,14 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   {
     name: '@tauri-apps/plugin-updater',
     version: '^2.10.0',
+    type: 'desktop',
+    source: 'npm',
+    runtime: 'desktop',
+    manifestSection: 'dependencies',
+  },
+  {
+    name: '@tauri-apps/plugin-window-state',
+    version: '^2.4.1',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -872,6 +880,14 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'tauri-plugin-updater',
+    version: '2',
+    type: 'desktop',
+    source: 'cargo',
+    runtime: 'desktop',
+    manifestSection: 'target.\'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))\'.dependencies',
+  },
+  {
+    name: 'tauri-plugin-window-state',
     version: '2',
     type: 'desktop',
     source: 'cargo',

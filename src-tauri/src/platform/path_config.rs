@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Manager};
 
@@ -15,7 +15,7 @@ use crate::data::StorageError;
 // ============================================================================
 
 /// User-customizable path configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PathConfig {
     /// Custom data directory (stores, settings, solver config)
     /// When None, uses default app_data_dir/skymap
@@ -23,15 +23,6 @@ pub struct PathConfig {
     /// Custom cache directory (offline tiles, unified cache)
     /// When None, uses default app_data_dir/skymap
     pub custom_cache_dir: Option<String>,
-}
-
-impl Default for PathConfig {
-    fn default() -> Self {
-        Self {
-            custom_data_dir: None,
-            custom_cache_dir: None,
-        }
-    }
 }
 
 /// Full path information returned to the frontend
@@ -227,7 +218,7 @@ fn validate_dir(path: &str) -> DirectoryValidation {
 
 /// Get available disk space for a path using native OS APIs.
 /// Safe, fast, and cross-platform (no shell commands).
-fn get_available_space(path: &PathBuf) -> Option<u64> {
+fn get_available_space(path: &Path) -> Option<u64> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::ffi::OsStrExt;

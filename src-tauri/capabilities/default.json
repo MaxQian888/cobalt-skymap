@@ -47,6 +47,7 @@
     "clipboard-manager:allow-read-image",
     "clipboard-manager:allow-write-image",
     "clipboard-manager:allow-clear",
+    "window-state:default",
     "global-shortcut:allow-register",
     "global-shortcut:allow-register-all",
     "global-shortcut:allow-unregister",

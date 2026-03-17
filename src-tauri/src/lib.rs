@@ -313,6 +313,8 @@ pub fn run() {
                 app.handle().plugin(tauri_plugin_positioner::init())?;
                 app.handle()
                     .plugin(tauri_plugin_clipboard_manager::init())?;
+                app.handle()
+                    .plugin(tauri_plugin_window_state::Builder::default().build())?;
                 app.handle().plugin(tauri_plugin_autostart::init(
                     tauri_plugin_autostart::MacosLauncher::LaunchAgent,
                     None::<Vec<&str>>,
@@ -333,7 +335,7 @@ pub fn run() {
                 app.handle().plugin(tauri_plugin_process::init())?;
                 app.handle().plugin(tauri_plugin_os::init())?;
 
-                if let Err(error) = initialize_tray(&app.handle()) {
+                if let Err(error) = initialize_tray(app.handle()) {
                     log::warn!("Tray initialization skipped: {error}");
                 }
             }
