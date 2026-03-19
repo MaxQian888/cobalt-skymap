@@ -278,7 +278,7 @@ describe('OfflineCacheManager', () => {
       { layerId: 'layer1', cached: true, cachedBytes: 512, cachedFiles: 5, totalFiles: 10, isComplete: true },
     ];
     render(<OfflineCacheManager />);
-    fireEvent.click(screen.getByText('cache.clearAll'));
+    fireEvent.click(screen.getByRole('button', { name: 'cache.clearAll' }));
     expect(mockClearAllCache).toHaveBeenCalled();
   });
 
