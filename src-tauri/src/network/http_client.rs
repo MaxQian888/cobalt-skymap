@@ -2,6 +2,7 @@
 //! Provides HTTP requests with retries, progress reporting, and cancellation
 
 use std::collections::HashMap;
+use std::env;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -96,6 +97,63 @@ pub struct DownloadProgress {
     pub percent: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProxyMode {
+    Auto,
+    Manual,
+    Off,
+}
+
+impl Default for ProxyMode {
+    fn default() -> Self {
+        Self::Auto
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProxySource {
+    Manual,
+    Env,
+    System,
+    None,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EffectiveProxyState {
+    pub mode: ProxyMode,
+    pub source: ProxySource,
+    pub source_detail: Option<String>,
+    pub resolved_proxy: Option<String>,
+    pub fallback_to_direct_on_failure: bool,
+    pub fallback_applied: bool,
+    pub last_error: Option<String>,
+}
+
+impl Default for EffectiveProxyState {
+    fn default() -> Self {
+        Self {
+            mode: ProxyMode::Auto,
+            source: ProxySource::None,
+            source_detail: None,
+            resolved_proxy: None,
+            fallback_to_direct_on_failure: true,
+            fallback_applied: false,
+            last_error: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ProxyStrategy {
+    state: EffectiveProxyState,
+    proxy_url_to_apply: Option<String>,
+    disable_proxy: bool,
+    can_fallback_to_direct: bool,
+    build_error: Option<String>,
+}
+
 static ACTIVE_REQUESTS: Lazy<Arc<Mutex<HashMap<String, bool>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
@@ -126,6 +184,242 @@ fn unregister_request(request_id: &Option<String>) {
     }
 }
 
+fn sanitize_proxy_url(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|proxy| !proxy.is_empty())
+        .map(String::from)
+}
+
+fn discover_proxy_from_env() -> Option<(String, String)> {
+    const CANDIDATES: [&str; 6] = [
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+    ];
+
+    for key in CANDIDATES {
+        if let Some(raw_value) = env::var_os(key).and_then(|v| v.into_string().ok()) {
+            if let Some(proxy) = sanitize_proxy_url(Some(&raw_value)) {
+                return Some((proxy, key.to_string()));
+            }
+        }
+    }
+    None
+}
+
+fn resolve_proxy_strategy(config: &HttpClientConfig) -> ProxyStrategy {
+    let manual_proxy_url = sanitize_proxy_url(config.manual_proxy_url.as_deref())
+        .or_else(|| sanitize_proxy_url(config.proxy_url.as_deref()));
+
+    let state = EffectiveProxyState {
+        mode: config.proxy_mode.clone(),
+        source: ProxySource::None,
+        source_detail: None,
+        resolved_proxy: None,
+        fallback_to_direct_on_failure: config.fallback_to_direct_on_failure,
+        fallback_applied: false,
+        last_error: None,
+    };
+
+    let mut strategy = ProxyStrategy {
+        state,
+        proxy_url_to_apply: None,
+        disable_proxy: false,
+        can_fallback_to_direct: false,
+        build_error: None,
+    };
+
+    match config.proxy_mode {
+        ProxyMode::Off => {
+            strategy.state.source = ProxySource::None;
+            strategy.disable_proxy = true;
+        }
+        ProxyMode::Manual => {
+            strategy.state.source = ProxySource::Manual;
+            strategy.state.resolved_proxy = manual_proxy_url.clone();
+
+            match manual_proxy_url {
+                Some(proxy_url) => match reqwest::Proxy::all(&proxy_url) {
+                    Ok(_) => {
+                        strategy.proxy_url_to_apply = Some(proxy_url);
+                        strategy.can_fallback_to_direct = config.fallback_to_direct_on_failure;
+                    }
+                    Err(error) => {
+                        strategy.state.last_error =
+                            Some(format!("Invalid manual proxy URL: {error}"));
+                        if config.fallback_to_direct_on_failure {
+                            strategy.disable_proxy = true;
+                        } else {
+                            strategy.build_error = strategy.state.last_error.clone();
+                        }
+                    }
+                },
+                None => {
+                    strategy.state.last_error =
+                        Some("Manual proxy mode requires a proxy URL".into());
+                    if config.fallback_to_direct_on_failure {
+                        strategy.disable_proxy = true;
+                    } else {
+                        strategy.build_error = strategy.state.last_error.clone();
+                    }
+                }
+            }
+        }
+        ProxyMode::Auto => {
+            if let Some((proxy_url, env_key)) = discover_proxy_from_env() {
+                strategy.state.source = ProxySource::Env;
+                strategy.state.source_detail = Some(env_key);
+                strategy.state.resolved_proxy = Some(proxy_url.clone());
+                match reqwest::Proxy::all(&proxy_url) {
+                    Ok(_) => {
+                        strategy.proxy_url_to_apply = Some(proxy_url);
+                    }
+                    Err(error) => {
+                        strategy.state.last_error =
+                            Some(format!("Invalid proxy from environment: {error}"));
+                    }
+                }
+            } else {
+                // Keep reqwest system proxy behavior in auto mode when env is not present.
+                strategy.state.source = ProxySource::System;
+                strategy.state.source_detail = Some("reqwest-system-proxy".to_string());
+            }
+            strategy.can_fallback_to_direct = true;
+        }
+    }
+
+    strategy
+}
+
+fn update_effective_proxy_state(state: EffectiveProxyState) {
+    if let Ok(mut current) = EFFECTIVE_PROXY_STATE.lock() {
+        *current = state;
+    }
+}
+
+fn should_attempt_direct_fallback(
+    error: &HttpClientError,
+    strategy: &ProxyStrategy,
+    fallback_already_applied: bool,
+) -> bool {
+    if fallback_already_applied || !strategy.can_fallback_to_direct {
+        return false;
+    }
+
+    matches!(
+        error,
+        HttpClientError::Request(_) | HttpClientError::Timeout(_)
+    )
+}
+
+async fn execute_request_with_client(
+    app: &AppHandle,
+    client: &reqwest::Client,
+    config: &RequestConfig,
+    max_response_size: usize,
+) -> Result<HttpResponse, HttpClientError> {
+    let mut request = match config.method.to_uppercase().as_str() {
+        "GET" => client.get(&config.url),
+        "POST" => client.post(&config.url),
+        "PUT" => client.put(&config.url),
+        "DELETE" => client.delete(&config.url),
+        "HEAD" => client.head(&config.url),
+        _ => client.get(&config.url),
+    };
+
+    for (key, value) in &config.headers {
+        request = request.header(key, value);
+    }
+
+    if let Some(body) = &config.body {
+        request = request.body(body.clone());
+    }
+
+    let response = request.send().await.map_err(|e| {
+        if e.is_timeout() {
+            HttpClientError::Timeout(config.timeout_seconds)
+        } else {
+            HttpClientError::Request(e.to_string())
+        }
+    })?;
+
+    let status = response.status().as_u16();
+    let content_type = response
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .map(String::from);
+    let content_length = response.content_length();
+
+    let mut headers = HashMap::new();
+    for (key, value) in response.headers() {
+        if let Ok(v) = value.to_str() {
+            headers.insert(key.to_string(), v.to_string());
+        }
+    }
+
+    let body = if let (true, Some(total)) = (config.report_progress, content_length) {
+        if total > max_response_size as u64 {
+            return Err(HttpClientError::InvalidResponse(format!(
+                "Response size {} exceeds maximum allowed {}",
+                total, max_response_size
+            )));
+        }
+
+        let mut downloaded = 0u64;
+        let mut body_bytes = Vec::with_capacity(total as usize);
+        let mut stream = response.bytes_stream();
+
+        use futures_util::StreamExt;
+        while let Some(chunk) = stream.next().await {
+            if is_cancelled(&config.request_id) {
+                return Err(HttpClientError::Cancelled);
+            }
+
+            match chunk {
+                Ok(bytes) => {
+                    downloaded += bytes.len() as u64;
+                    body_bytes.extend_from_slice(&bytes);
+
+                    if let Some(ref id) = config.request_id {
+                        let _ = app.emit(
+                            "download-progress",
+                            DownloadProgress {
+                                request_id: id.clone(),
+                                downloaded,
+                                total: Some(total),
+                                percent: (downloaded as f64 / total as f64) * 100.0,
+                            },
+                        );
+                    }
+                }
+                Err(error) => {
+                    return Err(HttpClientError::Request(error.to_string()));
+                }
+            }
+        }
+        body_bytes
+    } else {
+        response
+            .bytes()
+            .await
+            .map_err(|e| HttpClientError::Request(e.to_string()))?
+            .to_vec()
+    };
+
+    Ok(HttpResponse {
+        status,
+        headers,
+        body,
+        content_type,
+        content_length,
+    })
+}
+
 #[tauri::command]
 pub async fn http_request(
     app: AppHandle,
@@ -134,41 +428,24 @@ pub async fn http_request(
     security::validate_url(&config.url, config.allow_http, None)?;
     register_request(&config.request_id);
 
-    // Get global HTTP configuration
-    let global_config = HTTP_CONFIG.lock().map(|c| c.clone()).unwrap_or_default();
+    let global_config = HTTP_CONFIG
+        .lock()
+        .map(|c| c.clone())
+        .unwrap_or_default()
+        .normalize();
 
-    // Build client with global and request-specific configuration
-    let mut client_builder = reqwest::Client::builder()
-        .timeout(Duration::from_secs(config.timeout_seconds))
-        .connect_timeout(Duration::from_millis(global_config.connect_timeout_ms))
-        .user_agent(&global_config.user_agent);
-
-    // Apply compression setting
-    if global_config.enable_compression {
-        client_builder = client_builder.gzip(true).deflate(true);
-    } else {
-        client_builder = client_builder.no_gzip().no_deflate();
-    }
-
-    // Apply redirect settings
-    if global_config.follow_redirects {
-        client_builder = client_builder.redirect(reqwest::redirect::Policy::limited(
-            global_config.max_redirects as usize,
-        ));
-    } else {
-        client_builder = client_builder.redirect(reqwest::redirect::Policy::none());
-    }
-
-    // Apply proxy if configured
-    if let Some(ref proxy_url) = global_config.proxy_url {
-        if let Ok(proxy) = reqwest::Proxy::all(proxy_url) {
-            client_builder = client_builder.proxy(proxy);
-        }
-    }
-
-    let client = client_builder
-        .build()
-        .map_err(|e| HttpClientError::Request(e.to_string()))?;
+    let (client, strategy) =
+        match build_client_with_strategy(config.timeout_seconds, &global_config) {
+            Ok(result) => result,
+            Err(error) => {
+                unregister_request(&config.request_id);
+                return Err(error);
+            }
+        };
+    let mut active_client = client;
+    let mut fallback_applied = false;
+    let mut effective_state = strategy.state.clone();
+    update_effective_proxy_state(effective_state.clone());
 
     let mut last_error = None;
     for attempt in 0..=config.max_retries {
@@ -182,113 +459,75 @@ pub async fn http_request(
             tokio::time::sleep(Duration::from_millis(delay)).await;
         }
 
-        let mut request = match config.method.to_uppercase().as_str() {
-            "GET" => client.get(&config.url),
-            "POST" => client.post(&config.url),
-            "PUT" => client.put(&config.url),
-            "DELETE" => client.delete(&config.url),
-            "HEAD" => client.head(&config.url),
-            _ => client.get(&config.url),
-        };
-
-        for (key, value) in &config.headers {
-            request = request.header(key, value);
-        }
-
-        if let Some(body) = &config.body {
-            request = request.body(body.clone());
-        }
-
-        match request.send().await {
+        match execute_request_with_client(
+            &app,
+            &active_client,
+            &config,
+            global_config.max_response_size,
+        )
+        .await
+        {
             Ok(response) => {
-                let status = response.status().as_u16();
-                let content_type = response
-                    .headers()
-                    .get("content-type")
-                    .and_then(|v| v.to_str().ok())
-                    .map(String::from);
-                let content_length = response.content_length();
+                unregister_request(&config.request_id);
+                return Ok(response);
+            }
+            Err(HttpClientError::Cancelled) => {
+                unregister_request(&config.request_id);
+                return Err(HttpClientError::Cancelled);
+            }
+            Err(HttpClientError::InvalidResponse(message)) => {
+                unregister_request(&config.request_id);
+                return Err(HttpClientError::InvalidResponse(message));
+            }
+            Err(error) => {
+                if should_attempt_direct_fallback(&error, &strategy, fallback_applied) {
+                    match build_direct_client(config.timeout_seconds, &global_config) {
+                        Ok(direct_client) => {
+                            log::warn!(
+                                "Proxy request failed; switching to direct fallback. error={}",
+                                error
+                            );
+                            fallback_applied = true;
+                            effective_state.fallback_applied = true;
+                            effective_state.last_error = Some(error.to_string());
+                            effective_state.source = ProxySource::None;
+                            effective_state.source_detail = Some("direct-fallback".to_string());
+                            effective_state.resolved_proxy = None;
+                            update_effective_proxy_state(effective_state.clone());
+                            active_client = direct_client;
 
-                let mut headers = HashMap::new();
-                for (key, value) in response.headers() {
-                    if let Ok(v) = value.to_str() {
-                        headers.insert(key.to_string(), v.to_string());
-                    }
-                }
-
-                let body = if let (true, Some(total)) = (config.report_progress, content_length) {
-                    // Validate response size before allocation
-                    if total > global_config.max_response_size as u64 {
-                        return Err(HttpClientError::InvalidResponse(format!(
-                            "Response size {} exceeds maximum allowed {}",
-                            total, global_config.max_response_size
-                        )));
-                    }
-                    let mut downloaded = 0u64;
-                    let mut body_bytes = Vec::with_capacity(total as usize);
-                    let mut stream = response.bytes_stream();
-                    let mut stream_error = None;
-
-                    use futures_util::StreamExt;
-                    while let Some(chunk) = stream.next().await {
-                        if is_cancelled(&config.request_id) {
-                            unregister_request(&config.request_id);
-                            return Err(HttpClientError::Cancelled);
-                        }
-
-                        match chunk {
-                            Ok(bytes) => {
-                                downloaded += bytes.len() as u64;
-                                body_bytes.extend_from_slice(&bytes);
-
-                                if let Some(ref id) = config.request_id {
-                                    let _ = app.emit(
-                                        "download-progress",
-                                        DownloadProgress {
-                                            request_id: id.clone(),
-                                            downloaded,
-                                            total: Some(total),
-                                            percent: (downloaded as f64 / total as f64) * 100.0,
-                                        },
-                                    );
+                            match execute_request_with_client(
+                                &app,
+                                &active_client,
+                                &config,
+                                global_config.max_response_size,
+                            )
+                            .await
+                            {
+                                Ok(response) => {
+                                    unregister_request(&config.request_id);
+                                    return Ok(response);
+                                }
+                                Err(HttpClientError::Cancelled) => {
+                                    unregister_request(&config.request_id);
+                                    return Err(HttpClientError::Cancelled);
+                                }
+                                Err(HttpClientError::InvalidResponse(message)) => {
+                                    unregister_request(&config.request_id);
+                                    return Err(HttpClientError::InvalidResponse(message));
+                                }
+                                Err(fallback_error) => {
+                                    last_error = Some(fallback_error);
                                 }
                             }
-                            Err(e) => {
-                                stream_error = Some(HttpClientError::Request(e.to_string()));
-                                break;
-                            }
+                        }
+                        Err(fallback_build_error) => {
+                            last_error = Some(fallback_build_error);
                         }
                     }
-
-                    // If streaming failed, retry in outer loop
-                    if let Some(err) = stream_error {
-                        last_error = Some(err);
-                        continue;
-                    }
-                    body_bytes
                 } else {
-                    response
-                        .bytes()
-                        .await
-                        .map_err(|e| HttpClientError::Request(e.to_string()))?
-                        .to_vec()
-                };
-
-                unregister_request(&config.request_id);
-                return Ok(HttpResponse {
-                    status,
-                    headers,
-                    body,
-                    content_type,
-                    content_length,
-                });
-            }
-            Err(e) => {
-                last_error = Some(if e.is_timeout() {
-                    HttpClientError::Timeout(config.timeout_seconds)
-                } else {
-                    HttpClientError::Request(e.to_string())
-                });
+                    last_error = Some(error);
+                }
             }
         }
     }
@@ -352,6 +591,14 @@ pub struct HttpClientConfig {
     pub retry_base_delay_ms: u64,
     pub retry_max_delay_ms: u64,
     pub user_agent: String,
+    #[serde(default)]
+    pub proxy_mode: ProxyMode,
+    #[serde(default)]
+    pub manual_proxy_url: Option<String>,
+    #[serde(default)]
+    pub fallback_to_direct_on_failure: bool,
+    /// Legacy field kept for compatibility with older frontend payloads.
+    #[serde(default)]
     pub proxy_url: Option<String>,
     pub max_response_size: usize,
     pub enable_compression: bool,
@@ -369,6 +616,9 @@ impl Default for HttpClientConfig {
             retry_base_delay_ms: 1000,
             retry_max_delay_ms: 30000,
             user_agent: format!("SkyMap/{}", env!("CARGO_PKG_VERSION")),
+            proxy_mode: ProxyMode::Auto,
+            manual_proxy_url: None,
+            fallback_to_direct_on_failure: true,
             proxy_url: None,
             max_response_size: 100 * 1024 * 1024, // 100MB
             enable_compression: true,
@@ -380,11 +630,25 @@ impl Default for HttpClientConfig {
 
 static HTTP_CONFIG: Lazy<Arc<Mutex<HttpClientConfig>>> =
     Lazy::new(|| Arc::new(Mutex::new(HttpClientConfig::default())));
+static EFFECTIVE_PROXY_STATE: Lazy<Arc<Mutex<EffectiveProxyState>>> =
+    Lazy::new(|| Arc::new(Mutex::new(EffectiveProxyState::default())));
 
-/// Build a reqwest client with global configuration applied
-fn build_configured_client(timeout_secs: u64) -> Result<reqwest::Client, HttpClientError> {
-    let global_config = HTTP_CONFIG.lock().map(|c| c.clone()).unwrap_or_default();
+impl HttpClientConfig {
+    fn normalize(mut self) -> Self {
+        self.manual_proxy_url = sanitize_proxy_url(self.manual_proxy_url.as_deref())
+            .or_else(|| sanitize_proxy_url(self.proxy_url.as_deref()));
+        self.proxy_url = self.manual_proxy_url.clone();
+        if self.manual_proxy_url.is_some() && matches!(self.proxy_mode, ProxyMode::Auto) {
+            self.proxy_mode = ProxyMode::Manual;
+        }
+        self
+    }
+}
 
+fn build_base_client_builder(
+    timeout_secs: u64,
+    global_config: &HttpClientConfig,
+) -> reqwest::ClientBuilder {
     let mut builder = reqwest::Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
         .connect_timeout(Duration::from_millis(global_config.connect_timeout_ms))
@@ -403,28 +667,82 @@ fn build_configured_client(timeout_secs: u64) -> Result<reqwest::Client, HttpCli
     } else {
         builder = builder.redirect(reqwest::redirect::Policy::none());
     }
-
-    if let Some(ref proxy_url) = global_config.proxy_url {
-        if let Ok(proxy) = reqwest::Proxy::all(proxy_url) {
-            builder = builder.proxy(proxy);
-        }
-    }
-
     builder
+}
+
+fn build_direct_client(
+    timeout_secs: u64,
+    global_config: &HttpClientConfig,
+) -> Result<reqwest::Client, HttpClientError> {
+    build_base_client_builder(timeout_secs, global_config)
+        .no_proxy()
         .build()
         .map_err(|e| HttpClientError::Request(e.to_string()))
 }
 
+fn build_client_with_strategy(
+    timeout_secs: u64,
+    global_config: &HttpClientConfig,
+) -> Result<(reqwest::Client, ProxyStrategy), HttpClientError> {
+    let strategy = resolve_proxy_strategy(global_config);
+    if let Some(error) = strategy.build_error.clone() {
+        return Err(HttpClientError::Request(error));
+    }
+
+    let mut builder = build_base_client_builder(timeout_secs, global_config);
+
+    if strategy.disable_proxy {
+        builder = builder.no_proxy();
+    } else if let Some(proxy_url) = strategy.proxy_url_to_apply.as_deref() {
+        let proxy = reqwest::Proxy::all(proxy_url)
+            .map_err(|e| HttpClientError::Request(format!("Invalid proxy URL: {e}")))?;
+        builder = builder.proxy(proxy);
+    }
+
+    let client = builder
+        .build()
+        .map_err(|e| HttpClientError::Request(e.to_string()))?;
+
+    Ok((client, strategy))
+}
+
+/// Build a reqwest client with global configuration applied
+fn build_configured_client(timeout_secs: u64) -> Result<reqwest::Client, HttpClientError> {
+    let global_config = HTTP_CONFIG
+        .lock()
+        .map(|c| c.clone())
+        .unwrap_or_default()
+        .normalize();
+    let (client, strategy) = build_client_with_strategy(timeout_secs, &global_config)?;
+    update_effective_proxy_state(strategy.state);
+    Ok(client)
+}
+
 #[tauri::command]
 pub fn get_http_config() -> HttpClientConfig {
-    HTTP_CONFIG.lock().map(|c| c.clone()).unwrap_or_default()
+    HTTP_CONFIG
+        .lock()
+        .map(|c| c.clone().normalize())
+        .unwrap_or_default()
 }
 
 #[tauri::command]
 pub fn set_http_config(config: HttpClientConfig) {
+    let normalized = config.normalize();
+    let strategy = resolve_proxy_strategy(&normalized);
+
     if let Ok(mut cfg) = HTTP_CONFIG.lock() {
-        *cfg = config;
+        *cfg = normalized;
     }
+    update_effective_proxy_state(strategy.state);
+}
+
+#[tauri::command]
+pub fn get_effective_proxy_state() -> EffectiveProxyState {
+    EFFECTIVE_PROXY_STATE
+        .lock()
+        .map(|s| s.clone())
+        .unwrap_or_default()
 }
 
 // ============================================================================
@@ -785,6 +1103,9 @@ mod tests {
         assert_eq!(config.read_timeout_ms, 30000);
         assert_eq!(config.request_timeout_ms, 60000);
         assert_eq!(config.max_retries, 3);
+        assert!(matches!(config.proxy_mode, ProxyMode::Auto));
+        assert!(config.manual_proxy_url.is_none());
+        assert!(config.fallback_to_direct_on_failure);
         assert!(config.enable_compression);
         assert!(config.follow_redirects);
         assert_eq!(config.max_redirects, 10);
@@ -997,6 +1318,8 @@ mod tests {
 
         let new_config = HttpClientConfig {
             connect_timeout_ms: 5000,
+            proxy_mode: ProxyMode::Manual,
+            manual_proxy_url: Some("http://127.0.0.1:7890".to_string()),
             ..HttpClientConfig::default()
         };
 
@@ -1004,6 +1327,11 @@ mod tests {
 
         let updated = get_http_config();
         assert_eq!(updated.connect_timeout_ms, 5000);
+        assert!(matches!(updated.proxy_mode, ProxyMode::Manual));
+        assert_eq!(
+            updated.manual_proxy_url.as_deref(),
+            Some("http://127.0.0.1:7890")
+        );
     }
 
     #[test]
@@ -1015,6 +1343,67 @@ mod tests {
         });
 
         assert!(build_configured_client(5).is_ok());
+    }
+
+    #[test]
+    fn test_legacy_proxy_url_migrates_to_manual_proxy_url() {
+        let _ctx = HttpTestContext::new();
+
+        set_http_config(HttpClientConfig {
+            proxy_url: Some("http://127.0.0.1:8000".to_string()),
+            ..HttpClientConfig::default()
+        });
+
+        let updated = get_http_config();
+        assert!(matches!(updated.proxy_mode, ProxyMode::Manual));
+        assert_eq!(
+            updated.manual_proxy_url.as_deref(),
+            Some("http://127.0.0.1:8000")
+        );
+    }
+
+    #[test]
+    fn test_manual_mode_invalid_proxy_without_fallback_errors() {
+        let _ctx = HttpTestContext::new();
+
+        set_http_config(HttpClientConfig {
+            proxy_mode: ProxyMode::Manual,
+            manual_proxy_url: Some("not-valid".to_string()),
+            fallback_to_direct_on_failure: false,
+            ..HttpClientConfig::default()
+        });
+
+        let error = build_configured_client(5).unwrap_err();
+        assert!(error.to_string().contains("Invalid manual proxy URL"));
+    }
+
+    #[test]
+    fn test_get_effective_proxy_state_reports_off_mode() {
+        let _ctx = HttpTestContext::new();
+        set_http_config(HttpClientConfig {
+            proxy_mode: ProxyMode::Off,
+            ..HttpClientConfig::default()
+        });
+
+        let state = get_effective_proxy_state();
+        assert!(matches!(state.mode, ProxyMode::Off));
+        assert!(matches!(state.source, ProxySource::None));
+        assert!(state.resolved_proxy.is_none());
+    }
+
+    #[test]
+    fn test_auto_mode_prefers_env_proxy() {
+        let _ctx = HttpTestContext::new();
+
+        std::env::set_var("HTTPS_PROXY", "http://127.0.0.1:8899");
+        let strategy = resolve_proxy_strategy(&HttpClientConfig::default());
+        std::env::remove_var("HTTPS_PROXY");
+
+        assert!(matches!(strategy.state.source, ProxySource::Env));
+        assert_eq!(
+            strategy.state.resolved_proxy.as_deref(),
+            Some("http://127.0.0.1:8899")
+        );
     }
 
     // ------------------------------------------------------------------------

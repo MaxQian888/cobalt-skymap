@@ -81,6 +81,7 @@ describe('useStellariumLoader', () => {
 
     expect(result.current.loadingState).toBeDefined();
     expect(result.current.engineReady).toBe(false);
+    expect(result.current.loadingState.tierReadiness?.core).toBeDefined();
     expect(typeof result.current.startLoading).toBe('function');
     expect(typeof result.current.handleRetry).toBe('function');
     expect(typeof result.current.reloadEngine).toBe('function');

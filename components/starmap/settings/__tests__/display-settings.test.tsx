@@ -257,6 +257,28 @@ it('renders AR camera device preference and diagnostics', () => {
   expect(screen.getAllByText(/Back Camera/).length).toBeGreaterThan(0);
 });
 
+it('renders remembered-plan AR diagnostics using the shared summary contract', () => {
+  useARRuntimeStore.setState((state) => ({
+    camera: {
+      ...state.camera,
+      acquisitionDiagnostics: {
+        currentStage: 'remembered-device',
+        attemptedStages: ['remembered-device'],
+        lastFailureStage: 'requested-facing-mode-safe',
+        lastFailureMessage: null,
+        stalePreferredDevice: false,
+        staleRememberedDevice: false,
+        usedRememberedPlan: true,
+        activeDevice: { deviceId: 'cam-back', label: 'Back Camera', groupId: 'g1' },
+      },
+    },
+  }));
+
+  render(<DisplaySettings />);
+
+  expect(screen.getByText(/settings\.arCameraRememberedPlan/)).toBeInTheDocument();
+});
+
 it('renders AR launch assistant entry in camera settings', () => {
   render(<DisplaySettings />);
   expect(screen.getByText('settings.arLaunchOpenAssistant')).toBeInTheDocument();

@@ -172,6 +172,8 @@ class HiPSService {
           'Accept': 'application/json',
         },
         timeout: 30000, // 30 second timeout
+        cachePolicy: 'hips-registry',
+        cacheTtl: this.CACHE_DURATION,
       });
 
       if (!response.ok) {

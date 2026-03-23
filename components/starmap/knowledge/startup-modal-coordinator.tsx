@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DailyKnowledgeDialog } from './daily-knowledge-dialog';
 import { useDailyKnowledgeStore, useOnboardingBridgeStore, useOnboardingStore, useSettingsStore } from '@/lib/stores';
 
@@ -21,6 +21,41 @@ export function StartupModalCoordinator({ showSplash }: StartupModalCoordinatorP
 
   const autoTriggeredRef = useRef(false);
   const handledOpenRequestRef = useRef(0);
+  const [dailyKnowledgeHydrated, setDailyKnowledgeHydrated] = useState(() => {
+    const persistApi = (
+      useDailyKnowledgeStore as typeof useDailyKnowledgeStore & {
+        persist?: {
+          hasHydrated?: () => boolean;
+        };
+      }
+    ).persist;
+
+    return persistApi?.hasHydrated ? persistApi.hasHydrated() : true;
+  });
+
+  useEffect(() => {
+    const persistApi = (
+      useDailyKnowledgeStore as typeof useDailyKnowledgeStore & {
+        persist?: {
+          onFinishHydration?: (cb: () => void) => (() => void) | void;
+          hasHydrated?: () => boolean;
+        };
+      }
+    ).persist;
+
+    if (!persistApi?.onFinishHydration || !persistApi?.hasHydrated) {
+      return;
+    }
+
+    const markHydrated = () => setDailyKnowledgeHydrated(true);
+    const unsubscribe = persistApi.onFinishHydration(markHydrated);
+
+    if (!dailyKnowledgeHydrated && persistApi.hasHydrated()) {
+      queueMicrotask(markHydrated);
+    }
+
+    return typeof unsubscribe === 'function' ? unsubscribe : undefined;
+  }, [dailyKnowledgeHydrated]);
 
   useEffect(() => {
     if (
@@ -36,6 +71,7 @@ export function StartupModalCoordinator({ showSplash }: StartupModalCoordinatorP
     if (autoTriggeredRef.current) return;
     if (showSplash) return;
     if (!dailyKnowledgeEnabled) return;
+    if (!dailyKnowledgeHydrated) return;
 
     const onboardingBlocking =
       isSetupOpen ||
@@ -50,6 +86,7 @@ export function StartupModalCoordinator({ showSplash }: StartupModalCoordinatorP
     void openDialog('auto');
   }, [
     dailyKnowledgeEnabled,
+    dailyKnowledgeHydrated,
     hasCompletedOnboarding,
     isSetupOpen,
     isTourActive,

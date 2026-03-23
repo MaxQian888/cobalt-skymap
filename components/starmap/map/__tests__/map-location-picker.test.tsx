@@ -611,6 +611,48 @@ describe('MapLocationPicker', () => {
       });
     });
 
+    it('shows submit-search capability guidance when autocomplete is unavailable', () => {
+      mockGetSearchCapabilities.mockReturnValue({
+        autocompleteAvailable: false,
+        mode: 'submit-search',
+        providers: ['openstreetmap'],
+      });
+
+      render(<MapLocationPicker onLocationChange={mockOnLocationChange} />);
+
+      expect(screen.getByTestId('map-capability-status')).toHaveTextContent(
+        /map\.submitToSearch|Press Enter to search/
+      );
+    });
+
+    it('shows offline-cache capability guidance while online', () => {
+      mockGetSearchCapabilities.mockReturnValue({
+        autocompleteAvailable: false,
+        mode: 'offline-cache',
+        providers: [],
+      });
+
+      render(<MapLocationPicker onLocationChange={mockOnLocationChange} />);
+
+      expect(screen.getByTestId('map-capability-status')).toHaveTextContent(
+        /map\.offlineSearchRestricted|Offline mode: online search disabled/
+      );
+    });
+
+    it('shows disabled capability guidance when search policy disables lookup', () => {
+      mockGetSearchCapabilities.mockReturnValue({
+        autocompleteAvailable: false,
+        mode: 'disabled',
+        providers: [],
+      });
+
+      render(<MapLocationPicker onLocationChange={mockOnLocationChange} />);
+
+      expect(screen.getByTestId('map-capability-status')).toHaveTextContent(
+        /map\.searchDisabled|Search is disabled by policy/
+      );
+    });
+
     it('falls back to openstreetmap when a tile layer becomes unavailable', async () => {
       render(<MapLocationPicker onLocationChange={mockOnLocationChange} showControls />);
 
@@ -631,6 +673,34 @@ describe('MapLocationPicker', () => {
       await waitFor(() => {
         expect(screen.getByTestId('leaflet-map')).toHaveAttribute('data-tile-layer', 'openstreetmap');
       });
+    });
+
+    it('uses fallback copy when translations are empty and a tile layer fails', async () => {
+      const nextIntlMock = jest.requireMock('next-intl') as typeof nextIntl;
+      const originalUseTranslations = nextIntlMock.useTranslations;
+      Object.defineProperty(nextIntlMock, 'useTranslations', {
+        configurable: true,
+        value: () => (((_key: string) => '') as ReturnType<typeof nextIntl.useTranslations>),
+      });
+
+      try {
+        render(<MapLocationPicker onLocationChange={mockOnLocationChange} showControls />);
+
+        const menuItems = screen.getAllByTestId('dropdown-menu-item');
+        fireEvent.click(menuItems[4]);
+        fireEvent.click(screen.getByTestId('leaflet-tile-fallback'));
+
+        await waitFor(() => {
+          expect(screen.getByTestId('map-capability-status')).toHaveTextContent(
+            'Layer esri_topo is unavailable. Switched to openstreetmap.'
+          );
+        });
+      } finally {
+        Object.defineProperty(nextIntlMock, 'useTranslations', {
+          configurable: true,
+          value: originalUseTranslations,
+        });
+      }
     });
 
     it('shows recovery actions for matching draft metadata without clearing coordinates', () => {
@@ -686,6 +756,61 @@ describe('MapLocationPicker', () => {
       expect(screen.queryByText(/common\.retry|Retry/)).not.toBeInTheDocument();
       expect(screen.queryByTestId('map-health-monitor')).not.toBeInTheDocument();
     });
+
+    it('shows draft metadata loading message for matching coordinates', () => {
+      render(
+        <MapLocationPicker
+          onLocationChange={mockOnLocationChange}
+          initialLocation={{ latitude: 12, longitude: 34 }}
+          draftMetadataState={{
+            coordinates: { latitude: 12, longitude: 34 },
+            summaryStatus: 'loading',
+            issues: [],
+          }}
+        />
+      );
+
+      expect(screen.getByTestId('map-draft-metadata-status')).toHaveTextContent(
+        /map\.metadataLoading|Refreshing location metadata\.\.\./
+      );
+    });
+
+    it('shows draft metadata error message when metadata resolution fails', () => {
+      render(
+        <MapLocationPicker
+          onLocationChange={mockOnLocationChange}
+          initialLocation={{ latitude: 56, longitude: 78 }}
+          draftMetadataState={{
+            coordinates: { latitude: 56, longitude: 78 },
+            summaryStatus: 'error',
+            issues: [
+              { field: 'timezone', reason: 'timezone_failed', message: 'Timezone lookup failed' },
+            ],
+          }}
+        />
+      );
+
+      expect(screen.getByTestId('map-draft-metadata-status')).toHaveTextContent(
+        /map\.metadataResolveFailed|Location metadata refresh failed/
+      );
+      expect(screen.getByText('Timezone lookup failed')).toBeInTheDocument();
+    });
+
+    it('hides draft metadata status block when summary is ready', () => {
+      render(
+        <MapLocationPicker
+          onLocationChange={mockOnLocationChange}
+          initialLocation={{ latitude: 22, longitude: 114 }}
+          draftMetadataState={{
+            coordinates: { latitude: 22, longitude: 114 },
+            summaryStatus: 'ready',
+            issues: [],
+          }}
+        />
+      );
+
+      expect(screen.queryByTestId('map-draft-metadata-status')).not.toBeInTheDocument();
+    });
   });
 
   describe('External initialLocation sync', () => {
@@ -730,6 +855,49 @@ describe('MapLocationPicker', () => {
       await waitFor(() => {
         expect(mockGeocode).toHaveBeenCalledWith('Tokyo', expect.any(Object));
       });
+    });
+
+    it('emits onLocationSelect immediately when selecting from search in immediate mode', async () => {
+      mockGeocode.mockResolvedValue([
+        {
+          displayName: 'Tokyo, Japan',
+          address: 'Tokyo',
+          coordinates: { latitude: 35.6762, longitude: 139.6503 },
+        },
+      ]);
+
+      render(
+        <MapLocationPicker
+          onLocationChange={mockOnLocationChange}
+          onLocationSelect={mockOnLocationSelect}
+          showSearch
+          commitMode="immediate"
+        />
+      );
+
+      const inputs = screen.getAllByTestId('input');
+      fireEvent.change(inputs[0], { target: { value: 'Tokyo' } });
+      fireEvent.keyDown(inputs[0], { key: 'Enter' });
+
+      await waitFor(() => {
+        expect(screen.getByText('Tokyo, Japan')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Tokyo, Japan'));
+
+      expect(mockOnLocationSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          coordinates: { latitude: 35.6762, longitude: 139.6503 },
+          address: 'Tokyo',
+          displayName: 'Tokyo, Japan',
+        })
+      );
+      expect(mockOnLocationChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          latitude: 35.6762,
+          longitude: 139.6503,
+        })
+      );
     });
   });
 

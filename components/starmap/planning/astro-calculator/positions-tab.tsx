@@ -33,7 +33,6 @@ import {
   formatTimeShort,
 } from '@/lib/astronomy/astro-utils';
 import { raDecToAltAzAtTime, raDecToEcliptic, raDecToGalactic } from '@/lib/astronomy/coordinates/transforms';
-import { computeEphemeris } from '@/lib/astronomy/engine';
 import { TranslatedName } from '../../objects/translated-name';
 import {
   useSkyAtlasStore,
@@ -43,6 +42,7 @@ import {
 } from '@/lib/catalogs';
 import { SortableHeader } from './sortable-header';
 import type { CelestialPosition } from './types';
+import { runCalculatorEphemerisBatch, summarizeCalculatorMeta, type CalculatorMetaSummary } from './orchestrator';
 
 interface PositionsTabProps {
   latitude: number;
@@ -73,6 +73,7 @@ export function PositionsTab({ latitude, longitude, onSelectObject, onAddToList 
     sun: null,
     moon: null,
   });
+  const [solarReferenceMeta, setSolarReferenceMeta] = useState<CalculatorMetaSummary | null>(null);
   
   // Initialize catalog
   useEffect(() => {
@@ -85,32 +86,34 @@ export function PositionsTab({ latitude, longitude, onSelectObject, onAddToList 
     let cancelled = false;
     async function loadReferences() {
       try {
-        const [sunResult, moonResult] = await Promise.all([
-          computeEphemeris({
+        const [sunResult, moonResult] = await runCalculatorEphemerisBatch([
+          {
             body: 'Sun',
             observer: { latitude, longitude },
             startDate: new Date(),
             stepHours: 24,
             steps: 1,
-          }),
-          computeEphemeris({
+          },
+          {
             body: 'Moon',
             observer: { latitude, longitude },
             startDate: new Date(),
             stepHours: 24,
             steps: 1,
-          }),
-        ]);
+          },
+        ], { concurrency: 2 });
 
         if (!cancelled) {
           setSolarReference({
-            sun: sunResult.points[0] ? { ra: sunResult.points[0].ra, dec: sunResult.points[0].dec } : null,
-            moon: moonResult.points[0] ? { ra: moonResult.points[0].ra, dec: moonResult.points[0].dec } : null,
+            sun: sunResult.response.points[0] ? { ra: sunResult.response.points[0].ra, dec: sunResult.response.points[0].dec } : null,
+            moon: moonResult.response.points[0] ? { ra: moonResult.response.points[0].ra, dec: moonResult.response.points[0].dec } : null,
           });
+          setSolarReferenceMeta(summarizeCalculatorMeta([sunResult.meta, moonResult.meta]));
         }
       } catch {
         if (!cancelled) {
           setSolarReference({ sun: null, moon: null });
+          setSolarReferenceMeta(null);
         }
       }
     }
@@ -352,9 +355,16 @@ export function PositionsTab({ latitude, longitude, onSelectObject, onAddToList 
             </Label>
           </div>
         </div>
-        <Badge variant="outline" className="text-xs">
-          {positions.length} {t('astroCalc.objects')}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {solarReferenceMeta && (
+            <Badge variant="secondary" className="text-[10px]" data-testid="positions-meta">
+              {`src:${solarReferenceMeta.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${solarReferenceMeta.cacheHits}/${solarReferenceMeta.total}`}
+            </Badge>
+          )}
+          <Badge variant="outline" className="text-xs">
+            {positions.length} {t('astroCalc.objects')}
+          </Badge>
+        </div>
       </div>
       
       {/* Results Table */}

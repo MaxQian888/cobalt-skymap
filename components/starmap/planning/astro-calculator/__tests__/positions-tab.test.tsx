@@ -34,6 +34,7 @@ jest.mock('@/lib/catalogs', () => ({
 
 jest.mock('@/lib/astronomy/engine', () => ({
   computeEphemeris: (...args: unknown[]) => mockComputeEphemeris(...args),
+  serializeCacheKey: (payload: unknown) => JSON.stringify(payload),
 }));
 
 jest.mock('@/lib/astronomy/coordinates/transforms', () => ({

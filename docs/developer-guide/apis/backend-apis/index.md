@@ -1,6 +1,6 @@
 # 后端 API 概览
 
-SkyMap Test 后端基于 Tauri 2.9 和 Rust 构建，提供高性能的桌面应用功能。
+SkyMap 后端基于 Tauri 2.9 和 Rust 构建，提供高性能的桌面应用功能。
 
 ## 架构概述
 
@@ -197,3 +197,4 @@ await targetListApi.setTargetsStatusBatch(ids, 'completed');
 ---
 
 返回：[API参考](../index.md)
+

@@ -475,6 +475,62 @@ describe('FavoritesQuickAccess', () => {
     expect(screen.getByTestId('dialog')).toBeInTheDocument();
   });
 
+  it('adds a custom tag from the dialog when Enter is pressed', () => {
+    const addTag = jest.fn();
+    const { useFavoritesStore } = jest.requireMock('@/lib/stores');
+    useFavoritesStore.mockReturnValue({
+      favorites: [
+        { id: '1', name: 'M31', ra: 10.68, dec: 41.27, type: 'Galaxy', tags: ['imaging'] },
+      ],
+      recentlyViewed: [],
+      removeFavorite: jest.fn(),
+      addTag,
+      removeTag: jest.fn(),
+      clearRecentlyViewed: jest.fn(),
+      getAllTags: jest.fn(() => ['imaging']),
+      exportFavorites: jest.fn(() => []),
+      importFavorites: jest.fn(() => ({ imported: 0, skipped: 0 })),
+    });
+
+    render(<FavoritesQuickAccess {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('tags-1'));
+
+    const input = screen.getByPlaceholderText('favorites.customTag');
+    fireEvent.change(input, { target: { value: '  DeepSky  ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(addTag).toHaveBeenCalledWith('1', 'deepsky');
+  });
+
+  it('adds a custom tag from the dialog add button', () => {
+    const addTag = jest.fn();
+    const { useFavoritesStore } = jest.requireMock('@/lib/stores');
+    useFavoritesStore.mockReturnValue({
+      favorites: [
+        { id: '1', name: 'M31', ra: 10.68, dec: 41.27, type: 'Galaxy', tags: ['imaging'] },
+      ],
+      recentlyViewed: [],
+      removeFavorite: jest.fn(),
+      addTag,
+      removeTag: jest.fn(),
+      clearRecentlyViewed: jest.fn(),
+      getAllTags: jest.fn(() => ['imaging']),
+      exportFavorites: jest.fn(() => []),
+      importFavorites: jest.fn(() => ({ imported: 0, skipped: 0 })),
+    });
+
+    render(<FavoritesQuickAccess {...defaultProps} />);
+    fireEvent.click(screen.getByTestId('tags-1'));
+
+    const input = screen.getByPlaceholderText('favorites.customTag');
+    fireEvent.change(input, { target: { value: 'visual' } });
+
+    const buttons = screen.getAllByTestId('button');
+    fireEvent.click(buttons[buttons.length - 1]);
+
+    expect(addTag).toHaveBeenCalledWith('1', 'visual');
+  });
+
   it('calls removeFavorite when remove button clicked', () => {
     const removeFavorite = jest.fn();
     const { useFavoritesStore } = jest.requireMock('@/lib/stores');

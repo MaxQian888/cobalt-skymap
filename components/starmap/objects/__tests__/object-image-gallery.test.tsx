@@ -332,6 +332,29 @@ describe('ObjectImageGallery', () => {
       expect(screen.queryByTestId('fullscreen-dialog')).not.toBeInTheDocument();
     });
 
+    it('closes fullscreen dialog when internal close icon button clicked', async () => {
+      render(<ObjectImageGallery images={mockImages} objectName="M31" />);
+
+      const buttons = screen.getAllByRole('button');
+      const fullscreenButton = buttons.find(btn => btn.querySelector('.lucide-maximize2'));
+
+      await act(async () => {
+        fireEvent.click(fullscreenButton!);
+      });
+
+      const closeIconButton = screen
+        .getAllByRole('button')
+        .find(btn => btn.querySelector('.lucide-x'));
+
+      expect(closeIconButton).toBeDefined();
+
+      await act(async () => {
+        fireEvent.click(closeIconButton!);
+      });
+
+      expect(screen.queryByTestId('fullscreen-dialog')).not.toBeInTheDocument();
+    });
+
     it('shows external link in fullscreen mode', async () => {
       render(<ObjectImageGallery images={mockImages} objectName="M31" />);
       
@@ -345,6 +368,25 @@ describe('ObjectImageGallery', () => {
       const externalLink = screen.getByRole('link');
       expect(externalLink).toHaveAttribute('href', mockImages[0].url);
       expect(externalLink).toHaveAttribute('target', '_blank');
+    });
+
+    it('keeps fullscreen dialog open when external link is clicked', async () => {
+      render(<ObjectImageGallery images={mockImages} objectName="M31" />);
+
+      const buttons = screen.getAllByRole('button');
+      const fullscreenButton = buttons.find(btn => btn.querySelector('.lucide-maximize2'));
+
+      await act(async () => {
+        fireEvent.click(fullscreenButton!);
+      });
+
+      const externalLink = screen.getByRole('link');
+
+      await act(async () => {
+        fireEvent.click(externalLink);
+      });
+
+      expect(screen.getByTestId('fullscreen-dialog')).toBeInTheDocument();
     });
 
     it('renders fullscreen image with onLoad and onError handlers', async () => {
@@ -365,6 +407,46 @@ describe('ObjectImageGallery', () => {
       // Fullscreen should contain the image info (multiple elements may exist)
       expect(screen.getAllByText('M31 Image 1').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('NASA/ESA').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('updates fullscreen image state on load', async () => {
+      render(<ObjectImageGallery images={mockImages} objectName="M31" />);
+
+      const buttons = screen.getAllByRole('button');
+      const fullscreenButton = buttons.find(btn => btn.querySelector('.lucide-maximize2'));
+
+      await act(async () => {
+        fireEvent.click(fullscreenButton!);
+      });
+
+      const fullscreenDialog = screen.getByTestId('fullscreen-dialog');
+      const fullscreenImage = fullscreenDialog.querySelector('img') as HTMLImageElement;
+
+      await act(async () => {
+        fireEvent.load(fullscreenImage);
+      });
+
+      expect(fullscreenImage.className).toContain('opacity-100');
+    });
+
+    it('shows fullscreen error state when fullscreen image fails to load', async () => {
+      render(<ObjectImageGallery images={mockImages} objectName="M31" />);
+
+      const buttons = screen.getAllByRole('button');
+      const fullscreenButton = buttons.find(btn => btn.querySelector('.lucide-maximize2'));
+
+      await act(async () => {
+        fireEvent.click(fullscreenButton!);
+      });
+
+      const fullscreenDialog = screen.getByTestId('fullscreen-dialog');
+      const fullscreenImage = fullscreenDialog.querySelector('img') as HTMLImageElement;
+
+      await act(async () => {
+        fireEvent.error(fullscreenImage);
+      });
+
+      expect(screen.getAllByText('objectDetail.imageLoadError').length).toBeGreaterThanOrEqual(1);
     });
 
     it('shows image counter in fullscreen mode', async () => {

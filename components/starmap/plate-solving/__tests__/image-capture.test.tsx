@@ -5,14 +5,18 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 // Mock next-intl
+const mockTranslate = jest.fn((key: string) => key);
+
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => mockTranslate,
 }));
 
 // Mock platform detection
 jest.mock('@/lib/storage/platform', () => ({
   isMobile: jest.fn(() => false),
 }));
+
+const mockIsMobile = jest.requireMock('@/lib/storage/platform').isMobile as jest.Mock;
 
 // Mock useCamera hook
 const mockStart = jest.fn();
@@ -123,11 +127,82 @@ jest.mock('@/components/ui/slider', () => ({
   ),
 }));
 
+jest.mock('@/components/ui/switch-item', () => ({
+  SwitchItem: ({
+    id,
+    label,
+    checked,
+    onCheckedChange,
+  }: {
+    id?: string;
+    label: React.ReactNode;
+    checked: boolean;
+    onCheckedChange?: (checked: boolean) => void;
+  }) => {
+    const labelText = typeof label === 'string' ? label : id ?? 'switch-item';
+    return (
+      <label>
+        <span>{label}</span>
+        <input
+          type="checkbox"
+          data-testid="switch"
+          aria-label={labelText}
+          checked={checked}
+          onChange={(event) => onCheckedChange?.(event.target.checked)}
+        />
+      </label>
+    );
+  },
+}));
+
 jest.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipContent: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   TooltipProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   TooltipTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+const mockParseFITSHeader: jest.Mock = jest.fn();
+const mockIsFITSFile: jest.Mock = jest.fn(
+  (file: File) => /\.(fits|fit|fts)$/i.test(file.name) || file.type === 'application/fits'
+);
+const mockReadFITSPixelData: jest.Mock = jest.fn();
+const mockGeneratePreviewImageData: jest.Mock = jest.fn(() => ({
+  width: 2,
+  height: 2,
+  data: new Uint8ClampedArray(16),
+}));
+const mockGetImageDimensions: jest.Mock = jest.fn(
+  async () => ({ width: 1920, height: 1080 })
+);
+const mockCompressImage: jest.Mock = jest.fn(
+  async (file: File) => new File(['compressed'], `compressed-${file.name}`, { type: file.type })
+);
+const mockFormatFileSize: jest.Mock = jest.fn((size: number) => `${size} bytes`);
+
+jest.mock('@/lib/plate-solving', () => ({
+  parseFITSHeader: (file: File) => mockParseFITSHeader(file),
+  isFITSFile: (file: File) => mockIsFITSFile(file),
+  readFITSPixelData: (file: File) => mockReadFITSPixelData(file),
+  generatePreviewImageData: (pixelData: unknown) => mockGeneratePreviewImageData(pixelData),
+  getImageDimensions: (file: File) => mockGetImageDimensions(file),
+  compressImage: (file: File, maxDimension?: number, quality?: number) => (
+    mockCompressImage(file, maxDimension, quality)
+  ),
+  DEFAULT_MAX_FILE_SIZE_MB: 20,
+  DEFAULT_ACCEPTED_FORMATS: ['image/jpeg', 'image/png'],
+  COMPRESSION_QUALITY: 0.92,
+  MAX_DIMENSION_FOR_PREVIEW: 2048,
+}));
+
+jest.mock('@/lib/tauri/plate-solver-api', () => ({
+  formatFileSize: (size: number) => mockFormatFileSize(size),
+}));
+
+jest.mock('../fits-metadata-panel', () => ({
+  FitsMetadataPanel: ({ metadata }: { metadata: { name: string } }) => (
+    <div data-testid="fits-metadata-panel">{metadata.name}</div>
+  ),
 }));
 
 // Mock URL.createObjectURL and URL.revokeObjectURL
@@ -198,6 +273,23 @@ describe('ImageCapture', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     cameraState = { ...defaultCameraState };
+    mockTranslate.mockImplementation((key: string) => key);
+    mockIsMobile.mockReturnValue(false);
+    mockParseFITSHeader.mockResolvedValue({
+      image: { width: 2048, height: 1024 },
+      wcs: null,
+    });
+    mockReadFITSPixelData.mockResolvedValue(null);
+    mockGeneratePreviewImageData.mockReturnValue({
+      width: 2,
+      height: 2,
+      data: new Uint8ClampedArray(16),
+    });
+    mockGetImageDimensions.mockResolvedValue({ width: 1920, height: 1080 });
+    mockCompressImage.mockImplementation(async (file: File) => (
+      new File(['compressed'], `compressed-${file.name}`, { type: file.type })
+    ));
+    mockFormatFileSize.mockImplementation((size: number) => `${size} bytes`);
   });
 
   describe('Rendering', () => {
@@ -226,6 +318,21 @@ describe('ImageCapture', () => {
       render(<ImageCapture {...defaultProps} />);
       expect(screen.getByText('plateSolving.clickOrDrag')).toBeInTheDocument();
       expect(screen.getByText('plateSolving.supportedFormats')).toBeInTheDocument();
+    });
+
+    it('uses fallback upload labels when translations are missing', () => {
+      mockTranslate.mockImplementation(() => '');
+
+      render(<ImageCapture {...defaultProps} />);
+      fireEvent.click(screen.getByText('Advanced Options'));
+
+      expect(screen.getByText('Capture Image')).toBeInTheDocument();
+      expect(screen.getByText('Image Capture')).toBeInTheDocument();
+      expect(screen.getByText('Upload an image or take a photo for plate solving')).toBeInTheDocument();
+      expect(screen.getByText('Click or drag image here')).toBeInTheDocument();
+      expect(screen.getByText('JPEG, PNG, FITS')).toBeInTheDocument();
+      expect(screen.getByText('Enable Compression')).toBeInTheDocument();
+      expect(screen.getByText('Quality: 85%')).toBeInTheDocument();
     });
   });
 
@@ -862,6 +969,92 @@ describe('ImageCapture', () => {
   });
 
   describe('File Processing', () => {
+    it('compresses large images using the updated quality slider value', async () => {
+      render(<ImageCapture {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('plateSolving.advancedOptions'));
+      fireEvent.change(screen.getByTestId('slider'), { target: { value: '50' } });
+
+      expect(screen.getByText('plateSolving.quality: 50%')).toBeInTheDocument();
+
+      const file = new File([new Uint8Array(3 * 1024 * 1024)], 'big.jpg', { type: 'image/jpeg' });
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      Object.defineProperty(input, 'files', { value: [file] });
+      fireEvent.change(input);
+
+      await waitFor(() => {
+        expect(mockCompressImage).toHaveBeenCalledWith(file, 2048, 0.5);
+      });
+
+      fireEvent.click(screen.getByText('plateSolving.useImage'));
+
+      expect(mockOnImageCapture).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'compressed-big.jpg' }),
+        expect.objectContaining({ name: 'big.jpg', width: 1920, height: 1080 })
+      );
+    });
+
+    it('shows FITS placeholder and metadata when preview generation is skipped', async () => {
+      render(<ImageCapture {...defaultProps} />);
+
+      const file = new File([new Uint8Array(1024)], 'frame.fits', { type: 'application/fits' });
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+      Object.defineProperty(input, 'files', { value: [file] });
+      fireEvent.change(input);
+
+      await waitFor(() => {
+        expect(screen.getByText('FITS - 1024 bytes')).toBeInTheDocument();
+      });
+
+      expect(screen.getByTestId('fits-metadata-panel')).toHaveTextContent('frame.fits');
+
+      fireEvent.click(screen.getByText('plateSolving.useImage'));
+
+      expect(mockOnImageCapture).toHaveBeenCalledWith(
+        file,
+        expect.objectContaining({
+          name: 'frame.fits',
+          isFits: true,
+          fitsData: expect.objectContaining({
+            image: { width: 2048, height: 1024 },
+          }),
+        })
+      );
+    });
+
+    it('generates a FITS preview when pixel data is available', async () => {
+      const originalGetContext = HTMLCanvasElement.prototype.getContext;
+      const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+      const putImageData = jest.fn();
+      const toDataURL = jest.fn(() => 'data:image/png;base64,fits-preview');
+
+      HTMLCanvasElement.prototype.getContext = jest.fn(
+        () => ({ putImageData } as Partial<CanvasRenderingContext2D>)
+      ) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.toDataURL = toDataURL;
+      mockReadFITSPixelData.mockResolvedValue({ width: 2, height: 2, data: [0, 1, 2, 3] });
+
+      try {
+        render(<ImageCapture {...defaultProps} />);
+
+        const file = new File([new Uint8Array(512)], 'preview.fits', { type: 'application/fits' });
+        const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+
+        Object.defineProperty(input, 'files', { value: [file] });
+        fireEvent.change(input);
+
+        await waitFor(() => {
+          expect(mockGeneratePreviewImageData).toHaveBeenCalled();
+          expect(document.querySelector('img')).toBeInTheDocument();
+        });
+      } finally {
+        HTMLCanvasElement.prototype.getContext = originalGetContext;
+        HTMLCanvasElement.prototype.toDataURL = originalToDataURL;
+      }
+    });
+
     it('processes a normal image file and shows preview', async () => {
       render(<ImageCapture {...defaultProps} />);
       
@@ -912,6 +1105,52 @@ describe('ImageCapture', () => {
         expect.any(File),
         expect.objectContaining({ name: 'photo.jpg' })
       );
+    });
+  });
+
+  describe('Mobile Native Capture', () => {
+    it('switches between browser and native camera capture on mobile', async () => {
+      mockIsMobile.mockReturnValue(true);
+
+      render(<ImageCapture {...defaultProps} />);
+
+      fireEvent.click(screen.getByTestId('tab-camera'));
+
+      const nativeSwitch = screen.getByRole('checkbox', { name: 'plateSolving.nativeCapture' });
+      fireEvent.click(nativeSwitch);
+
+      expect(mockStop).toHaveBeenCalled();
+
+      await waitFor(() => {
+        const inputs = document.querySelectorAll('input[type="file"]');
+        expect(inputs.length).toBeGreaterThan(0);
+      });
+      const inputClickSpy = jest.spyOn(HTMLInputElement.prototype, 'click');
+
+      fireEvent.click(screen.getByTestId('tab-upload'));
+      fireEvent.click(screen.getByTestId('tab-camera'));
+
+      fireEvent.keyDown(screen.getAllByRole('button', { name: 'plateSolving.takePhoto' })[0], { key: 'Enter' });
+      expect(inputClickSpy).toHaveBeenCalled();
+
+      inputClickSpy.mockRestore();
+    });
+
+    it('uses fallback mobile camera copy when translations are missing', () => {
+      mockTranslate.mockImplementation(() => '');
+      mockIsMobile.mockReturnValue(true);
+
+      render(<ImageCapture {...defaultProps} />);
+
+      fireEvent.click(screen.getByTestId('tab-camera'));
+
+      expect(screen.getByText('Browser Camera')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Native Camera' }));
+
+      expect(screen.getByText('Native Camera')).toBeInTheDocument();
+      expect(screen.getByText("Opens your device's built-in camera app")).toBeInTheDocument();
+      expect(screen.getAllByText('Take Photo').length).toBeGreaterThan(0);
     });
   });
 });

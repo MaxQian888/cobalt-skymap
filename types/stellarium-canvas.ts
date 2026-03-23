@@ -2,6 +2,7 @@
 // Stellarium Canvas Types
 // ============================================================================
 
+import type { StarmapDataTier, StarmapTierReadiness } from '@/lib/core/starmap-data-tier';
 import type { ClickCoords } from '@/lib/core/types';
 import type { SkyMapCanvasRef, SkyMapCanvasProps } from '@/lib/core/types/sky-engine';
 
@@ -26,6 +27,7 @@ export type LoadingPhase =
   | 'initializing_engine'
   | 'ready'
   | 'retrying'
+  | 'degraded'
   | 'failed'
   | 'timed_out';
 
@@ -48,6 +50,7 @@ export interface LoadingState {
   phase?: LoadingPhase;
   errorCode?: LoadingErrorCode | null;
   retryCount?: number;
+  tierReadiness?: Partial<Record<StarmapDataTier, StarmapTierReadiness>>;
 }
 
 export interface ViewDirection {

@@ -39,6 +39,8 @@ import {
   CoordinateTab,
   TimeTab,
   SolarSystemTab,
+  ASTRO_CALCULATOR_CAPABILITY_MATRIX,
+  ASTRO_CALCULATOR_TAB_ORDER,
 } from './astro-calculator';
 
 // ============================================================================
@@ -49,6 +51,19 @@ export function AstroCalculatorDialog() {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('wut');
+  const [sharedDate, setSharedDate] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [sharedTime, setSharedTime] = useState(() => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  });
 
   const profileInfo = useMountStore((state) => state.profileInfo);
   const setViewDirection = useStellariumStore((state) => state.setViewDirection);
@@ -104,38 +119,23 @@ export function AstroCalculatorDialog() {
         </ResponsiveDialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
-          <TabsList className="grid w-full grid-cols-3 grid-rows-3 h-auto gap-0.5 p-1">
-            <TabsTrigger value="wut" className="text-xs">
-              {t('astroCalc.wut')}
-            </TabsTrigger>
-            <TabsTrigger value="positions" className="text-xs">
-              {t('astroCalc.positions')}
-            </TabsTrigger>
-            <TabsTrigger value="rts" className="text-xs">
-              {t('astroCalc.rts')}
-            </TabsTrigger>
-            <TabsTrigger value="ephemeris" className="text-xs">
-              {t('astroCalc.ephemeris')}
-            </TabsTrigger>
-            <TabsTrigger value="almanac" className="text-xs">
-              {t('astroCalc.almanac')}
-            </TabsTrigger>
-            <TabsTrigger value="phenomena" className="text-xs">
-              {t('astroCalc.phenomena')}
-            </TabsTrigger>
-            <TabsTrigger value="coordinate" className="text-xs">
-              {t('astroCalc.coordinate')}
-            </TabsTrigger>
-            <TabsTrigger value="time" className="text-xs">
-              {t('astroCalc.timeCalc')}
-            </TabsTrigger>
-            <TabsTrigger value="solar-system" className="text-xs">
-              {t('astroCalc.solarSystem')}
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-1" data-testid="astro-calculator-tab-nav">
+            <TabsList className="inline-flex w-max min-w-full h-auto flex-nowrap gap-1 p-1 sm:grid sm:w-full sm:grid-cols-3 sm:grid-rows-3 lg:grid-cols-5 lg:grid-rows-2">
+              {ASTRO_CALCULATOR_TAB_ORDER.map((tabId) => (
+                <TabsTrigger
+                  key={tabId}
+                  value={tabId}
+                  data-capability-tab={tabId}
+                  className="text-xs min-w-[110px] sm:min-w-0"
+                >
+                  {t(ASTRO_CALCULATOR_CAPABILITY_MATRIX[tabId].labelKey)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
-          <div className="flex-1 overflow-auto mt-4">
-            <TabsContent value="wut" className="mt-0 h-full">
+          <div className="flex-1 mt-3 min-h-0 overflow-hidden">
+            <TabsContent value="wut" className="mt-0 h-full overflow-hidden">
               <WUTTab
                 latitude={latitude}
                 longitude={longitude}
@@ -144,7 +144,7 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="positions" className="mt-0 h-full">
+            <TabsContent value="positions" className="mt-0 h-full overflow-hidden">
               <PositionsTab
                 latitude={latitude}
                 longitude={longitude}
@@ -153,32 +153,69 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="rts" className="mt-0 h-full">
-              <RTSTab latitude={latitude} longitude={longitude} />
+            <TabsContent value="rts" className="mt-0 h-full overflow-hidden">
+              <RTSTab
+                latitude={latitude}
+                longitude={longitude}
+                sharedDate={sharedDate}
+                onSharedDateChange={setSharedDate}
+              />
             </TabsContent>
 
-            <TabsContent value="ephemeris" className="mt-0 h-full">
-              <EphemerisTab latitude={latitude} longitude={longitude} />
+            <TabsContent value="ephemeris" className="mt-0 h-full overflow-hidden">
+              <EphemerisTab
+                latitude={latitude}
+                longitude={longitude}
+                sharedDate={sharedDate}
+                onSharedDateChange={setSharedDate}
+              />
             </TabsContent>
 
-            <TabsContent value="almanac" className="mt-0 h-full">
-              <AlmanacTab latitude={latitude} longitude={longitude} />
+            <TabsContent value="almanac" className="mt-0 h-full overflow-hidden">
+              <AlmanacTab
+                latitude={latitude}
+                longitude={longitude}
+                sharedDate={sharedDate}
+                sharedTime={sharedTime}
+                onSharedDateChange={setSharedDate}
+                onSharedTimeChange={setSharedTime}
+              />
             </TabsContent>
 
-            <TabsContent value="phenomena" className="mt-0 h-full">
+            <TabsContent value="phenomena" className="mt-0 h-full overflow-hidden">
               <PhenomenaTab latitude={latitude} longitude={longitude} />
             </TabsContent>
 
-            <TabsContent value="coordinate" className="mt-0 h-full">
-              <CoordinateTab latitude={latitude} longitude={longitude} />
+            <TabsContent value="coordinate" className="mt-0 h-full overflow-hidden">
+              <CoordinateTab
+                latitude={latitude}
+                longitude={longitude}
+                sharedDate={sharedDate}
+                sharedTime={sharedTime}
+                onSharedDateChange={setSharedDate}
+                onSharedTimeChange={setSharedTime}
+              />
             </TabsContent>
 
-            <TabsContent value="time" className="mt-0 h-full">
-              <TimeTab longitude={longitude} />
+            <TabsContent value="time" className="mt-0 h-full overflow-hidden">
+              <TimeTab
+                longitude={longitude}
+                sharedDate={sharedDate}
+                sharedTime={sharedTime}
+                onSharedDateChange={setSharedDate}
+                onSharedTimeChange={setSharedTime}
+              />
             </TabsContent>
 
-            <TabsContent value="solar-system" className="mt-0 h-full">
-              <SolarSystemTab latitude={latitude} longitude={longitude} />
+            <TabsContent value="solar-system" className="mt-0 h-full overflow-hidden">
+              <SolarSystemTab
+                latitude={latitude}
+                longitude={longitude}
+                sharedDate={sharedDate}
+                sharedTime={sharedTime}
+                onSharedDateChange={setSharedDate}
+                onSharedTimeChange={setSharedTime}
+              />
             </TabsContent>
           </div>
         </Tabs>

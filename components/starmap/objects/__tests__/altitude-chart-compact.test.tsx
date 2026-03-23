@@ -283,7 +283,9 @@ describe('AltitudeChartCompact', () => {
 
       // Dispatch a native wheel event to trigger the addEventListener handler
       const wheelEvent = new WheelEvent('wheel', { deltaY: 100, bubbles: true });
-      chartDiv!.dispatchEvent(wheelEvent);
+      act(() => {
+        chartDiv!.dispatchEvent(wheelEvent);
+      });
 
       // Component should still function
       expect(screen.getByTestId('area-chart')).toBeInTheDocument();
@@ -294,9 +296,95 @@ describe('AltitudeChartCompact', () => {
       const chartDiv = container.querySelector('[role="img"]');
 
       const wheelEvent = new WheelEvent('wheel', { deltaY: -100, bubbles: true });
-      chartDiv!.dispatchEvent(wheelEvent);
+      act(() => {
+        chartDiv!.dispatchEvent(wheelEvent);
+      });
 
       expect(screen.getByTestId('area-chart')).toBeInTheDocument();
+    });
+
+    it('handles touch swipe right to decrease time range', () => {
+      const { container } = render(<AltitudeChartCompact {...defaultProps} />);
+      const chartDiv = container.querySelector('[role="img"]') as HTMLElement;
+      expect(screen.getByText(/12h/)).toBeInTheDocument();
+
+      const touchStart = new Event('touchstart', { bubbles: true, cancelable: true });
+      Object.defineProperty(touchStart, 'touches', {
+        value: [{ clientX: 200, clientY: 100 }],
+      });
+
+      const touchEnd = new Event('touchend', { bubbles: true, cancelable: true });
+      Object.defineProperty(touchEnd, 'touches', { value: [] });
+      Object.defineProperty(touchEnd, 'changedTouches', {
+        value: [{ clientX: 280, clientY: 100 }],
+      });
+
+      act(() => {
+        chartDiv.dispatchEvent(touchStart);
+        chartDiv.dispatchEvent(touchEnd);
+      });
+
+      expect(screen.getByText(/10h/)).toBeInTheDocument();
+    });
+
+    it('handles touch swipe left to increase time range', () => {
+      const { container } = render(<AltitudeChartCompact {...defaultProps} />);
+      const chartDiv = container.querySelector('[role="img"]') as HTMLElement;
+      expect(screen.getByText(/12h/)).toBeInTheDocument();
+
+      const touchStart = new Event('touchstart', { bubbles: true, cancelable: true });
+      Object.defineProperty(touchStart, 'touches', {
+        value: [{ clientX: 280, clientY: 100 }],
+      });
+
+      const touchEnd = new Event('touchend', { bubbles: true, cancelable: true });
+      Object.defineProperty(touchEnd, 'touches', { value: [] });
+      Object.defineProperty(touchEnd, 'changedTouches', {
+        value: [{ clientX: 180, clientY: 100 }],
+      });
+
+      act(() => {
+        chartDiv.dispatchEvent(touchStart);
+        chartDiv.dispatchEvent(touchEnd);
+      });
+
+      expect(screen.getByText(/14h/)).toBeInTheDocument();
+    });
+
+    it('handles pinch gesture to change time range', () => {
+      const { container } = render(<AltitudeChartCompact {...defaultProps} />);
+      const chartDiv = container.querySelector('[role="img"]') as HTMLElement;
+      expect(screen.getByText(/12h/)).toBeInTheDocument();
+
+      const pinchStart = new Event('touchstart', { bubbles: true, cancelable: true });
+      Object.defineProperty(pinchStart, 'touches', {
+        value: [
+          { clientX: 100, clientY: 100 },
+          { clientX: 200, clientY: 100 },
+        ],
+      });
+
+      const pinchMove = new Event('touchmove', { bubbles: true, cancelable: true });
+      Object.defineProperty(pinchMove, 'touches', {
+        value: [
+          { clientX: 80, clientY: 100 },
+          { clientX: 260, clientY: 100 },
+        ],
+      });
+
+      const pinchEnd = new Event('touchend', { bubbles: true, cancelable: true });
+      Object.defineProperty(pinchEnd, 'touches', { value: [] });
+      Object.defineProperty(pinchEnd, 'changedTouches', {
+        value: [{ clientX: 80, clientY: 100 }],
+      });
+
+      act(() => {
+        chartDiv.dispatchEvent(pinchStart);
+        chartDiv.dispatchEvent(pinchMove);
+        chartDiv.dispatchEvent(pinchEnd);
+      });
+
+      expect(screen.queryByText(/12h/)).not.toBeInTheDocument();
     });
 
     it('cleans up event listeners on unmount', () => {

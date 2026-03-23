@@ -1,6 +1,6 @@
 # 数据流设计
 
-本文档介绍 SkyMap Test 的数据流架构。
+本文档介绍 SkyMap 的数据流架构。
 
 ## 整体数据流
 
@@ -175,3 +175,4 @@ const store = create((set, get) => ({
 - [前端架构](frontend-architecture.md)
 - [后端架构](backend-architecture.md)
 - [Stores API](../apis/frontend-apis/stores.md)
+

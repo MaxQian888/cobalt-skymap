@@ -6,6 +6,7 @@ import {
   CACHE_CONFIG,
   CACHEABLE_URL_PATTERNS,
   PREFETCH_RESOURCES,
+  getStarmapTierPrefetchResources,
   hoursToMs,
   daysToMs,
   formatBytes,
@@ -102,6 +103,25 @@ describe('PREFETCH_RESOURCES', () => {
   it('should contain the stellarium engine bootstrap script', () => {
     const hasEngineScript = PREFETCH_RESOURCES.some((p) => p.includes('stellarium-web-engine.js'));
     expect(hasEngineScript).toBe(true);
+  });
+
+  it('should include catalog bootstrap manifests for richer first render', () => {
+    expect(PREFETCH_RESOURCES.some((p) => p.includes('/stellarium-data/stars/info.json'))).toBe(true);
+    expect(PREFETCH_RESOURCES.some((p) => p.includes('/stellarium-data/dso/info.json'))).toBe(true);
+  });
+});
+
+describe('getStarmapTierPrefetchResources', () => {
+  it('returns tier-specific prefetch resources', () => {
+    expect(getStarmapTierPrefetchResources('core')).toEqual(
+      expect.arrayContaining(['/stellarium-js/stellarium-web-engine.js'])
+    );
+    expect(getStarmapTierPrefetchResources('catalog')).toEqual(
+      expect.arrayContaining(['/stellarium-data/stars/info.json'])
+    );
+    expect(getStarmapTierPrefetchResources('survey')).toEqual(
+      expect.arrayContaining(['/stellarium-data/surveys/dss/info.json'])
+    );
   });
 });
 

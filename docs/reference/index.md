@@ -1,6 +1,6 @@
 # 参考资料
 
-本章节提供参考资料，帮助您深入理解天文学知识和 SkyMap Test 的技术细节。
+本章节提供参考资料，帮助您深入理解天文学知识和 SkyMap 的技术细节。
 
 ## 章节内容
 
@@ -15,6 +15,7 @@
 
 - **[Stellarium 能力矩阵](stellarium-capability-matrix.md)** - 官方 JS 能力与实现/测试对照
 - **[观测系统契约](observation-system-contracts.md)** - 坐标/时制、推荐评分、移动端可达矩阵
+- **[文档-实现对齐矩阵](documentation-implementation-alignment.md)** - 文档描述、实现入口、验证证据的追溯表
 - **[术语表](glossary.md)** - 专业术语解释
 - **[常见问题](faq.md)** - 常见问题解答
 
@@ -22,7 +23,7 @@
 
 ### 坐标系统
 
-理解天文学坐标系统对于使用 SkyMap Test 非常重要：
+理解天文学坐标系统对于使用 SkyMap 非常重要：
 
 - **地平坐标系**：以观测者为基准
 - **赤道坐标系**：以天赤道为基准
@@ -48,7 +49,7 @@
 
 ### 主要星表
 
-SkyMap Test 支持多种星表：
+SkyMap 支持多种星表：
 
 - **HIPPARCOS**：依巴谷卫星星表
 - **Tycho-2**：第谷星表第二版
@@ -190,3 +191,4 @@ SkyMap Test 支持多种星表：
 ---
 
 开始探索：[天文学基础](astronomy-basics/index.md)
+

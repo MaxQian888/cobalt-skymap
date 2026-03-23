@@ -50,6 +50,11 @@ import { CacheUnifiedTab } from './cache-unified-tab';
 
 const logger = createLogger('offline-cache-manager');
 
+function getCapabilityStateLabel(supported: boolean, providerAvailable: boolean): 'supported' | 'degraded' | 'unsupported' {
+  if (supported) return 'supported';
+  return providerAvailable ? 'degraded' : 'unsupported';
+}
+
 export function OfflineCacheManager() {
   const t = useTranslations();
   const [activeTab, setActiveTab] = useState<'layers' | 'surveys' | 'unified'>('layers');
@@ -207,6 +212,26 @@ export function OfflineCacheManager() {
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">{t('cache.persistentShared')}</span>
               <span>{diagnosticsSummary.persistentShared}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1 pt-1">
+              <div className="rounded bg-background/60 p-1 text-center">
+                <div className="text-[10px] text-muted-foreground">{t('cache.clearAll')}</div>
+                <div className="font-medium">
+                  {getCapabilityStateLabel(providerDiagnostics.supportsClear, providerDiagnostics.available)}
+                </div>
+              </div>
+              <div className="rounded bg-background/60 p-1 text-center">
+                <div className="text-[10px] text-muted-foreground">{t('cache.cleanup')}</div>
+                <div className="font-medium">
+                  {getCapabilityStateLabel(providerDiagnostics.supportsCleanup, providerDiagnostics.available)}
+                </div>
+              </div>
+              <div className="rounded bg-background/60 p-1 text-center">
+                <div className="text-[10px] text-muted-foreground">{t('cache.flush')}</div>
+                <div className="font-medium">
+                  {getCapabilityStateLabel(providerDiagnostics.supportsFlush, providerDiagnostics.available)}
+                </div>
+              </div>
             </div>
           </div>
           

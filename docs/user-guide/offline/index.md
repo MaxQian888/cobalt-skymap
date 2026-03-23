@@ -1,6 +1,6 @@
 # 离线功能
 
-SkyMap Test 支持离线使用，让您在没有网络的观测现场也能正常使用。
+SkyMap 支持离线使用，让您在没有网络的观测现场也能正常使用。
 
 ## 功能概览
 
@@ -90,6 +90,19 @@ SkyMap Test 支持离线使用，让您在没有网络的观测现场也能正�
 | 卫星 TLE | 1 天 |
 | 天文事件 | 1 天 |
 
+## 统一缓存与诊断（实现对齐）
+
+当前实现将缓存分为两个层级：
+
+- **离线瓦片缓存（offline cache）**：面向星图瓦片文件，核心实现位于 `src-tauri/src/cache/offline.rs`
+- **统一网络缓存（unified cache）**：面向在线数据与预取内容，核心实现位于 `src-tauri/src/cache/unified.rs`
+
+缓存策略与跨能力诊断汇总位于 `lib/cache/integration-policy.ts`，用于提供：
+
+- 缓存能力状态（active/degraded/mismatch/local-only/uncached-by-design）
+- 分层就绪状态（`core` / `catalog` / `survey`）
+- 预取资源到策略 ID 的映射
+
 ## 离线模式
 
 ### 启用离线模式
@@ -138,9 +151,9 @@ SkyMap Test 支持离线使用，让您在没有网络的观测现场也能正�
 
 缓存数据存储在应用数据目录：
 
-- **Windows**: `%APPDATA%\skymap-test\cache`
-- **macOS**: `~/Library/Application Support/skymap-test/cache`
-- **Linux**: `~/.local/share/skymap-test/cache`
+- **Windows**: `%APPDATA%\skymap\cache`
+- **macOS**: `~/Library/Application Support/skymap/cache`
+- **Linux**: `~/.local/share/skymap/cache`
 
 ### 配额设置
 
@@ -183,3 +196,4 @@ SkyMap Test 支持离线使用，让您在没有网络的观测现场也能正�
 ---
 
 返回：[用户指南](../index.md)
+

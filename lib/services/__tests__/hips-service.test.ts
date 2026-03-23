@@ -4,14 +4,16 @@
 
 import { hipsService, RECOMMENDED_SURVEY_IDS, HiPSSurvey } from '../hips-service';
 
-// Mock fetch
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+const mockSmartFetch = jest.fn();
+
+jest.mock('@/lib/services/http-fetch', () => ({
+  smartFetch: (...args: unknown[]) => mockSmartFetch(...args),
+}));
 
 describe('hipsService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFetch.mockReset();
+    mockSmartFetch.mockReset();
     hipsService.clearCache();
   });
 
@@ -48,21 +50,28 @@ describe('hipsService', () => {
     ];
 
     it('should fetch surveys from registry', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockSurveyData),
       });
 
       const surveys = await hipsService.fetchSurveys();
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockSmartFetch).toHaveBeenCalledTimes(1);
+      expect(mockSmartFetch).toHaveBeenCalledWith(
+        expect.stringContaining('https://alasky.cds.unistra.fr/MocServer/query'),
+        expect.objectContaining({
+          cachePolicy: 'hips-registry',
+          cacheTtl: 24 * 60 * 60 * 1000,
+        })
+      );
       expect(surveys.length).toBe(2);
       expect(surveys[0].name).toBe('DSS2 Color');
       expect(surveys[0].category).toBe('optical');
     });
 
     it('should cache results', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockSurveyData),
       });
@@ -70,13 +79,13 @@ describe('hipsService', () => {
       await hipsService.fetchSurveys();
       await hipsService.fetchSurveys();
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockSmartFetch).toHaveBeenCalledTimes(1);
     });
 
     it('should filter by category', async () => {
       // Only return infrared survey for this test
       const infraredOnly = [mockSurveyData[1]]; // 2MASS is infrared
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(infraredOnly),
       });
@@ -89,7 +98,7 @@ describe('hipsService', () => {
     });
 
     it('should apply limit', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockSurveyData),
       });
@@ -101,7 +110,7 @@ describe('hipsService', () => {
 
     it('should handle fetch errors and return cached surveys', async () => {
       // First call succeeds
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockSurveyData),
       });
@@ -110,7 +119,7 @@ describe('hipsService', () => {
       hipsService.clearCache();
 
       // Second call fails
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockSmartFetch.mockRejectedValueOnce(new Error('Network error'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const surveys = await hipsService.fetchSurveys();
@@ -125,7 +134,7 @@ describe('hipsService', () => {
         hips_service_url: 'https://example.com/survey',
       }];
 
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(dataWithoutSlash),
       });
@@ -143,7 +152,7 @@ describe('hipsService', () => {
         { ...mockSurveyData[0], obs_regime: 'Gamma-ray', ID: 'gamma-1' },
       ];
 
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(multiRegimeData),
       });
@@ -159,7 +168,7 @@ describe('hipsService', () => {
 
   describe('searchSurveys', () => {
     it('should search surveys by query', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve([{
           ID: 'CDS/P/DSS2/color',
@@ -171,9 +180,9 @@ describe('hipsService', () => {
 
       const searchResults = await hipsService.searchSurveys('DSS');
 
-      expect(mockFetch).toHaveBeenCalled();
+      expect(mockSmartFetch).toHaveBeenCalled();
       expect(searchResults).toBeDefined();
-      const callUrl = mockFetch.mock.calls[0][0];
+      const callUrl = mockSmartFetch.mock.calls[0][0];
       expect(callUrl).toContain('obs_title=*DSS*');
     });
   });
@@ -190,7 +199,7 @@ describe('hipsService', () => {
         },
       ];
 
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mockData),
       });
@@ -204,7 +213,7 @@ describe('hipsService', () => {
 
   describe('getSurveysByCategory', () => {
     it('should get surveys by category', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve([{
           ID: 'CDS/P/2MASS/color',
@@ -223,7 +232,7 @@ describe('hipsService', () => {
 
   describe('getSurveyById', () => {
     it('should return survey by ID', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve([{
           ID: 'CDS/P/DSS2/color',
@@ -239,7 +248,7 @@ describe('hipsService', () => {
     });
 
     it('should return undefined for non-existent ID', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve([]),
       });
@@ -253,7 +262,7 @@ describe('hipsService', () => {
   describe('getSurveyByUrl', () => {
     it('should return survey by URL', async () => {
       const testUrl = 'https://alasky.cds.unistra.fr/DSS/';
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve([{
           ID: 'CDS/P/DSS2/color',
@@ -270,7 +279,7 @@ describe('hipsService', () => {
     });
 
     it('should normalize URL for comparison', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve([{
           ID: 'test',
@@ -289,7 +298,7 @@ describe('hipsService', () => {
 
   describe('clearCache', () => {
     it('should clear cached surveys', async () => {
-      mockFetch.mockResolvedValue({
+      mockSmartFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve([{
           ID: 'test',
@@ -303,7 +312,7 @@ describe('hipsService', () => {
       hipsService.clearCache();
       await hipsService.fetchSurveys();
 
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockSmartFetch).toHaveBeenCalledTimes(2);
     });
   });
 

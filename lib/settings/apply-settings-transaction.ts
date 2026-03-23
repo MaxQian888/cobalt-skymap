@@ -55,6 +55,7 @@ export async function applySettingsTransaction(
   const settingsSnapshot = {
     connection: { ...settingsStore.connection },
     backendProtocol: settingsStore.backendProtocol,
+    proxy: { ...settingsStore.proxy },
     preferences: { ...settingsStore.preferences },
     performance: { ...settingsStore.performance },
     accessibility: { ...settingsStore.accessibility },
@@ -72,6 +73,7 @@ export async function applySettingsTransaction(
     connection: (currentDraft) => {
       settingsStore.setConnection(currentDraft.connection);
       settingsStore.setBackendProtocol(currentDraft.backendProtocol);
+      settingsStore.setProxySettings(currentDraft.proxy);
     },
     preferences: (currentDraft) => {
       settingsStore.setPreferences(currentDraft.preferences);
@@ -111,6 +113,7 @@ export async function applySettingsTransaction(
     connection: () => {
       settingsStore.setConnection(settingsSnapshot.connection);
       settingsStore.setBackendProtocol(settingsSnapshot.backendProtocol);
+      settingsStore.setProxySettings(settingsSnapshot.proxy);
     },
     preferences: () => {
       settingsStore.setPreferences(settingsSnapshot.preferences);

@@ -5,6 +5,23 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 文档与工程治理
+
+- 对齐项目文档与当前实现：统一仓库标识、站点元信息与链接基线。
+- 新增文档-实现-验证追溯矩阵：`docs/reference/documentation-implementation-alignment.md`。
+- 在核心文档补充以下实现参考：
+  - starmap 启动引导与降级恢复（bootstrap/loaders）
+  - unified/offline cache 与诊断策略
+  - 在线解板与赤道仪控制链路
+  - Daily Knowledge 多源与回退链路
+
+### 说明
+
+- 本节反映当前主分支已合入但尚未打版本标签的变更。
+- 下方“版本规划”仅代表计划，不表示功能已交付。
+
 ## [0.1.0] - 2025-01-04
 
 ### 新增功能
@@ -74,7 +91,7 @@
 
 ---
 
-## 版本规划
+## 版本规划（计划中，非已交付）
 
 ### [0.2.0] - 计划中
 - 望远镜控制（ASCOM/INDI 协议）

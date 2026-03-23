@@ -34,6 +34,19 @@ async function getListen() {
 /**
  * HTTP client configuration
  */
+export type ProxyMode = 'auto' | 'manual' | 'off';
+export type ProxySource = 'manual' | 'env' | 'system' | 'none';
+
+export interface EffectiveProxyState {
+  mode: ProxyMode;
+  source: ProxySource;
+  source_detail: string | null;
+  resolved_proxy: string | null;
+  fallback_to_direct_on_failure: boolean;
+  fallback_applied: boolean;
+  last_error: string | null;
+}
+
 export interface HttpClientConfig {
   /** Connection timeout in milliseconds */
   connect_timeout_ms: number;
@@ -49,7 +62,13 @@ export interface HttpClientConfig {
   retry_max_delay_ms: number;
   /** User agent string */
   user_agent: string;
-  /** Proxy URL (optional) */
+  /** Proxy mode: auto-discovery, manual URL, or disabled */
+  proxy_mode: ProxyMode;
+  /** Manual proxy URL when mode is manual */
+  manual_proxy_url: string | null;
+  /** Whether manual proxy failure can fallback to direct connection */
+  fallback_to_direct_on_failure: boolean;
+  /** Legacy proxy URL field kept for backward compatibility */
   proxy_url: string | null;
   /** Maximum response size in bytes */
   max_response_size: number;
@@ -237,6 +256,14 @@ export const httpApi = {
     const invoke = await getInvoke();
     const currentConfig = await this.getConfig();
     return invoke('set_http_config', { config: { ...currentConfig, ...config } });
+  },
+
+  /**
+   * Get the currently effective proxy state after resolution/fallback.
+   */
+  async getEffectiveProxyState(): Promise<EffectiveProxyState> {
+    const invoke = await getInvoke();
+    return invoke('get_effective_proxy_state');
   },
 
   /**

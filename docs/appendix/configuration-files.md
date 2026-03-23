@@ -1,6 +1,6 @@
 # 配置文件说明
 
-本文档说明 SkyMap Test 使用的配置文件格式和位置。
+本文档说明 SkyMap 使用的配置文件格式和位置。
 
 ## 配置文件位置
 
@@ -302,3 +302,4 @@ cp -r ~/Library/Application\ Support/SkyMapTest ~/Backup
 ---
 
 返回：[附录](index.md)
+

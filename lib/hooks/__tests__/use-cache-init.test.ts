@@ -55,7 +55,15 @@ jest.mock('@/lib/tauri/unified-cache-api', () => ({
 // Mock cache config
 jest.mock('@/lib/cache/config', () => ({
   PREFETCH_RESOURCES: [],
-  CACHE_CONFIG: { unified: { maxSize: 500 * 1024 * 1024 } },
+  CACHE_CONFIG: { unified: { maxSize: 500 * 1024 * 1024, prefetchTTL: 30 * 24 * 60 * 60 * 1000 } },
+}));
+
+jest.mock('@/lib/cache/integration-policy', () => ({
+  resolveCachePolicyForPrefetchResource: jest.fn(() => null),
+}));
+
+jest.mock('@/lib/services/http-fetch', () => ({
+  smartFetch: jest.fn(),
 }));
 
 const mockInstallFetchInterceptor = installFetchInterceptor as jest.Mock;
@@ -163,6 +171,26 @@ describe('useCacheInit', () => {
     });
 
     expect(mockInitializeCacheSystem).toHaveBeenCalledTimes(1);
+  });
+
+  it('notifies cache-index lifecycle callbacks', async () => {
+    const onCacheIndexStart = jest.fn();
+    const onCacheIndexReady = jest.fn();
+    const onCacheIndexError = jest.fn();
+
+    renderHook(() => useCacheInit({
+      onCacheIndexStart,
+      onCacheIndexReady,
+      onCacheIndexError,
+    }));
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(onCacheIndexStart).toHaveBeenCalledTimes(1);
+    expect(onCacheIndexReady).toHaveBeenCalledTimes(1);
+    expect(onCacheIndexError).not.toHaveBeenCalled();
   });
 
   it('sets up periodic cleanup interval', () => {

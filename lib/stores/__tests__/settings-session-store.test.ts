@@ -37,9 +37,11 @@ describe('settings-session-store', () => {
     useSettingsSessionStore.getState().startSession(snapshot);
 
     useSettingsSessionStore.getState().setConnection({ ip: '127.0.0.1' });
+    useSettingsSessionStore.getState().setProxySettings({ mode: 'manual' });
 
     const state = useSettingsSessionStore.getState();
     expect(state.dirtyPaths).toContain('connection.ip');
+    expect(state.dirtyPaths).toContain('proxy.mode');
     expect(state.dirtyCategories).toContain('connection');
   });
 

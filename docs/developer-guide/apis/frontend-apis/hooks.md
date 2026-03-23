@@ -1,6 +1,6 @@
 # React Hooks API
 
-SkyMap Test 提供了一系列自定义 React Hooks，封装常用的业务逻辑。
+SkyMap 提供了一系列自定义 React Hooks，封装常用的业务逻辑。
 
 ## Hooks 概览
 
@@ -1132,3 +1132,4 @@ useEffect(() => {
 ---
 
 返回：[API参考](../index.md)
+

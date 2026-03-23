@@ -16,7 +16,7 @@ jest.mock('@/lib/services/map-config', () => ({
   },
 }));
 
-import { mapConfig } from '@/lib/services/map-config';
+import { mapConfig, type MapConfiguration } from '@/lib/services/map-config';
 
 const mockMapConfig = mapConfig as jest.Mocked<typeof mapConfig>;
 
@@ -547,6 +547,43 @@ describe('MapApiKeyManager', () => {
         expect(screen.getByText('AIza123456789abcdef')).toBeInTheDocument();
       });
     });
+
+    it('hides API key again when visibility is toggled twice', async () => {
+      mockMapConfig.getApiKeys.mockReturnValue([
+        {
+          id: 'key-1',
+          provider: 'google',
+          apiKey: 'AIza123456789abcdef',
+          isDefault: false,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      render(<MapApiKeyManager />);
+
+      const visibilityButton = screen
+        .getAllByRole('button')
+        .find((btn) => btn.getAttribute('data-size') === 'icon');
+
+      expect(visibilityButton).toBeDefined();
+
+      if (visibilityButton) {
+        await act(async () => {
+          fireEvent.click(visibilityButton);
+        });
+
+        await waitFor(() => {
+          expect(screen.getByText('secure-key-1')).toBeInTheDocument();
+        });
+
+        await act(async () => {
+          fireEvent.click(visibilityButton);
+        });
+      }
+
+      expect(screen.queryByText('secure-key-1')).not.toBeInTheDocument();
+      expect(screen.getByText(/••••••••/)).toBeInTheDocument();
+    });
   });
 
   describe('Copy API Key', () => {
@@ -641,6 +678,40 @@ describe('MapApiKeyManager', () => {
       await waitFor(() => {
         expect(mockCopyTextWithFeedback).toHaveBeenCalledWith(
           expect.objectContaining({ text: 'AIza123456789abcdef' })
+        );
+      });
+    });
+
+    it('copies empty text when the key entry disappears before copy executes', async () => {
+      const sharedKeys = [
+        {
+          id: 'key-1',
+          provider: 'google',
+          apiKey: 'AIza123456789abcdef',
+          isDefault: false,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      mockMapConfig.getApiKeys.mockReturnValue(sharedKeys as ReturnType<typeof mapConfig.getApiKeys>);
+
+      render(<MapApiKeyManager />);
+
+      const copyButton = screen
+        .getAllByRole('button')
+        .filter((btn) => btn.getAttribute('data-size') === 'icon')[1];
+
+      // Mutate the shared array so the handler cannot resolve this key id anymore.
+      sharedKeys.length = 0;
+
+      if (copyButton) {
+        await act(async () => {
+          fireEvent.click(copyButton);
+        });
+      }
+
+      await waitFor(() => {
+        expect(mockCopyTextWithFeedback).toHaveBeenCalledWith(
+          expect.objectContaining({ text: '' })
         );
       });
     });
@@ -993,6 +1064,36 @@ describe('MapApiKeyManager', () => {
       const { unmount } = render(<MapApiKeyManager />);
 
       expect(() => unmount()).not.toThrow();
+    });
+
+    it('refreshes API key rows when configuration listener fires', async () => {
+      let listener: ((config: MapConfiguration) => void) | undefined;
+      mockMapConfig.getApiKeys
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce([
+          {
+            id: 'key-2',
+            provider: 'mapbox',
+            apiKey: 'pk.1234567890',
+            isDefault: false,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      mockMapConfig.addConfigurationListener.mockImplementation((callback) => {
+        listener = callback;
+        return () => {};
+      });
+
+      render(<MapApiKeyManager />);
+      expect(screen.getByText(/map\.noApiKeys|No API keys configured/)).toBeInTheDocument();
+
+      act(() => {
+        listener?.({} as MapConfiguration);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('mapbox')).toBeInTheDocument();
+      });
     });
   });
 

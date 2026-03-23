@@ -1,11 +1,11 @@
 # 目录布局
 
-本文档详细说明 SkyMap Test 项目的目录结构和各模块的职责。
+本文档详细说明 SkyMap 项目的目录结构和各模块的职责。
 
 ## 项目根目录
 
 ```
-skymap-test/
+cobalt-skymap/
 ├── app/                      # Next.js App Router 页面
 ├── components/               # React 组件
 │   ├── starmap/             # 星图功能组件
@@ -329,7 +329,7 @@ src-tauri/
 ### 根目录配置
 
 ```
-skymap-test/
+cobalt-skymap/
 ├── package.json          # Node.js 依赖
 ├── tsconfig.json         # TypeScript 配置
 ├── next.config.ts        # Next.js 配置
@@ -348,7 +348,7 @@ skymap-test/
 
 ```json
 {
-  "name": "skymap-test",
+  "name": "cobalt-skymap",
   "version": "0.1.0",
   "scripts": {
     "dev": "next dev",
@@ -572,3 +572,4 @@ const HeavyComponent = dynamic(
 ---
 
 返回：[项目结构](index.md)
+

@@ -9,6 +9,18 @@ This document defines the data quality rules for `lib/data/daily-knowledge-curat
 - Keep online fallback reliable when external services are unavailable.
 - Keep external source ingestion allowlisted, attributable, and regression-resistant.
 
+## Runtime Chain（实现参考）
+
+Daily Knowledge 运行时主链路：
+
+- 聚合与回退策略：`lib/services/daily-knowledge/service.ts`
+  - 负责 source status 汇总、在线增强判定、curated fallback 触发
+- UI 展示与降级提示：`components/starmap/knowledge/daily-knowledge-dialog.tsx`
+  - 负责 `sourceStatuses` 与 `usedCuratedFallback` 的展示
+- 状态持久化：`lib/stores/daily-knowledge-store.ts`
+
+变更上述运行时文件时，应同步更新本文档对应描述与测试建议。
+
 ## Entry Requirements
 
 Each curated entry must include:

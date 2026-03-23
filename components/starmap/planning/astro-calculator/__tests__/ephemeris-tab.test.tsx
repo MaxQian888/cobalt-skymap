@@ -13,6 +13,7 @@ jest.mock('next-intl', () => ({
 
 jest.mock('@/lib/astronomy/engine', () => ({
   computeEphemeris: (...args: unknown[]) => mockComputeEphemeris(...args),
+  serializeCacheKey: (payload: unknown) => JSON.stringify(payload),
 }));
 
 jest.mock('@/lib/astronomy/starmap-utils', () => ({
@@ -87,6 +88,8 @@ describe('EphemerisTab', () => {
     });
 
     expect(screen.getByText('astroCalc.coordinateOutput')).toBeInTheDocument();
-    expect(screen.getByText('12.30h')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('12.30h')).toBeInTheDocument();
+    });
   });
 });

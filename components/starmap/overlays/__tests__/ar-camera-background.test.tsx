@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import { ARCameraBackground } from '../ar-camera-background';
 import type { ARSessionStatus } from '@/lib/core/ar-session';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
@@ -250,6 +250,14 @@ describe('ARCameraBackground', () => {
     expect(screen.getByText('common.retry')).toBeInTheDocument();
   });
 
+  it('retries camera start when retry button is clicked in error state', () => {
+    mockError = 'Failed';
+    mockErrorType = 'unknown';
+    renderComponent(<ARCameraBackground enabled={true} />);
+    fireEvent.click(screen.getByText('common.retry'));
+    expect(mockStart).toHaveBeenCalledTimes(2);
+  });
+
   it('renders video element when stream is available', () => {
     mockStream = new MockMediaStream() as unknown as MediaStream;
     renderComponent(<ARCameraBackground enabled={true} />);
@@ -265,11 +273,27 @@ describe('ARCameraBackground', () => {
     expect(screen.getByLabelText(/switchCamera|Switch camera/i)).toBeInTheDocument();
   });
 
+  it('invokes switchCamera when switch button is clicked', () => {
+    mockStream = new MockMediaStream() as unknown as MediaStream;
+    mockHasMultipleCameras = true;
+    renderComponent(<ARCameraBackground enabled={true} />);
+    fireEvent.click(screen.getByLabelText(/switchCamera|Switch camera/i));
+    expect(mockSwitchCamera).toHaveBeenCalled();
+  });
+
   it('renders torch button when torch capability is available', () => {
     mockStream = new MockMediaStream() as unknown as MediaStream;
     mockCapabilities = { torch: true };
     renderComponent(<ARCameraBackground enabled={true} />);
     expect(screen.getByLabelText('Torch')).toBeInTheDocument();
+  });
+
+  it('invokes toggleTorch when torch button is clicked', () => {
+    mockStream = new MockMediaStream() as unknown as MediaStream;
+    mockCapabilities = { torch: true };
+    renderComponent(<ARCameraBackground enabled={true} />);
+    fireEvent.click(screen.getByLabelText('Torch'));
+    expect(mockToggleTorch).toHaveBeenCalled();
   });
 
   it('exposes adaptation metadata for camera controls', () => {

@@ -59,6 +59,7 @@ export interface SettingsProfileData {
   settings?: {
     connection: ReturnType<typeof useSettingsStore.getState>['connection'];
     backendProtocol: ReturnType<typeof useSettingsStore.getState>['backendProtocol'];
+    proxy?: ReturnType<typeof useSettingsStore.getState>['proxy'];
     skyEngine: ReturnType<typeof useSettingsStore.getState>['skyEngine'];
     stellarium: ReturnType<typeof useSettingsStore.getState>['stellarium'];
     preferences: ReturnType<typeof useSettingsStore.getState>['preferences'];
@@ -200,6 +201,9 @@ function validateSettingsAndLocation(
   }
   if (settings?.backendProtocol) {
     draft.backendProtocol = settings.backendProtocol;
+  }
+  if (settings?.proxy) {
+    draft.proxy = { ...draft.proxy, ...settings.proxy };
   }
   if (settings?.preferences) {
     draft.preferences = { ...draft.preferences, ...settings.preferences };
@@ -431,6 +435,7 @@ export function buildSettingsProfile(options: BuildSettingsProfileOptions = {}):
     profile.settings = {
       connection: settingsState.connection,
       backendProtocol: settingsState.backendProtocol,
+      proxy: settingsState.proxy,
       skyEngine: settingsState.skyEngine,
       stellarium: settingsState.stellarium,
       preferences: settingsState.preferences,

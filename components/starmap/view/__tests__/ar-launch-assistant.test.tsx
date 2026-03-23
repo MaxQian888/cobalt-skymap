@@ -84,7 +84,7 @@ describe('ARLaunchAssistant', () => {
     render(<ARLaunchAssistant />);
 
     expect(screen.getByTestId('ar-launch-assistant')).toBeInTheDocument();
-    expect(screen.getByText('Back Camera')).toBeInTheDocument();
+    expect(screen.getAllByText('Back Camera').length).toBeGreaterThan(0);
     expect(screen.getByTestId('ar-launch-check-sensor')).toBeInTheDocument();
   });
 
@@ -132,5 +132,97 @@ describe('ARLaunchAssistant', () => {
     expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-sensor-path', 'camera-primary');
     expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-sticky-actions', 'true');
     expect(screen.getByText('settings.arAdaptationCameraFirst')).toBeInTheDocument();
+  });
+
+  it('shows remembered-plan diagnostics using the shared summary contract', () => {
+    useARRuntimeStore.setState((state) => ({
+      camera: {
+        ...state.camera,
+        acquisitionDiagnostics: {
+          ...state.camera.acquisitionDiagnostics,
+          currentStage: 'remembered-device',
+          usedRememberedPlan: true,
+          lastFailureStage: 'requested-facing-mode-safe',
+        },
+      },
+    }));
+
+    render(<ARLaunchAssistant />);
+
+    expect(screen.getByTestId('ar-launch-assistant').textContent).toContain('settings.arCameraRememberedPlan');
+  });
+
+  it('closes the assistant when the dismiss button is clicked', () => {
+    render(<ARLaunchAssistant />);
+
+    fireEvent.click(screen.getByTestId('ar-launch-close'));
+
+    expect(useARRuntimeStore.getState().launchAssistant.visible).toBe(false);
+  });
+
+  it('marks the assistant as resumed when the page becomes visible again', () => {
+    const before = useARRuntimeStore.getState().launchAssistant.resumeCount;
+    render(<ARLaunchAssistant />);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+
+    expect(useARRuntimeStore.getState().launchAssistant.resumeCount).toBe(before + 1);
+  });
+
+  it('dispatches switch-camera and calibrate-sensor actions through shared recovery handlers', async () => {
+    useARRuntimeStore.setState((state) => ({
+      launchAssistant: {
+        ...state.launchAssistant,
+        summaryActions: ['switch-camera', 'calibrate-sensor'],
+      },
+    }));
+
+    render(<ARLaunchAssistant />);
+
+    fireEvent.click(screen.getByTestId('ar-launch-action-switch-camera'));
+    fireEvent.click(screen.getByTestId('ar-launch-action-calibrate-sensor'));
+
+    await waitFor(() => {
+      expect(useARRuntimeStore.getState().recoveryRequestVersion['switch-camera']).toBe(1);
+      expect(useARRuntimeStore.getState().recoveryRequestVersion['calibrate-sensor']).toBe(1);
+    });
+  });
+
+  it('opens camera settings and reverts the profile from launch assistant actions', async () => {
+    useARRuntimeStore.setState((state) => ({
+      launchAssistant: {
+        ...state.launchAssistant,
+        summaryActions: ['open-camera-settings', 'revert-last-known-good-profile'],
+      },
+    }));
+
+    render(<ARLaunchAssistant />);
+
+    fireEvent.click(screen.getByTestId('ar-launch-action-open-camera-settings'));
+    fireEvent.click(screen.getByTestId('ar-launch-action-revert-last-known-good-profile'));
+
+    expect(mockOpenSettingsDrawer).toHaveBeenCalledWith('display');
+    await waitFor(() => {
+      expect(useARRuntimeStore.getState().recoveryRequestVersion['revert-last-known-good-profile']).toBe(1);
+    });
+  });
+
+  it('disables AR from the launch assistant summary action', () => {
+    useARRuntimeStore.setState((state) => ({
+      launchAssistant: {
+        ...state.launchAssistant,
+        summaryActions: ['disable-ar'],
+      },
+    }));
+
+    render(<ARLaunchAssistant />);
+
+    fireEvent.click(screen.getByTestId('ar-launch-action-disable-ar'));
+
+    expect(mockSetStellariumSetting).toHaveBeenCalledWith('arMode', false);
   });
 });

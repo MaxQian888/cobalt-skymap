@@ -10,6 +10,11 @@
 // Core stores
 export { useStellariumStore } from './stellarium-store';
 export {
+  useStarmapBootstrapStore,
+  type StarmapBootstrapResourceRuntime,
+  type StarmapBootstrapDiagnostic,
+} from './starmap-bootstrap-store';
+export {
   useSettingsStore,
   type PrecisionMode,
   type EopUpdatePolicy,

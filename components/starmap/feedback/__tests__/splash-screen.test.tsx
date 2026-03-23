@@ -141,6 +141,19 @@ describe('SplashScreen', () => {
     expect(onComplete).toHaveBeenCalled();
   });
 
+  it('does not skip when pressing unrelated keys', () => {
+    const onComplete = jest.fn();
+    render(<SplashScreen onComplete={onComplete} minDuration={5000} />);
+
+    fireEvent.keyDown(window, { key: 'Tab' });
+
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+
   it('triggers early completion when isReady becomes true', () => {
     const onComplete = jest.fn();
 
@@ -250,5 +263,16 @@ describe('SplashScreen', () => {
       { selector: '.sr-only' }
     );
     expect(srText2).toBeInTheDocument();
+  });
+
+  it('updates accessibility state when entering fadeout phase', () => {
+    render(<SplashScreen minDuration={5000} />);
+
+    const splash = screen.getByTestId('splash-screen');
+    fireEvent.click(splash);
+
+    expect(splash).toHaveAttribute('aria-busy', 'false');
+    expect(splash).not.toHaveAttribute('aria-label');
+    expect(screen.getByText('splash.tagline', { selector: '.sr-only' })).toBeInTheDocument();
   });
 });

@@ -221,6 +221,36 @@ describe('LocationSearch', () => {
       });
     });
 
+    it('aborts the previous in-flight search when a new query starts', async () => {
+      const abortSpy = jest.spyOn(AbortController.prototype, 'abort');
+      mockGeocode.mockImplementation(() => {
+        return new Promise(() => undefined);
+      });
+
+      render(<LocationSearch onLocationSelect={mockOnLocationSelect} />);
+
+      const input = screen.getByTestId('search-input');
+      fireEvent.change(input, { target: { value: 'Tok' } });
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(mockGeocode).toHaveBeenCalledTimes(1);
+      });
+
+      fireEvent.change(input, { target: { value: 'Tokyo' } });
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(mockGeocode).toHaveBeenCalledTimes(2);
+      });
+      expect(abortSpy).toHaveBeenCalled();
+      abortSpy.mockRestore();
+    });
+
     it('does not search when query is empty', async () => {
       render(<LocationSearch onLocationSelect={mockOnLocationSelect} />);
       
@@ -311,6 +341,45 @@ describe('LocationSearch', () => {
       // Should not crash, results should be empty
       await waitFor(() => {
         expect(mockGeocode).toHaveBeenCalled();
+      });
+    });
+
+    it('shows no-results message in online-autocomplete mode when nothing is found', async () => {
+      mockGeocode.mockResolvedValue([]);
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: jest.fn(() =>
+            JSON.stringify([
+              {
+                query: 'History item',
+                result: {
+                  displayName: 'History Place',
+                  coordinates: { latitude: 1, longitude: 2 },
+                  address: 'History Address',
+                },
+                timestamp: Date.now(),
+              },
+            ])
+          ),
+          setItem: jest.fn(),
+          removeItem: jest.fn(),
+          clear: jest.fn(),
+        },
+        writable: true,
+      });
+
+      render(<LocationSearch onLocationSelect={mockOnLocationSelect} />);
+
+      const input = screen.getByTestId('search-input');
+      fireEvent.change(input, { target: { value: 'NoSuchPlace' } });
+      fireEvent.focus(input);
+
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/map\.noResults|No locations found/)).toBeInTheDocument();
       });
     });
 
@@ -433,6 +502,51 @@ describe('LocationSearch', () => {
 
       expect(mockOnLocationSelect).toHaveBeenCalled();
     });
+
+    it('selects recent history entry on Enter when navigating history', async () => {
+      const historyItem = {
+        query: 'Kyoto',
+        result: {
+          displayName: 'Kyoto, Japan',
+          coordinates: { latitude: 35.0116, longitude: 135.7681 },
+          address: 'Kyoto',
+        },
+        timestamp: Date.now(),
+      };
+      Object.defineProperty(window, 'localStorage', {
+        value: {
+          getItem: jest.fn(() => JSON.stringify([historyItem])),
+          setItem: jest.fn(),
+          removeItem: jest.fn(),
+          clear: jest.fn(),
+        },
+        writable: true,
+      });
+
+      render(
+        <LocationSearch
+          onLocationSelect={mockOnLocationSelect}
+          showCurrentLocation={false}
+          showRecentSearches
+        />
+      );
+
+      const input = screen.getByTestId('search-input');
+      fireEvent.focus(input);
+
+      await waitFor(() => {
+        expect(screen.getByText('Kyoto, Japan')).toBeInTheDocument();
+      });
+
+      fireEvent.keyDown(input, { key: 'ArrowDown' });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(mockOnLocationSelect).toHaveBeenCalledWith({
+        coordinates: { latitude: 35.0116, longitude: 135.7681 },
+        address: 'Kyoto',
+        displayName: 'Kyoto, Japan',
+      });
+    });
   });
 
   describe('Clear Button', () => {
@@ -487,9 +601,59 @@ describe('LocationSearch', () => {
         expect(screen.getByText(/map\.currentLocation|Current Location/)).toBeInTheDocument();
       });
     });
+
+    it('uses reverse geocode result when current location succeeds', async () => {
+      mockReverseGeocode.mockResolvedValue({
+        displayName: 'Shinjuku, Tokyo',
+        address: 'Shinjuku',
+        coordinates: { latitude: 35.6895, longitude: 139.6917 },
+      });
+
+      render(
+        <LocationSearch
+          onLocationSelect={mockOnLocationSelect}
+          showCurrentLocation
+        />
+      );
+
+      const input = screen.getByTestId('search-input');
+      fireEvent.focus(input);
+
+      await waitFor(() => {
+        expect(screen.getByText(/map\.currentLocation|Current Location/)).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText(/map\.currentLocation|Current Location/));
+
+      await waitFor(() => {
+        expect(mockOnLocationSelect).toHaveBeenCalledWith({
+          coordinates: { latitude: 35.6762, longitude: 139.6503 },
+          address: 'Shinjuku',
+          displayName: 'Shinjuku, Tokyo',
+        });
+        expect(screen.getByTestId('search-input')).toHaveValue('Shinjuku, Tokyo');
+      });
+    });
   });
 
   describe('Recent Searches', () => {
+    it('handles malformed or inaccessible localStorage history gracefully', () => {
+      const localStorageMock = {
+        getItem: jest.fn(() => {
+          throw new Error('Read failure');
+        }),
+        setItem: jest.fn(),
+        removeItem: jest.fn(),
+        clear: jest.fn(),
+      };
+      Object.defineProperty(window, 'localStorage', { value: localStorageMock, writable: true });
+
+      expect(() => {
+        render(<LocationSearch onLocationSelect={mockOnLocationSelect} showRecentSearches />);
+      }).not.toThrow();
+      expect(localStorageMock.getItem).toHaveBeenCalledWith('skymap-location-search-history');
+    });
+
     it('loads search history from localStorage', () => {
       const mockHistory = [
         {
@@ -562,6 +726,106 @@ describe('LocationSearch', () => {
       await waitFor(() => {
         expect(localStorageMock.setItem).toHaveBeenCalled();
       });
+    });
+
+    it('deduplicates history when selecting the same location again', async () => {
+      const timestamp = Date.now();
+      const existingHistory = [
+        {
+          query: 'Tokyo',
+          result: {
+            displayName: 'Tokyo, Japan',
+            coordinates: { latitude: 35.6762, longitude: 139.6503 },
+            address: 'Tokyo',
+          },
+          timestamp,
+        },
+      ];
+      const localStorageMock = {
+        getItem: jest.fn(() => JSON.stringify(existingHistory)),
+        setItem: jest.fn(),
+        removeItem: jest.fn(),
+        clear: jest.fn(),
+      };
+      Object.defineProperty(window, 'localStorage', { value: localStorageMock, writable: true });
+
+      mockGeocode.mockResolvedValue([
+        {
+          displayName: 'Tokyo, Japan',
+          coordinates: { latitude: 35.6762, longitude: 139.6503 },
+          address: 'Tokyo',
+        },
+      ]);
+
+      render(<LocationSearch onLocationSelect={mockOnLocationSelect} showRecentSearches />);
+
+      const input = screen.getByTestId('search-input');
+      fireEvent.change(input, { target: { value: 'Tokyo' } });
+      fireEvent.focus(input);
+
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Tokyo, Japan')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Tokyo, Japan'));
+
+      await waitFor(() => {
+        expect(localStorageMock.setItem).toHaveBeenCalled();
+      });
+
+      const lastSaved = localStorageMock.setItem.mock.calls.at(-1)?.[1];
+      const parsedHistory = JSON.parse(lastSaved as string);
+      expect(parsedHistory).toHaveLength(1);
+      expect(parsedHistory[0].query).toBe('Tokyo');
+    });
+
+    it('keeps selection working when localStorage write fails', async () => {
+      const localStorageMock = {
+        getItem: jest.fn(() => null),
+        setItem: jest.fn(() => {
+          throw new Error('Write failure');
+        }),
+        removeItem: jest.fn(),
+        clear: jest.fn(),
+      };
+      Object.defineProperty(window, 'localStorage', { value: localStorageMock, writable: true });
+
+      mockGeocode.mockResolvedValue([
+        {
+          displayName: 'Osaka, Japan',
+          coordinates: { latitude: 34.6937, longitude: 135.5023 },
+          address: 'Osaka',
+        },
+      ]);
+
+      render(<LocationSearch onLocationSelect={mockOnLocationSelect} showRecentSearches />);
+
+      const input = screen.getByTestId('search-input');
+      fireEvent.change(input, { target: { value: 'Osaka' } });
+      fireEvent.focus(input);
+
+      act(() => {
+        jest.advanceTimersByTime(300);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText('Osaka, Japan')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Osaka, Japan'));
+
+      await waitFor(() => {
+        expect(mockOnLocationSelect).toHaveBeenCalledWith({
+          coordinates: { latitude: 34.6937, longitude: 135.5023 },
+          address: 'Osaka',
+          displayName: 'Osaka, Japan',
+        });
+      });
+      expect(localStorageMock.setItem).toHaveBeenCalled();
     });
 
     it('displays recent search history items in dropdown', () => {

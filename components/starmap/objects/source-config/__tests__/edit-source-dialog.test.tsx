@@ -48,6 +48,8 @@ describe('EditSourceDialog', () => {
     apiEndpoint: '/api/query',
     timeout: 10000,
     status: 'online' as const,
+    renderTier: 'enrichment' as const,
+    fallbackRole: 'primary' as const,
   };
 
   const defaultProps = {
@@ -130,6 +132,8 @@ describe('EditSourceDialog', () => {
       urlTemplate: '/cgi-bin/images?',
       credit: 'NASA',
       status: 'online',
+      renderTier: 'survey',
+      fallbackRole: 'primary',
     };
     render(<EditSourceDialog source={imageSource} type="image" open={true} onOpenChange={jest.fn()} onSave={jest.fn()} />);
     // Source info section should show base URL

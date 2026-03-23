@@ -298,6 +298,119 @@ jest.mock('@/components/ui/alert-dialog', () => ({
   }) => (asChild ? <>{children}</> : <div data-testid="alert-dialog-trigger">{children}</div>),
 }));
 
+jest.mock('../source-config/source-item', () => ({
+  SourceItem: ({
+    source,
+    onToggle,
+    onCheck,
+    onRemove,
+    onEdit,
+  }: {
+    source: {
+      id: string;
+      name: string;
+      description: string;
+      builtIn?: boolean;
+      enabled: boolean;
+      status?: string;
+      responseTime?: number;
+      priority: number;
+    };
+    onToggle: () => void;
+    onCheck: () => void;
+    onRemove?: () => void;
+    onEdit: () => void;
+  }) => (
+    <div data-testid={`source-item-${source.id}`}>
+      <span>{source.name}</span>
+      <span>{source.description}</span>
+      <span>{source.priority}</span>
+      {source.builtIn && <span>sourceConfig.builtIn</span>}
+      {source.responseTime != null && <span>{source.responseTime}ms</span>}
+      <input
+        type="checkbox"
+        data-testid="switch"
+        checked={source.enabled}
+        onChange={onToggle}
+      />
+      <button
+        type="button"
+        data-testid={`check-source-${source.id}`}
+        onClick={onCheck}
+        disabled={source.status === 'checking'}
+      >
+        check
+      </button>
+      <button type="button" onClick={onEdit}>
+        <span className="lucide-settings">edit</span>
+      </button>
+      {onRemove && (
+        <button type="button" onClick={onRemove}>
+          remove
+        </button>
+      )}
+      <div data-testid="tooltip-content">sourceConfig.priorityHint</div>
+    </div>
+  ),
+}));
+
+jest.mock('../source-config/add-custom-source-dialog', () => ({
+  AddCustomSourceDialog: ({
+    type,
+    onAdd,
+  }: {
+    type: 'image' | 'data';
+    onAdd: (source: Record<string, unknown>) => void;
+  }) => (
+    <button
+      type="button"
+      data-testid={`add-custom-${type}`}
+      onClick={() => {
+        onAdd({
+          name: `${type}-custom`,
+          type: 'custom',
+          enabled: true,
+          priority: 9,
+          baseUrl: 'https://example.com',
+          urlTemplate: '/api',
+          description: `${type} custom`,
+        });
+      }}
+    >
+      sourceConfig.addCustom
+    </button>
+  ),
+}));
+
+jest.mock('../source-config/edit-source-dialog', () => ({
+  EditSourceDialog: ({
+    type,
+    open,
+    onOpenChange,
+    onSave,
+  }: {
+    type: 'image' | 'data';
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSave: (updates: Record<string, unknown>) => void;
+  }) =>
+    open ? (
+      <div data-testid={`edit-source-dialog-${type}`}>
+        <span>sourceConfig.editSource</span>
+        <button type="button" data-testid={`close-edit-dialog-${type}`} onClick={() => onOpenChange(false)}>
+          close
+        </button>
+        <button
+          type="button"
+          data-testid={`save-edit-dialog-${type}`}
+          onClick={() => onSave({ description: `${type}-updated` })}
+        >
+          save
+        </button>
+      </div>
+    ) : null,
+}));
+
 import { ObjectInfoSourcesConfig } from '../object-info-sources-config';
 
 const mockImageSources = [
@@ -480,7 +593,22 @@ describe('ObjectInfoSourcesConfig', () => {
     it('shows add custom source button', () => {
       render(<ObjectInfoSourcesConfig />);
       // The add custom button is inside collapsible content
-      expect(screen.queryAllByText('sourceConfig.addCustom').length).toBeGreaterThanOrEqual(0);
+      expect(screen.getAllByText('sourceConfig.addCustom').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('adds custom image source through add dialog callback', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('add-custom-image'));
+      });
+
+      expect(mockStoreState.addImageSource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'image-custom',
+          type: 'custom',
+        })
+      );
     });
   });
 
@@ -493,6 +621,21 @@ describe('ObjectInfoSourcesConfig', () => {
     it('displays data source descriptions', () => {
       render(<ObjectInfoSourcesConfig />);
       expect(screen.getByText('SIMBAD Astronomical Database')).toBeInTheDocument();
+    });
+
+    it('adds custom data source through add dialog callback', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('add-custom-data'));
+      });
+
+      expect(mockStoreState.addDataSource).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'data-custom',
+          type: 'custom',
+        })
+      );
     });
   });
 
@@ -535,6 +678,19 @@ describe('ObjectInfoSourcesConfig', () => {
       expect(screen.getByText('sourceConfig.healthCheckInterval')).toBeInTheDocument();
     });
 
+    it('renders disabled label when health check interval is zero', () => {
+      mockUseObjectInfoConfigStore.mockReturnValue({
+        ...mockStoreState,
+        settings: {
+          ...mockSettings,
+          healthCheckInterval: 0,
+        },
+      });
+
+      render(<ObjectInfoSourcesConfig />);
+      expect(screen.getByText('sourceConfig.disabled')).toBeInTheDocument();
+    });
+
     it('updates settings when slider changed', async () => {
       render(<ObjectInfoSourcesConfig />);
 
@@ -557,6 +713,39 @@ describe('ObjectInfoSourcesConfig', () => {
       });
 
       expect(mockStoreState.updateSettings).toHaveBeenCalledWith({ preferredImageFormat: 'png' });
+    });
+
+    it('updates api timeout when second slider changes', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      const sliders = screen.getAllByTestId('slider');
+      await act(async () => {
+        fireEvent.change(sliders[1], { target: { value: '9000' } });
+      });
+
+      expect(mockStoreState.updateSettings).toHaveBeenCalledWith({ apiTimeout: 9000 });
+    });
+
+    it('updates default image size when third slider changes', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      const sliders = screen.getAllByTestId('slider');
+      await act(async () => {
+        fireEvent.change(sliders[2], { target: { value: '25' } });
+      });
+
+      expect(mockStoreState.updateSettings).toHaveBeenCalledWith({ defaultImageSize: 25 });
+    });
+
+    it('updates health check interval when last slider changes', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      const sliders = screen.getAllByTestId('slider');
+      await act(async () => {
+        fireEvent.change(sliders[3], { target: { value: '60000' } });
+      });
+
+      expect(mockStoreState.updateSettings).toHaveBeenCalledWith({ healthCheckInterval: 60000 });
     });
   });
 
@@ -681,20 +870,30 @@ describe('ObjectInfoSourcesConfig', () => {
     it('calls checkImageSourceHealth when source check button clicked', async () => {
       render(<ObjectInfoSourcesConfig />);
 
-      // The SourceItem renders a switch + refresh + settings buttons for each source
-      // The "Check All" button also has a refresh icon, so skip it
-      // SourceItem's refresh buttons are inside collapsible content
-      const allSwitches = screen.getAllByTestId('switch');
-      // Each source has one switch; find the refresh buttons near them
-      expect(allSwitches.length).toBeGreaterThanOrEqual(2); // at least image + data sources
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('check-source-skyview'));
+      });
 
-      // Verify checkImageSourceHealth mock is available
-      expect(mockCheckImageSourceHealth).toBeDefined();
+      expect(mockStoreState.setImageSourceStatus).toHaveBeenNthCalledWith(1, 'skyview', 'checking');
+      expect(mockCheckImageSourceHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'skyview' })
+      );
+      expect(mockStoreState.setImageSourceStatus).toHaveBeenNthCalledWith(2, 'skyview', 'online', 100);
     });
 
-    it('calls checkDataSourceHealth when data source check triggered', () => {
+    it('calls checkDataSourceHealth when data source check triggered', async () => {
       render(<ObjectInfoSourcesConfig />);
-      expect(mockCheckDataSourceHealth).toBeDefined();
+
+      mockCheckDataSourceHealth.mockResolvedValueOnce({ online: false, responseTime: 900 });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('check-source-simbad'));
+      });
+
+      expect(mockStoreState.setDataSourceStatus).toHaveBeenNthCalledWith(1, 'simbad', 'checking');
+      expect(mockCheckDataSourceHealth).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'simbad' })
+      );
+      expect(mockStoreState.setDataSourceStatus).toHaveBeenNthCalledWith(2, 'simbad', 'offline', 900);
     });
 
     it('disables check button when source is in checking state', () => {
@@ -725,6 +924,93 @@ describe('ObjectInfoSourcesConfig', () => {
       await waitFor(() => {
         expect(screen.getByText(/sourceConfig.editSource/)).toBeInTheDocument();
       });
+    });
+
+    it('saves edited image source and closes edit dialog', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      const allButtons = screen.getAllByRole('button');
+      const editButtons = allButtons.filter((btn) => btn.querySelector('.lucide-settings'));
+      await act(async () => {
+        fireEvent.click(editButtons[0]);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-source-dialog-image')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('save-edit-dialog-image'));
+      });
+
+      expect(mockStoreState.updateImageSource).toHaveBeenCalledWith(
+        'skyview',
+        expect.objectContaining({ description: 'image-updated' })
+      );
+    });
+
+    it('closes image source edit dialog through onOpenChange(false)', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      const allButtons = screen.getAllByRole('button');
+      const editButtons = allButtons.filter((btn) => btn.querySelector('.lucide-settings'));
+      await act(async () => {
+        fireEvent.click(editButtons[0]);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-source-dialog-image')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('close-edit-dialog-image'));
+      });
+
+      expect(screen.queryByTestId('edit-source-dialog-image')).not.toBeInTheDocument();
+    });
+
+    it('closes data source edit dialog through onOpenChange(false)', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      const allButtons = screen.getAllByRole('button');
+      const editButtons = allButtons.filter((btn) => btn.querySelector('.lucide-settings'));
+      // The third source in fixture is data source (simbad)
+      await act(async () => {
+        fireEvent.click(editButtons[2]);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-source-dialog-data')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('close-edit-dialog-data'));
+      });
+
+      expect(screen.queryByTestId('edit-source-dialog-data')).not.toBeInTheDocument();
+    });
+
+    it('saves edited data source and closes edit dialog', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      const allButtons = screen.getAllByRole('button');
+      const editButtons = allButtons.filter((btn) => btn.querySelector('.lucide-settings'));
+      await act(async () => {
+        fireEvent.click(editButtons[2]);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('edit-source-dialog-data')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('save-edit-dialog-data'));
+      });
+
+      expect(mockStoreState.updateDataSource).toHaveBeenCalledWith(
+        'simbad',
+        expect.objectContaining({ description: 'data-updated' })
+      );
     });
 
     it('toggles image source enable/disable', async () => {
@@ -789,6 +1075,58 @@ describe('ObjectInfoSourcesConfig', () => {
 
       // updateSettings should have been called
       expect(mockStoreState.updateSettings).toHaveBeenCalled();
+    });
+  });
+
+  describe('Remove Source Callbacks', () => {
+    it('removes custom image source when remove button clicked', async () => {
+      render(<ObjectInfoSourcesConfig />);
+
+      const customImageSource = screen.getByTestId('source-item-custom-1');
+      const removeButton = screen.getByRole('button', { name: /remove/i });
+
+      expect(customImageSource).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(removeButton);
+      });
+
+      expect(mockStoreState.removeImageSource).toHaveBeenCalledWith('custom-1');
+    });
+
+    it('removes custom data source when remove button clicked', async () => {
+      mockUseObjectInfoConfigStore.mockReturnValue({
+        ...mockStoreState,
+        dataSources: [
+          ...mockDataSources,
+          {
+            id: 'custom-data',
+            name: 'Custom Data Source',
+            type: 'custom',
+            enabled: true,
+            priority: 2,
+            baseUrl: 'https://custom.example.com',
+            apiEndpoint: '/objects',
+            timeout: 5000,
+            description: 'Custom data source',
+            builtIn: false,
+            status: 'online' as const,
+          },
+        ],
+      });
+
+      render(<ObjectInfoSourcesConfig />);
+
+      const customDataSource = screen.getByTestId('source-item-custom-data');
+      const removeButtons = screen.getAllByRole('button', { name: /remove/i });
+
+      expect(customDataSource).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(removeButtons[1]);
+      });
+
+      expect(mockStoreState.removeDataSource).toHaveBeenCalledWith('custom-data');
     });
   });
 });

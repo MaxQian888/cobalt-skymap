@@ -121,6 +121,12 @@ const DEFAULT_SEARCH = {
   maxHistoryItems: 20,
 };
 
+const DEFAULT_PROXY = {
+  mode: 'auto' as const,
+  manualUrl: '',
+  fallbackToDirectOnFailure: true,
+};
+
 const DEFAULT_MOBILE_FEATURES = {
   compactBottomBar: false,
   oneHandMode: false,
@@ -133,6 +139,7 @@ describe('Settings Store', () => {
     useSettingsStore.setState({
       connection: { ip: 'localhost', port: '1888' },
       backendProtocol: 'http',
+      proxy: DEFAULT_PROXY,
       skyEngine: 'stellarium',
       stellarium: DEFAULT_STELLARIUM,
       preferences: DEFAULT_PREFERENCES,
@@ -176,6 +183,11 @@ describe('Settings Store', () => {
     it('has default backend protocol', () => {
       const state = useSettingsStore.getState();
       expect(state.backendProtocol).toBe('http');
+    });
+
+    it('has default proxy settings', () => {
+      const state = useSettingsStore.getState();
+      expect(state.proxy).toEqual(DEFAULT_PROXY);
     });
 
     it('has default stellarium settings', () => {
@@ -256,6 +268,28 @@ describe('Settings Store', () => {
       useSettingsStore.getState().setBackendProtocol('https');
       useSettingsStore.getState().setBackendProtocol('http');
       expect(useSettingsStore.getState().backendProtocol).toBe('http');
+    });
+  });
+
+  describe('setProxySettings', () => {
+    it('updates proxy mode and manual URL', () => {
+      useSettingsStore.getState().setProxySettings({
+        mode: 'manual',
+        manualUrl: ' http://127.0.0.1:7890 ',
+      });
+
+      const state = useSettingsStore.getState();
+      expect(state.proxy.mode).toBe('manual');
+      expect(state.proxy.manualUrl).toBe('http://127.0.0.1:7890');
+      expect(state.proxy.fallbackToDirectOnFailure).toBe(true);
+    });
+
+    it('updates manual fallback toggle', () => {
+      useSettingsStore.getState().setProxySettings({
+        fallbackToDirectOnFailure: false,
+      });
+
+      expect(useSettingsStore.getState().proxy.fallbackToDirectOnFailure).toBe(false);
     });
   });
 
@@ -601,6 +635,11 @@ describe('Settings Store', () => {
       useSettingsStore.getState().setStellariumSetting('atmosphereVisible', true);
       useSettingsStore.getState().setObservationProfile('visual');
       useSettingsStore.getState().setPrecisionMode('realtime_lightweight');
+      useSettingsStore.getState().setProxySettings({
+        mode: 'manual',
+        manualUrl: 'http://127.0.0.1:7890',
+        fallbackToDirectOnFailure: false,
+      });
 
       // Reset
       useSettingsStore.getState().resetToDefaults();
@@ -615,6 +654,7 @@ describe('Settings Store', () => {
       expect(state.stellarium.atmosphereVisible).toBe(false);
       expect(state.observationProfile).toBe('imaging');
       expect(state.precisionMode).toBe('core_high_precision');
+      expect(state.proxy).toEqual(DEFAULT_PROXY);
     });
 
     it('does not reset connection settings', () => {

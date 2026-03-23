@@ -42,6 +42,26 @@ describe('ar-adaptation', () => {
     expect(context.sensorPath).toBe('camera-primary');
   });
 
+  it('classifies tablet portrait as expanded mobile AR without desktop fallback', () => {
+    const context = deriveARAdaptationContext({
+      viewportWidth: 820,
+      viewportHeight: 1180,
+      safeAreaInsets: { top: 20, right: 0, bottom: 20, left: 0 },
+      runtimeKind: 'browser',
+      cameraSupported: true,
+      capabilityMap: createConservativeARCameraCapabilities(),
+      sensorSupported: true,
+      sensorPermissionGranted: true,
+      sensorStatus: 'active',
+    });
+
+    expect(context.runtimeClass).toBe('browser-mobile');
+    expect(context.layoutTier).toBe('tablet');
+    expect(context.assistantMode).toBe('floating-card');
+    expect(context.recoveryMode).toBe('floating-card');
+    expect(context.sensorPath).toBe('sensor-primary');
+  });
+
   it('treats short landscape viewport as reduced compact layout', () => {
     const context = deriveARAdaptationContext({
       viewportWidth: 844,

@@ -17,6 +17,7 @@ jest.mock('@/lib/storage', () => ({
 interface MockSettingsDraft {
   connection: typeof settingsStoreState.connection;
   backendProtocol: typeof settingsStoreState.backendProtocol;
+  proxy: typeof settingsStoreState.proxy;
   preferences: typeof settingsStoreState.preferences;
   performance: typeof settingsStoreState.performance;
   accessibility: typeof settingsStoreState.accessibility;
@@ -68,6 +69,7 @@ const mockApplySettingsTransaction = jest.fn((draft: MockSettingsDraft, options:
   if (domainOrder.includes('connection')) {
     settingsStoreState.connection = draft.connection;
     settingsStoreState.backendProtocol = draft.backendProtocol;
+    settingsStoreState.proxy = draft.proxy;
   }
   if (domainOrder.includes('preferences')) {
     settingsStoreState.preferences = draft.preferences;
@@ -105,6 +107,7 @@ const mockApplySettingsTransaction = jest.fn((draft: MockSettingsDraft, options:
 const settingsStoreState = {
   connection: { ip: 'localhost', port: '1888' },
   backendProtocol: 'http',
+  proxy: { mode: 'auto', manualUrl: '', fallbackToDirectOnFailure: true },
   skyEngine: 'stellarium-web-engine',
   stellarium: { nightMode: false },
   preferences: { locale: 'en' },
@@ -115,6 +118,7 @@ const settingsStoreState = {
   aladinDisplay: { showGrid: false },
   setConnection: jest.fn(function (value) { settingsStoreState.connection = value; }),
   setBackendProtocol: jest.fn(function (value) { settingsStoreState.backendProtocol = value; }),
+  setProxySettings: jest.fn(function (value) { settingsStoreState.proxy = value; }),
   setSkyEngine: jest.fn(function (value) { settingsStoreState.skyEngine = value; }),
   setStellariumSettings: jest.fn(function (value) { settingsStoreState.stellarium = value; }),
   setPreferences: jest.fn(function (value) { settingsStoreState.preferences = value; }),
@@ -296,6 +300,7 @@ describe('settings-profile-transaction', () => {
     useSettingsImportRestoreStore.getState().clearRestorePoint();
     settingsStoreState.connection = { ip: 'localhost', port: '1888' };
     settingsStoreState.backendProtocol = 'http';
+    settingsStoreState.proxy = { mode: 'auto', manualUrl: '', fallbackToDirectOnFailure: true };
     settingsStoreState.skyEngine = 'stellarium-web-engine';
     settingsStoreState.stellarium = { nightMode: false };
     settingsStoreState.preferences = { locale: 'en' };

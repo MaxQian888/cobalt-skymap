@@ -23,6 +23,7 @@ const TEMPERATURE_UNITS = new Set(['celsius', 'fahrenheit']);
 const STARTUP_VIEWS = new Set(['last', 'default', 'custom']);
 const RENDER_QUALITIES = new Set(['low', 'medium', 'high', 'ultra']);
 const BACKEND_PROTOCOLS = new Set(['http', 'https']);
+const PROXY_MODES = new Set(['auto', 'manual', 'off']);
 
 const EMPTY_VALIDATION_RESULT: SettingsDraftValidationResult = {
   isValid: true,
@@ -53,6 +54,30 @@ export function validateSettingsDraft(draft: SettingsDraft): SettingsDraftValida
   const parsedPort = Number.parseInt(draft.connection.port, 10);
   if (!Number.isFinite(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
     addIssue('connection', 'connection.port', 'Connection port must be between 1 and 65535.');
+  }
+
+  if (!PROXY_MODES.has(draft.proxy.mode)) {
+    addIssue('connection', 'proxy.mode', 'Proxy mode must be auto, manual, or off.');
+  }
+
+  const manualProxyUrl = draft.proxy.manualUrl.trim();
+  if (draft.proxy.mode === 'manual' && manualProxyUrl.length === 0) {
+    addIssue(
+      'connection',
+      'proxy.manualUrl',
+      'Manual proxy mode requires a proxy URL.',
+    );
+  }
+
+  if (
+    manualProxyUrl.length > 0
+    && !/^(https?|socks5h?):\/\/\S+$/i.test(manualProxyUrl)
+  ) {
+    addIssue(
+      'connection',
+      'proxy.manualUrl',
+      'Proxy URL must start with http://, https://, socks5://, or socks5h://.',
+    );
   }
 
   if (!APP_LOCALES.has(draft.preferences.locale)) {
@@ -189,4 +214,3 @@ export function getCategoryValidationStatus(
 ): 'valid' | 'invalid' {
   return (validation.categoryErrors[category]?.length ?? 0) > 0 ? 'invalid' : 'valid';
 }
-

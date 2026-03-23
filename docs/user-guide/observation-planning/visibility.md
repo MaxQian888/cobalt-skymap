@@ -1,6 +1,6 @@
 # 可见性预测
 
-本文档介绍如何使用 SkyMap Test 的天体可见性预测功能。
+本文档介绍如何使用 SkyMap 的天体可见性预测功能。
 
 ## 可见性基础
 
@@ -311,3 +311,4 @@
 - [规划概览](index.md)
 - [目标列表](target-lists.md)
 - [天体详情](../celestial-objects/object-details.md)
+

@@ -132,6 +132,14 @@ jest.mock('@/lib/astronomy/astro-utils', () => ({
   getTransitTime: jest.fn(() => new Date()),
 }));
 
+jest.mock('@/lib/astronomy/target-display-model', () => {
+  const actual = jest.requireActual('@/lib/astronomy/target-display-model');
+  return {
+    ...actual,
+    buildTargetDisplayModel: jest.fn(actual.buildTargetDisplayModel),
+  };
+});
+
 // Mock utils
 jest.mock('@/lib/astronomy/starmap-utils', () => ({
   raDecToAltAz: jest.fn(() => ({ altitude: 45, azimuth: 180 })),
@@ -198,6 +206,7 @@ jest.mock('recharts', () => ({
 }));
 
 import { useObjectActions } from '@/lib/hooks';
+import * as targetDisplayModel from '@/lib/astronomy/target-display-model';
 
 const mockUseObjectActions = useObjectActions as jest.Mock;
 
@@ -430,6 +439,75 @@ describe('InfoPanel', () => {
     });
   });
 
+  describe('risk hint mapping', () => {
+    it('maps known risk keys and falls back for unknown risk key', () => {
+      const mockedBuildTargetDisplayModel = targetDisplayModel.buildTargetDisplayModel as unknown as jest.Mock;
+      mockedBuildTargetDisplayModel.mockReturnValueOnce({
+          sections: {
+            identity: {
+              primaryName: 'M31',
+              aliases: ['NGC 224'],
+              type: 'Galaxy',
+              magnitude: '3.4',
+              size: '3° x 1°',
+              constellation: 'Andromeda',
+              coordinates: {
+                ra: '00h 42m 44s',
+                dec: '+41° 16\' 09"',
+              },
+            },
+            liveStatus: {
+              altitude: '45.0°',
+              azimuth: '180.0°',
+              altitudeState: 'high',
+              moonInterferenceLevel: 'moderate',
+              calculationState: 'nominal',
+              riskHints: ['never-rises', 'moon-interference', 'low-feasibility', 'custom-risk'],
+            },
+            planningMetrics: {
+              visibility: {
+                isVisible: true,
+                isCircumpolar: false,
+                transitAltitude: 75,
+                riseTime: new Date(),
+                setTime: new Date(),
+                transitTime: new Date(),
+                darkImagingHours: 6,
+              },
+              moonDistance: '90°',
+              maxAltitude: '75.0°',
+              feasibility: {
+                score: 80,
+                recommendation: 'good',
+                moonScore: 90,
+                altitudeScore: 85,
+                durationScore: 75,
+                twilightScore: 90,
+                warnings: [],
+              },
+            },
+            advancedMetadata: {
+              frame: 'J2000',
+              timeScale: 'UTC',
+              qualityFlag: 'A',
+              dataFreshness: 'fresh',
+              calculationSource: 'engine',
+              calculationState: 'nominal',
+              updatedAt: '2026-03-19T12:00:00Z',
+              calculationTimestamp: '2026-03-19T12:00:00Z',
+            },
+          },
+        } as unknown as ReturnType<typeof targetDisplayModel.buildTargetDisplayModel>);
+
+      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+
+      expect(screen.getByText('objectDetail.riskHintsMap.never-rises')).toBeInTheDocument();
+      expect(screen.getByText('objectDetail.riskHintsMap.moon-interference')).toBeInTheDocument();
+      expect(screen.getByText('objectDetail.riskHintsMap.low-feasibility')).toBeInTheDocument();
+      expect(screen.getByText('custom-risk')).toBeInTheDocument();
+    });
+  });
+
   describe('compact-priority behavior', () => {
     it('de-prioritizes advanced metadata while keeping critical actions visible', () => {
       render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
@@ -470,11 +548,13 @@ describe('InfoPanel', () => {
       render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
       const card = screen.getByTestId('card');
 
-      // These React synthetic events should be handled
-      const pointerDownEvent = new MouseEvent('pointerdown', { bubbles: true });
-      jest.spyOn(pointerDownEvent, 'stopPropagation');
-      fireEvent(card, pointerDownEvent);
-      // The card's onPointerDown handler calls stopPropagation
+      // Ensure all panel-level handlers execute (pointer/mouse/double-click/wheel)
+      fireEvent.pointerDown(card);
+      fireEvent.mouseDown(card);
+      fireEvent.doubleClick(card);
+      fireEvent.wheel(card);
+
+      // No crash means handlers are wired and safe to invoke
       expect(card).toBeInTheDocument();
     });
   });

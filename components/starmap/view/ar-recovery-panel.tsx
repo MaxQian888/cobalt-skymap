@@ -5,6 +5,11 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { executeARRecoveryAction, type ARRecoveryActionHandlers } from '@/lib/core/ar-recovery-actions';
+import {
+  deriveARCameraDiagnosticSummary,
+  getARLaunchAssistantReason,
+  getRecoveryAssistantReason,
+} from '@/lib/core/ar-invocation';
 import type { ARRecoveryAction, ARSessionStatus } from '@/lib/core/ar-session';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import { useOnboardingBridgeStore, useSettingsStore } from '@/lib/stores';
@@ -75,6 +80,7 @@ export function ARRecoveryPanel({
 
   const recoveryActionLastFiredAt = useARRuntimeStore((state) => state.recoveryActionLastFiredAt);
   const [now, setNow] = useState(0);
+  const diagnosticSummary = deriveARCameraDiagnosticSummary(cameraRuntime);
 
   const actions = Array.from(new Set(recoveryActions));
 
@@ -89,6 +95,11 @@ export function ARRecoveryPanel({
   };
 
   const handleRecoveryAction = async (action: ARRecoveryAction): Promise<void> => {
+    const assistantReason = getRecoveryAssistantReason(action);
+    if (assistantReason) {
+      openLaunchAssistant(assistantReason);
+    }
+
     setRecoveryNoticeKey(getActionRequestedNoticeKey(action));
 
     const succeeded = await executeARRecoveryAction(action, handlers, {
@@ -160,12 +171,14 @@ export function ARRecoveryPanel({
       data-ar-sticky-actions={String(layoutTokens.stickyActions)}
     >
       <p className="text-xs font-medium">{t(getStatusTextKey(status))}</p>
-      {(cameraRuntime.acquisitionDiagnostics.activeDevice || cameraRuntime.acquisitionDiagnostics.lastFailureStage) && (
+      {(diagnosticSummary.deviceLabel || diagnosticSummary.lastFailureStage || diagnosticSummary.usedRememberedPlan) && (
         <p className="text-[11px] text-white/80" data-testid="ar-recovery-diagnostics">
           {[
-            cameraRuntime.acquisitionDiagnostics.activeDevice?.label,
-            cameraRuntime.acquisitionDiagnostics.lastFailureStage
-              ? t('settings.arCameraLastFailureStage')
+            diagnosticSummary.deviceLabel,
+            diagnosticSummary.currentStage,
+            diagnosticSummary.usedRememberedPlan ? t('settings.arCameraRememberedPlan') : null,
+            diagnosticSummary.lastFailureStage
+              ? `${t('settings.arCameraLastFailureStage')}: ${diagnosticSummary.lastFailureStage}`
               : null,
           ].filter(Boolean).join(' · ')}
         </p>
@@ -176,7 +189,7 @@ export function ARRecoveryPanel({
             variant="secondary"
             size="sm"
             className="h-7 rounded-full bg-white/15 px-3 text-xs text-white hover:bg-white/25"
-            onClick={() => openLaunchAssistant('recovery')}
+            onClick={() => openLaunchAssistant(getARLaunchAssistantReason('recovery'))}
             data-testid="ar-recovery-open-launch-assistant"
           >
             {t('settings.arLaunchOpenAssistant')}

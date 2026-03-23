@@ -23,7 +23,13 @@ jest.mock('@/components/ui/label', () => ({
 
 jest.mock('@/components/ui/select', () => ({
   Select: ({ children, value, onValueChange }: { children: React.ReactNode; value?: string; onValueChange?: (v: string) => void }) => (
-    <div data-testid="select" data-value={value} onClick={() => onValueChange?.('https')}>{children}</div>
+    <div
+      data-testid="select"
+      data-value={value}
+      onClick={() => onValueChange?.(value === 'http' || value === 'https' ? 'https' : 'manual')}
+    >
+      {children}
+    </div>
   ),
   SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => <option value={value}>{children}</option>,
@@ -37,6 +43,20 @@ jest.mock('@/components/ui/button', () => ({
   ),
 }));
 
+jest.mock('@/lib/storage/platform', () => {
+  const actual = jest.requireActual('@/lib/storage/platform');
+  return {
+    ...actual,
+    isTauri: jest.fn(() => false),
+  };
+});
+
+jest.mock('@/lib/tauri/http-api', () => ({
+  httpApi: {
+    getEffectiveProxyState: jest.fn(),
+  },
+}));
+
 jest.mock('@/components/ui/collapsible', () => ({
   Collapsible: ({ children }: { children: React.ReactNode }) => <div data-testid="collapsible">{children}</div>,
   CollapsibleContent: ({ children }: { children: React.ReactNode }) => <div data-testid="collapsible-content">{children}</div>,
@@ -47,10 +67,19 @@ jest.mock('@/components/ui/collapsible', () => ({
 
 import { ConnectionSettings } from '../connection-settings';
 
-function setStoreState(connection: { ip: string; port: string }, protocol: 'http' | 'https' = 'http') {
+function setStoreState(
+  connection: { ip: string; port: string },
+  protocol: 'http' | 'https' = 'http',
+  proxy: { mode: 'auto' | 'manual' | 'off'; manualUrl: string; fallbackToDirectOnFailure: boolean } = {
+    mode: 'auto',
+    manualUrl: '',
+    fallbackToDirectOnFailure: true,
+  },
+) {
   useSettingsStore.setState({
     connection,
     backendProtocol: protocol,
+    proxy,
   });
 }
 
@@ -67,7 +96,7 @@ describe('ConnectionSettings', () => {
 
   it('renders protocol select', () => {
     render(<ConnectionSettings />);
-    expect(screen.getByTestId('select')).toBeInTheDocument();
+    expect(screen.getAllByTestId('select').length).toBeGreaterThanOrEqual(2);
   });
 
   it('renders IP address and port inputs', () => {
@@ -148,7 +177,7 @@ describe('ConnectionSettings validation tests', () => {
   it('handles https protocol', () => {
     setStoreState({ ip: 'localhost', port: '443' }, 'https');
     render(<ConnectionSettings />);
-    expect(screen.getByTestId('select')).toHaveAttribute('data-value', 'https');
+    expect(screen.getAllByTestId('select')[0]).toHaveAttribute('data-value', 'https');
   });
 
   it('handles port change to non-standard port', () => {
@@ -175,7 +204,13 @@ describe('ConnectionSettings validation tests', () => {
 
   it('handles protocol change callback', () => {
     render(<ConnectionSettings />);
-    fireEvent.click(screen.getByTestId('select'));
+    fireEvent.click(screen.getAllByTestId('select')[0]);
     expect(useSettingsStore.getState().backendProtocol).toBe('https');
+  });
+
+  it('updates proxy mode when proxy select is changed', () => {
+    render(<ConnectionSettings />);
+    fireEvent.click(screen.getAllByTestId('select')[1]);
+    expect(useSettingsStore.getState().proxy.mode).toBe('manual');
   });
 });

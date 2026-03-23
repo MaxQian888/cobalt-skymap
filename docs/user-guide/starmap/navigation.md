@@ -1,6 +1,6 @@
 # 导航控制
 
-本文档介绍如何使用 SkyMap Test 的星图导航功能。
+本文档介绍如何使用 SkyMap 的星图导航功能。
 
 ## 视角控制
 
@@ -239,3 +239,4 @@
 - [显示设置](display-settings.md)
 - [缩放控制](zoom-controls.md)
 - [键盘快捷键](../../appendix/keyboard-shortcuts.md)
+

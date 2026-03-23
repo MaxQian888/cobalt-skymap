@@ -1,10 +1,10 @@
 # 桌面应用部署
 
-本章节介绍如何构建和部署 SkyMap Test 桌面应用。
+本章节介绍如何构建和部署 SkyMap 桌面应用。
 
 ## 概览
 
-SkyMap Test 使用 Tauri 框架构建跨平台桌面应用，支持 Windows、macOS 和 Linux。
+SkyMap 使用 Tauri 框架构建跨平台桌面应用，支持 Windows、macOS 和 Linux。
 
 ## 支持平台
 
@@ -67,3 +67,4 @@ pnpm tauri build
 - [部署概览](../index.md)
 - [Web 部署](../web/index.md)
 - [前置要求](../../developer-guide/development-environment/prerequisites.md)
+

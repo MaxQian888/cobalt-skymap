@@ -5,21 +5,42 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 
+let mockProfileInfo = {
+  AstrometrySettings: { Latitude: 40, Longitude: -74, Elevation: 100 },
+};
+
+let mockGetCurrentViewDirection: (() => { ra: number; dec: number; alt: number; az: number }) | null = null;
+
+let mockConditions = {
+  moonPhase: 0.5,
+  moonIllumination: 100,
+  moonAltitude: 45,
+  moonPhaseName: 'Full Moon',
+  skyQuality: 'average',
+  sunAltitude: -30,
+  isTwilight: false,
+  bortleClass: 5,
+  limitingMagnitude: 5.0,
+  lstString: '12:00:00',
+  twilight: {
+    sunset: new Date(),
+    sunrise: new Date(),
+    astronomicalDusk: new Date(),
+    astronomicalDawn: new Date(),
+  },
+};
+
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }));
 
 jest.mock('@/lib/stores', () => ({
   useMountStore: jest.fn((selector) => {
-    const state = {
-      profileInfo: {
-        AstrometrySettings: { Latitude: 40, Longitude: -74, Elevation: 100 },
-      },
-    };
+    const state = { profileInfo: mockProfileInfo };
     return selector(state);
   }),
   useStellariumStore: jest.fn((selector) => {
-    const state = { getCurrentViewDirection: null };
+    const state = { getCurrentViewDirection: mockGetCurrentViewDirection };
     return selector(state);
   }),
 }));
@@ -34,24 +55,7 @@ jest.mock('@/lib/astronomy/starmap-utils', () => ({
 }));
 
 jest.mock('@/lib/astronomy/sky-quality', () => ({
-  calculateAstroConditions: jest.fn(() => ({
-    moonPhase: 0.5,
-    moonIllumination: 100,
-    moonAltitude: 45,
-    moonPhaseName: 'Full Moon',
-    skyQuality: 'average',
-    sunAltitude: -30,
-    isTwilight: false,
-    bortleClass: 5,
-    limitingMagnitude: 5.0,
-    lstString: '12:00:00',
-    twilight: {
-      sunset: new Date(),
-      sunrise: new Date(),
-      astronomicalDusk: new Date(),
-      astronomicalDawn: new Date(),
-    },
-  })),
+  calculateAstroConditions: jest.fn(() => mockConditions),
   getSkyQualityColor: jest.fn(() => 'text-yellow-400'),
 }));
 
@@ -75,6 +79,32 @@ jest.mock('@/components/ui/separator', () => ({
 import { StatusBar } from '../status-bar';
 
 describe('StatusBar', () => {
+  beforeEach(() => {
+    mockProfileInfo = {
+      AstrometrySettings: { Latitude: 40, Longitude: -74, Elevation: 100 },
+    };
+    mockGetCurrentViewDirection = null;
+    mockConditions = {
+      moonPhase: 0.5,
+      moonIllumination: 100,
+      moonAltitude: 45,
+      moonPhaseName: 'Full Moon',
+      skyQuality: 'average',
+      sunAltitude: -30,
+      isTwilight: false,
+      bortleClass: 5,
+      limitingMagnitude: 5.0,
+      lstString: '12:00:00',
+      twilight: {
+        sunset: new Date(),
+        sunrise: new Date(),
+        astronomicalDusk: new Date(),
+        astronomicalDawn: new Date(),
+      },
+    };
+    Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
+  });
+
   it('renders without crashing', () => {
     render(<StatusBar currentFov={60} />);
   });
@@ -126,5 +156,60 @@ describe('StatusBar', () => {
     render(<StatusBar currentFov={60} />);
     // LocationTimeDisplay renders Clock icon + time
     expect(document.body.textContent).toContain('session.location');
+  });
+
+  it('renders online/offline status based on browser connectivity', () => {
+    Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
+    render(<StatusBar currentFov={60} />);
+    expect(document.body.textContent).toContain('system.connectionOffline');
+  });
+
+  it('renders daylight and twilight labels for solar condition branches', () => {
+    mockConditions = {
+      ...mockConditions,
+      sunAltitude: 12,
+      isTwilight: false,
+    };
+    const first = render(<StatusBar currentFov={60} />);
+    expect(document.body.textContent).toContain('statusBar.daylight');
+    first.unmount();
+
+    mockConditions = {
+      ...mockConditions,
+      sunAltitude: -6,
+      isTwilight: true,
+    };
+    render(<StatusBar currentFov={60} />);
+    expect(document.body.textContent).toContain('statusBar.twilight');
+  });
+
+  it('renders night label and view center values when Stellarium direction is available', () => {
+    mockConditions = {
+      ...mockConditions,
+      sunAltitude: -25,
+      isTwilight: false,
+    };
+    mockGetCurrentViewDirection = () => ({
+      ra: Math.PI / 2,
+      dec: Math.PI / 4,
+      alt: Math.PI / 6,
+      az: Math.PI / 3,
+    });
+
+    render(<StatusBar currentFov={0.8} />);
+
+    expect(document.body.textContent).toContain('statusBar.night');
+    expect(document.body.textContent).toContain('coordinates.ra');
+    expect(document.body.textContent).toContain('12h 00m 00s');
+    expect(document.body.textContent).toContain('30.0°');
+  });
+
+  it('swallows view-direction read errors and keeps rendering', () => {
+    mockGetCurrentViewDirection = () => {
+      throw new Error('direction unavailable');
+    };
+
+    render(<StatusBar currentFov={60} />);
+    expect(screen.queryByText('coordinates.ra')).not.toBeInTheDocument();
   });
 });

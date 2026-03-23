@@ -74,8 +74,10 @@ const mockStore: {
   filters: { query: string; category: string; source: string; favoritesOnly: boolean };
   sourceStatuses: Array<{ source: string; state: string; reason: string; itemCount: number; transport: string }>;
   usedCuratedFallback: boolean;
+  resolutionMode: 'fresh-online' | 'stale-cache' | 'curated-fallback';
   closeDialog: jest.Mock;
   loadDaily: jest.Mock;
+  refreshCurrentDate: jest.Mock;
   next: jest.Mock;
   prev: jest.Mock;
   random: jest.Mock;
@@ -113,8 +115,10 @@ const mockStore: {
     },
   ],
   usedCuratedFallback: true,
+  resolutionMode: 'curated-fallback',
   closeDialog: jest.fn(),
   loadDaily: jest.fn(),
+  refreshCurrentDate: jest.fn(),
   next: jest.fn(),
   prev: jest.fn(),
   random: jest.fn(),
@@ -174,6 +178,7 @@ describe('daily-knowledge-dialog', () => {
       },
     ];
     mockStore.usedCuratedFallback = true;
+    mockStore.resolutionMode = 'curated-fallback';
     mockStore.viewMode = 'pager';
     mockStore.wheelPagingEnabled = false;
     mockCopyTextWithFeedback.mockResolvedValue(true);
@@ -224,6 +229,7 @@ describe('daily-knowledge-dialog', () => {
     expect(screen.getByText('dailyKnowledge.observationTips')).toBeInTheDocument();
     expect(screen.getByText('dailyKnowledge.difficultyBadge.intermediate')).toBeInTheDocument();
     expect(screen.getByText('dailyKnowledge.curatedFallbackNotice')).toBeInTheDocument();
+    expect(screen.getByText('dailyKnowledge.freshness.curated-fallback')).toBeInTheDocument();
     expect(screen.getByText('dailyKnowledge.sourceStatus.nasa-image-library.error')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /SEDS M31/ })).toHaveAttribute(
       'href',
@@ -283,12 +289,30 @@ describe('daily-knowledge-dialog', () => {
     jest.useRealTimers();
   });
 
+  it('pages backward on upward wheel delta when wheel paging is enabled', () => {
+    jest.useFakeTimers();
+    mockStore.viewMode = 'pager';
+    mockStore.wheelPagingEnabled = true;
+    render(<DailyKnowledgeDialog />);
+    fireEvent.wheel(window, { deltaY: -120 });
+    expect(mockStore.prev).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
   it('renders feed cards and sets current item on card click', () => {
     mockStore.viewMode = 'feed';
     render(<DailyKnowledgeDialog />);
     fireEvent.click(screen.getByRole('button', { name: 'Item B' }));
     expect(mockStore.setCurrentItemById).toHaveBeenCalledWith('item-b');
     expect(screen.getAllByText('dailyKnowledge.observationTips').length).toBeGreaterThan(0);
+  });
+
+  it('triggers date-aware refresh from the toolbar', () => {
+    render(<DailyKnowledgeDialog />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.refreshCurrentDate' }));
+
+    expect(mockStore.refreshCurrentDate).toHaveBeenCalledWith('manual');
   });
 
   it('uses share->clipboard fallback and supports copy action', async () => {
@@ -400,6 +424,16 @@ describe('daily-knowledge-dialog', () => {
     expect(screen.getByText('Public Domain')).toBeInTheDocument();
   });
 
+  it('renders all-year badge when bestViewingMonths is empty', () => {
+    const itemAllYear = { ...itemA, bestViewingMonths: [] as number[] };
+    mockStore.items = [itemAllYear];
+    mockStore.currentItem = itemAllYear;
+    render(<DailyKnowledgeDialog />);
+    expect(
+      screen.getByText((content) => content.includes('dailyKnowledge.allYear') || /all year|全年/i.test(content))
+    ).toBeInTheDocument();
+  });
+
   it('shows noFactSources when factSources is empty', () => {
     const itemNoFacts = { ...itemA, factSources: [] };
     mockStore.items = [itemNoFacts];
@@ -502,6 +536,26 @@ describe('daily-knowledge-dialog', () => {
     const text = mockCopyTextWithFeedback.mock.calls[0][0].text as string;
     expect(text).toContain('Test Copyright');
     expect(text).toContain('MIT');
+  });
+
+  it('buildShareText omits license line when licenseName is missing', async () => {
+    const itemWithoutLicense = {
+      ...itemA,
+      attribution: {
+        sourceName: 'Test',
+        copyright: 'Only Copyright',
+        licenseName: undefined as string | undefined,
+        licenseUrl: undefined as string | undefined,
+      },
+    };
+    mockStore.items = [itemWithoutLicense];
+    mockStore.currentItem = itemWithoutLicense;
+    render(<DailyKnowledgeDialog />);
+    fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.copy' }));
+    await Promise.resolve();
+    const text = mockCopyTextWithFeedback.mock.calls[0][0].text as string;
+    const lines = text.split('\n');
+    expect(lines[lines.length - 1]).toBe('Only Copyright');
   });
 
   it('shows share failed toast when clipboard also fails in share fallback', async () => {

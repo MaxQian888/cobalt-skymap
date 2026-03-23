@@ -53,6 +53,16 @@ Stellarium 扩展能力（可选）：
 - 对 `performance.renderQuality` 读取增加默认回退（`'high'`），避免异常持久化状态导致加载链路中断。
 - 失败策略保持手动切换：不自动降级 Aladin，仅提供显式重试/手动引擎切换入口。
 
+### 启动资源引导与降级恢复（实现参考）
+
+- 启动会话与资源状态收敛：`lib/stores/starmap-bootstrap-store.ts`
+- 引擎加载、阶段事件与降级终态：`lib/hooks/stellarium/use-stellarium-loader.ts`
+
+维护建议：
+
+- 若调整 bootstrap 资源分层或降级判定，需同步更新本节描述与 `docs/reference/documentation-implementation-alignment.md`。
+- 若新增失败阶段或恢复策略，需补充对应测试/验证入口。
+
 ## 核心设置映射
 
 `lib/stores/stellarium-store.ts` 中 `updateStellariumCore` 已拆分为原子能力函数：

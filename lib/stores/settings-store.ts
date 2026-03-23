@@ -21,6 +21,13 @@ export type DistanceUnit = 'metric' | 'imperial';
 export type TemperatureUnit = 'celsius' | 'fahrenheit';
 export type RenderQuality = 'low' | 'medium' | 'high' | 'ultra';
 export type StartupView = 'last' | 'default' | 'custom';
+export type ProxyMode = 'auto' | 'manual' | 'off';
+
+export interface ProxySettings {
+  mode: ProxyMode;
+  manualUrl: string;
+  fallbackToDirectOnFailure: boolean;
+}
 
 export interface AppPreferences {
   locale: AppLocale;
@@ -90,6 +97,7 @@ export interface SettingsState {
     port: string;
   };
   backendProtocol: 'http' | 'https';
+  proxy: ProxySettings;
   
   // Sky engine selection
   skyEngine: SkyEngineType;
@@ -124,6 +132,7 @@ export interface SettingsState {
   // Actions - Connection
   setConnection: (connection: Partial<SettingsState['connection']>) => void;
   setBackendProtocol: (protocol: 'http' | 'https') => void;
+  setProxySettings: (proxy: Partial<ProxySettings>) => void;
   
   // Actions - Sky Engine
   setSkyEngine: (engine: SkyEngineType) => void;
@@ -178,6 +187,11 @@ export const DEFAULT_CONNECTION: SettingsState['connection'] = {
 };
 
 export const DEFAULT_BACKEND_PROTOCOL: SettingsState['backendProtocol'] = 'http';
+export const DEFAULT_PROXY: ProxySettings = {
+  mode: 'auto',
+  manualUrl: '',
+  fallbackToDirectOnFailure: true,
+};
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
   locale: 'en',
@@ -264,6 +278,7 @@ export const useSettingsStore = create<SettingsState>()(
       // Initial state
       connection: DEFAULT_CONNECTION,
       backendProtocol: DEFAULT_BACKEND_PROTOCOL,
+      proxy: DEFAULT_PROXY,
       skyEngine: 'stellarium' as SkyEngineType,
       stellarium: DEFAULT_STELLARIUM,
       preferences: DEFAULT_PREFERENCES,
@@ -285,6 +300,13 @@ export const useSettingsStore = create<SettingsState>()(
       })),
       
       setBackendProtocol: (backendProtocol) => set({ backendProtocol }),
+      setProxySettings: (proxy) => set((state) => ({
+        proxy: {
+          ...state.proxy,
+          ...proxy,
+          manualUrl: (proxy.manualUrl ?? state.proxy.manualUrl).trim(),
+        },
+      })),
       
       // Actions - Sky Engine
       setSkyEngine: (skyEngine) => set({ skyEngine }),
@@ -384,6 +406,7 @@ export const useSettingsStore = create<SettingsState>()(
       // Actions - Reset
       resetToDefaults: () => set({
         skyEngine: 'stellarium' as SkyEngineType,
+        proxy: DEFAULT_PROXY,
         stellarium: DEFAULT_STELLARIUM,
         preferences: DEFAULT_PREFERENCES,
         performance: DEFAULT_PERFORMANCE,
@@ -402,7 +425,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'starmap-settings',
       storage: getZustandStorage(),
-      version: 18, // v18: desktop autostart preference field
+      version: 19, // v19: network proxy settings
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<SettingsState>;
         
@@ -610,12 +633,23 @@ export const useSettingsStore = create<SettingsState>()(
             },
           };
         }
+
+        if (version < 19) {
+          return {
+            ...state,
+            proxy: {
+              ...DEFAULT_PROXY,
+              ...(state.proxy ?? {}),
+            },
+          };
+        }
         
         
         return state;
       },
       merge: (persistedState, currentState) => {
         const state = (persistedState as Partial<SettingsState> | undefined) ?? {};
+        const currentProxy = (currentState as Partial<SettingsState>).proxy ?? DEFAULT_PROXY;
 
         return {
           ...currentState,
@@ -623,6 +657,12 @@ export const useSettingsStore = create<SettingsState>()(
           connection: {
             ...currentState.connection,
             ...state.connection,
+          },
+          proxy: {
+            ...DEFAULT_PROXY,
+            ...currentProxy,
+            ...state.proxy,
+            manualUrl: String(state.proxy?.manualUrl ?? currentProxy.manualUrl).trim(),
           },
           stellarium: {
             ...currentState.stellarium,
@@ -667,6 +707,7 @@ export const useSettingsStore = create<SettingsState>()(
       partialize: (state) => ({
         connection: state.connection,
         backendProtocol: state.backendProtocol,
+        proxy: state.proxy,
         skyEngine: state.skyEngine,
         stellarium: state.stellarium,
         preferences: state.preferences,

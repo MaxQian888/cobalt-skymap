@@ -1,6 +1,6 @@
 # 基本概念
 
-本文档介绍使用 SkyMap Test 需要了解的天文学基本概念。
+本文档介绍使用 SkyMap 需要了解的天文学基本概念。
 
 ## 天球坐标系
 
@@ -55,7 +55,7 @@ graph LR
 
 ### 坐标系转换
 
-SkyMap Test 支持多种坐标系统之间的转换：
+SkyMap 支持多种坐标系统之间的转换：
 
 - 地平坐标 ↔ 赤道坐标
 - 赤道坐标 ↔ 银河坐标
@@ -90,7 +90,7 @@ LST = GST + 东经
 
 - 从公元前4713年1月1日正午开始连续计数
 - 便于计算两个日期之间的时间间隔
-- SkyMap Test 内部使用儒略日进行时间计算
+- SkyMap 内部使用儒略日进行时间计算
 
 ## 天体坐标表示
 
@@ -181,7 +181,7 @@ LST = GST + 东经
 
 - 天顶处折射为0
 - 地平处折射约0.5°
-- SkyMap Test 自动修正大气折射
+- SkyMap 自动修正大气折射
 
 ### 光污染
 
@@ -206,7 +206,7 @@ LST = GST + 东经
 ### 观测意义
 
 - 天文曙暮光结束时才开始真正的夜间观测
-- SkyMap Test 可计算曙暮光时间
+- SkyMap 可计算曙暮光时间
 
 ## 下一步
 
@@ -221,3 +221,4 @@ LST = GST + 东经
 - [天文学基础](../reference/astronomy-basics/index.md)
 - [术语表](../reference/glossary.md)
 - [坐标系统详细说明](../reference/astronomy-basics/coordinates.md)
+

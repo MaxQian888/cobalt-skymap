@@ -1,6 +1,6 @@
 # 星图概览
 
-星图是 SkyMap Test 的核心功能，提供交互式的实时星空显示。
+星图是 SkyMap 的核心功能，提供交互式的实时星空显示。
 
 ## 星图界面
 
@@ -24,7 +24,7 @@
 
 ## 星图图层
 
-SkyMap Test 支持多种星图图层：
+SkyMap 支持多种星图图层：
 
 ### 恒星层
 
@@ -205,3 +205,4 @@ SkyMap Test 支持多种星图图层：
 - [基本概念](../../getting-started/basic-concepts.md)
 - [导航控制](navigation.md)
 - [显示设置](display-settings.md)
+

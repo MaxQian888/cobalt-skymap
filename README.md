@@ -56,8 +56,8 @@ Before you begin, ensure you have the following installed:
 1. **Clone the repository**
 
    ```bash
-   git clone <your-repo-url>
-   cd skymap
+   git clone https://github.com/ElementAstro/cobalt-skymap.git
+   cd cobalt-skymap
    ```
 
 2. **Install dependencies**
@@ -214,3 +214,4 @@ Full documentation is available in the `docs/` directory:
 ## License
 
 MIT License
+

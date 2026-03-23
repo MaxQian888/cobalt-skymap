@@ -29,6 +29,11 @@ describe('apply-settings-transaction', () => {
     useSettingsStore.setState({
       connection: { ip: 'localhost', port: '1888' },
       backendProtocol: 'http',
+      proxy: {
+        mode: 'auto',
+        manualUrl: '',
+        fallbackToDirectOnFailure: true,
+      },
       preferences: {
         ...useSettingsStore.getState().preferences,
         locale: 'en',
@@ -50,6 +55,11 @@ describe('apply-settings-transaction', () => {
     const draft = createDefaultSettingsDraft();
     draft.connection = { ip: '127.0.0.1', port: '9999' };
     draft.backendProtocol = 'https';
+    draft.proxy = {
+      mode: 'manual',
+      manualUrl: 'http://127.0.0.1:7890',
+      fallbackToDirectOnFailure: false,
+    };
     draft.preferences.locale = 'zh';
     draft.location = { latitude: 20, longitude: 30, elevation: 50 };
 
@@ -77,6 +87,11 @@ describe('apply-settings-transaction', () => {
     ]);
     expect(useSettingsStore.getState().connection).toEqual({ ip: '127.0.0.1', port: '9999' });
     expect(useSettingsStore.getState().backendProtocol).toBe('https');
+    expect(useSettingsStore.getState().proxy).toEqual({
+      mode: 'manual',
+      manualUrl: 'http://127.0.0.1:7890',
+      fallbackToDirectOnFailure: false,
+    });
     expect(useSettingsStore.getState().preferences.locale).toBe('zh');
     expect(useMountStore.getState().profileInfo.AstrometrySettings.Latitude).toBe(20);
     expect(mockApplyCanonicalObservationLocation).toHaveBeenCalledWith({

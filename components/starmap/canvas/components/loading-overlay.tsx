@@ -67,7 +67,7 @@ export function LoadingOverlay({ loadingState, onRetry }: LoadingOverlayProps) {
 
   const isSlow = isLoading && !errorMessage && elapsed >= SLOW_LOADING_THRESHOLD;
   const isFirstLoad = isLoading && !errorMessage && elapsed >= 5 && elapsed < SLOW_LOADING_THRESHOLD;
-  const showTerminalRetry = !isLoading && (phase === 'timed_out' || phase === 'failed');
+  const showTerminalRetry = !isLoading && (phase === 'timed_out' || phase === 'failed' || phase === 'degraded');
   const showRetry = isSlow || Boolean(errorMessage) || showTerminalRetry;
   const liveRole: 'status' | 'alert' = errorMessage || showTerminalRetry ? 'alert' : 'status';
 

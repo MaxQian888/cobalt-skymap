@@ -1,6 +1,6 @@
 # 后端架构
 
-本文档详细介绍 SkyMap Test 的 Tauri/Rust 后端架构设计。
+本文档详细介绍 SkyMap 的 Tauri/Rust 后端架构设计。
 
 ## 技术栈
 
@@ -285,3 +285,4 @@ SkyMap 后端实现了多层安全防护：
 - [系统架构](overview.md)
 - [前端架构](frontend-architecture.md)
 - [Tauri Commands API](../apis/backend-apis/tauri-commands.md)
+

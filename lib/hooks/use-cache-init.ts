@@ -3,9 +3,10 @@
 import { useEffect, useRef } from 'react';
 import { installFetchInterceptor, unifiedCache, getUnifiedCacheProviderDiagnostics, type CacheStrategy, type UnifiedCacheProviderDiagnostics } from '@/lib/offline';
 import { PREFETCH_RESOURCES, CACHE_CONFIG } from '@/lib/cache/config';
+import { resolveCachePolicyForPrefetchResource } from '@/lib/cache/integration-policy';
 import { initializeCacheSystem } from '@/lib/cache/migration';
+import { smartFetch } from '@/lib/services/http-fetch';
 import { isTauri } from '@/lib/storage/platform';
-import { unifiedCacheApi } from '@/lib/tauri/unified-cache-api';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('cache-init');
@@ -19,29 +20,55 @@ interface UseCacheInitOptions {
   enablePrefetch?: boolean;
   /** Custom resources to prefetch (in addition to defaults) */
   additionalPrefetchUrls?: string[];
+  /** Called when cache-index bootstrap starts */
+  onCacheIndexStart?: () => void;
+  /** Called when cache-index bootstrap succeeds */
+  onCacheIndexReady?: () => void;
+  /** Called when cache-index bootstrap fails */
+  onCacheIndexError?: (error: unknown) => void;
 }
 
 /**
  * Prefetch critical resources for better cold-start performance
  */
 async function prefetchCriticalResources(additionalUrls: string[] = []): Promise<void> {
-  const urlsToPrefetch = [...PREFETCH_RESOURCES, ...additionalUrls];
+  const urlsToPrefetch = Array.from(new Set([...PREFETCH_RESOURCES, ...additionalUrls]));
   if (urlsToPrefetch.length === 0) return;
   
   logger.info('Starting prefetch of critical resources');
   
-  try {
-    if (isTauri()) {
-      const result = await unifiedCacheApi.prefetchUrls(urlsToPrefetch, CACHE_CONFIG.unified.prefetchTTL);
-      logger.info(`Prefetched ${result} resources via Tauri`);
-    } else {
-      const results = await unifiedCache.prefetchAll(urlsToPrefetch, CACHE_CONFIG.unified.prefetchTTL);
-      const successCount = Array.from(results.values()).filter(Boolean).length;
-      logger.info(`Prefetched ${successCount}/${urlsToPrefetch.length} resources`);
-    }
-  } catch (error) {
-    logger.warn('Prefetch failed', error);
+  const results = await Promise.allSettled(
+    urlsToPrefetch.map(async (url) => {
+      const cachePolicy = resolveCachePolicyForPrefetchResource(url);
+      if (!cachePolicy) {
+        logger.warn('Skipping prefetch for resource without declared cache policy', { url });
+        return false;
+      }
+
+      const response = await smartFetch(url, {
+        method: 'GET',
+        cachePolicy,
+        cacheTtl: CACHE_CONFIG.unified.prefetchTTL,
+      });
+
+      if (!response.ok) {
+        logger.warn('Prefetch request failed', { url, cachePolicy, status: response.status });
+        return false;
+      }
+
+      return true;
+    })
+  );
+
+  const successCount = results.filter((result) => result.status === 'fulfilled' && result.value).length;
+  const skippedOrFailed = urlsToPrefetch.length - successCount;
+
+  if (skippedOrFailed > 0) {
+    logger.warn(`Prefetched ${successCount}/${urlsToPrefetch.length} resources`, { skippedOrFailed });
+    return;
   }
+
+  logger.info(`Prefetched ${successCount}/${urlsToPrefetch.length} resources`);
 }
 
 /**
@@ -54,6 +81,9 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
     enableInterception = true,
     enablePrefetch = true,
     additionalPrefetchUrls = [],
+    onCacheIndexStart,
+    onCacheIndexReady,
+    onCacheIndexError,
   } = options;
   const initialized = useRef(false);
   const providerDiagnostics: UnifiedCacheProviderDiagnostics | null = getUnifiedCacheProviderDiagnostics();
@@ -63,12 +93,15 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
     initialized.current = true;
 
     // Run cache migrations on startup
+    onCacheIndexStart?.();
     initializeCacheSystem().then((result) => {
       if (result.migratedItems > 0 || result.deletedItems > 0) {
         logger.info('Cache migration completed', result);
       }
+      onCacheIndexReady?.();
     }).catch((error) => {
       logger.warn('Cache migration failed', error);
+      onCacheIndexError?.(error);
     });
 
     // Install fetch interceptor for automatic caching
@@ -139,7 +172,15 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
       cleanupFlush?.();
       clearInterval(cleanupInterval);
     };
-  }, [strategy, enableInterception, enablePrefetch, additionalPrefetchUrls]);
+  }, [
+    strategy,
+    enableInterception,
+    enablePrefetch,
+    additionalPrefetchUrls,
+    onCacheIndexStart,
+    onCacheIndexReady,
+    onCacheIndexError,
+  ]);
 
   return {
     providerDiagnostics,

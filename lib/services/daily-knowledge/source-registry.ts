@@ -76,21 +76,23 @@ export async function fetchDailyKnowledgeRegistryItems(
     DAILY_KNOWLEDGE_SOURCE_FETCH_CONCURRENCY,
     async (adapter) => {
       try {
-        const items = (await adapter.fetchItems(context)).filter(isValidRegistryItem);
+        const rawItems = await adapter.fetchItems(context);
+        const items = rawItems.filter(isValidRegistryItem);
+        const hasInvalidItems = rawItems.length > items.length;
         const status: DailyKnowledgeSourceStatus =
           items.length > 0
             ? {
                 source: adapter.source,
                 transport: adapter.transport,
-                state: 'ready',
+                state: 'healthy',
                 reason: 'success',
                 itemCount: items.length,
               }
             : {
                 source: adapter.source,
                 transport: adapter.transport,
-                state: 'skipped',
-                reason: 'empty',
+                state: 'degraded',
+                reason: hasInvalidItems ? 'invalid' : 'empty',
                 itemCount: 0,
               };
         return { items, status };

@@ -15,6 +15,7 @@ import type {
   DailyKnowledgeLanguageStatus,
   DailyKnowledgeOptions,
   DailyKnowledgeOnlineSource,
+  DailyKnowledgeResolutionMode,
   DailyKnowledgeServiceResult,
   DailyKnowledgeSourceStatus,
   DailyKnowledgeSourceStatusReason,
@@ -96,6 +97,48 @@ function makeSkippedStatuses(reason: 'offline' | 'disabled'): DailyKnowledgeSour
   return ONLINE_SOURCE_DEFINITIONS.map(({ source, transport }) =>
     makeSourceStatus(source, transport, 'skipped', reason, 0)
   );
+}
+
+function getResolutionMode(
+  selected: DailyKnowledgeItem,
+  staleCacheUsed: boolean
+): DailyKnowledgeResolutionMode {
+  if (staleCacheUsed) return 'stale-cache';
+  return selected.source === 'curated' ? 'curated-fallback' : 'fresh-online';
+}
+
+function markSelectedSourceAsStale(
+  sourceStatuses: DailyKnowledgeSourceStatus[],
+  selectedSource: DailyKnowledgeItem['source']
+): DailyKnowledgeSourceStatus[] {
+  if (selectedSource === 'curated') return sourceStatuses;
+  return sourceStatuses.map((status) =>
+    status.source === selectedSource
+      ? {
+          ...status,
+          state: 'stale',
+          reason: 'success',
+          itemCount: Math.max(status.itemCount, 1),
+        }
+      : status
+  );
+}
+
+function resolveStaleCacheResult(
+  cachedResult: DailyKnowledgeServiceResult | undefined,
+  sourceStatuses: DailyKnowledgeSourceStatus[]
+): DailyKnowledgeServiceResult | null {
+  if (!cachedResult || cachedResult.selected.source === 'curated') {
+    return null;
+  }
+
+  return {
+    ...cachedResult,
+    sourceStatuses: markSelectedSourceAsStale(sourceStatuses, cachedResult.selected.source),
+    usedCuratedFallback: false,
+    fallbackReason: null,
+    resolutionMode: 'stale-cache',
+  };
 }
 
 function enrichItemWithWikimedia(
@@ -274,7 +317,13 @@ async function fetchApodWithStatus(
     const item = await fetchApodItem(dateKey, apiKey, { signal });
     return {
       item,
-      status: makeSourceStatus('nasa-apod', 'api', item ? 'ready' : 'skipped', item ? 'success' : 'empty', item ? 1 : 0),
+      status: makeSourceStatus(
+        'nasa-apod',
+        'api',
+        item ? 'healthy' : 'degraded',
+        item ? 'success' : 'empty',
+        item ? 1 : 0
+      ),
     };
   } catch (error) {
     logger.warn('APOD fetch failed, fallback to curated', error);
@@ -302,7 +351,13 @@ async function fetchWikimediaWithStatus(
     const item = await fetchWikimediaItem(dateKey, query, { locale, signal });
     return {
       item,
-      status: makeSourceStatus('wikimedia', 'api', item ? 'ready' : 'skipped', item ? 'success' : 'empty', item ? 1 : 0),
+      status: makeSourceStatus(
+        'wikimedia',
+        'api',
+        item ? 'healthy' : 'degraded',
+        item ? 'success' : 'empty',
+        item ? 1 : 0
+      ),
     };
   } catch (error) {
     logger.warn('Wikimedia fetch failed, fallback to curated', error);
@@ -335,7 +390,7 @@ function resolveFallbackState(
   if (sourceStatuses.some((status) => status.state === 'failed')) {
     return { usedCuratedFallback: true, fallbackReason: 'source-failure' };
   }
-  if (sourceStatuses.every((status) => status.state !== 'ready')) {
+  if (sourceStatuses.every((status) => status.state !== 'healthy')) {
     return { usedCuratedFallback: true, fallbackReason: 'quality-threshold' };
   }
   return { usedCuratedFallback: false, fallbackReason: null };
@@ -363,6 +418,7 @@ export async function getDailyKnowledge(
   if (cachedResult && cachedResult.expiresAt > Date.now()) {
     return cachedResult.result;
   }
+  const staleCachedResult = cachedResult?.result;
 
   const curatedDaily = getCuratedDailyItem(dateKey, locale, {
     recentItemIds: recentHistoryItemIds,
@@ -378,6 +434,7 @@ export async function getDailyKnowledge(
       items: deduped,
       selected,
       sourceStatuses: makeSkippedStatuses(!onlineEnhancement ? 'disabled' : 'offline'),
+      resolutionMode: getResolutionMode(selected, false),
       ...resolveFallbackState(selected, makeSkippedStatuses(!onlineEnhancement ? 'disabled' : 'offline'), onlineEnhancement, onlineAvailable),
     };
     aggregatedResultCache.set(cacheKey, { result, expiresAt: getNextLocalMidnight() });
@@ -425,11 +482,22 @@ export async function getDailyKnowledge(
   );
   const selected = selectPrimaryItem(merged, locale, curatedWithWiki, recentHistoryItemIds);
   const sourceStatuses = [apodStatus, wikimediaStatus, ...registryResult.sourceStatuses];
+  const staleCacheResult =
+    selected.source === 'curated'
+      ? resolveStaleCacheResult(staleCachedResult, sourceStatuses)
+      : null;
+
+  if (staleCacheResult) {
+    aggregatedResultCache.set(cacheKey, { result: staleCacheResult, expiresAt: getNextLocalMidnight() });
+    return staleCacheResult;
+  }
+
   const fallbackState = resolveFallbackState(selected, sourceStatuses, onlineEnhancement, onlineAvailable);
   const result = {
     items: merged,
     selected,
     sourceStatuses,
+    resolutionMode: getResolutionMode(selected, false),
     ...fallbackState,
   };
   aggregatedResultCache.set(cacheKey, { result, expiresAt: getNextLocalMidnight() });

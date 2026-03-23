@@ -1,3 +1,10 @@
+import {
+  sortStarmapTierCandidates,
+  type StarmapDataTier,
+  type StarmapSourceFallbackRole,
+  type StarmapTierCandidate,
+} from '@/lib/core/starmap-data-tier';
+
 export type SearchProviderId =
   | 'sesame'
   | 'simbad'
@@ -29,6 +36,9 @@ export type ProviderCapability =
   | 'image_enrichment'
   | 'survey_enrichment';
 
+export type RenderProviderTier = Exclude<StarmapDataTier, 'core'>;
+export type RenderProviderWorkflow = 'search' | 'objectInfo' | 'render';
+
 interface SearchProviderConfig {
   enabled: boolean;
   priority: number;
@@ -44,6 +54,14 @@ interface ObjectInfoProviderConfig {
   apiEndpoint?: string;
 }
 
+interface RenderProviderConfig {
+  enabled: boolean;
+  tier: RenderProviderTier;
+  priority: number;
+  fallbackRole: StarmapSourceFallbackRole;
+  workflows: RenderProviderWorkflow[];
+}
+
 export interface OnlineDataProviderDefinition {
   id: SearchProviderId | ObjectInfoDataProviderId;
   name: string;
@@ -55,6 +73,7 @@ export interface OnlineDataProviderDefinition {
   observationEndpoint?: string;
   search?: SearchProviderConfig;
   objectInfo?: ObjectInfoProviderConfig;
+  render?: RenderProviderConfig;
   capabilities: ProviderCapability[];
 }
 
@@ -78,6 +97,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       queryKinds: ['name', 'minor'],
       availabilityCheckPath: '/cgi-bin/Sesame/-ox/SNV?M31',
     },
+    render: {
+      enabled: true,
+      tier: 'enrichment',
+      priority: 3,
+      fallbackRole: 'supplemental',
+      workflows: ['search', 'render'],
+    },
     capabilities: ['name_search'],
   },
   simbad: {
@@ -98,6 +124,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 1,
       timeout: 5000,
       apiEndpoint: '/simbad/sim-tap/sync',
+    },
+    render: {
+      enabled: true,
+      tier: 'enrichment',
+      priority: 0,
+      fallbackRole: 'primary',
+      workflows: ['search', 'objectInfo', 'render'],
     },
     capabilities: ['name_search', 'coordinate_search', 'metadata_enrichment'],
   },
@@ -120,6 +153,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       timeout: 5000,
       apiEndpoint: '/sbdb.api',
     },
+    render: {
+      enabled: true,
+      tier: 'enrichment',
+      priority: 2,
+      fallbackRole: 'fallback',
+      workflows: ['search', 'objectInfo', 'render'],
+    },
     capabilities: ['small_body_search', 'metadata_enrichment'],
   },
   mpc: {
@@ -135,6 +175,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       timeout: 15000,
       queryKinds: ['minor'],
       availabilityCheckPath: '/api/query-identifier',
+    },
+    render: {
+      enabled: true,
+      tier: 'enrichment',
+      priority: 4,
+      fallbackRole: 'supplemental',
+      workflows: ['search'],
     },
     capabilities: ['small_body_search'],
   },
@@ -157,6 +204,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       timeout: 5000,
       apiEndpoint: '/viz-bin/votable',
     },
+    render: {
+      enabled: true,
+      tier: 'enrichment',
+      priority: 1,
+      fallbackRole: 'supplemental',
+      workflows: ['objectInfo', 'render'],
+    },
     capabilities: ['name_search', 'metadata_enrichment', 'survey_enrichment'],
   },
   ned: {
@@ -178,6 +232,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       timeout: 5000,
       apiEndpoint: '/cgi-bin/objsearch',
     },
+    render: {
+      enabled: true,
+      tier: 'enrichment',
+      priority: 5,
+      fallbackRole: 'supplemental',
+      workflows: ['objectInfo', 'render'],
+    },
     capabilities: ['name_search', 'metadata_enrichment'],
   },
   wikipedia: {
@@ -191,6 +252,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       timeout: 5000,
       apiEndpoint: '/api/rest_v1/page/summary',
     },
+    render: {
+      enabled: true,
+      tier: 'enrichment',
+      priority: 1,
+      fallbackRole: 'fallback',
+      workflows: ['objectInfo', 'render'],
+    },
     capabilities: ['description_enrichment', 'image_enrichment'],
   },
   dss: {
@@ -202,6 +270,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       enabled: true,
       priority: 4,
       timeout: 10000,
+    },
+    render: {
+      enabled: true,
+      tier: 'survey',
+      priority: 0,
+      fallbackRole: 'primary',
+      workflows: ['objectInfo', 'render'],
     },
     capabilities: ['image_enrichment', 'survey_enrichment'],
   },
@@ -215,6 +290,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 6,
       timeout: 5000,
       apiEndpoint: '/planetary/apod',
+    },
+    render: {
+      enabled: true,
+      tier: 'enrichment',
+      priority: 6,
+      fallbackRole: 'supplemental',
+      workflows: ['objectInfo'],
     },
     capabilities: ['description_enrichment', 'image_enrichment'],
   },
@@ -233,6 +315,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 0,
       timeout: 100,
     },
+    render: {
+      enabled: true,
+      tier: 'catalog',
+      priority: 0,
+      fallbackRole: 'primary',
+      workflows: ['search', 'objectInfo', 'render'],
+    },
     capabilities: ['metadata_enrichment'],
   },
   stellarium: {
@@ -243,6 +332,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       enabled: true,
       priority: 0,
       timeout: 100,
+    },
+    render: {
+      enabled: true,
+      tier: 'catalog',
+      priority: 1,
+      fallbackRole: 'fallback',
+      workflows: ['objectInfo', 'render'],
     },
     capabilities: ['metadata_enrichment'],
   },
@@ -256,6 +352,35 @@ export function getSearchProviderDefinitions(): OnlineDataProviderDefinition[] {
   return Object.values(ONLINE_DATA_PROVIDER_REGISTRY)
     .filter((provider) => provider.search)
     .sort((left, right) => (left.search?.priority ?? 999) - (right.search?.priority ?? 999));
+}
+
+function toTierCandidate(provider: OnlineDataProviderDefinition): StarmapTierCandidate | null {
+  if (!provider.render) {
+    return null;
+  }
+
+  return {
+    id: provider.id,
+    tier: provider.render.tier,
+    enabled: provider.render.enabled,
+    priority: provider.render.priority,
+    fallbackRole: provider.render.fallbackRole,
+    available: true,
+  };
+}
+
+export function getRenderEligibleProviders(tier: RenderProviderTier): OnlineDataProviderDefinition[] {
+  const providerMap = new Map<OnlineDataProviderDefinition['id'], OnlineDataProviderDefinition>(
+    Object.values(ONLINE_DATA_PROVIDER_REGISTRY).map((provider) => [provider.id, provider])
+  );
+
+  return sortStarmapTierCandidates(
+    Object.values(ONLINE_DATA_PROVIDER_REGISTRY)
+      .map((provider) => toTierCandidate(provider))
+      .filter((candidate): candidate is StarmapTierCandidate => candidate !== null && candidate.tier === tier)
+  )
+    .map((candidate) => providerMap.get(candidate.id as OnlineDataProviderDefinition['id']))
+    .filter((provider): provider is OnlineDataProviderDefinition => Boolean(provider));
 }
 
 export function getEligibleSearchProviders(kind: SearchQueryKind): SearchProviderId[] {
@@ -305,6 +430,8 @@ export function getDefaultObjectInfoDataSourceConfigs(): Array<{
   apiEndpoint: string;
   timeout: number;
   description: string;
+  renderTier: Extract<RenderProviderTier, 'enrichment'>;
+  fallbackRole: StarmapSourceFallbackRole;
 }> {
   return (['simbad', 'wikipedia', 'sbdb', 'vizier', 'ned'] as const).map((providerId) => {
     const provider = ONLINE_DATA_PROVIDER_REGISTRY[providerId];
@@ -318,6 +445,8 @@ export function getDefaultObjectInfoDataSourceConfigs(): Array<{
       apiEndpoint: provider.objectInfo?.apiEndpoint ?? provider.endpoint ?? provider.tapEndpoint ?? '',
       timeout: provider.objectInfo?.timeout ?? provider.search?.timeout ?? 5000,
       description: provider.description,
+      renderTier: provider.render?.tier === 'enrichment' ? 'enrichment' : 'enrichment',
+      fallbackRole: provider.render?.fallbackRole ?? 'fallback',
     };
   });
 }

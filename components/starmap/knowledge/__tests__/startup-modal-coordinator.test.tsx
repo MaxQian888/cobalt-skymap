@@ -3,11 +3,55 @@
  */
 
 import React from 'react';
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { StartupModalCoordinator } from '../startup-modal-coordinator';
 
 const mockOpenDialog = jest.fn();
 const mockShouldAutoShowToday = jest.fn(() => false);
+
+function getHydrationCallbacks(): Array<() => void> {
+  const scope = globalThis as typeof globalThis & {
+    __dailyKnowledgeHydrationCallbacks?: Array<() => void>;
+  };
+  if (!scope.__dailyKnowledgeHydrationCallbacks) {
+    scope.__dailyKnowledgeHydrationCallbacks = [];
+  }
+  return scope.__dailyKnowledgeHydrationCallbacks;
+}
+
+function getMockPersistApi() {
+  const scope = globalThis as typeof globalThis & {
+    __dailyKnowledgePersistApi?: {
+      hasHydrated: jest.Mock<boolean, []>;
+      onFinishHydration: jest.Mock<() => void, [() => void]>;
+    };
+  };
+
+  if (!scope.__dailyKnowledgePersistApi) {
+    scope.__dailyKnowledgePersistApi = {
+      hasHydrated: jest.fn(() => true),
+      onFinishHydration: jest.fn((callback: () => void) => {
+        const hydrationCallbacks = getHydrationCallbacks();
+        hydrationCallbacks.push(callback);
+        return () => {
+          const index = hydrationCallbacks.indexOf(callback);
+          if (index >= 0) {
+            hydrationCallbacks.splice(index, 1);
+          }
+        };
+      }),
+    };
+  }
+
+  return scope.__dailyKnowledgePersistApi;
+}
+
+function setMockPersistApi(persistApi: unknown): void {
+  const mockedStores = jest.requireMock('@/lib/stores') as {
+    useDailyKnowledgeStore: { persist?: unknown };
+  };
+  mockedStores.useDailyKnowledgeStore.persist = persistApi;
+}
 
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -50,8 +94,11 @@ const mockOnboardingState = {
 const mockSettingsState = { preferences: { dailyKnowledgeEnabled: false } };
 
 jest.mock('@/lib/stores', () => ({
-  useDailyKnowledgeStore: jest.fn((selector: (s: typeof mockDailyKnowledgeState) => unknown) =>
-    selector(mockDailyKnowledgeState),
+  useDailyKnowledgeStore: Object.assign(
+    jest.fn((selector: (s: typeof mockDailyKnowledgeState) => unknown) =>
+      selector(mockDailyKnowledgeState),
+    ),
+    { persist: getMockPersistApi() }
   ),
   useOnboardingBridgeStore: jest.fn((selector: (s: typeof mockBridgeState) => unknown) =>
     selector(mockBridgeState),
@@ -71,6 +118,7 @@ jest.mock('../daily-knowledge-dialog', () => ({
 describe('StartupModalCoordinator', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    getHydrationCallbacks().length = 0;
     mockBridgeState.openDailyKnowledgeRequestId = 0;
     mockOnboardingState.hasCompletedOnboarding = true;
     mockOnboardingState.showOnNextVisit = false;
@@ -79,6 +127,9 @@ describe('StartupModalCoordinator', () => {
     mockOnboardingState.phase = 'idle';
     mockSettingsState.preferences.dailyKnowledgeEnabled = false;
     mockShouldAutoShowToday.mockReturnValue(false);
+    const persistApi = getMockPersistApi();
+    persistApi.hasHydrated.mockReturnValue(true);
+    setMockPersistApi(persistApi);
   });
 
   it('renders DailyKnowledgeDialog', () => {
@@ -149,5 +200,49 @@ describe('StartupModalCoordinator', () => {
     mockShouldAutoShowToday.mockReturnValue(false);
     render(<StartupModalCoordinator showSplash={false} />);
     expect(mockOpenDialog).not.toHaveBeenCalledWith('auto');
+  });
+
+  it('waits for daily knowledge hydration before auto-opening', async () => {
+    mockSettingsState.preferences.dailyKnowledgeEnabled = true;
+    mockShouldAutoShowToday.mockReturnValue(true);
+    getMockPersistApi().hasHydrated.mockReturnValue(false);
+
+    render(<StartupModalCoordinator showSplash={false} />);
+
+    expect(mockOpenDialog).not.toHaveBeenCalledWith('auto');
+
+    await act(async () => {
+      getHydrationCallbacks().forEach((callback) => callback());
+    });
+
+    expect(mockOpenDialog).toHaveBeenCalledWith('auto');
+  });
+
+  it('skips hydration listener when persist api shape is unavailable', () => {
+    mockSettingsState.preferences.dailyKnowledgeEnabled = true;
+    mockShouldAutoShowToday.mockReturnValue(true);
+    setMockPersistApi({});
+
+    render(<StartupModalCoordinator showSplash={false} />);
+
+    expect(mockOpenDialog).toHaveBeenCalledWith('auto');
+  });
+
+  it('queues microtask hydration update when hasHydrated flips during setup', async () => {
+    mockSettingsState.preferences.dailyKnowledgeEnabled = true;
+    mockShouldAutoShowToday.mockReturnValue(true);
+    const persistApi = getMockPersistApi();
+    persistApi.hasHydrated.mockReset();
+    persistApi.hasHydrated.mockImplementationOnce(() => false).mockImplementation(() => true);
+    setMockPersistApi(persistApi);
+
+    render(<StartupModalCoordinator showSplash={false} />);
+    expect(mockOpenDialog).not.toHaveBeenCalledWith('auto');
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockOpenDialog).toHaveBeenCalledWith('auto');
   });
 });

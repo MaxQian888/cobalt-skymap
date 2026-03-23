@@ -1,10 +1,10 @@
 # 部署指南
 
-本指南介绍如何构建和部署 SkyMap Test 应用程序。
+本指南介绍如何构建和部署 SkyMap 应用程序。
 
 ## 部署选项
 
-SkyMap Test 支持多种部署方式：
+SkyMap 支持多种部署方式：
 
 ### 桌面应用部署
 
@@ -38,8 +38,8 @@ SkyMap Test 支持多种部署方式：
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/skymap-test.git
-cd skymap-test
+git clone https://github.com/ElementAstro/cobalt-skymap.git
+cd cobalt-skymap
 
 # 安装依赖
 pnpm install
@@ -65,8 +65,8 @@ pnpm tauri build
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/skymap-test.git
-cd skymap-test
+git clone https://github.com/ElementAstro/cobalt-skymap.git
+cd cobalt-skymap
 
 # 安装依赖
 pnpm install
@@ -110,8 +110,8 @@ sudo dnf install webkit2gtk3-devel \
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/skymap-test.git
-cd skymap-test
+git clone https://github.com/ElementAstro/cobalt-skymap.git
+cd cobalt-skymap
 
 # 安装依赖
 pnpm install
@@ -161,7 +161,7 @@ pnpm build
 server {
     listen 80;
     server_name skymap.example.com;
-    root /var/www/skymap-test/out;
+    root /var/www/cobalt-skymap/out;
     index index.html;
 
     location / {
@@ -175,9 +175,9 @@ server {
 ```apache
 <VirtualHost *:80>
     ServerName skymap.example.com
-    DocumentRoot /var/www/skymap-test/out
+    DocumentRoot /var/www/cobalt-skymap/out
 
-    <Directory /var/www/skymap-test/out>
+    <Directory /var/www/cobalt-skymap/out>
         RewriteEngine On
         RewriteBase /
         RewriteRule ^index\.html$ - [L]
@@ -195,7 +195,7 @@ server {
 使用 [SignTool](https://docs.microsoft.com/en-us/windows/win32/seccrypto/signtool) 对应用进行签名：
 
 ```bash
-signtool sign /f certificate.pfx /p password /t timestamp_url skymap-test.msi
+signtool sign /f certificate.pfx /p password /t timestamp_url cobalt-skymap.msi
 ```
 
 ### macOS代码签名
@@ -287,7 +287,7 @@ jobs:
 
 ### 内置更新
 
-SkyMap Test 内置更新机制：
+SkyMap 内置更新机制：
 
 - 自动检查更新
 - 下载更新包
@@ -304,7 +304,7 @@ SkyMap Test 内置更新机制：
 当前 updater endpoint：
 
 ```text
-https://github.com/AstroAir/skymap-test/releases/latest/download/latest.json
+https://github.com/ElementAstro/cobalt-skymap/releases/latest/download/latest.json
 ```
 
 发布时，GitHub Actions 会为 tag 构建动态注入一份临时 Tauri 配置，包含：
@@ -360,3 +360,4 @@ pnpm add -D @tauri-apps/cli
 - [构建指南](desktop/building.md)
 - [开发环境](../developer-guide/development-environment/setup.md)
 - [项目结构](../developer-guide/project-structure/index.md)
+

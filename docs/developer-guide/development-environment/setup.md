@@ -1,6 +1,6 @@
 # 开发环境搭建
 
-本文档详细介绍如何搭建 SkyMap Test 的开发环境。
+本文档详细介绍如何搭建 SkyMap 的开发环境。
 
 ## 前置要求
 
@@ -100,11 +100,11 @@ API 测试工具（可选）。
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/skymap-test.git
-cd skymap-test
+git clone https://github.com/ElementAstro/cobalt-skymap.git
+cd cobalt-skymap
 
 # 或使用 SSH
-git clone git@github.com:yourusername/skymap-test.git
+git clone git@github.com:ElementAstro/cobalt-skymap.git
 ```
 
 ## 安装依赖
@@ -175,7 +175,7 @@ cp .env.example .env.local
 
 ```env
 # 应用配置
-NEXT_PUBLIC_APP_NAME=SkyMap Test
+NEXT_PUBLIC_APP_NAME=SkyMap
 NEXT_PUBLIC_APP_VERSION=0.1.0
 
 # API 配置（如果需要）
@@ -300,7 +300,7 @@ code --install-extension rust-lang.rust-analyzer
   "cargo": {
     "args": ["build", "--manifest-path=src-tauri/Cargo.toml"],
     "filter": {
-      "name": "skymap-test",
+      "name": "cobalt-skymap",
       "kind": "bin"
     }
   },
@@ -564,8 +564,9 @@ echo "验证完成"
 
 - 查看[故障排除](../../../reference/troubleshooting.md)
 - 阅读[常见问题](../../../reference/faq.md)
-- 提交 [GitHub Issue](https://github.com/yourusername/skymap-test/issues)
+- 提交 [GitHub Issue](https://github.com/ElementAstro/cobalt-skymap/issues)
 
 ---
 
 返回：[开发环境](index.md)
+

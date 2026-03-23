@@ -72,8 +72,23 @@ async function openReadyStarmap(page: Page) {
     waitUntil: 'domcontentloaded',
     timeout: TEST_TIMEOUTS.wasmInit,
   });
+
+  const splash = page.getByTestId('splash-screen');
+  if (await splash.isVisible().catch(() => false)) {
+    await splash.click({ force: true });
+  }
+
+  await page.waitForFunction(() => {
+    const canvasReady = document.querySelectorAll('canvas').length > 0;
+    const splashVisible = !!document.querySelector('[data-testid="splash-screen"]');
+    const dailyKnowledgeButton = !!document.querySelector(
+      '[data-tour-id="daily-knowledge"] button, button[aria-label="Daily Knowledge"], button[aria-label="每日知识"]'
+    );
+
+    return canvasReady && dailyKnowledgeButton && !splashVisible;
+  }, { timeout: TEST_TIMEOUTS.long });
+
   await expect(page.locator('canvas').first()).toBeVisible({ timeout: TEST_TIMEOUTS.long });
-  await page.waitForTimeout(1200);
 }
 
 async function openDailyKnowledgeManually(page: Page) {
@@ -135,6 +150,16 @@ test.describe('Daily Knowledge', () => {
       .first();
     await dontShowButton.click();
     await expect(dialog).toBeHidden({ timeout: TEST_TIMEOUTS.medium });
+    await page.waitForFunction(() => {
+      const raw = localStorage.getItem('starmap-daily-knowledge');
+      if (!raw) return false;
+      try {
+        const parsed = JSON.parse(raw);
+        return Boolean(parsed?.state?.snoozedDate);
+      } catch {
+        return false;
+      }
+    }, { timeout: TEST_TIMEOUTS.medium });
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.locator('canvas').first()).toBeVisible({ timeout: TEST_TIMEOUTS.long });
@@ -220,5 +245,46 @@ test.describe('Daily Knowledge', () => {
 
     const updatedCurrent = dialog.locator('[data-testid="daily-knowledge-view-feed"] [data-current="true"]');
     await expect(updatedCurrent).toHaveCount(1);
+  });
+
+  test('manual refresh preserves feed context for the active date', async ({ page }) => {
+    await seedStarmapState(page, {
+      enabled: true,
+      autoShow: false,
+      onlineEnhancement: false,
+      viewMode: 'feed',
+    });
+    await openReadyStarmap(page);
+    await openDailyKnowledgeManually(page);
+
+    const dialog = page.locator('[role="dialog"]').filter({ hasText: /daily knowledge|每日知识/i });
+    await expect(dialog).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+    await expect(dialog.getByTestId('daily-knowledge-view-feed')).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+    await expect(dialog.getByText(/curated fallback|本地策展回退/i)).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+
+    const refreshButton = dialog.getByRole('button', { name: /refresh current date|刷新当前日期/i });
+    await expect(refreshButton).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+    await refreshButton.click();
+
+    await expect(dialog.getByTestId('daily-knowledge-view-feed')).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+    await expect(dialog.getByText(/curated fallback|本地策展回退/i)).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+  });
+
+  test('offline degraded mode surfaces fallback messaging', async ({ page }) => {
+    await seedStarmapState(page, { enabled: true, autoShow: false, onlineEnhancement: true });
+    await openReadyStarmap(page);
+    await page.context().setOffline(true);
+    await openDailyKnowledgeManually(page);
+
+    const dialog = page.locator('[role="dialog"]').filter({ hasText: /daily knowledge|每日知识/i });
+    await expect(dialog).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+    await expect(dialog.getByText(/^curated fallback$|^本地策展回退$/i)).toBeVisible({
+      timeout: TEST_TIMEOUTS.medium,
+    });
+    await expect(
+      dialog.getByText(
+        /NASA APOD was skipped because the app is offline|当前处于离线状态，已跳过 NASA APOD/i
+      )
+    ).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
   });
 });

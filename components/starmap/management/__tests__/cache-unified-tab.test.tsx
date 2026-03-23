@@ -36,6 +36,14 @@ jest.mock('@/lib/logger', () => ({
 
 jest.mock('@/lib/offline', () => ({
   formatBytes: jest.fn((bytes: number) => `${bytes}B`),
+  unifiedCache: {
+    getSize: jest.fn().mockResolvedValue(0),
+    keys: jest.fn().mockResolvedValue([]),
+    getCacheStats: jest.fn(() => ({ hitRate: 0 })),
+    clear: jest.fn().mockResolvedValue(undefined),
+    cleanupExpired: jest.fn().mockResolvedValue(0),
+    flush: jest.fn().mockResolvedValue(undefined),
+  },
 }));
 
 jest.mock('@/lib/tauri', () => ({
@@ -63,24 +71,36 @@ jest.mock('@/lib/cache', () => ({
     {
       id: 'hips-registry',
       title: 'HiPS registry fetches',
-      modulePath: 'lib/services/hips/service.ts',
+      modulePath: 'lib/services/hips-service.ts',
       policyId: 'hips-registry',
+      owner: 'starmap-settings',
+      environments: ['web', 'tauri'],
+      implementation: 'shared-policy',
       cacheMode: 'persistent-shared',
       status: 'active',
       strategy: 'network-first',
       ttl: 86400000,
       providerId: 'tauri-unified-cache',
+      runtimeEnvironment: 'tauri',
+      environmentSupported: true,
     },
     {
       id: 'astro-iss-position',
       title: 'ISS realtime position',
       modulePath: 'lib/services/astro-data-sources.ts',
       policyId: 'astro-iss-position',
+      owner: 'astro-events',
+      environments: ['web', 'tauri'],
+      implementation: 'uncached',
+      reason: 'Realtime position lookups are intentionally kept fresh on every request.',
       cacheMode: 'uncached',
       status: 'uncached-by-design',
       strategy: 'network-only',
       ttl: 0,
       providerId: 'tauri-unified-cache',
+      runtimeEnvironment: 'tauri',
+      environmentSupported: true,
+      statusReason: 'Realtime position lookups are intentionally kept fresh on every request.',
     },
   ]),
   getCacheDiagnosticsSummary: () => ({
@@ -90,6 +110,7 @@ jest.mock('@/lib/cache', () => ({
     uncached: 1,
     active: 1,
     degraded: 0,
+    mismatch: 0,
   }),
 }));
 
@@ -150,6 +171,8 @@ describe('CacheUnifiedTab', () => {
     expect(screen.getByText('85.0%')).toBeInTheDocument();
     expect(screen.getByText('cache.provider')).toBeInTheDocument();
     expect(screen.getAllByText('cache.persistentShared').length).toBeGreaterThan(0);
+    expect(screen.getByText('cache.modulePath: lib/services/hips-service.ts')).toBeInTheDocument();
+    expect(screen.getAllByText('cache.statusActive').length).toBeGreaterThan(0);
   });
 
   it('calls flush when flush button clicked', async () => {
@@ -161,10 +184,12 @@ describe('CacheUnifiedTab', () => {
 
     render(<CacheUnifiedTab isActive={true} />);
 
-    const flushButton = await screen.findByText('cache.flush');
+    const flushButton = await screen.findByRole('button', { name: 'cache.flush' });
     fireEvent.click(flushButton);
 
     await waitFor(() => expect(mockFlush).toHaveBeenCalled(), { timeout: 3000 });
+    await waitFor(() => expect(mockGetStats.mock.calls.length).toBeGreaterThanOrEqual(2), { timeout: 3000 });
+    expect(mockListKeys.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   // 显示 cached items 列表
@@ -204,11 +229,13 @@ describe('CacheUnifiedTab', () => {
 
     render(<CacheUnifiedTab isActive={true} />);
 
-    const cleanupBtn = await screen.findByText('cache.cleanup');
+    const cleanupBtn = await screen.findByRole('button', { name: 'cache.cleanup' });
     fireEvent.click(cleanupBtn);
 
     // cleanup is called synchronously after click handler invokes the async fn
     await waitFor(() => expect(mockCleanup).toHaveBeenCalled(), { timeout: 3000 });
+    await waitFor(() => expect(mockGetStats.mock.calls.length).toBeGreaterThanOrEqual(2), { timeout: 3000 });
+    expect(mockListKeys.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   // 点击 clear all 确认
@@ -222,12 +249,14 @@ describe('CacheUnifiedTab', () => {
     render(<CacheUnifiedTab isActive={true} />);
 
     // Wait for stats to load
-    await screen.findByText('cache.cleanup');
+    await screen.findByRole('button', { name: 'cache.cleanup' });
 
-    const clearButtons = screen.getAllByText('cache.clearAll');
+    const clearButtons = screen.getAllByRole('button', { name: 'cache.clearAll' });
     fireEvent.click(clearButtons[clearButtons.length - 1]);
 
     await waitFor(() => expect(mockClearCache).toHaveBeenCalled(), { timeout: 3000 });
+    await waitFor(() => expect(mockGetStats.mock.calls.length).toBeGreaterThanOrEqual(2), { timeout: 3000 });
+    expect(mockListKeys.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
   // 0 entries 时禁用 clear 按钮
@@ -239,11 +268,12 @@ describe('CacheUnifiedTab', () => {
 
     render(<CacheUnifiedTab isActive={true} />);
 
-    await screen.findByText('cache.cleanup');
+    await screen.findByRole('button', { name: 'cache.cleanup' });
 
-    const clearBtns = screen.getAllByText('cache.clearAll');
-    const triggerBtn = clearBtns.find(el => el.closest('button')?.getAttribute('disabled') !== null);
-    expect(triggerBtn?.closest('button')).toBeDisabled();
+    const clearBtns = screen.getAllByRole('button', { name: 'cache.clearAll' });
+    const triggerBtn = clearBtns.find((button) => button.className.includes('text-destructive'));
+    expect(triggerBtn).toBeDefined();
+    expect(triggerBtn).toBeDisabled();
   });
 
   // 加载失败显示错误 toast
@@ -269,7 +299,7 @@ describe('CacheUnifiedTab', () => {
 
     render(<CacheUnifiedTab isActive={true} />);
 
-    const cleanupBtn = await screen.findByText('cache.cleanup');
+    const cleanupBtn = await screen.findByRole('button', { name: 'cache.cleanup' });
     await act(async () => { fireEvent.click(cleanupBtn); });
 
     const { toast } = jest.requireMock('sonner') as { toast: { error: jest.Mock } };
@@ -286,9 +316,9 @@ describe('CacheUnifiedTab', () => {
 
     render(<CacheUnifiedTab isActive={true} />);
 
-    await screen.findByText('cache.cleanup');
+    await screen.findByRole('button', { name: 'cache.cleanup' });
 
-    const clearButtons = screen.getAllByText('cache.clearAll');
+    const clearButtons = screen.getAllByRole('button', { name: 'cache.clearAll' });
     await act(async () => { fireEvent.click(clearButtons[clearButtons.length - 1]); });
 
     const { toast } = jest.requireMock('sonner') as { toast: { error: jest.Mock } };

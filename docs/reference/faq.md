@@ -176,7 +176,7 @@ Linux: `~/.local/share/SkyMapTest/logs/`
 ### Q: 如何报告bug？
 
 **A**:
-1. 访问 [GitHub Issue 表单](https://github.com/AstroAir/skymap-test/issues/new)
+1. 访问 [GitHub Issue 表单](https://github.com/ElementAstro/cobalt-skymap/issues/new)
 2. 搜索是否已有相同问题
 3. 创建新 Issue，详细描述问题
 4. 可在应用内反馈功能中勾选诊断信息并下载诊断包，随后在 GitHub 页面手动上传附件
@@ -198,7 +198,7 @@ Linux: `~/.local/share/SkyMapTest/logs/`
 ### Q: 如何联系开发团队？
 
 **A**:
-- GitHub: [https://github.com/AstroAir/skymap-test](https://github.com/AstroAir/skymap-test)
+- GitHub: [https://github.com/ElementAstro/cobalt-skymap](https://github.com/ElementAstro/cobalt-skymap)
 - Email: support@example.com
 
 ## 其他问题
@@ -222,5 +222,6 @@ Linux: `~/.local/share/SkyMapTest/logs/`
 ---
 
 仍有疑问？请访问：
-- [GitHub Discussions](https://github.com/AstroAir/skymap-test/discussions)
-- [提交问题（Issue 表单）](https://github.com/AstroAir/skymap-test/issues/new)
+- [GitHub Discussions](https://github.com/ElementAstro/cobalt-skymap/discussions)
+- [提交问题（Issue 表单）](https://github.com/ElementAstro/cobalt-skymap/issues/new)
+

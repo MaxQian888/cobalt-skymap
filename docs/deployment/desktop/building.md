@@ -1,6 +1,6 @@
 # 桌面应用构建指南
 
-本文档介绍如何构建 SkyMap Test 桌面应用。
+本文档介绍如何构建 SkyMap 桌面应用。
 
 ## 构建前准备
 
@@ -83,7 +83,7 @@ pnpm tauri build
 
 ```json
 {
-  "productName": "SkyMap Test",
+  "productName": "SkyMap",
   "version": "1.0.0",
   "identifier": "com.skymap.test"
 }
@@ -163,3 +163,4 @@ pnpm tauri build
 
 - [部署概览](../index.md)
 - [前置要求](../../developer-guide/development-environment/prerequisites.md)
+

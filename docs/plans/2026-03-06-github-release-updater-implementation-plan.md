@@ -182,7 +182,7 @@ fn normalize_updater_error(raw: &str, phase: &'static str) -> String {
   "updater": {
     "pubkey": "PASTE_REAL_PROJECT_PUBLIC_KEY_HERE",
     "endpoints": [
-      "https://github.com/AstroAir/skymap-test/releases/latest/download/latest.json"
+      "https://github.com/ElementAstro/cobalt-skymap/releases/latest/download/latest.json"
     ]
   }
 }
@@ -226,7 +226,7 @@ it('builds a static updater manifest for GitHub Releases', () => {
     version: '0.2.0',
     pubDate: '2026-03-06T00:00:00Z',
     notes: '### Added\n- GitHub updater support',
-    repository: 'AstroAir/skymap-test',
+    repository: 'ElementAstro/cobalt-skymap',
     tag: 'v0.2.0',
     assets: [
       {
@@ -363,3 +363,4 @@ Expected: PASS
 git add CI_CD.md docs/deployment/index.md docs/deployment/desktop/windows.md docs/getting-started/installation.md
 git commit -m "docs: document github release updater flow"
 ```
+

@@ -110,7 +110,7 @@
   - 与 updater payload 对应的 `.sig`
   - `latest.json`
 - 客户端 endpoint 固定指向：
-  - `https://github.com/AstroAir/skymap-test/releases/latest/download/latest.json`
+  - `https://github.com/ElementAstro/cobalt-skymap/releases/latest/download/latest.json`
 - 这样可避免直接请求 GitHub Releases API，也避免自己解析 HTML 或分页接口。
 
 ### 3. 文档与版本源
@@ -268,3 +268,4 @@
 - 当出现配置错误、签名错误、平台缺失或网络问题时，能看到明确错误，并可打开 `GitHub Releases` 页面手动更新。
 - GitHub Actions 在 tag 构建后，能够把安装包、updater payload、签名文件和 `latest.json` 一起上传到 draft release。
 - 发布后的正式 Release 可被客户端稳定检测到，draft release 不会被客户端提前发现。
+

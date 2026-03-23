@@ -1,6 +1,6 @@
 # 目标列表
 
-本文档介绍如何使用 SkyMap Test 的目标列表功能管理观测目标。
+本文档介绍如何使用 SkyMap 的目标列表功能管理观测目标。
 
 ## 目标列表概览
 
@@ -335,3 +335,4 @@
 - [规划概览](index.md)
 - [可见性预测](visibility.md)
 - [天体搜索](../celestial-objects/search.md)
+

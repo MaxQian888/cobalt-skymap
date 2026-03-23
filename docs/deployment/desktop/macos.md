@@ -1,6 +1,6 @@
 # macOS 打包指南
 
-本文档介绍如何为 macOS 平台构建和打包 SkyMap Test。
+本文档介绍如何为 macOS 平台构建和打包 SkyMap。
 
 ## 环境要求
 
@@ -36,9 +36,9 @@ pnpm tauri build
 ```
 src-tauri/target/release/bundle/
 ├── macos/
-│   └── SkyMap Test.app
+│   └── SkyMap.app
 └── dmg/
-    └── SkyMap Test_1.0.0_x64.dmg
+    └── SkyMap_1.0.0_x64.dmg
 ```
 
 ## 应用签名
@@ -204,3 +204,4 @@ pnpm tauri build --bundles app
 - [构建指南](building.md)
 - [Windows 打包](windows.md)
 - [部署概览](../index.md)
+

@@ -13,6 +13,7 @@ jest.mock('next-intl', () => ({
 
 jest.mock('@/lib/astronomy/engine', () => ({
   searchPhenomena: (...args: unknown[]) => mockSearchPhenomena(...args),
+  serializeCacheKey: (payload: unknown) => JSON.stringify(payload),
 }));
 
 jest.mock('@/components/ui/badge', () => ({
@@ -66,7 +67,9 @@ describe('PhenomenaTab', () => {
       expect(mockSearchPhenomena).toHaveBeenCalled();
     });
 
-    expect(screen.getByText('Moon conjunction Venus')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.eventType.conjunction')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Moon conjunction Venus')).toBeInTheDocument();
+      expect(screen.getByText('astroCalc.eventType.conjunction')).toBeInTheDocument();
+    });
   });
 });

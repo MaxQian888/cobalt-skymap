@@ -22,6 +22,10 @@ describe('Stores Module Exports', () => {
     expect(stores.useStellariumStore).toBeDefined();
   });
 
+  it('exports useStarmapBootstrapStore', () => {
+    expect(stores.useStarmapBootstrapStore).toBeDefined();
+  });
+
   it('exports useSettingsStore', () => {
     expect(stores.useSettingsStore).toBeDefined();
   });

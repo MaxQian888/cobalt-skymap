@@ -3,6 +3,11 @@
  * Allows customization of image and data sources with connectivity checking
  */
 
+import {
+  sortStarmapTierCandidates,
+  type StarmapDataTier,
+  type StarmapSourceFallbackRole,
+} from '@/lib/core/starmap-data-tier';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { getDefaultObjectInfoDataSourceConfigs } from './online-data-provider-registry';
@@ -35,6 +40,8 @@ export interface ImageSourceConfig {
   responseTime?: number;
   // Is built-in (cannot be deleted)
   builtIn: boolean;
+  renderTier: Extract<StarmapDataTier, 'survey'>;
+  fallbackRole: StarmapSourceFallbackRole;
 }
 
 export interface DataSourceConfig {
@@ -56,7 +63,17 @@ export interface DataSourceConfig {
   responseTime?: number;
   // Is built-in (cannot be deleted)
   builtIn: boolean;
+  renderTier: Extract<StarmapDataTier, 'enrichment'>;
+  fallbackRole: StarmapSourceFallbackRole;
 }
+
+type LegacyImageSourceConfig = Omit<ImageSourceConfig, 'renderTier' | 'fallbackRole'> & Partial<
+  Pick<ImageSourceConfig, 'renderTier' | 'fallbackRole'>
+>;
+
+type LegacyDataSourceConfig = Omit<DataSourceConfig, 'renderTier' | 'fallbackRole'> & Partial<
+  Pick<DataSourceConfig, 'renderTier' | 'fallbackRole'>
+>;
 
 export interface ObjectInfoConfig {
   // Image sources
@@ -101,6 +118,8 @@ export const DEFAULT_IMAGE_SOURCES: ImageSourceConfig[] = [
     description: 'High-quality color composite from DSS2 via Aladin',
     status: 'unknown',
     builtIn: true,
+    renderTier: 'survey',
+    fallbackRole: 'primary',
   },
   {
     id: 'skyview-dss2-red',
@@ -114,6 +133,8 @@ export const DEFAULT_IMAGE_SOURCES: ImageSourceConfig[] = [
     description: 'Digitized Sky Survey 2 Red band via NASA SkyView',
     status: 'unknown',
     builtIn: true,
+    renderTier: 'survey',
+    fallbackRole: 'fallback',
   },
   {
     id: 'skyview-2mass-j',
@@ -127,6 +148,8 @@ export const DEFAULT_IMAGE_SOURCES: ImageSourceConfig[] = [
     description: 'Near-infrared J-band from Two Micron All Sky Survey',
     status: 'unknown',
     builtIn: true,
+    renderTier: 'survey',
+    fallbackRole: 'fallback',
   },
   {
     id: 'skyview-sdss-r',
@@ -140,6 +163,8 @@ export const DEFAULT_IMAGE_SOURCES: ImageSourceConfig[] = [
     description: 'Sloan Digital Sky Survey r-band (northern sky only)',
     status: 'unknown',
     builtIn: true,
+    renderTier: 'survey',
+    fallbackRole: 'supplemental',
   },
   {
     id: 'skyview-wise',
@@ -153,6 +178,8 @@ export const DEFAULT_IMAGE_SOURCES: ImageSourceConfig[] = [
     description: 'Wide-field Infrared Survey Explorer mid-infrared',
     status: 'unknown',
     builtIn: true,
+    renderTier: 'survey',
+    fallbackRole: 'supplemental',
   },
   {
     id: 'aladin-panstarrs',
@@ -166,6 +193,8 @@ export const DEFAULT_IMAGE_SOURCES: ImageSourceConfig[] = [
     description: 'Panoramic Survey Telescope and Rapid Response System',
     status: 'unknown',
     builtIn: true,
+    renderTier: 'survey',
+    fallbackRole: 'supplemental',
   },
   {
     id: 'aladin-allwise',
@@ -179,6 +208,8 @@ export const DEFAULT_IMAGE_SOURCES: ImageSourceConfig[] = [
     description: 'AllWISE infrared color composite',
     status: 'unknown',
     builtIn: true,
+    renderTier: 'survey',
+    fallbackRole: 'supplemental',
   },
 ];
 
@@ -199,6 +230,57 @@ export const DEFAULT_SETTINGS: ObjectInfoConfig['settings'] = {
   defaultImageSize: 15, // arcminutes
 };
 
+function normalizeImageSourceConfig(source: LegacyImageSourceConfig): ImageSourceConfig {
+  return {
+    ...source,
+    renderTier: source.renderTier ?? 'survey',
+    fallbackRole: source.fallbackRole ?? (source.priority <= 1 ? 'primary' : 'fallback'),
+  };
+}
+
+function normalizeDataSourceConfig(source: LegacyDataSourceConfig): DataSourceConfig {
+  return {
+    ...source,
+    renderTier: source.renderTier ?? 'enrichment',
+    fallbackRole: source.fallbackRole ?? (source.priority <= 1 ? 'primary' : 'fallback'),
+  };
+}
+
+export function getObjectInfoConfigMigratedState(
+  persisted: Partial<Omit<ObjectInfoConfig, 'imageSources' | 'dataSources'>> & {
+    imageSources?: LegacyImageSourceConfig[];
+    dataSources?: LegacyDataSourceConfig[];
+  }
+): ObjectInfoConfig {
+  return {
+    imageSources: (persisted.imageSources ?? DEFAULT_IMAGE_SOURCES).map((source) =>
+      normalizeImageSourceConfig(source as ImageSourceConfig)
+    ),
+    dataSources: (persisted.dataSources ?? DEFAULT_DATA_SOURCES).map((source) =>
+      normalizeDataSourceConfig(source as DataSourceConfig)
+    ),
+    settings: {
+      ...DEFAULT_SETTINGS,
+      ...(persisted.settings ?? {}),
+    },
+  };
+}
+
+function sortSourceConfigs<T extends { id: string; renderTier: StarmapDataTier; enabled: boolean; priority: number; fallbackRole: StarmapSourceFallbackRole }>(
+  sources: T[]
+): T[] {
+  return sortStarmapTierCandidates(
+    sources.map((source) => ({
+      id: source.id,
+      tier: source.renderTier,
+      enabled: source.enabled,
+      priority: source.priority,
+      fallbackRole: source.fallbackRole,
+      available: true,
+    }))
+  ).map((candidate) => sources.find((source) => source.id === candidate.id) as T);
+}
+
 // ============================================================================
 // Store
 // ============================================================================
@@ -208,13 +290,19 @@ interface ObjectInfoConfigStore extends ObjectInfoConfig {
   setImageSourceEnabled: (id: string, enabled: boolean) => void;
   setImageSourcePriority: (id: string, priority: number) => void;
   updateImageSource: (id: string, updates: Partial<ImageSourceConfig>) => void;
-  addImageSource: (source: Omit<ImageSourceConfig, 'id' | 'builtIn' | 'status'>) => void;
+  addImageSource: (
+    source: Omit<ImageSourceConfig, 'id' | 'builtIn' | 'status' | 'renderTier' | 'fallbackRole'> &
+      Partial<Pick<ImageSourceConfig, 'renderTier' | 'fallbackRole'>>
+  ) => void;
   removeImageSource: (id: string) => void;
   
   setDataSourceEnabled: (id: string, enabled: boolean) => void;
   setDataSourcePriority: (id: string, priority: number) => void;
   updateDataSource: (id: string, updates: Partial<DataSourceConfig>) => void;
-  addDataSource: (source: Omit<DataSourceConfig, 'id' | 'builtIn' | 'status'>) => void;
+  addDataSource: (
+    source: Omit<DataSourceConfig, 'id' | 'builtIn' | 'status' | 'renderTier' | 'fallbackRole'> &
+      Partial<Pick<DataSourceConfig, 'renderTier' | 'fallbackRole'>>
+  ) => void;
   removeDataSource: (id: string) => void;
   
   updateSettings: (settings: Partial<ObjectInfoConfig['settings']>) => void;
@@ -237,7 +325,7 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
       setImageSourceEnabled: (id, enabled) => {
         set((state) => ({
           imageSources: state.imageSources.map((s) =>
-            s.id === id ? { ...s, enabled } : s
+            s.id === id ? normalizeImageSourceConfig({ ...s, enabled }) : s
           ),
         }));
       },
@@ -245,7 +333,7 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
       setImageSourcePriority: (id, priority) => {
         set((state) => ({
           imageSources: state.imageSources.map((s) =>
-            s.id === id ? { ...s, priority } : s
+            s.id === id ? normalizeImageSourceConfig({ ...s, priority }) : s
           ),
         }));
       },
@@ -253,7 +341,7 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
       updateImageSource: (id, updates) => {
         set((state) => ({
           imageSources: state.imageSources.map((s) =>
-            s.id === id ? { ...s, ...updates } : s
+            s.id === id ? normalizeImageSourceConfig({ ...s, ...updates }) : s
           ),
         }));
       },
@@ -263,7 +351,12 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
         set((state) => ({
           imageSources: [
             ...state.imageSources,
-            { ...source, id, builtIn: false, status: 'unknown' as const },
+            normalizeImageSourceConfig({
+              ...source,
+              id,
+              builtIn: false,
+              status: 'unknown' as const,
+            }),
           ],
         }));
       },
@@ -277,7 +370,7 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
       setDataSourceEnabled: (id, enabled) => {
         set((state) => ({
           dataSources: state.dataSources.map((s) =>
-            s.id === id ? { ...s, enabled } : s
+            s.id === id ? normalizeDataSourceConfig({ ...s, enabled }) : s
           ),
         }));
       },
@@ -285,7 +378,7 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
       setDataSourcePriority: (id, priority) => {
         set((state) => ({
           dataSources: state.dataSources.map((s) =>
-            s.id === id ? { ...s, priority } : s
+            s.id === id ? normalizeDataSourceConfig({ ...s, priority }) : s
           ),
         }));
       },
@@ -293,7 +386,7 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
       updateDataSource: (id, updates) => {
         set((state) => ({
           dataSources: state.dataSources.map((s) =>
-            s.id === id ? { ...s, ...updates } : s
+            s.id === id ? normalizeDataSourceConfig({ ...s, ...updates }) : s
           ),
         }));
       },
@@ -303,7 +396,12 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
         set((state) => ({
           dataSources: [
             ...state.dataSources,
-            { ...source, id, builtIn: false, status: 'unknown' as const },
+            normalizeDataSourceConfig({
+              ...source,
+              id,
+              builtIn: false,
+              status: 'unknown' as const,
+            }),
           ],
         }));
       },
@@ -350,7 +448,8 @@ export const useObjectInfoConfigStore = create<ObjectInfoConfigStore>()(
     }),
     {
       name: 'object-info-config',
-      version: 1,
+      version: 2,
+      migrate: (persistedState) => getObjectInfoConfigMigratedState(persistedState as Partial<ObjectInfoConfig>),
     }
   )
 );
@@ -529,10 +628,11 @@ export function generateImageUrl(
 export function getActiveImageSources(): ImageSourceConfig[] {
   const store = useObjectInfoConfigStore.getState();
   
-  return store.imageSources
+  return sortSourceConfigs(
+    store.imageSources
     .filter((s) => s.enabled)
     .filter((s) => !store.settings.autoSkipOffline || s.status !== 'offline')
-    .sort((a, b) => a.priority - b.priority);
+  );
 }
 
 /**
@@ -541,8 +641,9 @@ export function getActiveImageSources(): ImageSourceConfig[] {
 export function getActiveDataSources(): DataSourceConfig[] {
   const store = useObjectInfoConfigStore.getState();
   
-  return store.dataSources
+  return sortSourceConfigs(
+    store.dataSources
     .filter((s) => s.enabled)
     .filter((s) => !store.settings.autoSkipOffline || s.status !== 'offline')
-    .sort((a, b) => a.priority - b.priority);
+  );
 }

@@ -1,6 +1,6 @@
 # 快速开始
 
-欢迎来到 SkyMap Test 文档！本章节将帮助您快速上手使用 SkyMap Test 天文观测应用。
+欢迎来到 SkyMap 文档！本章节将帮助您快速上手使用 SkyMap 天文观测应用。
 
 ## 本章内容
 
@@ -32,7 +32,7 @@
 
 ## 快速上手
 
-如果您是第一次使用 SkyMap Test，建议按照以下顺序阅读：
+如果您是第一次使用 SkyMap，建议按照以下顺序阅读：
 
 ### 1. 安装应用
 
@@ -77,5 +77,6 @@
 
 - 查看[常见问题](../reference/faq.md)
 - 阅读[故障排除](../reference/troubleshooting.md)
-- 提交 [GitHub Issue 表单](https://github.com/AstroAir/skymap-test/issues/new)
+- 提交 [GitHub Issue 表单](https://github.com/ElementAstro/cobalt-skymap/issues/new)
 - 如需提供诊断信息：在应用内反馈对话框勾选诊断并下载诊断包，然后在 Issue 页面手动上传附件
+

@@ -1,6 +1,6 @@
 # 开发指南
 
-欢迎来到 SkyMap Test 开发指南！本章节面向希望参与开发或扩展应用功能的开发者。
+欢迎来到 SkyMap 开发指南！本章节面向希望参与开发或扩展应用功能的开发者。
 
 ## 章节内容
 
@@ -89,8 +89,8 @@
 ### 克隆仓库
 
 ```bash
-git clone https://github.com/yourusername/skymap-test.git
-cd skymap-test
+git clone https://github.com/ElementAstro/cobalt-skymap.git
+cd cobalt-skymap
 ```
 
 ### 安装依赖
@@ -339,8 +339,8 @@ pnpm test:coverage
 
 ### 社区
 
-- [GitHub Discussions](https://github.com/yourusername/skymap-test/discussions)
-- [GitHub Issues](https://github.com/yourusername/skymap-test/issues)
+- [GitHub Discussions](https://github.com/ElementAstro/cobalt-skymap/discussions)
+- [GitHub Issues](https://github.com/ElementAstro/cobalt-skymap/issues)
 
 ## 相关资源
 
@@ -352,3 +352,4 @@ pnpm test:coverage
 ---
 
 开始开发：[架构概览](architecture/index.md)
+

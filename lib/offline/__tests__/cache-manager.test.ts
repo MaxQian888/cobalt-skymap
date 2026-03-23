@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-import { STELLARIUM_LAYERS, offlineCacheManager } from '../cache-manager';
+import { STELLARIUM_LAYERS, getStellariumLayersForTier, offlineCacheManager } from '../cache-manager';
 import type { HiPSSurvey } from '@/lib/services/hips-service';
 
 // Mock fetch
@@ -99,6 +99,7 @@ describe('STELLARIUM_LAYERS', () => {
       expect(layer).toHaveProperty('id');
       expect(layer).toHaveProperty('name');
       expect(layer).toHaveProperty('description');
+      expect(layer).toHaveProperty('tier');
       expect(layer).toHaveProperty('baseUrl');
       expect(layer).toHaveProperty('files');
       expect(layer).toHaveProperty('size');
@@ -115,6 +116,16 @@ describe('STELLARIUM_LAYERS', () => {
         STELLARIUM_LAYERS[i - 1].priority
       );
     }
+  });
+
+  it('groups layers by tier for shared cache planning', () => {
+    expect(getStellariumLayersForTier('core').map((layer) => layer.id)).toEqual(['core']);
+    expect(getStellariumLayersForTier('catalog').map((layer) => layer.id)).toEqual(
+      expect.arrayContaining(['stars', 'dso', 'skycultures', 'planets', 'comets'])
+    );
+    expect(getStellariumLayersForTier('survey').map((layer) => layer.id)).toEqual(
+      expect.arrayContaining(['dss', 'milkyway'])
+    );
   });
 });
 

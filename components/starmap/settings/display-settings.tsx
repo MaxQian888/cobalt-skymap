@@ -43,6 +43,10 @@ import {
   buildARAdaptiveRecommendationSummary,
   deriveARAdaptiveAdjustments,
 } from '@/lib/core/ar-adaptive-learner';
+import {
+  deriveARCameraDiagnosticSummary,
+  getARLaunchAssistantReason,
+} from '@/lib/core/ar-invocation';
 import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
 import { AladinCatalogSettings } from './aladin-catalog-settings';
 import { AladinOverlaySettings } from './aladin-overlay-settings';
@@ -114,7 +118,7 @@ export function DisplaySettings() {
   const hasAdaptiveRecommendation = Object.keys(adaptiveRecommendation).length > 0;
   const capabilityMap = arCameraRuntime.capabilityMap;
   const availableDevices = arCameraRuntime.availableDevices ?? [];
-  const activeDeviceLabel = arCameraRuntime.acquisitionDiagnostics.activeDevice?.label ?? null;
+  const cameraDiagnostics = deriveARCameraDiagnosticSummary(arCameraRuntime);
   const resolutionTierOptions = capabilityMap?.resolutionTiers ?? ['auto', '720p', '1080p', '4k'];
   const fpsMin = capabilityMap?.fpsRange.min ?? 10;
   const fpsMax = capabilityMap?.fpsRange.max ?? 60;
@@ -757,11 +761,15 @@ export function DisplaySettings() {
                 </Select>
               </div>
 
-              {(activeDeviceLabel || arCameraRuntime.acquisitionDiagnostics.lastFailureStage) && (
+              {(cameraDiagnostics.deviceLabel || cameraDiagnostics.lastFailureStage || cameraDiagnostics.usedRememberedPlan) && (
                 <p className="text-[11px] text-muted-foreground">
                   {[
-                    activeDeviceLabel,
-                    arCameraRuntime.acquisitionDiagnostics.lastFailureStage ? t('settings.arCameraLastFailureStage') : null,
+                    cameraDiagnostics.deviceLabel,
+                    cameraDiagnostics.currentStage,
+                    cameraDiagnostics.usedRememberedPlan ? t('settings.arCameraRememberedPlan') : null,
+                    cameraDiagnostics.lastFailureStage
+                      ? `${t('settings.arCameraLastFailureStage')}: ${cameraDiagnostics.lastFailureStage}`
+                      : null,
                   ].filter(Boolean).join(' · ')}
                 </p>
               )}
@@ -783,7 +791,7 @@ export function DisplaySettings() {
                 variant="outline"
                 size="sm"
                 className="h-8 justify-start text-xs"
-                onClick={() => openLaunchAssistant('settings')}
+                onClick={() => openLaunchAssistant(getARLaunchAssistantReason('settings'))}
                 data-testid="ar-launch-assistant-settings-entry"
               >
                 {t('settings.arLaunchOpenAssistant')}

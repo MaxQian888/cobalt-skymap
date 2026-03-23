@@ -9,13 +9,22 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { MoonPhaseSVG } from '../moon-phase-svg';
-import { computeAlmanac, computeRiseTransitSet } from '@/lib/astronomy/engine';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
 import { formatDuration, formatTimeShort } from '@/lib/astronomy/time/formats';
+import {
+  runCalculatorAlmanac,
+  runCalculatorRiseTransitSet,
+  summarizeCalculatorMeta,
+  type CalculatorMetaSummary,
+} from './orchestrator';
 
 interface AlmanacTabProps {
   latitude: number;
   longitude: number;
+  sharedDate?: string;
+  sharedTime?: string;
+  onSharedDateChange?: (nextDate: string) => void;
+  onSharedTimeChange?: (nextTime: string) => void;
 }
 
 function toDateInputString(date: Date): string {
@@ -25,16 +34,36 @@ function toDateInputString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function AlmanacTab({ latitude, longitude }: AlmanacTabProps) {
+export function AlmanacTab({
+  latitude,
+  longitude,
+  sharedDate,
+  sharedTime,
+  onSharedDateChange,
+  onSharedTimeChange,
+}: AlmanacTabProps) {
   const t = useTranslations();
-  const [selectedDate, setSelectedDate] = useState(toDateInputString(new Date()));
-  const [selectedTime, setSelectedTime] = useState('22:00');
-  const [almanac, setAlmanac] = useState<Awaited<ReturnType<typeof computeAlmanac>> | null>(null);
+  const [selectedDate, setSelectedDate] = useState(sharedDate ?? toDateInputString(new Date()));
+  const [selectedTime, setSelectedTime] = useState(sharedTime ?? '22:00');
+  const [almanac, setAlmanac] = useState<Awaited<ReturnType<typeof runCalculatorAlmanac>>['response'] | null>(null);
   const [sunTransit, setSunTransit] = useState<Date | null>(null);
+  const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const date = useMemo(() => new Date(`${selectedDate}T${selectedTime}:00`), [selectedDate, selectedTime]);
+
+  useEffect(() => {
+    if (sharedDate && sharedDate !== selectedDate) {
+      setSelectedDate(sharedDate);
+    }
+  }, [sharedDate, selectedDate]);
+
+  useEffect(() => {
+    if (sharedTime && sharedTime !== selectedTime) {
+      setSelectedTime(sharedTime);
+    }
+  }, [sharedTime, selectedTime]);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,11 +73,11 @@ export function AlmanacTab({ latitude, longitude }: AlmanacTabProps) {
       setError(null);
       try {
         const [almanacResult, sunRts] = await Promise.all([
-          computeAlmanac({
+          runCalculatorAlmanac({
             date,
             observer: { latitude, longitude },
           }),
-          computeRiseTransitSet({
+          runCalculatorRiseTransitSet({
             body: 'Sun',
             date,
             observer: { latitude, longitude },
@@ -56,13 +85,15 @@ export function AlmanacTab({ latitude, longitude }: AlmanacTabProps) {
         ]);
 
         if (!cancelled) {
-          setAlmanac(almanacResult);
-          setSunTransit(sunRts.transitTime);
+          setAlmanac(almanacResult.response);
+          setSunTransit(sunRts.response.transitTime);
+          setMetaSummary(summarizeCalculatorMeta([almanacResult.meta, sunRts.meta]));
         }
       } catch (runError) {
         if (!cancelled) {
           setAlmanac(null);
           setSunTransit(null);
+          setMetaSummary(null);
           setError(runError instanceof Error ? runError.message : t('astroCalc.calculationFailed'));
         }
       } finally {
@@ -87,7 +118,11 @@ export function AlmanacTab({ latitude, longitude }: AlmanacTabProps) {
             <Input
               type="date"
               value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedDate(value);
+                onSharedDateChange?.(value);
+              }}
               className="h-8 w-44"
             />
           </div>
@@ -97,13 +132,22 @@ export function AlmanacTab({ latitude, longitude }: AlmanacTabProps) {
               type="time"
               step={60}
               value={selectedTime}
-              onChange={(event) => setSelectedTime(event.target.value)}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedTime(value);
+                onSharedTimeChange?.(value);
+              }}
               className="h-8 w-32"
             />
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {metaSummary && (
+            <Badge variant="secondary" className="text-[10px]" data-testid="almanac-meta">
+              {`src:${metaSummary.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${metaSummary.cacheHits}/${metaSummary.total}`}
+            </Badge>
+          )}
           {isLoading && <Badge variant="secondary">{t('astroCalc.calculating')}</Badge>}
           <Badge variant="outline">
             {latitude.toFixed(2)}°, {longitude.toFixed(2)}°

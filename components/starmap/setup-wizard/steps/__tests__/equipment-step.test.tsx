@@ -624,7 +624,7 @@ describe('EquipmentStep', () => {
   });
 
   describe('manual input toggle behavior', () => {
-    it('should hide manual telescope form when preset is selected', async () => {
+    it('should hide manual telescope form when preset is selected', () => {
       render(<EquipmentStep />);
       
       // Open manual input
@@ -641,13 +641,10 @@ describe('EquipmentStep', () => {
         fireEvent.click(telescopeButton);
       }
 
-      await waitFor(() => {
-        // Manual form should be hidden
-        expect(screen.queryByPlaceholderText(/focalLengthPlaceholder/i)).not.toBeInTheDocument();
-      });
+      expect(screen.queryByPlaceholderText(/focalLengthPlaceholder/i)).not.toBeInTheDocument();
     });
 
-    it('should hide manual camera form when preset is selected', async () => {
+    it('should hide manual camera form when preset is selected', () => {
       render(<EquipmentStep />);
       
       // Open manual input for camera
@@ -664,10 +661,7 @@ describe('EquipmentStep', () => {
         fireEvent.click(cameraButton);
       }
 
-      await waitFor(() => {
-        // Manual form should be hidden
-        expect(screen.queryByPlaceholderText(/sensorWidthPlaceholder/i)).not.toBeInTheDocument();
-      });
+      expect(screen.queryByPlaceholderText(/sensorWidthPlaceholder/i)).not.toBeInTheDocument();
     });
 
     it('should toggle manual telescope form visibility', () => {

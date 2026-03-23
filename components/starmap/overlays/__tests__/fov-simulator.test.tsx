@@ -4,6 +4,16 @@
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 
+const mockEvaluateTargetFitFromSize = jest.fn();
+jest.mock('@/lib/astronomy/fov-calculations', () => {
+  const actual = jest.requireActual('@/lib/astronomy/fov-calculations');
+  return {
+    ...actual,
+    evaluateTargetFitFromSize: (...args: Parameters<typeof actual.evaluateTargetFitFromSize>) =>
+      mockEvaluateTargetFitFromSize(...args),
+  };
+});
+
 // Mock UI components
 jest.mock('@/components/ui/card', () => ({
   Card: ({ children, ...props }: { children: React.ReactNode }) => <div data-testid="card" {...props}>{children}</div>,
@@ -40,20 +50,64 @@ jest.mock('@/components/ui/slider', () => ({
   ),
 }));
 
-jest.mock('@/components/ui/select', () => ({
-  Select: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => <option value={value}>{children}</option>,
-  SelectTrigger: ({ children }: { children: React.ReactNode }) => <div data-testid="select-trigger">{children}</div>,
-  SelectValue: () => <span>Select...</span>,
-}));
+jest.mock('@/components/ui/select', () => {
+  const ReactLib = jest.requireActual<typeof import('react')>('react');
+  const SelectContext = ReactLib.createContext<(value: string) => void>(() => {});
 
-jest.mock('@/components/ui/tabs', () => ({
-  Tabs: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TabsContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TabsTrigger: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
-}));
+  return {
+    Select: ({
+      children,
+      onValueChange,
+    }: {
+      children: React.ReactNode;
+      onValueChange?: (value: string) => void;
+    }) => (
+      <SelectContext.Provider value={onValueChange ?? (() => {})}>
+        <div>{children}</div>
+      </SelectContext.Provider>
+    ),
+    SelectContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    SelectItem: ({ children, value }: { children: React.ReactNode; value: string }) => {
+      const onValueChange = ReactLib.useContext(SelectContext);
+      return (
+        <button type="button" data-testid={`select-item-${value}`} onClick={() => onValueChange(value)}>
+          {children}
+        </button>
+      );
+    },
+    SelectTrigger: ({ children }: { children: React.ReactNode }) => <div data-testid="select-trigger">{children}</div>,
+    SelectValue: () => <span>Select...</span>,
+  };
+});
+
+jest.mock('@/components/ui/tabs', () => {
+  const ReactLib = jest.requireActual<typeof import('react')>('react');
+  const TabsContext = ReactLib.createContext<(value: string) => void>(() => {});
+
+  return {
+    Tabs: ({
+      children,
+      onValueChange,
+    }: {
+      children: React.ReactNode;
+      onValueChange?: (value: string) => void;
+    }) => (
+      <TabsContext.Provider value={onValueChange ?? (() => {})}>
+        <div>{children}</div>
+      </TabsContext.Provider>
+    ),
+    TabsContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    TabsTrigger: ({ children, value }: { children: React.ReactNode; value?: string }) => {
+      const onValueChange = ReactLib.useContext(TabsContext);
+      return (
+        <button type="button" onClick={() => value && onValueChange(value)}>
+          {children}
+        </button>
+      );
+    },
+  };
+});
 
 jest.mock('@/components/ui/separator', () => ({
   Separator: () => <hr />,
@@ -212,6 +266,10 @@ describe('FOVSimulator', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockEvaluateTargetFitFromSize.mockImplementation((...args) => {
+      const actual = jest.requireActual('@/lib/astronomy/fov-calculations');
+      return actual.evaluateTargetFitFromSize(...args);
+    });
     mockUseFovEquipmentOptions.mockReturnValue({
       ...createMockFovEquipmentOptions(),
       mosaic: defaultMosaic,
@@ -592,5 +650,141 @@ describe('FOVSimulator', () => {
     render(<FOVSimulator {...defaultProps} />);
 
     expect(document.body.textContent).toContain('fov.rotateSkyUnavailable');
+  });
+
+  it('calls save/rename/delete setup handlers and setup selection callbacks', () => {
+    const saveFovSetup = jest.fn();
+    const renameFovSetup = jest.fn();
+    const removeFovSetup = jest.fn();
+    const applyFovSetup = jest.fn();
+    const setSelectedFovSetupId = jest.fn();
+
+    useEquipmentStore.setState({
+      saveFovSetup,
+      renameFovSetup,
+      removeFovSetup,
+      applyFovSetup,
+      setSelectedFovSetupId,
+      selectedFovSetupId: 'setup-1',
+      fovSetups: [{
+        id: 'setup-1',
+        name: 'Deep Sky',
+        sensorWidth: 36,
+        sensorHeight: 24,
+        focalLength: 1000,
+        pixelSize: 4.5,
+        rotationAngle: 0,
+        mosaic: defaultMosaic,
+        gridType: 'none',
+      }],
+    } as unknown as Parameters<typeof useEquipmentStore.setState>[0]);
+
+    render(<FOVSimulator {...defaultProps} />);
+
+    fireEvent.change(screen.getByPlaceholderText('fov.setupNamePlaceholder'), { target: { value: 'Night Rig' } });
+    fireEvent.click(screen.getByText('fov.saveSetup'));
+    fireEvent.click(screen.getByText('fov.renameSetup'));
+    fireEvent.click(screen.getByText('fov.deleteSetup'));
+    fireEvent.click(screen.getByTestId('select-item-setup-1'));
+    fireEvent.click(screen.getAllByTestId('select-item-__none__')[0]);
+
+    expect(saveFovSetup).toHaveBeenCalledWith('Night Rig');
+    expect(renameFovSetup).toHaveBeenCalledWith('setup-1', 'Night Rig');
+    expect(removeFovSetup).toHaveBeenCalledWith('setup-1');
+    expect(applyFovSetup).toHaveBeenCalledWith('setup-1');
+    expect(setSelectedFovSetupId).toHaveBeenCalledWith(null);
+  });
+
+  it('handles clipboard write failure without crashing', async () => {
+    Object.assign(navigator, {
+      clipboard: { writeText: jest.fn().mockRejectedValue(new Error('clipboard unavailable')) },
+    });
+
+    render(<FOVSimulator {...defaultProps} />);
+    const buttons = screen.getAllByRole('button');
+    const copyBtn = buttons.find(b => b.className?.includes('h-7 w-7'));
+    if (copyBtn) {
+      await act(async () => {
+        fireEvent.click(copyBtn);
+      });
+      expect(navigator.clipboard.writeText).toHaveBeenCalled();
+    }
+  });
+
+  it.each([
+    { status: 'tight', label: 'fov.fitStatusTight' },
+    { status: 'good', label: 'fov.fitStatusGood' },
+    { status: 'roomy', label: 'fov.fitStatusRoomy' },
+  ])('renders fit status label for %s target fit', ({ status, label }) => {
+    mockEvaluateTargetFitFromSize.mockReturnValue({
+      status,
+      fitRatio: 0.88,
+      targetWidthDeg: 1.2,
+      targetHeightDeg: 0.8,
+      availableWidthDeg: 1.3,
+      availableHeightDeg: 0.9,
+    });
+
+    render(
+      <FOVSimulator
+        {...defaultProps}
+        selectedTarget={{ name: 'M31', raDeg: 10, decDeg: 41, size: "190' x 60'" }}
+      />
+    );
+
+    expect(document.body.textContent).toContain(label);
+  });
+
+  it('renders accessory none summary when accessory selection is available but not selected', () => {
+    mockUseFovEquipmentOptions.mockReturnValue({
+      ...createMockFovEquipmentOptions(),
+      accessorySelectionAvailable: true,
+      barlowReducers: [{ id: 'reducer-08', name: '0.8x Reducer', factor: 0.8 }],
+      selectedBarlowReducerId: null,
+      selectedBarlowReducer: null,
+    });
+
+    render(<FOVSimulator {...defaultProps} />);
+
+    expect(document.body.textContent).toContain('fov.accessoryNoneSummary');
+  });
+
+  it('exercises broad interactive handlers across controls', () => {
+    const onEnabledChange = jest.fn();
+    const onMosaicChange = jest.fn();
+    const onCenterTarget = jest.fn();
+    const onRotationAngleChange = jest.fn();
+
+    const { container } = render(
+      <FOVSimulator
+        {...defaultProps}
+        onEnabledChange={onEnabledChange}
+        onMosaicChange={onMosaicChange}
+        onCenterTarget={onCenterTarget}
+        onRotationAngleChange={onRotationAngleChange}
+        selectedTarget={{ name: 'M42', raDeg: 83.8, decDeg: -5.4, size: "85' x 60'" }}
+      />
+    );
+
+    container.querySelectorAll('[data-testid^="select-item-"]').forEach((node) => {
+      fireEvent.click(node);
+    });
+    container.querySelectorAll('button').forEach((node) => {
+      fireEvent.click(node);
+    });
+    screen.getAllByRole('spinbutton').forEach((input, index) => {
+      fireEvent.change(input, { target: { value: String(index + 3) } });
+    });
+    screen.getAllByTestId('switch').forEach((toggle) => {
+      fireEvent.click(toggle);
+    });
+    screen.getAllByTestId('slider').forEach((slider) => {
+      fireEvent.change(slider, { target: { value: '30' } });
+    });
+
+    expect(onEnabledChange).toHaveBeenCalled();
+    expect(onMosaicChange).toHaveBeenCalled();
+    expect(onRotationAngleChange).toHaveBeenCalled();
+    expect(onCenterTarget).toHaveBeenCalled();
   });
 });

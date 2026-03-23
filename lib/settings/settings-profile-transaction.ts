@@ -113,6 +113,9 @@ async function applySettingsAndLocationDomains(
   if (profile.settings?.backendProtocol) {
     draft.backendProtocol = profile.settings.backendProtocol;
   }
+  if (profile.settings?.proxy) {
+    draft.proxy = { ...draft.proxy, ...profile.settings.proxy };
+  }
   if (profile.settings?.preferences) {
     draft.preferences = { ...draft.preferences, ...profile.settings.preferences };
   }

@@ -8,13 +8,72 @@ import { SolverSettings } from '../solver-settings';
 import { usePlateSolverStore } from '@/lib/stores/plate-solver-store';
 
 // Mock next-intl — return key as text (matches pattern in other plate-solving tests)
+const mockTranslate = jest.fn((key: string) => key);
+
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => mockTranslate,
 }));
 
 // Mock Tauri API
 jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(),
+}));
+
+jest.mock('@/components/ui/slider', () => ({
+  Slider: ({
+    value,
+    onValueChange,
+    min,
+    max,
+    step,
+  }: {
+    value: number[];
+    onValueChange?: (value: number[]) => void;
+    min?: number;
+    max?: number;
+    step?: number;
+    className?: string;
+  }) => (
+    <input
+      type="range"
+      role="slider"
+      value={value[0]}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(event) => onValueChange?.([Number(event.target.value)])}
+    />
+  ),
+}));
+
+jest.mock('@/components/ui/switch-item', () => ({
+  SwitchItem: ({
+    id,
+    label,
+    description,
+    checked,
+    onCheckedChange,
+  }: {
+    id?: string;
+    label: React.ReactNode;
+    description?: React.ReactNode;
+    checked: boolean;
+    onCheckedChange?: (checked: boolean) => void;
+  }) => {
+    const labelText = typeof label === 'string' ? label : id ?? 'switch-item';
+    return (
+      <label>
+        <span>{label}</span>
+        {description ? <span>{description}</span> : null}
+        <input
+          type="checkbox"
+          aria-label={labelText}
+          checked={checked}
+          onChange={(event) => onCheckedChange?.(event.target.checked)}
+        />
+      </label>
+    );
+  },
 }));
 
 // Mock plate-solver-api
@@ -136,6 +195,7 @@ describe('SolverSettings', () => {
       },
     });
     jest.clearAllMocks();
+    mockTranslate.mockImplementation((key: string) => key);
   });
 
   it('should render solver selection section', () => {
@@ -270,6 +330,17 @@ describe('SolverSettings', () => {
 
     // The actual detectSolvers function from the store will be called
     // We can verify by checking the store method was invoked
+  });
+
+  it('should show detecting state while solver discovery is running', () => {
+    usePlateSolverStore.setState({
+      ...usePlateSolverStore.getState(),
+      isDetecting: true,
+    });
+
+    render(<SolverSettings />);
+
+    expect(screen.getByText('plateSolving.detectSolvers').closest('button')).toBeDisabled();
   });
 
   it('should select solver via keyboard Enter', () => {
@@ -552,5 +623,139 @@ describe('SolverSettings', () => {
 
     expect(screen.getByText('ASTAP CLI')).toBeInTheDocument();
     expect(screen.getByText('No ASTAP database found')).toBeInTheDocument();
+  });
+
+  it('should update local slider and toggle options', () => {
+    render(<SolverSettings />);
+
+    const sliders = screen.getAllByRole('slider');
+    expect(sliders).toHaveLength(6);
+
+    fireEvent.change(sliders[0], { target: { value: '180' } });
+    fireEvent.change(sliders[1], { target: { value: '3' } });
+    fireEvent.change(sliders[2], { target: { value: '45' } });
+    fireEvent.change(sliders[3], { target: { value: '750' } });
+    fireEvent.change(sliders[4], { target: { value: '11' } });
+    fireEvent.change(sliders[5], { target: { value: '25' } });
+
+    fireEvent.click(screen.getByLabelText('plateSolving.useSip'));
+    fireEvent.click(screen.getByLabelText('plateSolving.equaliseBackground'));
+    fireEvent.click(screen.getByLabelText('plateSolving.autoHints'));
+    fireEvent.click(screen.getByLabelText('plateSolving.keepWcs'));
+    fireEvent.click(screen.getByLabelText('plateSolving.retryOnFailure'));
+
+    const state = usePlateSolverStore.getState();
+    expect(state.config.timeout_seconds).toBe(180);
+    expect(state.config.downsample).toBe(3);
+    expect(state.config.search_radius).toBe(45);
+    expect(state.config.astap_max_stars).toBe(750);
+    expect(state.config.astap_tolerance).toBeCloseTo(0.011);
+    expect(state.config.astap_min_star_size).toBeCloseTo(2.5);
+    expect(state.config.use_sip).toBe(false);
+    expect(state.config.astap_equalise_background).toBe(true);
+    expect(state.config.auto_hints).toBe(false);
+    expect(state.config.keep_wcs_file).toBe(false);
+    expect(state.config.retry_on_failure).toBe(true);
+  });
+
+  it('should update astrometry.net options', () => {
+    usePlateSolverStore.setState({
+      ...usePlateSolverStore.getState(),
+      config: {
+        ...usePlateSolverStore.getState().config,
+        solver_type: 'astrometry_net',
+        astrometry_scale_low: null,
+        astrometry_scale_high: null,
+        astrometry_no_verify: false,
+        astrometry_crpix_center: true,
+      },
+    });
+
+    render(<SolverSettings />);
+
+    const inputs = screen.getAllByRole('spinbutton');
+    fireEvent.change(inputs[0], { target: { value: '1.5' } });
+    fireEvent.change(inputs[1], { target: { value: '3.2' } });
+    fireEvent.click(screen.getByLabelText('plateSolving.skipVerify'));
+    fireEvent.click(screen.getByLabelText('plateSolving.crpixCenter'));
+
+    const state = usePlateSolverStore.getState();
+    expect(state.config.astrometry_scale_low).toBe(1.5);
+    expect(state.config.astrometry_scale_high).toBe(3.2);
+    expect(state.config.astrometry_no_verify).toBe(true);
+    expect(state.config.astrometry_crpix_center).toBe(false);
+  });
+
+  it('should update online solver API key', () => {
+    usePlateSolverStore.setState({
+      ...usePlateSolverStore.getState(),
+      config: {
+        ...usePlateSolverStore.getState().config,
+        solver_type: 'astrometry_net_online',
+      },
+      onlineApiKey: '',
+    });
+
+    render(<SolverSettings />);
+
+    fireEvent.change(screen.getByLabelText('plateSolving.apiKey'), {
+      target: { value: 'test-api-key' },
+    });
+
+    expect(usePlateSolverStore.getState().onlineApiKey).toBe('test-api-key');
+  });
+
+  it('should render local fallback copy when translations are missing', () => {
+    mockTranslate.mockImplementation(() => '');
+
+    render(<SolverSettings />);
+
+    expect(screen.getByText('Choose which plate solver to use')).toBeInTheDocument();
+    expect(screen.getByText('Add polynomial distortion correction')).toBeInTheDocument();
+    expect(screen.getByText('For images with gradient backgrounds')).toBeInTheDocument();
+    expect(screen.getByText('General Options')).toBeInTheDocument();
+    expect(screen.getByText('Index Files')).toBeInTheDocument();
+    expect(screen.getByText(/Total size/)).toBeInTheDocument();
+  });
+
+  it('should render astrometry and online fallback copy when translations are missing', () => {
+    mockTranslate.mockImplementation(() => '');
+    usePlateSolverStore.setState({
+      ...usePlateSolverStore.getState(),
+      config: {
+        ...usePlateSolverStore.getState().config,
+        solver_type: 'astrometry_net_online',
+      },
+      onlineApiKey: '',
+      onlineServiceStatus: {
+        status: 'unknown',
+        checkedAt: null,
+        message: null,
+      },
+    });
+
+    render(<SolverSettings />);
+
+    expect(screen.getByText('Get your free API key at nova.astrometry.net')).toBeInTheDocument();
+    expect(screen.getAllByText('API key required for online solving').length).toBeGreaterThan(0);
+  });
+
+  it('should render astrometry fallback copy when translations are missing', () => {
+    mockTranslate.mockImplementation(() => '');
+    usePlateSolverStore.setState({
+      ...usePlateSolverStore.getState(),
+      config: {
+        ...usePlateSolverStore.getState().config,
+        solver_type: 'astrometry_net',
+      },
+    });
+
+    render(<SolverSettings />);
+
+    expect(screen.getByText('Astrometry.net Options')).toBeInTheDocument();
+    expect(screen.getByText('Scale Low')).toBeInTheDocument();
+    expect(screen.getByText('Scale High')).toBeInTheDocument();
+    expect(screen.getByText('Skip Verification')).toBeInTheDocument();
+    expect(screen.getByText('Center Reference Pixel')).toBeInTheDocument();
   });
 });

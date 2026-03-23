@@ -14,6 +14,7 @@ import type {
   DailyKnowledgeHistoryEntry,
   DailyKnowledgeItem,
   DailyKnowledgeFavorite,
+  DailyKnowledgeResolutionMode,
   DailyKnowledgeSourceStatus,
 } from '@/lib/services/daily-knowledge/types';
 import { useSettingsStore } from './settings-store';
@@ -54,12 +55,14 @@ interface DailyKnowledgeState extends DailyKnowledgePersistedState {
   sourceStatuses: DailyKnowledgeSourceStatus[];
   usedCuratedFallback: boolean;
   fallbackReason: DailyKnowledgeFallbackReason;
+  resolutionMode: DailyKnowledgeResolutionMode;
   filters: DailyKnowledgeFilters;
 
   openDialog: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
   closeDialog: () => void;
   loadDaily: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
   loadByDate: (dateKey: string, entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
+  refreshCurrentDate: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
   next: () => void;
   prev: () => void;
   random: () => void;
@@ -111,6 +114,7 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
       sourceStatuses: [],
       usedCuratedFallback: false,
       fallbackReason: null,
+      resolutionMode: 'curated-fallback',
       filters: DEFAULT_FILTERS,
 
       openDialog: async (entry = 'manual') => {
@@ -136,6 +140,12 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
         await get().loadByDate(dateKey, entry);
       },
 
+      refreshCurrentDate: async (entry = 'manual') => {
+        const activeDateKey =
+          get().currentItem?.dateKey ?? get().items[0]?.dateKey ?? getLocalDateKey();
+        await get().loadByDate(activeDateKey, entry);
+      },
+
       loadByDate: async (dateKey, entry = 'manual') => {
         const settings = useSettingsStore.getState();
         const locale = settings.preferences.locale;
@@ -143,6 +153,8 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
           get().history,
           DAILY_KNOWLEDGE_REPEAT_WINDOW_DAYS
         );
+        const previousCurrentItemId =
+          get().currentItem?.dateKey === dateKey ? get().currentItem?.id : null;
         set({ loading: true, error: null });
         try {
           const result = await getDailyKnowledge(dateKey, locale, {
@@ -151,17 +163,22 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
             recentHistoryItemIds,
             repeatWindowDays: DAILY_KNOWLEDGE_REPEAT_WINDOW_DAYS,
           });
+          const nextCurrentItem =
+            (previousCurrentItemId
+              ? result.items.find((item) => item.id === previousCurrentItemId) ?? null
+              : null) ?? result.selected;
           set({
             loading: false,
             items: result.items,
-            currentItem: result.selected,
+            currentItem: nextCurrentItem,
             sourceStatuses: result.sourceStatuses,
             usedCuratedFallback: result.usedCuratedFallback,
             fallbackReason: result.fallbackReason,
-            lastSeenItemId: result.selected.id,
+            resolutionMode: result.resolutionMode,
+            lastSeenItemId: nextCurrentItem.id,
             lastShownDate: entry === 'auto' ? dateKey : get().lastShownDate,
           });
-          get().recordHistory(result.selected.id, entry, dateKey);
+          get().recordHistory(nextCurrentItem.id, entry, dateKey);
         } catch {
           set({
             loading: false,
@@ -169,6 +186,7 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
             sourceStatuses: [],
             usedCuratedFallback: false,
             fallbackReason: null,
+            resolutionMode: get().resolutionMode,
           });
         }
       },

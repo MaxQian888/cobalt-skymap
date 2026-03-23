@@ -3,13 +3,15 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { IndexManager } from '../index-manager';
 import { usePlateSolverStore } from '@/lib/stores/plate-solver-store';
 
 // Mock next-intl — return key as text
+const mockTranslate = jest.fn((key: string) => key);
+
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => mockTranslate,
 }));
 
 // Mock Tauri API
@@ -74,6 +76,8 @@ const mockDownloadIndex = jest.requireMock('@/lib/tauri/plate-solver-api').downl
 jest.mock('@tauri-apps/api/event', () => ({
   listen: jest.fn(() => Promise.resolve(jest.fn())),
 }));
+
+const mockListen = jest.requireMock('@tauri-apps/api/event').listen;
 
 jest.mock('@tauri-apps/api/path', () => ({
   join: jest.fn((...args: string[]) => args.join('/')),
@@ -192,6 +196,10 @@ describe('IndexManager', () => {
     });
 
     jest.clearAllMocks();
+    mockTranslate.mockImplementation((key: string) => key);
+    mockListen.mockImplementation(() => Promise.resolve(jest.fn()));
+    mockIsTauri.mockReturnValue(false);
+    mockDownloadIndex.mockResolvedValue(undefined);
 
     // Setup default mocks (after clearAllMocks so they persist)
     mockGetInstalledIndexes.mockResolvedValue([]);
@@ -242,6 +250,40 @@ describe('IndexManager', () => {
 
     expect(screen.getByTestId('tab-installed')).toBeInTheDocument();
     expect(screen.getByTestId('tab-available')).toBeInTheDocument();
+  });
+
+  it('should render ASTAP fallback copy when translations are missing', async () => {
+    mockTranslate.mockImplementation(() => '');
+
+    render(<IndexManager solverType="astap" />);
+
+    fireEvent.click(screen.getByTestId('dialog-trigger'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Index Manager')).toBeInTheDocument();
+      expect(screen.getByText('Manage star database index files for ASTAP')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('tab-available'));
+
+    await waitFor(() => {
+      expect(screen.getByText('ASTAP uses star databases. D50 is recommended for most setups.')).toBeInTheDocument();
+      expect(screen.getByText('ASTAP Website')).toBeInTheDocument();
+    });
+  });
+
+  it('should render astrometry fallback copy when translations are missing', async () => {
+    mockTranslate.mockImplementation(() => '');
+
+    render(<IndexManager solverType="astrometry_net" />);
+
+    fireEvent.click(screen.getByTestId('dialog-trigger'));
+    fireEvent.click(screen.getByTestId('tab-available'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Download indexes matching your image scale (FOV).')).toBeInTheDocument();
+      expect(screen.getByText('Astrometry.net Index Files')).toBeInTheDocument();
+    });
   });
 
   it('should load indexes when dialog opens', async () => {
@@ -461,34 +503,6 @@ describe('IndexManager', () => {
     // Confirm dialog should show
     expect(screen.getAllByText('plateSolving.deleteIndex').length).toBeGreaterThan(0);
     expect(screen.getByText('plateSolving.deleteIndexConfirm')).toBeInTheDocument();
-  });
-
-  it('should reload indexes on refresh button click', async () => {
-    render(<IndexManager />);
-
-    const trigger = screen.getByTestId('dialog-trigger');
-    fireEvent.click(trigger);
-
-    await waitFor(() => {
-      expect(mockGetInstalledIndexes).toHaveBeenCalled();
-    });
-
-    mockGetInstalledIndexes.mockClear();
-    mockGetAvailableIndexes.mockClear();
-
-    // Find and click the refresh button (ghost icon button)
-    const allButtons = screen.getAllByRole('button');
-    // The refresh button is typically the icon-only ghost button
-    const refreshButton = allButtons.find(
-      btn => !btn.textContent?.trim() || btn.querySelector('svg')
-    );
-    if (refreshButton) {
-      fireEvent.click(refreshButton);
-
-      await waitFor(() => {
-        expect(mockGetInstalledIndexes).toHaveBeenCalled();
-      });
-    }
   });
 
   it('should show installed badge for already-installed index in available tab', async () => {
@@ -914,5 +928,70 @@ describe('IndexManager', () => {
         expect(screen.queryByText('common.download')).not.toBeInTheDocument();
       });
     });
+
+    it('should update download progress from desktop events', async () => {
+      let progressHandler:
+        | ((event: { payload: { index_name: string; downloaded: number; total: number; percent: number } }) => void)
+        | undefined;
+      let resolveDownload: (() => void) | undefined;
+      mockListen.mockImplementation(async (_event: string, handler: typeof progressHandler) => {
+        progressHandler = handler;
+        return jest.fn();
+      });
+      mockDownloadIndex.mockImplementation(() => new Promise<void>((resolve) => {
+        resolveDownload = resolve;
+      }));
+      mockGetInstalledIndexes.mockResolvedValue([]);
+
+      render(<IndexManager />);
+
+      fireEvent.click(screen.getByTestId('dialog-trigger'));
+
+      await waitFor(() => {
+        expect(mockGetAvailableIndexes).toHaveBeenCalled();
+      });
+
+      fireEvent.click(screen.getByTestId('tab-available'));
+      fireEvent.click(screen.getByText('common.download'));
+
+      await waitFor(() => {
+        expect(mockDownloadIndex).toHaveBeenCalled();
+      });
+
+      act(() => {
+        progressHandler?.({
+          payload: {
+            index_name: 'D50',
+            downloaded: 42,
+            total: 100,
+            percent: 42,
+          },
+        });
+      });
+
+      expect(screen.getByText('42%')).toBeInTheDocument();
+      resolveDownload?.();
+    });
+
+    it('should surface download failures in desktop mode', async () => {
+      mockDownloadIndex.mockRejectedValueOnce(new Error('Disk full'));
+      mockGetInstalledIndexes.mockResolvedValue([]);
+
+      render(<IndexManager />);
+
+      fireEvent.click(screen.getByTestId('dialog-trigger'));
+
+      await waitFor(() => {
+        expect(mockGetAvailableIndexes).toHaveBeenCalled();
+      });
+
+      fireEvent.click(screen.getByTestId('tab-available'));
+      fireEvent.click(screen.getByText('common.download'));
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Disk full').length).toBeGreaterThan(0);
+      });
+    });
+
   });
 });

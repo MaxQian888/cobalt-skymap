@@ -1,6 +1,6 @@
 # 天文计算引擎
 
-本文档介绍 SkyMap Test 的天文计算模块。
+本文档介绍 SkyMap 的天文计算模块。
 
 ## 概述
 
@@ -783,3 +783,4 @@ pnpm test lib/astronomy/visibility
 ---
 
 返回：[核心模块](index.md)
+

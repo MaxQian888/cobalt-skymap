@@ -1212,8 +1212,17 @@ mod tests {
         }"##;
 
         let target: TargetItem = serde_json::from_str(json).unwrap();
-        assert_eq!(target.mosaic.as_ref().and_then(|mosaic| mosaic.layout_mode.as_deref()), Some("staggered"));
-        assert_eq!(target.mosaic_plan.as_ref().map(|plan| plan.total_panels), Some(6));
+        assert_eq!(
+            target
+                .mosaic
+                .as_ref()
+                .and_then(|mosaic| mosaic.layout_mode.as_deref()),
+            Some("staggered")
+        );
+        assert_eq!(
+            target.mosaic_plan.as_ref().map(|plan| plan.total_panels),
+            Some(6)
+        );
         assert_eq!(
             target
                 .mosaic_plan
@@ -1288,8 +1297,17 @@ mod tests {
 
         apply_target_updates(&mut target, &updates);
 
-        assert_eq!(target.mosaic.as_ref().and_then(|mosaic| mosaic.panel_order.as_deref()), Some("serpentine"));
-        assert_eq!(target.mosaic_plan.as_ref().map(|plan| plan.total_panels), Some(4));
+        assert_eq!(
+            target
+                .mosaic
+                .as_ref()
+                .and_then(|mosaic| mosaic.panel_order.as_deref()),
+            Some("serpentine")
+        );
+        assert_eq!(
+            target.mosaic_plan.as_ref().map(|plan| plan.total_panels),
+            Some(4)
+        );
         assert_eq!(
             target
                 .mosaic_plan

@@ -1,6 +1,6 @@
 # 搜索天体
 
-本文档介绍如何使用 SkyMap Test 的天体搜索功能。
+本文档介绍如何使用 SkyMap 的天体搜索功能。
 
 ## 打开搜索
 
@@ -292,3 +292,4 @@
 - [天体概览](index.md)
 - [查看详情](object-details.md)
 - [观测规划](../observation-planning/index.md)
+

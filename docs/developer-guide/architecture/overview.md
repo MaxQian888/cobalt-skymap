@@ -1,10 +1,10 @@
 # 系统架构
 
-本文档从宏观角度介绍 SkyMap Test 的整体系统架构设计。
+本文档从宏观角度介绍 SkyMap 的整体系统架构设计。
 
 ## 架构概览
 
-SkyMap Test 采用前后端分离的架构，通过 Tauri 框架将 Web 技术栈与原生桌面能力结合。
+SkyMap 采用前后端分离的架构，通过 Tauri 框架将 Web 技术栈与原生桌面能力结合。
 
 ## 整体架构图
 
@@ -642,3 +642,4 @@ graph TD
 - [后端架构详解](backend-architecture.md)
 - [数据流设计](data-flow.md)
 - [状态管理](../project-structure/index.md)
+

@@ -7,6 +7,7 @@ import { degreesToHMS, degreesToDMS, rad2deg } from '@/lib/astronomy/starmap-uti
 import { createStellariumTranslator } from '@/lib/translations';
 import { createLogger } from '@/lib/logger';
 import { DEFAULT_FOV } from '@/lib/core/constants/fov';
+import { deriveStarmapTierReadiness } from '@/lib/core/starmap-data-tier';
 import { getEffectiveDpr } from '@/lib/core/stellarium-canvas-utils';
 import {
   SCRIPT_LOAD_TIMEOUT,
@@ -22,7 +23,8 @@ import {
 import { withTimeout, fovToRad } from '@/lib/core/stellarium-canvas-utils';
 import { pointAndLockTargetAt } from './target-object-pool';
 import type { StellariumEngine, SelectedObjectData } from '@/lib/core/types';
-import type { LoadingState } from '@/types/stellarium-canvas';
+import type { LoadingErrorCode, LoadingState } from '@/types/stellarium-canvas';
+import { useStarmapBootstrapStore } from '@/lib/stores/starmap-bootstrap-store';
 
 const logger = createLogger('stellarium-loader');
 const TWO_PI = 2 * Math.PI;
@@ -109,6 +111,25 @@ interface LoaderStageError extends Error {
   stage: LoaderStage;
 }
 
+function normalizeErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown_error';
+}
+
+function classifyLoaderFailure(
+  stage: LoaderStage | null,
+  message: string,
+  scriptTimeoutMessage: string,
+  engineTimeoutMessage: string
+): LoadingErrorCode {
+  if (stage === 'script') {
+    return message === scriptTimeoutMessage ? 'script_timeout' : 'script_failed';
+  }
+  if (stage === 'engine') {
+    return message === engineTimeoutMessage ? 'engine_timeout' : 'engine_init_failed';
+  }
+  return 'unknown';
+}
+
 /**
  * Hook for loading and initializing the Stellarium engine
  */
@@ -141,14 +162,38 @@ export function useStellariumLoader({
   const [loadingPhase, setLoadingPhase] = useState<LoadingState['phase']>('preparing');
   const [loadingErrorCode, setLoadingErrorCode] = useState<LoadingState['errorCode']>(null);
   const [engineReady, setEngineReady] = useState(false);
+  const bootstrapResources = useStarmapBootstrapStore((state) => state.resources);
   
   const setStel = useStellariumStore((state) => state.setStel);
   const setBaseUrl = useStellariumStore((state) => state.setBaseUrl);
   const setHelpers = useStellariumStore((state) => state.setHelpers);
+  const tierReadiness = deriveStarmapTierReadiness(
+    Object.values(bootstrapResources).map((resource) => ({
+      id: resource.id,
+      tier: resource.tier,
+      critical: resource.critical,
+      state: resource.state,
+    }))
+  );
   const updateStellariumCore = useStellariumStore((state) => state.updateStellariumCore);
   const getRenderQuality = useCallback(() => {
     // Defensive fallback for partially-migrated persisted settings.
     return useSettingsStore.getState().performance?.renderQuality ?? 'high';
+  }, []);
+  const recordBootstrapStage = useCallback((
+    stage: string,
+    event: 'start' | 'complete' | 'failed',
+    metadata?: { attempt?: number; reason?: string }
+  ) => {
+    const bootstrap = useStarmapBootstrapStore.getState();
+    bootstrap.recordStageEvent(stage, event, metadata);
+    logger.debug('Starmap bootstrap stage event', {
+      sessionId: bootstrap.sessionId,
+      stage,
+      event,
+      attempt: metadata?.attempt,
+      reason: metadata?.reason,
+    });
   }, []);
 
   // Callback refs to keep initStellarium stable (avoids re-init on callback changes)
@@ -290,7 +335,9 @@ export function useStellariumLoader({
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/saturn', key: 'saturn' }, 'saturn');
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/uranus', key: 'uranus' }, 'uranus');
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/neptune', key: 'neptune' }, 'neptune');
+      useStarmapBootstrapStore.getState().markResourceReady('online_metadata');
     };
+    useStarmapBootstrapStore.getState().markResourceLoading('online_metadata');
     setTimeout(loadSecondarySources, 0);
 
     // Tertiary data sources (loaded during idle time)
@@ -316,6 +363,9 @@ export function useStellariumLoader({
       if (!mountedRef.current || stelRef.current !== stel) return;
       updateStellariumCore(currentSettings);
       setEngineReady(true);
+      const bootstrap = useStarmapBootstrapStore.getState();
+      bootstrap.markResourceReady('engine_core');
+      recordBootstrapStage('engine_core.initialize', 'complete');
     }, ENGINE_SETTINGS_INIT_DELAY);
 
     // Watch for selection changes (guard against callback firing after unmount)
@@ -360,6 +410,7 @@ export function useStellariumLoader({
     setStel,
     setBaseUrl,
     setHelpers,
+    recordBootstrapStage,
   ]);
 
   // Load the Stellarium engine script with timeout and cancellation support.
@@ -583,6 +634,12 @@ export function useStellariumLoader({
     const loadAbortController = new AbortController();
     abortControllerRef.current = loadAbortController;
 
+    const bootstrapStore = useStarmapBootstrapStore.getState();
+    const bootstrapSessionId = bootstrapStore.beginSession();
+    bootstrapStore.markResourceLoading('engine_core');
+    recordBootstrapStage('engine_core.session', 'start');
+    logger.debug('Starmap bootstrap in progress', { sessionId: bootstrapSessionId });
+
     // Set loading session window once. Keep the same deadline across retries.
     if (overallDeadlineRef.current === 0) {
       const startedAt = Date.now();
@@ -600,6 +657,9 @@ export function useStellariumLoader({
         setIsLoading(false);
         setLoadingPhase('timed_out');
         setLoadingErrorCode('overall_timeout');
+        const timeoutStore = useStarmapBootstrapStore.getState();
+        timeoutStore.recordStageEvent('engine_core.deadline', 'failed', { reason: 'overall_timeout' });
+        timeoutStore.markResourceFailed('engine_core', 'overall_timeout');
       }, OVERALL_LOADING_TIMEOUT);
     }
 
@@ -610,6 +670,7 @@ export function useStellariumLoader({
       setLoadingStatus(t('preparingResources'));
       setLoadingProgress(5);
       setLoadingPhase('preparing');
+      recordBootstrapStage('engine_core.preparing', 'start');
     }
 
     let shouldRetry = false;
@@ -620,6 +681,7 @@ export function useStellariumLoader({
         setLoadingStatus(t('canvasContainerNotReady'));
         setLoadingPhase('failed');
         setLoadingErrorCode('container_not_ready');
+        recordBootstrapStage('engine_core.container', 'failed', { reason: 'container_not_ready' });
         shouldRetry = true;
       } else {
         const canvas = canvasRef.current;
@@ -629,6 +691,7 @@ export function useStellariumLoader({
           setLoadingStatus(t('canvasContainerNotReady'));
           setLoadingPhase('failed');
           setLoadingErrorCode('container_not_ready');
+          recordBootstrapStage('engine_core.container', 'failed', { reason: 'container_not_ready' });
           shouldRetry = true;
         } else {
           const dpr = getEffectiveDpr(getRenderQuality());
@@ -641,6 +704,7 @@ export function useStellariumLoader({
           setLoadingStatus(t('preparingResources'));
           setLoadingProgress(10);
           setLoadingPhase('preparing');
+          recordBootstrapStage('engine_core.preparing', 'complete');
           const wasmPath = resolveAssetPath(WASM_PATH, assetPathModeRef.current);
           if (!document.querySelector('link[href$=".wasm"][rel="prefetch"]')) {
             const link = document.createElement('link');
@@ -655,8 +719,10 @@ export function useStellariumLoader({
           setLoadingStatus(t('loadingScript'));
           setLoadingProgress(20);
           setLoadingPhase('loading_script');
+          recordBootstrapStage('engine_core.loading_script', 'start');
           try {
             await loadScript(loadAbortController.signal);
+            recordBootstrapStage('engine_core.loading_script', 'complete');
           } catch (error) {
             if (isAbortError(error)) throw error;
             throw createStageError('script', error);
@@ -671,6 +737,7 @@ export function useStellariumLoader({
           setLoadingStatus(t('initializingStarmap'));
           setLoadingProgress(40);
           setLoadingPhase('initializing_engine');
+          recordBootstrapStage('engine_core.initialization', 'start');
           try {
             await withTimeout(
               initializeEngine(loadAbortController.signal),
@@ -730,26 +797,26 @@ export function useStellariumLoader({
         retryCountRef.current++;
         setLoadingStatus(t('retrying', { current: retryCountRef.current, max: MAX_RETRY_COUNT }));
         setLoadingPhase('retrying');
+        useStarmapBootstrapStore.getState().markResourceRetry('engine_core', retryCountRef.current, normalizeErrorMessage(err));
         shouldRetry = true;
       } else {
         // Max retries or overall deadline exceeded
         if (mountedRef.current) {
           const didTimeOut = !withinDeadline;
+          const classifiedCode = didTimeOut
+            ? 'overall_timeout'
+            : classifyLoaderFailure(stage, errorMsg, t('scriptLoadTimedOut'), t('starmapInitTimedOut'));
           setErrorMessage(didTimeOut ? t('overallTimeout') : errorMsg);
           setIsLoading(false);
-          setLoadingPhase(didTimeOut ? 'timed_out' : 'failed');
-          setLoadingErrorCode(
-            didTimeOut
-              ? 'overall_timeout'
-              : stage === 'script'
-                ? errorMsg === t('engineScriptTimedOut')
-                  ? 'script_timeout'
-                  : 'script_failed'
-                : stage === 'engine'
-                  ? errorMsg === t('starmapInitTimedOut')
-                    ? 'engine_timeout'
-                    : 'engine_init_failed'
-                  : 'unknown'
+          setLoadingPhase(didTimeOut ? 'timed_out' : 'degraded');
+          setLoadingErrorCode(classifiedCode);
+          recordBootstrapStage('engine_core.terminal', 'failed', {
+            attempt: retryCountRef.current,
+            reason: `${classifiedCode}:${errorMsg}`,
+          });
+          useStarmapBootstrapStore.getState().markResourceFailed(
+            'engine_core',
+            `${classifiedCode}:${errorMsg}`
           );
         }
         overallDeadlineRef.current = 0;
@@ -770,6 +837,8 @@ export function useStellariumLoader({
           setIsLoading(false);
           setLoadingPhase('timed_out');
           setLoadingErrorCode('overall_timeout');
+          recordBootstrapStage('engine_core.deadline', 'failed', { reason: 'overall_timeout' });
+          useStarmapBootstrapStore.getState().markResourceFailed('engine_core', 'overall_timeout');
         }
         overallDeadlineRef.current = 0;
         if (overallTimeoutRef.current !== null) {
@@ -817,10 +886,20 @@ export function useStellariumLoader({
         }, RETRY_DELAY_MS);
       }
     }
-  }, [containerRef, canvasRef, createStageError, loadScript, initializeEngine, t, getRenderQuality]);
+  }, [
+    containerRef,
+    canvasRef,
+    createStageError,
+    loadScript,
+    initializeEngine,
+    t,
+    getRenderQuality,
+    recordBootstrapStage,
+  ]);
 
   // Retry loading (user-triggered)
   const handleRetry = useCallback(() => {
+    useStarmapBootstrapStore.getState().requestRecovery();
     abortControllerRef.current?.abort();
     retryObserverRef.current?.disconnect();
     retryObserverRef.current = null;
@@ -843,6 +922,7 @@ export function useStellariumLoader({
   // Debug: Force reload the engine (clears current engine and restarts)
   const reloadEngine = useCallback(() => {
     logger.debug('Reloading Stellarium engine...');
+    useStarmapBootstrapStore.getState().requestRecovery();
     
     // Abort any ongoing loading
     abortControllerRef.current?.abort();
@@ -890,6 +970,7 @@ export function useStellariumLoader({
       phase: loadingPhase,
       errorCode: loadingErrorCode,
       retryCount: retryCountRef.current,
+      tierReadiness,
     },
     engineReady,
     startLoading,

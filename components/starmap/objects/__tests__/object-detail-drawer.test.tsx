@@ -8,12 +8,21 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 jest.mock('@/lib/services/object-info-service', () => ({
   getCachedObjectInfo: jest.fn(),
   enhanceObjectInfo: jest.fn(),
+  updateCachedObjectInfo: jest.fn(),
 }));
 
-import { getCachedObjectInfo, enhanceObjectInfo } from '@/lib/services/object-info-service';
+jest.mock('@/lib/tauri/app-control-api', () => ({
+  openExternalUrl: jest.fn(),
+}));
+
+import { getCachedObjectInfo, enhanceObjectInfo, updateCachedObjectInfo } from '@/lib/services/object-info-service';
+import { openExternalUrl } from '@/lib/tauri/app-control-api';
+import { clipboardService } from '@/lib/services/clipboard-service';
 
 const mockGetCachedObjectInfo = getCachedObjectInfo as jest.Mock;
 const mockEnhanceObjectInfo = enhanceObjectInfo as jest.Mock;
+const mockUpdateCachedObjectInfo = updateCachedObjectInfo as jest.Mock;
+const mockOpenExternalUrl = openExternalUrl as jest.Mock;
 
 // Mock astronomy utils
 jest.mock('@/lib/astronomy/starmap-utils', () => ({
@@ -290,6 +299,8 @@ describe('ObjectDetailDrawer', () => {
     
     mockGetCachedObjectInfo.mockResolvedValue(mockObjectInfo);
     mockEnhanceObjectInfo.mockResolvedValue(mockObjectInfo);
+    mockUpdateCachedObjectInfo.mockImplementation(() => {});
+    mockOpenExternalUrl.mockImplementation(() => {});
     
     mockUseMountStore.mockImplementation((selector) => {
       const state = {
@@ -624,6 +635,29 @@ describe('ObjectDetailDrawer', () => {
       });
     });
 
+    it('opens external links when clicked', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('SIMBAD')).toBeInTheDocument();
+        expect(screen.getByText('Wikipedia')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('SIMBAD'));
+        fireEvent.click(screen.getByText('Wikipedia'));
+      });
+
+      expect(mockOpenExternalUrl).toHaveBeenCalledWith(mockObjectInfo.simbadUrl);
+      expect(mockOpenExternalUrl).toHaveBeenCalledWith(mockObjectInfo.wikipediaUrl);
+    });
+
     it('displays data sources', async () => {
       render(
         <ObjectDetailDrawer
@@ -905,6 +939,29 @@ describe('ObjectDetailDrawer', () => {
 
       expect(mockHandleSlew).toHaveBeenCalled();
     });
+
+    it('invokes onAfterSlew callback to close drawer', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockUseObjectActions).toHaveBeenCalled();
+      });
+
+      const options = mockUseObjectActions.mock.calls.at(-1)?.[0];
+      expect(typeof options?.onAfterSlew).toBe('function');
+
+      await act(async () => {
+        options.onAfterSlew();
+      });
+
+      expect(mockOnOpenChange).toHaveBeenCalledWith(false);
+    });
   });
 
   describe('Close Functionality', () => {
@@ -950,8 +1007,7 @@ describe('ObjectDetailDrawer', () => {
     });
 
     it('copies coordinates to clipboard', async () => {
-      const writeText = jest.fn().mockResolvedValue(undefined);
-      Object.assign(navigator, { clipboard: { writeText } });
+      const writeTextSpy = jest.spyOn(clipboardService, 'writeText').mockResolvedValue(undefined);
 
       render(
         <ObjectDetailDrawer
@@ -973,9 +1029,60 @@ describe('ObjectDetailDrawer', () => {
         fireEvent.click(screen.getByText('common.copy'));
       });
 
-      expect(writeText).toHaveBeenCalledWith(
+      expect(writeTextSpy).toHaveBeenCalledWith(
         `RA: ${mockSelectedObject.ra}\nDec: ${mockSelectedObject.dec}`
       );
+
+      writeTextSpy.mockRestore();
+    });
+
+    it('handles clipboard write failure without crashing', async () => {
+      const writeTextSpy = jest.spyOn(clipboardService, 'writeText').mockRejectedValue(new Error('clipboard denied'));
+
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('common.copy'));
+      });
+
+      expect(writeTextSpy).toHaveBeenCalled();
+      expect(screen.getByText('common.copy')).toBeInTheDocument();
+      writeTextSpy.mockRestore();
+    });
+  });
+
+  describe('Timer Updates', () => {
+    it('updates periodically when drawer is open', async () => {
+      jest.useFakeTimers();
+
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(30000);
+      });
+
+      expect(screen.getByTestId('drawer')).toBeInTheDocument();
+      jest.useRealTimers();
     });
   });
 

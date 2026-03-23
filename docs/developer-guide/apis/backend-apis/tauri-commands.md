@@ -4,7 +4,7 @@
 
 ## API 概览
 
-SkyMap Test 后端使用 Rust + Tauri 提供100+命令，按以下模块组织：
+SkyMap 后端使用 Rust + Tauri 提供100+命令，按以下模块组织：
 
 ```mermaid
 graph TD
@@ -37,6 +37,20 @@ graph TD
     F --> F6[observation_log]
     F --> F7[target_io]
 ```
+
+## 在线解板与赤道仪控制链路（实现参考）
+
+在线解板与赤道仪控制分别由两个后端命令面提供，并在前端工作流中串联：
+
+- 在线解板主流程：`src-tauri/src/platform/plate_solver/online.rs`
+  - 核心命令：`solve_online`
+  - 提供操作 ID、进度事件、取消机制与 Astrometry.net 调用链
+- 赤道仪控制命令集：`src-tauri/src/mount/commands.rs`
+  - 核心命令：`mount_connect`、`mount_slew_to`、`mount_sync_to`、`mount_abort_slew`、`mount_set_tracking`
+
+维护建议：
+
+- 若解板阶段或 mount 命令契约发生变化，需同步更新本节，并在 `docs/reference/documentation-implementation-alignment.md` 更新映射与验证入口。
 
 ## 存储模块 API
 
@@ -1234,3 +1248,4 @@ await storageApi.saveStoreData('my-store', JSON.stringify(data));
 ---
 
 返回：[API参考](../index.md)
+

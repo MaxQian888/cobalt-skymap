@@ -7,8 +7,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SolveResultCard } from '../solve-result-card';
 
 // Mock next-intl
+const mockTranslate = jest.fn((key: string) => key);
+
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => mockTranslate,
 }));
 
 // Mock clipboard API
@@ -48,6 +50,7 @@ describe('SolveResultCard', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTranslate.mockImplementation((key: string) => key);
   });
 
   describe('success result', () => {
@@ -128,6 +131,25 @@ describe('SolveResultCard', () => {
       render(<SolveResultCard result={failedResult} />);
       expect(screen.getByText('No solution found')).toBeInTheDocument();
     });
+
+    it('should use fallback error labels and parse retry attempts when translations are missing', () => {
+      mockTranslate.mockImplementation(() => '');
+
+      render(
+        <SolveResultCard
+          result={{
+            ...failedResult,
+            errorMessage: '[network] Network down (Attempt 1/3)',
+          }}
+        />
+      );
+
+      expect(screen.getByText('Plate Solve Failed')).toBeInTheDocument();
+      expect(screen.getByText('Network down')).toBeInTheDocument();
+      expect(screen.getByText('(network)')).toBeInTheDocument();
+      expect(screen.getByText('Retry 1/3')).toBeInTheDocument();
+      expect(screen.getByText(/Solve time: 3\.0s/)).toBeInTheDocument();
+    });
   });
 
   describe('copy coordinates', () => {
@@ -184,6 +206,23 @@ describe('SolveResultCard', () => {
         expect(mockWriteText).toHaveBeenCalled();
       });
       expect(screen.getByText('plateSolving.solveSuccess')).toBeInTheDocument();
+    });
+
+    it('should use fallback success labels when translations are missing', async () => {
+      mockTranslate.mockImplementation(() => '');
+
+      render(<SolveResultCard result={successResult} />);
+
+      expect(screen.getByText('Plate Solve Successful!')).toBeInTheDocument();
+      expect(screen.getByText(/Rotation: 15\.50°/)).toBeInTheDocument();
+      expect(screen.getByText(/Scale: 1\.25/)).toBeInTheDocument();
+      expect(screen.getByText(/FOV: 2\.50° × 1\.80°/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('Copy'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Copied!')).toBeInTheDocument();
+      });
     });
   });
 

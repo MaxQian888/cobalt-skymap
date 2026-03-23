@@ -183,7 +183,7 @@ describe('settings-store migration - additional versions', () => {
   it('should return state as-is for current version', () => {
     const migrate = capturedPersistOptions?.migrate;
     const input = { skyEngine: 'stellarium', foo: 'bar' };
-    const migrated = migrate!(input, 17) as Record<string, unknown>;
+    const migrated = migrate!(input, 19) as Record<string, unknown>;
     expect(migrated.skyEngine).toBe(input.skyEngine);
     expect(migrated.foo).toBe(input.foo);
   });
@@ -194,6 +194,25 @@ describe('settings-store migration - additional versions', () => {
     const currentState = { skyEngine: 'stellarium', stellarium: { fov: 60 } };
     const merged = merge!(undefined, currentState) as Record<string, unknown>;
     expect(merged.skyEngine).toBe('stellarium');
+  });
+});
+
+describe('settings-store migration - proxy settings', () => {
+  it('should migrate from version < 19 (proxy defaults)', () => {
+    const migrate = capturedPersistOptions?.migrate;
+    const migrated = migrate!({ skyEngine: 'stellarium' }, 18) as {
+      proxy?: {
+        mode?: string;
+        manualUrl?: string;
+        fallbackToDirectOnFailure?: boolean;
+      };
+    };
+
+    expect(migrated.proxy).toEqual({
+      mode: 'auto',
+      manualUrl: '',
+      fallbackToDirectOnFailure: true,
+    });
   });
 });
 

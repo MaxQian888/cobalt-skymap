@@ -1,6 +1,6 @@
 # 功能导览
 
-本文档快速介绍 SkyMap Test 的主要功能。
+本文档快速介绍 SkyMap 的主要功能。
 
 ## 入门引导流程（v2）
 
@@ -22,11 +22,11 @@
 
 ## 主要功能概览
 
-SkyMap Test 包含以下主要功能模块：
+SkyMap 包含以下主要功能模块：
 
 ```mermaid
 mindmap
-  root((SkyMap Test))
+  root((SkyMap))
     星图显示
       交互式星图
       多层星图数据
@@ -304,3 +304,4 @@ mindmap
 - 查看[常见问题](../reference/faq.md)
 - 阅读[故障排除](../reference/troubleshooting.md)
 - 访问社区论坛
+

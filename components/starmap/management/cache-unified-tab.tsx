@@ -23,7 +23,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-import { formatBytes } from '@/lib/offline';
+import { formatBytes, unifiedCache } from '@/lib/offline';
 import { getCacheDiagnosticsSummary, getCacheIntegrationDiagnostics, getCacheProviderDiagnostics } from '@/lib/cache';
 import { EmptyState } from '@/components/ui/empty-state';
 import { unifiedCacheApi } from '@/lib/tauri';
@@ -37,82 +37,162 @@ interface CacheUnifiedTabProps {
   isActive: boolean;
 }
 
+type UnifiedCacheStatsShape = {
+  total_entries: number;
+  total_size: number;
+  hit_rate: number;
+};
+
+type RuntimeCacheMode = 'tauri' | 'web' | 'none';
+
+function getProviderLabel(providerId: string, t: ReturnType<typeof useTranslations>) {
+  if (providerId === 'tauri-unified-cache') return t('cache.providerDesktop');
+  if (providerId === 'browser-cache-api') return t('cache.providerBrowser');
+  return t('cache.providerUnavailable');
+}
+
+function getModeLabel(mode: 'persistent-shared' | 'local-only' | 'uncached', t: ReturnType<typeof useTranslations>) {
+  if (mode === 'persistent-shared') return t('cache.persistentShared');
+  if (mode === 'local-only') return t('cache.localOnly');
+  return t('cache.uncachedByDesign');
+}
+
+function getStatusLabel(status: 'active' | 'degraded' | 'mismatch' | 'local-only' | 'uncached-by-design', t: ReturnType<typeof useTranslations>) {
+  if (status === 'active') return t('cache.statusActive');
+  if (status === 'degraded') return t('cache.statusDegraded');
+  if (status === 'mismatch') return t('cache.statusMismatch');
+  if (status === 'local-only') return t('cache.statusLocalOnly');
+  return t('cache.statusUncachedByDesign');
+}
+
+function getEnvironmentLabel(environment: 'web' | 'tauri', t: ReturnType<typeof useTranslations>) {
+  return environment === 'tauri' ? t('cache.environmentTauri') : t('cache.environmentWeb');
+}
+
+function getRuntimeCacheMode(
+  providerId: string,
+  supportsPersistent: boolean
+): RuntimeCacheMode {
+  if (isTauri() && unifiedCacheApi.isAvailable()) return 'tauri';
+  if (!isTauri() && providerId === 'browser-cache-api' && supportsPersistent) return 'web';
+  return 'none';
+}
+
+function getCapabilityStateLabel(
+  supported: boolean,
+  providerAvailable: boolean
+): 'supported' | 'degraded' | 'unsupported' {
+  if (supported) return 'supported';
+  return providerAvailable ? 'degraded' : 'unsupported';
+}
+
 export function CacheUnifiedTab({ isActive }: CacheUnifiedTabProps) {
   const t = useTranslations();
-  const [unifiedCacheStats, setUnifiedCacheStats] = useState<{ total_entries: number; total_size: number; hit_rate: number } | null>(null);
+  const [unifiedCacheStats, setUnifiedCacheStats] = useState<UnifiedCacheStatsShape | null>(null);
   const [unifiedCacheKeys, setUnifiedCacheKeys] = useState<string[]>([]);
   const [loadingUnified, setLoadingUnified] = useState(false);
   const providerDiagnostics = getCacheProviderDiagnostics();
   const integrationDiagnostics = getCacheIntegrationDiagnostics();
   const diagnosticsSummary = getCacheDiagnosticsSummary();
+  const runtimeCacheMode = getRuntimeCacheMode(
+    providerDiagnostics.providerId,
+    providerDiagnostics.supportsPersistent
+  );
 
   const refreshUnifiedCache = useCallback(async () => {
-    if (!isTauri() || !unifiedCacheApi.isAvailable()) return;
+    if (runtimeCacheMode === 'none') return;
 
     setLoadingUnified(true);
     try {
-      const [stats, keys] = await Promise.all([
-        unifiedCacheApi.getStats(),
-        unifiedCacheApi.listKeys()
-      ]);
-      setUnifiedCacheStats(stats);
-      setUnifiedCacheKeys(keys);
+      if (runtimeCacheMode === 'tauri') {
+        const [stats, keys] = await Promise.all([
+          unifiedCacheApi.getStats(),
+          unifiedCacheApi.listKeys(),
+        ]);
+        setUnifiedCacheStats(stats);
+        setUnifiedCacheKeys(keys);
+      } else {
+        const [size, keys, webStats] = await Promise.all([
+          unifiedCache.getSize(),
+          unifiedCache.keys(),
+          Promise.resolve(unifiedCache.getCacheStats()),
+        ]);
+        setUnifiedCacheStats({
+          total_entries: keys.length,
+          total_size: size,
+          hit_rate: webStats.hitRate ?? 0,
+        });
+        setUnifiedCacheKeys(keys);
+      }
     } catch (error) {
       logger.error('Failed to load unified cache', error);
       toast.error(t('cache.loadFailed'));
     } finally {
       setLoadingUnified(false);
     }
-  }, [t]);
+  }, [runtimeCacheMode, t]);
 
   const handleClearUnifiedCache = useCallback(async () => {
-    if (!isTauri() || !unifiedCacheApi.isAvailable()) return;
+    if (runtimeCacheMode === 'none') return;
 
     try {
-      const deletedCount = await unifiedCacheApi.clearCache();
+      let deletedCount = 0;
+      if (runtimeCacheMode === 'tauri') {
+        deletedCount = await unifiedCacheApi.clearCache();
+      } else {
+        const existing = await unifiedCache.keys();
+        deletedCount = existing.length;
+        await unifiedCache.clear();
+      }
       toast.success(t('cache.cleared'), {
-        description: t('cache.entriesRemoved', { count: deletedCount })
+        description: t('cache.entriesRemoved', { count: deletedCount }),
       });
       await refreshUnifiedCache();
     } catch (error) {
       toast.error(t('cache.clearFailed'));
       logger.error('Failed to clear unified cache', error);
     }
-  }, [t, refreshUnifiedCache]);
+  }, [runtimeCacheMode, t, refreshUnifiedCache]);
 
   const handleCleanupUnifiedCache = useCallback(async () => {
-    if (!isTauri() || !unifiedCacheApi.isAvailable()) return;
+    if (runtimeCacheMode === 'none') return;
 
     try {
-      const deletedCount = await unifiedCacheApi.cleanup();
+      const deletedCount = runtimeCacheMode === 'tauri'
+        ? await unifiedCacheApi.cleanup()
+        : await unifiedCache.cleanupExpired();
       toast.success(t('cache.cleanupComplete'), {
-        description: t('cache.expiredEntriesRemoved', { count: deletedCount })
+        description: t('cache.expiredEntriesRemoved', { count: deletedCount }),
       });
       await refreshUnifiedCache();
     } catch (error) {
       toast.error(t('cache.cleanupFailed'));
       logger.error('Failed to cleanup unified cache', error);
     }
-  }, [t, refreshUnifiedCache]);
+  }, [runtimeCacheMode, t, refreshUnifiedCache]);
 
   const handleFlushUnifiedCache = useCallback(async () => {
-    if (!isTauri() || !unifiedCacheApi.isAvailable() || !providerDiagnostics.supportsFlush) return;
+    if (runtimeCacheMode === 'none' || !providerDiagnostics.supportsFlush) return;
 
     try {
-      await unifiedCacheApi.flush();
+      if (runtimeCacheMode === 'tauri') {
+        await unifiedCacheApi.flush();
+      } else {
+        await unifiedCache.flush();
+      }
       toast.success(t('cache.flushComplete'));
       await refreshUnifiedCache();
     } catch (error) {
       toast.error(t('cache.flushFailed'));
       logger.error('Failed to flush unified cache', error);
     }
-  }, [providerDiagnostics.supportsFlush, refreshUnifiedCache, t]);
+  }, [providerDiagnostics.supportsFlush, refreshUnifiedCache, runtimeCacheMode, t]);
 
   useEffect(() => {
-    if (isActive && isTauri() && unifiedCacheApi.isAvailable()) {
+    if (isActive && runtimeCacheMode !== 'none') {
       refreshUnifiedCache();
     }
-  }, [isActive, refreshUnifiedCache]);
+  }, [isActive, refreshUnifiedCache, runtimeCacheMode]);
 
   return (
     <div className="space-y-3">
@@ -126,13 +206,27 @@ export function CacheUnifiedTab({ isActive }: CacheUnifiedTabProps) {
           <div className="space-y-2 rounded border border-border/60 bg-muted/20 p-3 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">{t('cache.provider')}</span>
-              <Badge variant="outline">
-                {providerDiagnostics.providerId === 'tauri-unified-cache'
-                  ? t('cache.providerDesktop')
-                  : providerDiagnostics.providerId === 'browser-cache-api'
-                    ? t('cache.providerBrowser')
-                    : t('cache.providerUnavailable')}
-              </Badge>
+              <Badge variant="outline">{getProviderLabel(providerDiagnostics.providerId, t)}</Badge>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded bg-background/60 p-2">
+                <div className="text-[11px] text-muted-foreground">{t('cache.clearAll')}</div>
+                <div className="font-medium">
+                  {getCapabilityStateLabel(providerDiagnostics.supportsClear, providerDiagnostics.available)}
+                </div>
+              </div>
+              <div className="rounded bg-background/60 p-2">
+                <div className="text-[11px] text-muted-foreground">{t('cache.cleanup')}</div>
+                <div className="font-medium">
+                  {getCapabilityStateLabel(providerDiagnostics.supportsCleanup, providerDiagnostics.available)}
+                </div>
+              </div>
+              <div className="rounded bg-background/60 p-2">
+                <div className="text-[11px] text-muted-foreground">{t('cache.flush')}</div>
+                <div className="font-medium">
+                  {getCapabilityStateLabel(providerDiagnostics.supportsFlush, providerDiagnostics.available)}
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-4 gap-2 text-center">
               <div className="rounded bg-background/60 p-2">
@@ -150,6 +244,20 @@ export function CacheUnifiedTab({ isActive }: CacheUnifiedTabProps) {
               <div className="rounded bg-background/60 p-2">
                 <div className="font-medium">{diagnosticsSummary.uncached}</div>
                 <div className="text-muted-foreground">{t('cache.uncachedByDesign')}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded bg-background/60 p-2">
+                <div className="font-medium">{diagnosticsSummary.active}</div>
+                <div className="text-muted-foreground">{t('cache.statusActive')}</div>
+              </div>
+              <div className="rounded bg-background/60 p-2">
+                <div className="font-medium">{diagnosticsSummary.degraded}</div>
+                <div className="text-muted-foreground">{t('cache.statusDegraded')}</div>
+              </div>
+              <div className="rounded bg-background/60 p-2">
+                <div className="font-medium">{diagnosticsSummary.mismatch}</div>
+                <div className="text-muted-foreground">{t('cache.statusMismatch')}</div>
               </div>
             </div>
           </div>
@@ -252,15 +360,33 @@ export function CacheUnifiedTab({ isActive }: CacheUnifiedTabProps) {
             <h4 className="mb-2 text-sm font-medium">{t('cache.integrationAudit')}</h4>
             <div className="space-y-1">
               {integrationDiagnostics.map((integration) => (
-                <div key={integration.id} className="flex items-center justify-between rounded bg-muted/30 p-2 text-xs">
-                  <span className="truncate pr-2">{integration.title}</span>
-                  <Badge variant="outline">
-                    {integration.cacheMode === 'persistent-shared'
-                      ? t('cache.persistentShared')
-                      : integration.cacheMode === 'local-only'
-                        ? t('cache.localOnly')
-                        : t('cache.uncachedByDesign')}
-                  </Badge>
+                <div key={integration.id} className="rounded bg-muted/30 p-2 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-medium">{integration.title}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">
+                        {t('cache.modulePath')}: {integration.modulePath}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <Badge variant="outline">{getStatusLabel(integration.status, t)}</Badge>
+                      <Badge variant="outline">{getModeLabel(integration.cacheMode, t)}</Badge>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                    <span>
+                      {t('cache.currentEnvironment')}: {getEnvironmentLabel(integration.runtimeEnvironment, t)}
+                    </span>
+                    <span>
+                      {t('cache.environmentCoverage')}:{' '}
+                      {integration.environments.map((environment) => getEnvironmentLabel(environment, t)).join(' / ')}
+                    </span>
+                  </div>
+                  {integration.statusReason ? (
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      {t('cache.integrationReason')}: {integration.statusReason}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

@@ -1,6 +1,6 @@
 # 前端架构
 
-本文档详细介绍 SkyMap Test 的前端架构设计。
+本文档详细介绍 SkyMap 的前端架构设计。
 
 ## 技术栈
 
@@ -535,3 +535,4 @@ async function handleTauriCommand<T>(
 - [后端架构](backend-architecture.md)
 - [数据流设计](data-flow.md)
 - [Stores API](../apis/frontend-apis/stores.md)
+

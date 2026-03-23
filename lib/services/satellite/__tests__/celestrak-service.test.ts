@@ -7,9 +7,11 @@ import {
   fetchSatellitesFromCelesTrak,
 } from '../celestrak-service';
 
-// Mock fetch globally
-const mockFetch = jest.fn();
-global.fetch = mockFetch;
+const mockSmartFetch = jest.fn();
+
+jest.mock('@/lib/services/http-fetch', () => ({
+  smartFetch: (...args: unknown[]) => mockSmartFetch(...args),
+}));
 
 // Mock satellite propagator
 jest.mock('@/lib/services/satellite-propagator', () => ({
@@ -30,6 +32,7 @@ jest.mock('@/lib/logger', () => ({
 describe('celestrak-service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSmartFetch.mockReset();
   });
 
   describe('categorizeSatellite', () => {
@@ -158,19 +161,19 @@ describe('celestrak-service', () => {
 
   describe('fetchSatellitesFromCelesTrak', () => {
     it('should return empty array on fetch error', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockSmartFetch.mockRejectedValueOnce(new Error('Network error'));
       const result = await fetchSatellitesFromCelesTrak('stations');
       expect(result).toEqual([]);
     });
 
     it('should return empty array on non-ok response', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: false });
+      mockSmartFetch.mockResolvedValueOnce({ ok: false });
       const result = await fetchSatellitesFromCelesTrak('stations');
       expect(result).toEqual([]);
     });
 
     it('should parse CelesTrak GP data correctly', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockSmartFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => [
           {
@@ -192,6 +195,13 @@ describe('celestrak-service', () => {
       expect(result[0].source).toBe('CelesTrak');
       expect(result[0].altitude).toBeGreaterThan(0);
       expect(result[0].velocity).toBeGreaterThan(0);
+      expect(mockSmartFetch).toHaveBeenCalledWith(
+        'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json',
+        expect.objectContaining({
+          cachePolicy: 'satellite-tle',
+          cacheTtl: 3600 * 1000,
+        })
+      );
     });
   });
 });

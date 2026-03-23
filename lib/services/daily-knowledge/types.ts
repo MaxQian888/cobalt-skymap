@@ -10,7 +10,12 @@ export type DailyKnowledgeOnlineSource = Exclude<DailyKnowledgeSource, 'curated'
 
 export type DailyKnowledgeSourceTransport = 'api' | 'rss' | 'html';
 
-export type DailyKnowledgeSourceStatusState = 'ready' | 'failed' | 'skipped';
+export type DailyKnowledgeSourceStatusState =
+  | 'healthy'
+  | 'degraded'
+  | 'skipped'
+  | 'failed'
+  | 'stale';
 
 export type DailyKnowledgeSourceStatusReason =
   | 'success'
@@ -21,6 +26,11 @@ export type DailyKnowledgeSourceStatusReason =
   | 'disabled';
 
 export type DailyKnowledgeFallbackReason = 'offline' | 'source-failure' | 'quality-threshold' | null;
+
+export type DailyKnowledgeResolutionMode =
+  | 'fresh-online'
+  | 'stale-cache'
+  | 'curated-fallback';
 
 export interface DailyKnowledgeFactSource {
   title: string;
@@ -157,4 +167,5 @@ export interface DailyKnowledgeServiceResult {
   sourceStatuses: DailyKnowledgeSourceStatus[];
   usedCuratedFallback: boolean;
   fallbackReason: DailyKnowledgeFallbackReason;
+  resolutionMode: DailyKnowledgeResolutionMode;
 }

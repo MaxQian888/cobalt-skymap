@@ -56,20 +56,26 @@ export function useSettingsDraftStatus() {
 export function useConnectionDraftModel() {
   const connection = useSettingsStore((state) => state.connection);
   const backendProtocol = useSettingsStore((state) => state.backendProtocol);
+  const proxy = useSettingsStore((state) => state.proxy);
   const setConnection = useSettingsStore((state) => state.setConnection);
   const setBackendProtocol = useSettingsStore((state) => state.setBackendProtocol);
+  const setProxySettings = useSettingsStore((state) => state.setProxySettings);
 
   const sessionActive = useSettingsSessionStore((state) => state.sessionActive);
   const draftConnection = useSettingsSessionStore((state) => state.draft?.connection);
   const draftBackendProtocol = useSettingsSessionStore((state) => state.draft?.backendProtocol);
+  const draftProxy = useSettingsSessionStore((state) => state.draft?.proxy);
   const setDraftConnection = useSettingsSessionStore((state) => state.setConnection);
   const setDraftBackendProtocol = useSettingsSessionStore((state) => state.setBackendProtocol);
+  const setDraftProxySettings = useSettingsSessionStore((state) => state.setProxySettings);
 
   return {
     connection: (sessionActive && draftConnection) ? draftConnection : connection,
     backendProtocol: (sessionActive && draftBackendProtocol) ? draftBackendProtocol : backendProtocol,
+    proxy: (sessionActive && draftProxy) ? draftProxy : proxy,
     setConnection: sessionActive ? setDraftConnection : setConnection,
     setBackendProtocol: sessionActive ? setDraftBackendProtocol : setBackendProtocol,
+    setProxySettings: sessionActive ? setDraftProxySettings : setProxySettings,
   };
 }
 

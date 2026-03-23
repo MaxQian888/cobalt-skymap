@@ -25,12 +25,15 @@ import {
 import { cn } from '@/lib/utils';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
 import { parseDecCoordinate, parseRACoordinate } from '@/lib/astronomy/coordinates/conversions';
-import { computeEphemeris, type EngineBody, type EphemerisPoint } from '@/lib/astronomy/engine';
+import { type EngineBody, type EphemerisPoint } from '@/lib/astronomy/engine';
+import { runCalculatorEphemeris, type CalculatorMetaSummary } from './orchestrator';
 
 interface EphemerisTabProps {
   latitude: number;
   longitude: number;
   selectedTarget?: { name: string; ra: number; dec: number };
+  sharedDate?: string;
+  onSharedDateChange?: (nextDate: string) => void;
 }
 
 type CoordinateOutputMode = 'equatorial' | 'horizontal' | 'galactic' | 'ecliptic';
@@ -56,16 +59,23 @@ function toDateInputString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function EphemerisTab({ latitude, longitude, selectedTarget }: EphemerisTabProps) {
+export function EphemerisTab({
+  latitude,
+  longitude,
+  selectedTarget,
+  sharedDate,
+  onSharedDateChange,
+}: EphemerisTabProps) {
   const t = useTranslations();
   const [targetMode, setTargetMode] = useState<EngineBody>(selectedTarget ? 'Custom' : 'Moon');
   const [targetRA, setTargetRA] = useState(selectedTarget?.ra ? degreesToHMS(selectedTarget.ra) : '');
   const [targetDec, setTargetDec] = useState(selectedTarget?.dec ? degreesToDMS(selectedTarget.dec) : '');
-  const [startDate, setStartDate] = useState(toDateInputString(new Date()));
+  const [startDate, setStartDate] = useState(sharedDate ?? toDateInputString(new Date()));
   const [stepHours, setStepHours] = useState(1);
   const [numSteps, setNumSteps] = useState(24);
   const [coordinateMode, setCoordinateMode] = useState<CoordinateOutputMode>('equatorial');
   const [ephemeris, setEphemeris] = useState<EphemerisPoint[]>([]);
+  const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -86,6 +96,12 @@ export function EphemerisTab({ latitude, longitude, selectedTarget }: EphemerisT
   }, [parsedDec, parsedRa, targetDec, targetMode, targetRA, t]);
 
   useEffect(() => {
+    if (sharedDate && sharedDate !== startDate) {
+      setStartDate(sharedDate);
+    }
+  }, [sharedDate, startDate]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function run() {
@@ -98,7 +114,7 @@ export function EphemerisTab({ latitude, longitude, selectedTarget }: EphemerisT
       setIsLoading(true);
       setError(null);
       try {
-        const result = await computeEphemeris({
+        const result = await runCalculatorEphemeris({
           body: targetMode,
           observer: { latitude, longitude },
           startDate: new Date(`${startDate}T00:00:00`),
@@ -110,11 +126,24 @@ export function EphemerisTab({ latitude, longitude, selectedTarget }: EphemerisT
         });
 
         if (!cancelled) {
-          setEphemeris(result.points);
+          setEphemeris(result.response.points);
+          setMetaSummary({
+            total: 1,
+            sourceCounts: {
+              tauri: result.meta.source === 'tauri' ? 1 : 0,
+              fallback: result.meta.source === 'fallback' ? 1 : 0,
+            },
+            cacheHits: result.meta.cache === 'hit' ? 1 : 0,
+            cacheMisses: result.meta.cache === 'miss' ? 1 : 0,
+            degradedCount: result.meta.degraded ? 1 : 0,
+            warningsCount: result.meta.warnings?.length ?? 0,
+            latestComputedAt: result.meta.computedAt,
+          });
         }
       } catch (runError) {
         if (!cancelled) {
           setEphemeris([]);
+          setMetaSummary(null);
           setError(runError instanceof Error ? runError.message : t('astroCalc.calculationFailed'));
         }
       } finally {
@@ -153,7 +182,11 @@ export function EphemerisTab({ latitude, longitude, selectedTarget }: EphemerisT
           <Input
             type="date"
             value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setStartDate(value);
+              onSharedDateChange?.(value);
+            }}
             className="h-8"
           />
         </div>
@@ -229,6 +262,11 @@ export function EphemerisTab({ latitude, longitude, selectedTarget }: EphemerisT
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline">{ephemeris.length} {t('astroCalc.entries')}</Badge>
+          {metaSummary && (
+            <Badge variant="secondary" className="text-[10px]" data-testid="ephemeris-meta">
+              {`src:${metaSummary.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${metaSummary.cacheHits}/${metaSummary.total}`}
+            </Badge>
+          )}
           {isLoading && (
             <Badge variant="secondary">{t('astroCalc.calculating')}</Badge>
           )}

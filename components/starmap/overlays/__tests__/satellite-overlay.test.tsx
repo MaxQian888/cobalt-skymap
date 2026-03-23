@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 // Mock stores
 const mockUseStellariumStore = jest.fn((selector) => {
@@ -111,6 +111,48 @@ describe('SatelliteOverlay', () => {
     const { container } = render(<SatelliteOverlay {...defaultProps} />);
     expect(container.querySelector('svg')).toBeInTheDocument();
     expect(container.querySelector('.satellite-marker')).toBeInTheDocument();
+  });
+
+  it('calls onSatelliteClick when marker is clicked', () => {
+    const onSatelliteClick = jest.fn();
+    mockPositions = [{
+      item: { id: 'sat1', name: 'ISS', noradId: 25544, type: 'iss', altitude: 400, velocity: 7.66, ra: 10, dec: 20, isVisible: true },
+      x: 100, y: 200, visible: true,
+    }];
+
+    const { container } = render(
+      <SatelliteOverlay containerWidth={800} containerHeight={600} onSatelliteClick={onSatelliteClick} />
+    );
+
+    const marker = container.querySelector('.satellite-marker');
+    expect(marker).toBeInTheDocument();
+    if (marker) {
+      fireEvent.click(marker);
+    }
+
+    expect(onSatelliteClick).toHaveBeenCalledWith(expect.objectContaining({ id: 'sat1' }));
+  });
+
+  it('truncates long satellite labels in marker text', () => {
+    mockPositions = [{
+      item: {
+        id: 'sat-long',
+        name: 'VERY-LONG-SATELLITE-NAME-12345',
+        noradId: 99999,
+        type: 'communication',
+        altitude: 500,
+        velocity: 7.1,
+        ra: 10,
+        dec: 20,
+        isVisible: false,
+      },
+      x: 80,
+      y: 140,
+      visible: true,
+    }];
+
+    render(<SatelliteOverlay containerWidth={800} containerHeight={600} />);
+    expect(screen.getByText('VERY-LONG-SATEL...')).toBeInTheDocument();
   });
 
   it('renders with different container sizes', () => {

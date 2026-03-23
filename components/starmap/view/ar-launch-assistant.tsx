@@ -11,6 +11,7 @@ import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
 import { getARSurfaceLayoutTokens, withSafeAreaInset } from '@/lib/constants/ar-layout';
 import { executeARRecoveryAction, type ARRecoveryActionHandlers } from '@/lib/core/ar-recovery-actions';
+import { deriveARCameraDiagnosticSummary } from '@/lib/core/ar-invocation';
 import type { ARRecoveryAction } from '@/lib/core/ar-session';
 
 const RECOVERY_COOLDOWN_MS = 3000;
@@ -53,6 +54,10 @@ export function ARLaunchAssistant() {
   const setRecoveryNoticeKey = useARRuntimeStore((state) => state.setRecoveryNoticeKey);
   const recoveryNoticeKey = useARRuntimeStore((state) => state.recoveryNoticeKey);
   const [now, setNow] = useState(0);
+  const diagnosticSummary = useMemo(
+    () => deriveARCameraDiagnosticSummary(cameraRuntime),
+    [cameraRuntime],
+  );
 
   useEffect(() => {
     if (!launchAssistant.visible || typeof document === 'undefined') return;
@@ -183,14 +188,22 @@ export function ARLaunchAssistant() {
           </Button>
         </div>
 
-        {(launchAssistant.activeDeviceLabel || launchAssistant.currentAcquisitionStage) && (
+        {(diagnosticSummary.deviceLabel || diagnosticSummary.currentStage) && (
           <div className="mt-3 rounded-lg bg-white/5 px-3 py-2 text-xs text-white/80">
             <div className="flex items-center gap-2">
               <Camera className="h-4 w-4" />
-              <span>{launchAssistant.activeDeviceLabel ?? t('settings.arCameraDeviceSystemDefault')}</span>
+              <span>{diagnosticSummary.deviceLabel ?? t('settings.arCameraDeviceSystemDefault')}</span>
             </div>
-            {launchAssistant.currentAcquisitionStage && (
-              <p className="mt-1 text-[11px] text-white/60">{launchAssistant.currentAcquisitionStage}</p>
+            {diagnosticSummary.currentStage && (
+              <p className="mt-1 text-[11px] text-white/60">{diagnosticSummary.currentStage}</p>
+            )}
+            {diagnosticSummary.usedRememberedPlan && (
+              <p className="mt-1 text-[11px] text-sky-100">{t('settings.arCameraRememberedPlan')}</p>
+            )}
+            {diagnosticSummary.lastFailureStage && (
+              <p className="mt-1 text-[11px] text-amber-100">
+                {t('settings.arCameraLastFailureStage')}: {diagnosticSummary.lastFailureStage}
+              </p>
             )}
           </div>
         )}

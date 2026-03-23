@@ -1,6 +1,6 @@
 # 望远镜配置
 
-本文档介绍如何在 SkyMap Test 中配置和管理望远镜。
+本文档介绍如何在 SkyMap 中配置和管理望远镜。
 
 ## 望远镜管理
 
@@ -305,3 +305,4 @@
 - [设备概览](index.md)
 - [相机配置](cameras.md)
 - [视野计算](../observation-planning/index.md)
+

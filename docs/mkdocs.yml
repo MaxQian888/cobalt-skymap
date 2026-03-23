@@ -1,12 +1,12 @@
 # MkDocs配置文件
-site_name: SkyMap Test 文档
-site_description: SkyMap Test 天文观测桌面应用完整文档
-site_author: SkyMap Test Team
-copyright: Copyright &copy; 2024 SkyMap Test Team
+site_name: SkyMap 文档
+site_description: SkyMap 天文观测桌面应用完整文档
+site_author: SkyMap Team
+copyright: Copyright &copy; 2024 SkyMap Team
 
 # 仓库信息
-repo_name: skymap-test
-repo_url: https://github.com/yourusername/skymap-test
+repo_name: cobalt-skymap
+repo_url: https://github.com/ElementAstro/cobalt-skymap
 edit_uri: edit/main/docs/
 
 # 主题配置
@@ -139,7 +139,7 @@ extra:
   # 社交链接
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/yourusername/skymap-test
+      link: https://github.com/ElementAstro/cobalt-skymap
       name: GitHub
 
 # 导航结构
@@ -260,6 +260,7 @@ nav:
   - 参考资料:
       - 概览: reference/index.md
       - Stellarium 能力矩阵: reference/stellarium-capability-matrix.md
+      - 文档-实现对齐矩阵: reference/documentation-implementation-alignment.md
       - 天文学基础:
           - 基础概览: reference/astronomy-basics/index.md
           - 天球坐标: reference/astronomy-basics/coordinates.md
@@ -271,3 +272,4 @@ nav:
       - 概览: appendix/index.md
       - 键盘快捷键: appendix/keyboard-shortcuts.md
       - 配置文件: appendix/configuration-files.md
+

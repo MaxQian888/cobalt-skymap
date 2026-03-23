@@ -1,6 +1,6 @@
 # React 组件开发
 
-本文档介绍如何开发 SkyMap Test 的 React 组件。
+本文档介绍如何开发 SkyMap 的 React 组件。
 
 ## 组件架构
 
@@ -592,3 +592,4 @@ export function DataManager({ trigger }: DataManagerProps) {
 ---
 
 返回：[前端开发](index.md)
+

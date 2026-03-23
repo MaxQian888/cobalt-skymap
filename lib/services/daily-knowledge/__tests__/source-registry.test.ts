@@ -64,8 +64,8 @@ describe('daily-knowledge/source-registry', () => {
 
     expect(result.items).toHaveLength(1);
     expect(result.sourceStatuses).toEqual([
-      expect.objectContaining({ source: 'nasa-image-library', state: 'ready', itemCount: 1 }),
-      expect.objectContaining({ source: 'esa-science', state: 'skipped', itemCount: 0, reason: 'empty' }),
+      expect.objectContaining({ source: 'nasa-image-library', state: 'healthy', itemCount: 1 }),
+      expect.objectContaining({ source: 'esa-science', state: 'degraded', itemCount: 0, reason: 'empty' }),
     ]);
   });
 

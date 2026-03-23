@@ -17,6 +17,13 @@ const DEGRADED_SOURCE_STATUS_REASONS = [
   'disabled',
 ] as const;
 
+const DAILY_KNOWLEDGE_UI_KEYS = [
+  'dailyKnowledge.refreshCurrentDate',
+  'dailyKnowledge.freshness.fresh-online',
+  'dailyKnowledge.freshness.stale-cache',
+  'dailyKnowledge.freshness.curated-fallback',
+] as const;
+
 function getMessageValue(messages: Record<string, unknown>, dottedKey: string): unknown {
   return dottedKey.split('.').reduce<unknown>((currentValue, segment) => {
     if (currentValue && typeof currentValue === 'object' && segment in currentValue) {
@@ -37,6 +44,17 @@ describe('daily knowledge source status messages', () => {
     ['zh', zhMessages],
   ])('contains degraded source status messages for %s', (_locale, messages) => {
     const missingKeys = requiredKeys.filter(
+      (key) => getMessageValue(messages as Record<string, unknown>, key) === undefined
+    );
+
+    expect(missingKeys).toEqual([]);
+  });
+
+  it.each([
+    ['en', enMessages],
+    ['zh', zhMessages],
+  ])('contains refresh and freshness copy for %s', (_locale, messages) => {
+    const missingKeys = DAILY_KNOWLEDGE_UI_KEYS.filter(
       (key) => getMessageValue(messages as Record<string, unknown>, key) === undefined
     );
 

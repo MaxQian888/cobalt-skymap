@@ -23,15 +23,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { parseDecCoordinate, parseRACoordinate } from '@/lib/astronomy/coordinates/conversions';
-import { computeRiseTransitSet, type EngineBody } from '@/lib/astronomy/engine';
+import { type EngineBody } from '@/lib/astronomy/engine';
 import { formatTimeShort } from '@/lib/astronomy/time/formats';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
 import { AltitudeChart } from '../altitude-chart';
+import { runCalculatorRiseTransitSetBatch, summarizeCalculatorMeta, type CalculatorMetaSummary } from './orchestrator';
 
 interface RTSTabProps {
   latitude: number;
   longitude: number;
   selectedTarget?: { name: string; ra: number; dec: number };
+  sharedDate?: string;
+  onSharedDateChange?: (nextDate: string) => void;
 }
 
 type TargetMode = EngineBody;
@@ -68,17 +71,24 @@ interface RTSRow {
   darkImagingHours: number;
 }
 
-export function RTSTab({ latitude, longitude, selectedTarget }: RTSTabProps) {
+export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onSharedDateChange }: RTSTabProps) {
   const t = useTranslations();
   const [targetMode, setTargetMode] = useState<TargetMode>(selectedTarget ? 'Custom' : 'Moon');
   const [targetName, setTargetName] = useState(selectedTarget?.name ?? '');
   const [targetRA, setTargetRA] = useState(selectedTarget?.ra ? degreesToHMS(selectedTarget.ra) : '');
   const [targetDec, setTargetDec] = useState(selectedTarget?.dec ? degreesToDMS(selectedTarget.dec) : '');
   const [dateRange, setDateRange] = useState(7);
-  const [startDate, setStartDate] = useState(toLocalDateString(new Date()));
+  const [startDate, setStartDate] = useState(sharedDate ?? toLocalDateString(new Date()));
   const [rows, setRows] = useState<RTSRow[]>([]);
+  const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (sharedDate && sharedDate !== startDate) {
+      setStartDate(sharedDate);
+    }
+  }, [sharedDate, startDate]);
 
   const parsedRa = useMemo(() => parseRACoordinate(targetRA), [targetRA]);
   const parsedDec = useMemo(() => parseDecCoordinate(targetDec), [targetDec]);
@@ -107,38 +117,46 @@ export function RTSTab({ latitude, longitude, selectedTarget }: RTSTabProps) {
       setError(null);
       try {
         const start = new Date(`${startDate}T12:00:00`);
-        const nextRows: RTSRow[] = [];
+        const jobs: Array<{ date: Date; request: Parameters<typeof runCalculatorRiseTransitSetBatch>[0][number] }> = [];
         for (let index = 0; index < dateRange; index += 1) {
           const date = new Date(start);
           date.setDate(start.getDate() + index);
-
-          const result = await computeRiseTransitSet({
-            body: targetMode,
-            observer: { latitude, longitude },
+          jobs.push({
             date,
-            customCoordinate: targetMode === 'Custom' && parsedRa !== null && parsedDec !== null
-              ? { ra: parsedRa, dec: parsedDec }
-              : undefined,
-          });
-
-          nextRows.push({
-            date,
-            riseTime: result.riseTime,
-            transitTime: result.transitTime,
-            setTime: result.setTime,
-            transitAlt: result.transitAltitude,
-            isCircumpolar: result.isCircumpolar,
-            neverRises: result.neverRises,
-            darkImagingHours: result.darkImagingHours,
+            request: {
+              body: targetMode,
+              observer: { latitude, longitude },
+              date,
+              customCoordinate: targetMode === 'Custom' && parsedRa !== null && parsedDec !== null
+                ? { ra: parsedRa, dec: parsedDec }
+                : undefined,
+            },
           });
         }
 
+        const batchResults = await runCalculatorRiseTransitSetBatch(
+          jobs.map(job => job.request),
+          { concurrency: 3 },
+        );
+        const nextRows: RTSRow[] = batchResults.map((batchResult, index) => ({
+          date: jobs[index].date,
+          riseTime: batchResult.response.riseTime,
+          transitTime: batchResult.response.transitTime,
+          setTime: batchResult.response.setTime,
+          transitAlt: batchResult.response.transitAltitude,
+          isCircumpolar: batchResult.response.isCircumpolar,
+          neverRises: batchResult.response.neverRises,
+          darkImagingHours: batchResult.response.darkImagingHours,
+        }));
+
         if (!cancelled) {
           setRows(nextRows);
+          setMetaSummary(summarizeCalculatorMeta(batchResults.map(result => result.meta)));
         }
       } catch (runError) {
         if (!cancelled) {
           setRows([]);
+          setMetaSummary(null);
           setError(runError instanceof Error ? runError.message : t('astroCalc.calculationFailed'));
         }
       } finally {
@@ -183,7 +201,11 @@ export function RTSTab({ latitude, longitude, selectedTarget }: RTSTabProps) {
           <Input
             type="date"
             value={startDate}
-            onChange={(event) => setStartDate(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setStartDate(value);
+              onSharedDateChange?.(value);
+            }}
             className="h-8"
           />
         </div>
@@ -261,9 +283,16 @@ export function RTSTab({ latitude, longitude, selectedTarget }: RTSTabProps) {
       )}
 
       <div className="flex items-center justify-between">
-        <Badge variant="outline" className="text-xs">
-          {rows.length} {t('astroCalc.days')}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs">
+            {rows.length} {t('astroCalc.days')}
+          </Badge>
+          {metaSummary && (
+            <Badge variant="secondary" className="text-[10px]" data-testid="rts-meta">
+              {`src:${metaSummary.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${metaSummary.cacheHits}/${metaSummary.total}`}
+            </Badge>
+          )}
+        </div>
         {isLoading && (
           <Badge variant="secondary" className="text-xs">
             {t('astroCalc.calculating')}

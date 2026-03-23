@@ -812,7 +812,7 @@ def generate_all_reports():
     }
 
     # Generate JSON report
-    with open("d:/Project/skymap-test/docs/security/attack-trees-report.json", "w") as f:
+    with open("d:/Project/cobalt-skymap/docs/security/attack-trees-report.json", "w") as f:
         json.dump(report, f, indent=2)
 
     # Generate Mermaid diagrams
@@ -1015,7 +1015,7 @@ exploitation" to "secured application."
 - Tauri Security: https://tauri.app/v1/guides/security/
 """
 
-    with open("d:/Project/skymap-test/docs/security/attack-trees-analysis.md", "w") as f:
+    with open("d:/Project/cobalt-skymap/docs/security/attack-trees-analysis.md", "w") as f:
         f.write(md_report)
 
     print("✓ Generated attack-trees-report.json")
@@ -1048,3 +1048,4 @@ if __name__ == "__main__":
                 print(f"    Time: {node.attributes.time_hours}h")
                 if node.file_refs:
                     print(f"    Files: {', '.join(node.file_refs)}")
+

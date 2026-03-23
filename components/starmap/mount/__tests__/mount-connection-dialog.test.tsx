@@ -14,6 +14,18 @@ let mountState = {
     deviceId: 0,
     selectedDeviceId: 'simulator://builtin',
   },
+  selectedDevice: null as null | {
+    id: string;
+    protocol: 'alpaca' | 'simulator';
+    host: string;
+    port: number;
+    deviceId: number;
+    name: string;
+    deviceType: 'telescope' | 'simulator';
+    source: 'manual' | 'simulator' | 'alpaca-discovery';
+    description?: string;
+    uniqueId?: string;
+  },
   capabilities: {
     canSlew: false,
     canSlewAsync: false,
@@ -50,6 +62,42 @@ const mockUseMountStore = jest.fn((selector: (s: typeof mountState) => unknown) 
 
 jest.mock('@/lib/stores', () => ({
   useMountStore: (selector: (s: unknown) => unknown) => mockUseMountStore(selector),
+}));
+
+// ---- Device store mock ----
+const mockMountProfileId = 'mount-primary';
+const mockBeginConnection = jest.fn();
+const mockMarkConnected = jest.fn();
+const mockMarkFailed = jest.fn();
+const mockDisconnectConnection = jest.fn();
+const mockRetryConnection = jest.fn();
+const mockSyncFromMountStore = jest.fn();
+
+let deviceState = {
+  connections: {
+    [mockMountProfileId]: {
+      profileId: mockMountProfileId,
+      state: 'idle',
+      attempts: 0,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  },
+  diagnostics: {
+    [mockMountProfileId]: [] as Array<{ from: string; to: string }>,
+  },
+  beginConnection: mockBeginConnection,
+  markConnected: mockMarkConnected,
+  markFailed: mockMarkFailed,
+  disconnectConnection: mockDisconnectConnection,
+  retryConnection: mockRetryConnection,
+  syncFromMountStore: mockSyncFromMountStore,
+};
+
+const mockUseDeviceStore = jest.fn((selector: (s: typeof deviceState) => unknown) => selector(deviceState));
+
+jest.mock('@/lib/stores/device-store', () => ({
+  PRIMARY_MOUNT_DEVICE_PROFILE_ID: 'mount-primary',
+  useDeviceStore: (selector: (s: unknown) => unknown) => mockUseDeviceStore(selector),
 }));
 
 // ---- Tauri API mock ----
@@ -134,6 +182,7 @@ describe('MountConnectionDialog', () => {
         deviceId: 0,
         selectedDeviceId: 'simulator://builtin',
       },
+      selectedDevice: null,
       capabilities: {
         canSlew: false,
         canSlewAsync: false,
@@ -146,6 +195,25 @@ describe('MountConnectionDialog', () => {
         alignmentMode: '',
         equatorialSystem: '',
       },
+    };
+    deviceState = {
+      connections: {
+        [mockMountProfileId]: {
+          profileId: mockMountProfileId,
+          state: 'idle',
+          attempts: 0,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      },
+      diagnostics: {
+        [mockMountProfileId]: [],
+      },
+      beginConnection: mockBeginConnection,
+      markConnected: mockMarkConnected,
+      markFailed: mockMarkFailed,
+      disconnectConnection: mockDisconnectConnection,
+      retryConnection: mockRetryConnection,
+      syncFromMountStore: mockSyncFromMountStore,
     };
   });
 
@@ -189,6 +257,27 @@ describe('MountConnectionDialog', () => {
     });
   });
 
+  it('retry button triggers retryConnection and re-runs connect flow', async () => {
+    deviceState.connections[mockMountProfileId].state = 'failed';
+
+    const { getByTestId } = render(
+      <MountConnectionDialog open={true} onOpenChange={mockOnOpenChange} />
+    );
+    const footer = getByTestId('dialog-footer');
+    const retryBtn = footer.querySelectorAll('button')[2];
+
+    expect(retryBtn.disabled).toBeFalsy();
+
+    await act(async () => {
+      fireEvent.click(retryBtn);
+    });
+
+    await waitFor(() => {
+      expect(mockRetryConnection).toHaveBeenCalledWith(mockMountProfileId, 'mount-dialog-retry');
+      expect(mockConnect).toHaveBeenCalled();
+    });
+  });
+
   it('connect button is disabled when form is invalid (empty host for alpaca)', () => {
     mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
     mountState.connectionConfig.host = '';
@@ -201,7 +290,20 @@ describe('MountConnectionDialog', () => {
     // The button should be disabled due to empty host for alpaca protocol
     // Note: since protocol defaults from store and local state re-initializes,
     // the validation check happens on the local state.
-    expect(connectBtn).toBeTruthy();
+    expect(connectBtn.disabled).toBeTruthy();
+  });
+
+  it('connect button is disabled when alpaca deviceId is invalid', () => {
+    mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
+    mountState.connectionConfig.host = 'localhost';
+    mountState.connectionConfig.deviceId = -1;
+
+    const { getByTestId } = render(
+      <MountConnectionDialog open={true} onOpenChange={mockOnOpenChange} />
+    );
+    const footer = getByTestId('dialog-footer');
+    const connectBtn = footer.querySelectorAll('button')[1];
+    expect(connectBtn.disabled).toBeTruthy();
   });
 
   it('displays error message on connection failure', async () => {
@@ -330,6 +432,36 @@ describe('MountConnectionDialog', () => {
     });
   });
 
+  it('manual alpaca connect builds a fallback selected device when none was discovered', async () => {
+    mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
+    mountState.connectionConfig.host = '10.0.0.9';
+    mountState.connectionConfig.port = 12345;
+    mountState.connectionConfig.deviceId = 3;
+    mountState.selectedDevice = null;
+
+    const { getByTestId } = render(
+      <MountConnectionDialog open={true} onOpenChange={mockOnOpenChange} />
+    );
+    const footer = getByTestId('dialog-footer');
+    const connectBtn = footer.querySelectorAll('button')[1];
+
+    await act(async () => {
+      fireEvent.click(connectBtn);
+    });
+
+    await waitFor(() => {
+      expect(mockSetSelectedDevice).toHaveBeenCalledWith(expect.objectContaining({
+        id: 'alpaca://10.0.0.9:12345/telescope/3',
+        name: '10.0.0.9 #3',
+        source: 'manual',
+        description: 'manualConnectionFallback',
+      }));
+      expect(mockSetConnectionConfig).toHaveBeenCalledWith(expect.objectContaining({
+        selectedDeviceId: 'alpaca://10.0.0.9:12345/telescope/3',
+      }));
+    });
+  });
+
   it('handles non-Error exception on connect', async () => {
     mockConnect.mockRejectedValueOnce('string error');
 
@@ -370,6 +502,50 @@ describe('MountConnectionDialog', () => {
     );
     const dialog = getByTestId('dialog');
     expect(dialog.textContent).toContain('simulator');
+  });
+
+  it('shows selected device name when already connected', () => {
+    mountState.mountInfo.Connected = true;
+    mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
+    mountState.selectedDevice = {
+      id: 'alpaca://192.168.1.50:11111/telescope/0',
+      protocol: 'alpaca',
+      host: '192.168.1.50',
+      port: 11111,
+      deviceId: 0,
+      name: 'Backyard Scope',
+      deviceType: 'telescope',
+      source: 'manual',
+      description: 'saved',
+    };
+
+    const { getByTestId } = render(
+      <MountConnectionDialog open={true} onOpenChange={mockOnOpenChange} />
+    );
+    const dialog = getByTestId('dialog');
+    expect(dialog.textContent).toContain('Backyard Scope');
+  });
+
+  it('rehydrates selected discovered device details when stored protocol matches', () => {
+    mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
+    mountState.selectedDevice = {
+      id: 'alpaca://192.168.1.20:11111/telescope/0',
+      protocol: 'alpaca',
+      host: '192.168.1.20',
+      port: 11111,
+      deviceId: 0,
+      name: 'Remembered Mount',
+      deviceType: 'telescope',
+      source: 'manual',
+      description: 'cached',
+    };
+
+    const { getByTestId } = render(
+      <MountConnectionDialog open={true} onOpenChange={mockOnOpenChange} />
+    );
+    const dialog = getByTestId('dialog');
+    expect(dialog.textContent).toContain('selectedDevice');
+    expect(dialog.textContent).toContain('Remembered Mount');
   });
 
   it('discover button calls mountApi.discover and populates devices', async () => {
@@ -447,6 +623,24 @@ describe('MountConnectionDialog', () => {
     await waitFor(() => {
       expect(mockDiscover).toHaveBeenCalled();
     });
+  });
+
+  it('discover is a no-op when running outside tauri', async () => {
+    mountState.connectionConfig.protocol = 'alpaca' as 'simulator';
+    mockIsTauri.mockReturnValue(false);
+
+    const { getByTestId } = render(
+      <MountConnectionDialog open={true} onOpenChange={mockOnOpenChange} />
+    );
+    const dialog = getByTestId('dialog');
+    const buttons = dialog.querySelectorAll('button');
+    const discoverBtn = Array.from(buttons).find((b) => b.textContent?.includes('discoverDevices'));
+
+    await act(async () => {
+      fireEvent.click(discoverBtn!);
+    });
+
+    expect(mockDiscover).not.toHaveBeenCalled();
   });
 
   it('clicking a discovered device selects it', async () => {

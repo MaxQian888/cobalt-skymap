@@ -1,6 +1,6 @@
 # Windows 打包指南
 
-本文档介绍如何为 Windows 平台构建和打包 SkyMap Test。
+本文档介绍如何为 Windows 平台构建和打包 SkyMap。
 
 ## 环境要求
 
@@ -40,9 +40,9 @@ pnpm tauri build
 ```
 src-tauri/target/release/bundle/
 ├── msi/
-│   └── SkyMap Test_1.0.0_x64_en-US.msi
+│   └── SkyMap_1.0.0_x64_en-US.msi
 └── nsis/
-    └── SkyMap Test_1.0.0_x64-setup.exe
+    └── SkyMap_1.0.0_x64-setup.exe
 ```
 
 ## 安装包类型
@@ -55,7 +55,7 @@ src-tauri/target/release/bundle/
 
 ```powershell
 # 静默安装
-msiexec /i "SkyMap Test_1.0.0_x64_en-US.msi" /quiet
+msiexec /i "SkyMap_1.0.0_x64_en-US.msi" /quiet
 ```
 
 ### NSIS 安装包
@@ -108,7 +108,7 @@ Windows 自动更新依赖 GitHub Releases 中的以下文件：
 当前 updater endpoint：
 
 ```text
-https://github.com/AstroAir/skymap-test/releases/latest/download/latest.json
+https://github.com/ElementAstro/cobalt-skymap/releases/latest/download/latest.json
 ```
 
 发布时由 GitHub Actions 动态注入临时 Tauri 配置，而不是直接把公钥硬编码到仓库默认配置中。该临时配置会启用：
@@ -144,7 +144,7 @@ pnpm tauri signer generate -w
 创建无需安装的便携版：
 
 1. 构建应用
-2. 复制 `src-tauri/target/release/SkyMap Test.exe`
+2. 复制 `src-tauri/target/release/SkyMap.exe`
 3. 创建 `portable` 标记文件
 4. 打包为 ZIP
 
@@ -205,3 +205,4 @@ pnpm tauri signer generate -w
 - [构建指南](building.md)
 - [macOS 打包](macos.md)
 - [部署概览](../index.md)
+

@@ -15,6 +15,7 @@ pub use http_client::{
     // Commands
     cancel_request,
     get_active_requests,
+    get_effective_proxy_state,
     get_http_config,
     http_batch_download,
     http_cancel_all_requests,
@@ -30,9 +31,12 @@ pub use http_client::{
     BatchDownloadResult,
     BatchItemResult,
     DownloadProgress,
+    EffectiveProxyState,
     HttpClientConfig,
     HttpClientError,
     HttpResponse,
+    ProxyMode,
+    ProxySource,
     RequestConfig,
 };
 

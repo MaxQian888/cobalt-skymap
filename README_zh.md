@@ -56,8 +56,8 @@
 1. **克隆仓库**
 
    ```bash
-   git clone <your-repo-url>
-   cd skymap
+   git clone https://github.com/ElementAstro/cobalt-skymap.git
+   cd cobalt-skymap
    ```
 
 2. **安装依赖**
@@ -214,3 +214,4 @@ SkyMap 包含多层安全防护：
 ## 许可证
 
 MIT License
+

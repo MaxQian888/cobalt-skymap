@@ -1,6 +1,6 @@
 # 查看天体详情
 
-本文档介绍如何查看和使用 SkyMap Test 中的天体详细信息。
+本文档介绍如何查看和使用 SkyMap 中的天体详细信息。
 
 ## 打开详情面板
 
@@ -294,3 +294,4 @@
 - [搜索天体](search.md)
 - [观测规划](../observation-planning/index.md)
 - [目标列表](../observation-planning/target-lists.md)
+

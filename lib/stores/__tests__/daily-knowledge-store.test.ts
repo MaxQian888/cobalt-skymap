@@ -73,13 +73,14 @@ const baseResult = {
     {
       source: 'nasa-image-library' as const,
       transport: 'api' as const,
-      state: 'ready' as const,
+      state: 'healthy' as const,
       reason: 'success' as const,
       itemCount: 1,
     },
   ],
   usedCuratedFallback: false,
   fallbackReason: null,
+  resolutionMode: 'fresh-online' as const,
 };
 
 function resetDailyStore() {
@@ -99,6 +100,7 @@ function resetDailyStore() {
     sourceStatuses: [],
     usedCuratedFallback: false,
     fallbackReason: null,
+    resolutionMode: 'curated-fallback',
     filters: {
       query: '',
       category: 'all',
@@ -241,6 +243,82 @@ describe('daily-knowledge-store', () => {
 
     expect(mockGetDailyKnowledge).toHaveBeenCalled();
     expect(useDailyKnowledgeStore.getState().currentItem?.id).toBe('curated-andromeda-distance');
+  });
+
+  it('refreshes the active date without resetting filters or view mode and preserves current item when available', async () => {
+    const preservedItem = {
+      ...baseResult.selected,
+      id: 'preserved-item',
+      title: 'Preserved Item',
+    };
+    const freshSelected = {
+      ...baseResult.selected,
+      id: 'fresh-selected',
+      title: 'Fresh Selected',
+    };
+
+    mockGetDailyKnowledge.mockResolvedValue({
+      ...baseResult,
+      items: [freshSelected, preservedItem],
+      selected: freshSelected,
+      resolutionMode: 'fresh-online',
+    });
+
+    useDailyKnowledgeStore.setState({
+      items: [preservedItem],
+      currentItem: preservedItem,
+      filters: {
+        query: 'm31',
+        category: 'all',
+        source: 'all',
+        favoritesOnly: false,
+      },
+      viewMode: 'feed',
+    });
+
+    await useDailyKnowledgeStore.getState().refreshCurrentDate();
+
+    const state = useDailyKnowledgeStore.getState();
+    expect(mockGetDailyKnowledge).toHaveBeenCalledWith(
+      '2026-02-20',
+      'en',
+      expect.objectContaining({ onlineEnhancement: true })
+    );
+    expect(state.currentItem?.id).toBe('preserved-item');
+    expect(state.filters.query).toBe('m31');
+    expect(state.viewMode).toBe('feed');
+    expect(state.resolutionMode).toBe('fresh-online');
+  });
+
+  it('falls back to the refreshed selected item when the previous current item disappears', async () => {
+    const missingItem = {
+      ...baseResult.selected,
+      id: 'missing-item',
+      title: 'Missing Item',
+    };
+    const refreshedSelected = {
+      ...baseResult.selected,
+      id: 'refreshed-selected',
+      title: 'Refreshed Selected',
+    };
+
+    mockGetDailyKnowledge.mockResolvedValue({
+      ...baseResult,
+      items: [refreshedSelected],
+      selected: refreshedSelected,
+      resolutionMode: 'stale-cache',
+    });
+
+    useDailyKnowledgeStore.setState({
+      items: [missingItem],
+      currentItem: missingItem,
+    });
+
+    await useDailyKnowledgeStore.getState().refreshCurrentDate();
+
+    const state = useDailyKnowledgeStore.getState();
+    expect(state.currentItem?.id).toBe('refreshed-selected');
+    expect(state.resolutionMode).toBe('stale-cache');
   });
 
   it('jumps using embedded coordinates before name resolution', async () => {

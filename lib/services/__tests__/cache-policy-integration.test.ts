@@ -42,6 +42,30 @@ describe('service cache policy integration', () => {
     );
   });
 
+  it('uses the hips registry cache policy for the legacy survey selector service', async () => {
+    mockSmartFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          ID: 'CDS/P/DSS2/color',
+          obs_title: 'DSS2 Color',
+          hips_service_url: 'https://alasky.cds.unistra.fr/DSS/DSSColor/',
+        },
+      ],
+    });
+
+    const { hipsService } = await import('../hips-service');
+    hipsService.clearCache();
+    await hipsService.fetchSurveys();
+
+    expect(mockSmartFetch).toHaveBeenCalledWith(
+      expect.stringContaining('https://alasky.cds.unistra.fr/MocServer/query'),
+      expect.objectContaining({
+        cachePolicy: 'hips-registry',
+      })
+    );
+  });
+
   it('uses the satellite TLE cache policy', async () => {
     mockSmartFetch.mockResolvedValue({
       ok: true,
@@ -53,6 +77,32 @@ describe('service cache policy integration', () => {
 
     expect(mockSmartFetch).toHaveBeenCalledWith(
       TLE_SOURCES[0].url,
+      expect.objectContaining({
+        cachePolicy: 'satellite-tle',
+      })
+    );
+  });
+
+  it('uses the satellite TLE cache policy for the tracker feed service', async () => {
+    mockSmartFetch.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        {
+          OBJECT_NAME: 'ISS (ZARYA)',
+          NORAD_CAT_ID: 25544,
+          MEAN_MOTION: 15.5,
+          INCLINATION: 51.6,
+          TLE_LINE1: '',
+          TLE_LINE2: '',
+        },
+      ],
+    });
+
+    const { fetchSatellitesFromCelesTrak } = await import('../satellite/celestrak-service');
+    await fetchSatellitesFromCelesTrak('stations');
+
+    expect(mockSmartFetch).toHaveBeenCalledWith(
+      'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=json',
       expect.objectContaining({
         cachePolicy: 'satellite-tle',
       })

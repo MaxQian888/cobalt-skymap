@@ -4,6 +4,7 @@
  */
 
 import type { HiPSSurvey } from '@/lib/services/hips-service';
+import type { StarmapDataTier } from '@/lib/core/starmap-data-tier';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('cache-manager');
@@ -12,6 +13,7 @@ export interface LayerConfig {
   id: string;
   name: string;
   description: string;
+  tier: Extract<StarmapDataTier, 'core' | 'catalog' | 'survey'>;
   baseUrl: string;
   files: string[];
   size: number; // Estimated size in bytes
@@ -77,6 +79,7 @@ export const STELLARIUM_LAYERS: LayerConfig[] = [
     id: 'core',
     name: 'Core Engine',
     description: 'WebAssembly engine and core scripts',
+    tier: 'core',
     baseUrl: '/stellarium-js/',
     files: [
       'stellarium-web-engine.js',
@@ -89,6 +92,7 @@ export const STELLARIUM_LAYERS: LayerConfig[] = [
     id: 'stars',
     name: 'Star Catalog',
     description: 'Basic star catalog data',
+    tier: 'catalog',
     baseUrl: '/stellarium-data/stars/',
     files: [
       'info.json',
@@ -103,6 +107,7 @@ export const STELLARIUM_LAYERS: LayerConfig[] = [
     id: 'dso',
     name: 'Deep Sky Objects',
     description: 'Galaxies, nebulae, and clusters',
+    tier: 'catalog',
     baseUrl: '/stellarium-data/dso/',
     files: [
       'info.json',
@@ -115,6 +120,7 @@ export const STELLARIUM_LAYERS: LayerConfig[] = [
     id: 'skycultures',
     name: 'Sky Cultures',
     description: 'Constellation lines and names',
+    tier: 'catalog',
     baseUrl: '/stellarium-data/skycultures/western/',
     files: [
       'info.json',
@@ -128,6 +134,7 @@ export const STELLARIUM_LAYERS: LayerConfig[] = [
     id: 'planets',
     name: 'Solar System',
     description: 'Planet textures and orbital data',
+    tier: 'catalog',
     baseUrl: '/stellarium-data/surveys/sso/',
     files: [
       'info.json',
@@ -146,6 +153,7 @@ export const STELLARIUM_LAYERS: LayerConfig[] = [
     id: 'dss',
     name: 'DSS Survey',
     description: 'Digital Sky Survey images (basic tiles)',
+    tier: 'survey',
     baseUrl: '/stellarium-data/surveys/dss/',
     files: [
       'info.json',
@@ -158,6 +166,7 @@ export const STELLARIUM_LAYERS: LayerConfig[] = [
     id: 'milkyway',
     name: 'Milky Way',
     description: 'Milky Way panorama',
+    tier: 'survey',
     baseUrl: '/stellarium-data/surveys/milkyway/',
     files: [
       'info.json',
@@ -170,6 +179,7 @@ export const STELLARIUM_LAYERS: LayerConfig[] = [
     id: 'comets',
     name: 'Comets & Asteroids',
     description: 'Minor body orbital elements',
+    tier: 'catalog',
     baseUrl: '/stellarium-data/',
     files: [
       'CometEls.txt',
@@ -939,3 +949,9 @@ class OfflineCacheManager {
 
 // Singleton instance
 export const offlineCacheManager = new OfflineCacheManager();
+
+export function getStellariumLayersForTier(
+  tier: Extract<StarmapDataTier, 'core' | 'catalog' | 'survey'>
+): LayerConfig[] {
+  return STELLARIUM_LAYERS.filter((layer) => layer.tier === tier);
+}

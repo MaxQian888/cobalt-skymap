@@ -28,8 +28,27 @@ jest.mock('@/components/ui/tooltip', () => ({
 jest.mock('@/components/starmap/search/stellarium-search', () => ({
   StellariumSearch: () => <div data-testid="stellarium-search" />,
 }));
-jest.mock('@/components/starmap/search/favorites-quick-access', () => ({ FavoritesQuickAccess: () => null }));
-jest.mock('@/components/starmap/search/online-search-settings', () => ({ OnlineSearchSettings: () => null }));
+jest.mock('@/components/starmap/search/favorites-quick-access', () => ({
+  FavoritesQuickAccess: ({
+    onSelect,
+    onNavigate,
+  }: {
+    onSelect: (item: unknown) => void;
+    onNavigate: (item: unknown) => void;
+  }) => (
+    <div>
+      <button data-testid="favorites-select" onClick={() => onSelect({ id: 'favorite' })}>
+        select favorite
+      </button>
+      <button data-testid="favorites-navigate" onClick={() => onNavigate({ id: 'favorite' })}>
+        navigate favorite
+      </button>
+    </div>
+  ),
+}));
+jest.mock('@/components/starmap/search/online-search-settings', () => ({
+  OnlineSearchSettings: () => <div data-testid="online-search-settings" />,
+}));
 
 import { SearchPanel } from '../search-panel';
 
@@ -66,7 +85,7 @@ describe('SearchPanel', () => {
     // Second button is settings (Settings2 icon)
     const buttons = screen.getAllByRole('button');
     fireEvent.click(buttons[1]);
-    expect(screen.queryByTestId('stellarium-search')).not.toBeInTheDocument();
+    expect(screen.getByTestId('online-search-settings')).toBeInTheDocument();
   });
 
   it('toggles favorites off when clicked again', () => {
@@ -108,5 +127,29 @@ describe('SearchPanel', () => {
   it('renders mobile drawer variant when mobile shell is enabled', () => {
     render(<SearchPanel isOpen={true} isMobileShell={true} onClose={jest.fn()} onSelect={jest.fn()} />);
     expect(screen.getByTestId('search-mobile-drawer')).toBeInTheDocument();
+  });
+
+  it('closes favorites and forwards selection callbacks when a favorite is selected', () => {
+    const onSelect = jest.fn();
+    render(<SearchPanel isOpen={true} onClose={jest.fn()} onSelect={onSelect} />);
+
+    const buttons = screen.getAllByRole('button');
+    fireEvent.click(buttons[0]);
+    fireEvent.click(screen.getByTestId('favorites-select'));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('stellarium-search')).toBeInTheDocument();
+  });
+
+  it('closes favorites and forwards navigation callbacks when a favorite is navigated to', () => {
+    const onSelect = jest.fn();
+    render(<SearchPanel isOpen={true} onClose={jest.fn()} onSelect={onSelect} />);
+
+    const buttons = screen.getAllByRole('button');
+    fireEvent.click(buttons[0]);
+    fireEvent.click(screen.getByTestId('favorites-navigate'));
+
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('stellarium-search')).toBeInTheDocument();
   });
 });

@@ -1,19 +1,26 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 jest.mock('@/lib/storage/platform', () => ({
   isTauri: jest.fn(() => false),
 }));
 
 import { isTauri } from '@/lib/storage/platform';
 import {
+  getCacheCapabilityDiagnostics,
   getCachePolicy,
   getCacheProviderDiagnostics,
   getCacheDiagnosticsSummary,
   getCacheIntegrationDiagnostics,
+  getStarmapTierCacheDiagnostics,
   listCacheIntegrations,
   listCachePolicies,
+  resolveCachePolicyForPrefetchResource,
   resolveCachePolicy,
 } from '../integration-policy';
 
 const mockIsTauri = isTauri as jest.Mock;
+const repoRoot = path.resolve(__dirname, '../../..');
 
 describe('cache integration policy', () => {
   beforeEach(() => {
@@ -35,10 +42,13 @@ describe('cache integration policy', () => {
     const policies = listCachePolicies();
 
     expect(policies.length).toBeGreaterThan(3);
+    expect(policies.some((policy) => policy.id === 'ar-optimization-pack')).toBe(true);
+    expect(policies.some((policy) => policy.id === 'object-info-cache')).toBe(true);
     expect(policies.some((policy) => policy.id === 'daily-knowledge-wikimedia')).toBe(true);
     expect(policies.some((policy) => policy.id === 'daily-knowledge-nasa-library')).toBe(true);
     expect(policies.some((policy) => policy.id === 'daily-knowledge-nasa-photojournal')).toBe(true);
     expect(policies.some((policy) => policy.id === 'daily-knowledge-esa-science')).toBe(true);
+    expect(policies.some((policy) => policy.id === 'object-source-health-check')).toBe(true);
     expect(policies.some((policy) => policy.mode === 'uncached')).toBe(true);
   });
 
@@ -49,7 +59,7 @@ describe('cache integration policy', () => {
 
     expect(diagnostics.providerId).toBe('browser-cache-api');
     expect(diagnostics.supportsPersistent).toBe(true);
-    expect(diagnostics.supportsCleanup).toBe(false);
+    expect(diagnostics.supportsCleanup).toBe(true);
   });
 
   it('reports tauri unified cache provider diagnostics in desktop mode', () => {
@@ -70,13 +80,31 @@ describe('cache integration policy', () => {
     const hipsRegistry = diagnostics.find((item) => item.id === 'hips-registry');
     const nighttime = diagnostics.find((item) => item.id === 'nighttime-calculations');
     const issPosition = diagnostics.find((item) => item.id === 'astro-iss-position');
+    const sourceHealthCheck = diagnostics.find((item) => item.id === 'object-source-health-check');
 
     expect(hipsRegistry?.cacheMode).toBe('persistent-shared');
     expect(hipsRegistry?.status).toBe('active');
+    expect(hipsRegistry?.runtimeEnvironment).toBe('web');
+    expect(hipsRegistry?.environmentSupported).toBe(true);
     expect(nighttime?.cacheMode).toBe('local-only');
     expect(nighttime?.status).toBe('local-only');
     expect(issPosition?.cacheMode).toBe('uncached');
     expect(issPosition?.status).toBe('uncached-by-design');
+    expect(issPosition?.statusReason).toContain('Realtime position');
+    expect(sourceHealthCheck?.status).toBe('uncached-by-design');
+    expect(sourceHealthCheck?.statusReason).toContain('Health probes');
+  });
+
+  it('derives starmap tier cache diagnostics for the active runtime', () => {
+    (globalThis as typeof globalThis & { caches?: CacheStorage | undefined }).caches = {} as CacheStorage;
+
+    const diagnostics = getStarmapTierCacheDiagnostics();
+
+    expect(diagnostics.core.readiness).toBe('ready');
+    expect(diagnostics.catalog.readiness).toBe('ready');
+    expect(diagnostics.survey.readiness).toBe('ready');
+    expect(diagnostics.enrichment.readiness).toBe('ready');
+    expect(diagnostics.survey.policyIds.length).toBeGreaterThan(0);
   });
 
   describe('resolveCachePolicy', () => {
@@ -108,6 +136,18 @@ describe('cache integration policy', () => {
     });
   });
 
+  describe('resolveCachePolicyForPrefetchResource', () => {
+    it('maps known starmap prefetch resources to declared policies', () => {
+      expect(resolveCachePolicyForPrefetchResource('/stellarium-js/stellarium-web-engine.js')).toBe('starmap-core-bootstrap');
+      expect(resolveCachePolicyForPrefetchResource('https://example.com/stellarium-data/stars/info.json')).toBe('starmap-catalog-bootstrap');
+      expect(resolveCachePolicyForPrefetchResource('/stellarium-data/surveys/dss/info.json?ts=1')).toBe('starmap-survey-manifest');
+    });
+
+    it('returns null for resources without declared tier policy', () => {
+      expect(resolveCachePolicyForPrefetchResource('/not-prefetched/resource.json')).toBeNull();
+    });
+  });
+
   describe('listCacheIntegrations', () => {
     it('returns a non-empty array of integrations', () => {
       const integrations = listCacheIntegrations();
@@ -126,6 +166,29 @@ describe('cache integration policy', () => {
       const policyIds = listCachePolicies().map((p) => p.id);
       for (const integration of integrations) {
         expect(policyIds).toContain(integration.policyId);
+      }
+    });
+
+    it('every declared policy has at least one integration mapping', () => {
+      const integrations = listCacheIntegrations();
+      const usedPolicyIds = new Set<string>(integrations.map((item) => item.policyId));
+      for (const policy of listCachePolicies()) {
+        expect(usedPolicyIds.has(policy.id)).toBe(true);
+      }
+    });
+
+    it('tracks uncached runtime probe integrations with explicit reasons', () => {
+      const integrations = listCacheIntegrations();
+      const probeIds = [
+        'object-source-health-check',
+        'map-provider-connectivity-check',
+        'network-connectivity-smoke-test',
+      ];
+
+      for (const probeId of probeIds) {
+        const probe = integrations.find((item) => item.id === probeId);
+        expect(probe?.implementation).toBe('uncached');
+        expect(probe?.reason).toBeTruthy();
       }
     });
   });
@@ -149,6 +212,7 @@ describe('cache integration policy', () => {
       const summary = getCacheDiagnosticsSummary();
       expect(summary.active).toBeGreaterThan(0);
       expect(summary.degraded).toBe(0);
+      expect(summary.mismatch).toBe(0);
     });
   });
 
@@ -168,6 +232,83 @@ describe('cache integration policy', () => {
       const summary = getCacheDiagnosticsSummary();
       expect(summary.degraded).toBeGreaterThan(0);
       expect(summary.active).toBe(0);
+      expect(summary.mismatch).toBe(0);
+    });
+
+    it('marks render-relevant tiers degraded when persistent cache support is unavailable', () => {
+      mockIsTauri.mockReturnValue(false);
+      Reflect.deleteProperty(globalThis, 'caches');
+
+      const diagnostics = getStarmapTierCacheDiagnostics();
+
+      expect(diagnostics.core.readiness).toBe('degraded');
+      expect(diagnostics.catalog.readiness).toBe('degraded');
+      expect(diagnostics.survey.readiness).toBe('degraded');
+      expect(diagnostics.enrichment.readiness).toBe('ready');
+    });
+  });
+
+  describe('cache policy usage consistency', () => {
+    const policyLiteralPattern = /cachePolicy\s*:\s*'([^']+)'/g;
+    const auditedServiceFiles = [
+      'lib/services/http-fetch.ts',
+      'lib/services/hips-service.ts',
+      'lib/services/hips/service.ts',
+      'lib/services/satellite/celestrak-service.ts',
+      'lib/services/satellite/data-sources.ts',
+      'lib/services/astro-data-sources.ts',
+      'lib/services/daily-knowledge/source-apod.ts',
+      'lib/services/daily-knowledge/source-wikimedia.ts',
+      'lib/services/daily-knowledge/source-nasa-image-library.ts',
+      'lib/services/daily-knowledge/source-nasa-photojournal.ts',
+      'lib/services/daily-knowledge/source-esa-science.ts',
+      'lib/hooks/use-cache-init.ts',
+    ];
+
+    it('all literal cachePolicy usages resolve to known policy ids', () => {
+      const knownPolicyIds = new Set(listCachePolicies().map((policy) => policy.id));
+      const usedPolicyIds = new Set<string>();
+
+      for (const relativePath of auditedServiceFiles) {
+        const filePath = path.join(repoRoot, relativePath);
+        const source = fs.readFileSync(filePath, 'utf8');
+        for (const match of source.matchAll(policyLiteralPattern)) {
+          const policyId = match[1];
+          if (policyId) {
+            usedPolicyIds.add(policyId);
+          }
+        }
+      }
+
+      for (const policyId of usedPolicyIds) {
+        expect(knownPolicyIds.has(policyId)).toBe(true);
+      }
+    });
+
+    it('all literal cachePolicy usages are represented in integration inventory', () => {
+      const inventoryPolicyIds = new Set<string>(listCacheIntegrations().map((integration) => integration.policyId));
+
+      for (const relativePath of auditedServiceFiles) {
+        const filePath = path.join(repoRoot, relativePath);
+        const source = fs.readFileSync(filePath, 'utf8');
+        for (const match of source.matchAll(policyLiteralPattern)) {
+          const policyId = match[1];
+          if (policyId) {
+            expect(inventoryPolicyIds.has(policyId)).toBe(true);
+          }
+        }
+      }
+    });
+  });
+
+  describe('cache capability diagnostics', () => {
+    it('reports capability statuses for current runtime', () => {
+      (globalThis as typeof globalThis & { caches?: CacheStorage | undefined }).caches = {} as CacheStorage;
+      const capabilities = getCacheCapabilityDiagnostics();
+
+      expect(capabilities.find((item) => item.action === 'persistent')?.status).toBe('supported');
+      expect(capabilities.find((item) => item.action === 'cleanup')?.status).toBe('supported');
+      expect(capabilities.find((item) => item.action === 'flush')?.status).toBe('degraded');
     });
   });
 });

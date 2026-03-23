@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 
 // ============================================================================
 // Helper: create a complete mock return value for useObjectSearch
@@ -480,10 +480,14 @@ describe('StellariumSearch', () => {
     jest.useFakeTimers();
     render(<StellariumSearch {...defaultProps} />);
     const input = screen.getByTestId('search-input');
-    fireEvent.focus(input);
+    act(() => {
+      fireEvent.focus(input);
+    });
     // Keyboard hints should appear briefly
     expect(input).toBeInTheDocument();
-    jest.runAllTimers();
+    act(() => {
+      jest.runAllTimers();
+    });
     jest.useRealTimers();
   });
 
@@ -492,10 +496,28 @@ describe('StellariumSearch', () => {
     jest.useFakeTimers();
     const ref = React.createRef<{ focusSearchInput: () => void; closeSearch: () => void }>();
     render(<StellariumSearch {...defaultProps} ref={ref} />);
-    ref.current?.focusSearchInput();
-    jest.advanceTimersByTime(200);
+    act(() => {
+      ref.current?.focusSearchInput();
+      jest.advanceTimersByTime(200);
+    });
     expect(screen.getByTestId('search-input')).toBeInTheDocument();
     jest.useRealTimers();
+  });
+
+  it('setQuery via ref delegates to the search hook setter', () => {
+    const setQuery = jest.fn();
+    const ref = React.createRef<{ focusSearchInput: () => void; closeSearch: () => void; setQuery: (query: string) => void }>();
+    const { useObjectSearch } = jest.requireMock('@/lib/hooks');
+
+    useObjectSearch.mockReturnValue(createMockSearchHook({ setQuery }));
+
+    render(<StellariumSearch {...defaultProps} ref={ref} />);
+
+    act(() => {
+      ref.current?.setQuery('M31');
+    });
+
+    expect(setQuery).toHaveBeenCalledWith('M31');
   });
 
   it('closeSearch via ref blurs the input', () => {

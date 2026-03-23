@@ -21,6 +21,7 @@ import {
   DEFAULT_NOTIFICATIONS,
   DEFAULT_PERFORMANCE,
   DEFAULT_PREFERENCES,
+  DEFAULT_PROXY,
   DEFAULT_SEARCH,
   useSettingsStore,
 } from '@/lib/stores/settings-store';
@@ -39,6 +40,11 @@ describe('settings-draft', () => {
     useSettingsStore.setState({
       connection: { ip: '10.10.0.5', port: '7624' },
       backendProtocol: 'https',
+      proxy: {
+        mode: 'manual',
+        manualUrl: 'http://127.0.0.1:7890',
+        fallbackToDirectOnFailure: false,
+      },
       preferences: {
         ...DEFAULT_PREFERENCES,
         locale: 'zh',
@@ -78,6 +84,7 @@ describe('settings-draft', () => {
 
     expect(draft.connection).toEqual(DEFAULT_CONNECTION);
     expect(draft.backendProtocol).toBe(DEFAULT_BACKEND_PROTOCOL);
+    expect(draft.proxy).toEqual(DEFAULT_PROXY);
     expect(draft.preferences).toEqual(DEFAULT_PREFERENCES);
     expect(draft.location).toEqual(DEFAULT_SETTINGS_LOCATION);
 
@@ -95,6 +102,11 @@ describe('settings-draft', () => {
 
     expect(snapshot.connection).toEqual({ ip: '10.10.0.5', port: '7624' });
     expect(snapshot.backendProtocol).toBe('https');
+    expect(snapshot.proxy).toEqual({
+      mode: 'manual',
+      manualUrl: 'http://127.0.0.1:7890',
+      fallbackToDirectOnFailure: false,
+    });
     expect(snapshot.preferences.locale).toBe('zh');
     expect(snapshot.performance.maxStarsRendered).toBe(64000);
     expect(snapshot.accessibility.highContrast).toBe(true);
@@ -167,11 +179,21 @@ describe('settings-draft', () => {
     const defaults = createDefaultSettingsDraft();
     defaults.connection = { ip: 'reset-host', port: '3040' };
     defaults.backendProtocol = 'https';
+    defaults.proxy = {
+      mode: 'off',
+      manualUrl: '',
+      fallbackToDirectOnFailure: true,
+    };
     defaults.location = { latitude: 10, longitude: 20, elevation: 30 };
 
     const draft = createSettingsDraftSnapshot();
     draft.connection = { ip: '192.168.0.2', port: '5000' };
     draft.backendProtocol = 'http';
+    draft.proxy = {
+      mode: 'manual',
+      manualUrl: 'http://proxy.local:3128',
+      fallbackToDirectOnFailure: false,
+    };
     draft.preferences.locale = 'en';
     draft.location = { latitude: 80, longitude: 90, elevation: 100 };
 
@@ -185,6 +207,11 @@ describe('settings-draft', () => {
 
     expect(connectionReset.connection).toEqual({ ip: 'reset-host', port: '3040' });
     expect(connectionReset.backendProtocol).toBe('https');
+    expect(connectionReset.proxy).toEqual({
+      mode: 'off',
+      manualUrl: '',
+      fallbackToDirectOnFailure: true,
+    });
     expect(connectionReset.preferences.locale).toBe('en');
 
     expect(locationReset.location).toEqual({ latitude: 10, longitude: 20, elevation: 30 });

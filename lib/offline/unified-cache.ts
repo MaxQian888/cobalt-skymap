@@ -502,7 +502,7 @@ class UnifiedCacheManager {
         available: true,
         supportsPersistent: true,
         supportsClear: true,
-        supportsCleanup: false,
+        supportsCleanup: true,
         supportsFlush: false,
         supportsInterception: typeof window !== 'undefined',
       };

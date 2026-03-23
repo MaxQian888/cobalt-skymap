@@ -1,10 +1,10 @@
 # 项目结构概览
 
-本文档介绍 SkyMap Test 项目的整体结构和组织方式。
+本文档介绍 SkyMap 项目的整体结构和组织方式。
 
 ## 项目概览
 
-SkyMap Test 是一个全栈桌面应用，结合了现代 Web 技术和 Rust 性能优势。
+SkyMap 是一个全栈桌面应用，结合了现代 Web 技术和 Rust 性能优势。
 
 ```mermaid
 graph TB
@@ -54,7 +54,7 @@ graph TB
 ## 目录结构总览
 
 ```
-skymap-test/
+cobalt-skymap/
 ├── app/                    # Next.js 页面和路由
 ├── components/             # React 组件
 │   ├── ui/                # shadcn/ui 基础组件
@@ -217,3 +217,4 @@ docs/
 ---
 
 返回：[项目结构](index.md)
+

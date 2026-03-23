@@ -14,6 +14,10 @@ import { getHourAngleAtTime } from '@/lib/astronomy/coordinates/transforms';
 
 interface TimeTabProps {
   longitude: number;
+  sharedDate?: string;
+  sharedTime?: string;
+  onSharedDateChange?: (nextDate: string) => void;
+  onSharedTimeChange?: (nextTime: string) => void;
 }
 
 type InputMode = 'datetime' | 'jd' | 'mjd';
@@ -27,14 +31,23 @@ function toDateTimeInput(date: Date): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
-export function TimeTab({ longitude }: TimeTabProps) {
+export function TimeTab({
+  longitude,
+  sharedDate,
+  sharedTime,
+  onSharedDateChange,
+  onSharedTimeChange,
+}: TimeTabProps) {
   const t = useTranslations();
   const [mode, setMode] = useState<InputMode>('datetime');
-  const [dateTimeInput, setDateTimeInput] = useState(toDateTimeInput(new Date()));
+  const [dateTimeInputLocal, setDateTimeInputLocal] = useState(() => toDateTimeInput(new Date()));
   const [jdInput, setJdInput] = useState('2460400.500000');
   const [mjdInput, setMjdInput] = useState('60400.000000');
   const [longitudeInput, setLongitudeInput] = useState(longitude.toFixed(6));
   const [raInput, setRaInput] = useState('00:00:00');
+  const dateTimeInput = sharedDate && sharedTime
+    ? `${sharedDate}T${sharedTime}`
+    : dateTimeInputLocal;
 
   const computed = useMemo(() => {
     const lon = Number.parseFloat(longitudeInput);
@@ -106,7 +119,22 @@ export function TimeTab({ longitude }: TimeTabProps) {
         <div className="space-y-1.5">
           <Label className="text-xs">{mode === 'datetime' ? t('astroCalc.dateTime') : mode === 'jd' ? 'JD' : 'MJD'}</Label>
           {mode === 'datetime' && (
-            <Input type="datetime-local" value={dateTimeInput} onChange={(event) => setDateTimeInput(event.target.value)} className="h-8" />
+            <Input
+              type="datetime-local"
+              value={dateTimeInput}
+              onChange={(event) => {
+                const value = event.target.value;
+                setDateTimeInputLocal(value);
+                const [datePart, timePart] = value.split('T');
+                if (datePart) {
+                  onSharedDateChange?.(datePart);
+                }
+                if (timePart) {
+                  onSharedTimeChange?.(timePart.slice(0, 5));
+                }
+              }}
+              className="h-8"
+            />
           )}
           {mode === 'jd' && (
             <Input value={jdInput} onChange={(event) => setJdInput(event.target.value)} className="h-8 font-mono" />

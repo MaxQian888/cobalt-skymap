@@ -126,8 +126,8 @@ graph TB
 
 ```bash
 # 克隆仓库
-git clone <your-repo-url>
-cd skymap
+git clone https://github.com/ElementAstro/cobalt-skymap.git
+cd cobalt-skymap
 
 # 安装依赖
 pnpm install
@@ -184,9 +184,9 @@ pnpm tauri build
 
 ## 社区与支持
 
-- **GitHub**: [https://github.com/AstroAir/skymap-test](https://github.com/AstroAir/skymap-test)
-- **问题反馈**: [GitHub Issue 表单](https://github.com/AstroAir/skymap-test/issues/new)
-- **讨论区**: [GitHub Discussions](https://github.com/AstroAir/skymap-test/discussions)
+- **GitHub**: [https://github.com/ElementAstro/cobalt-skymap](https://github.com/ElementAstro/cobalt-skymap)
+- **问题反馈**: [GitHub Issue 表单](https://github.com/ElementAstro/cobalt-skymap/issues/new)
+- **讨论区**: [GitHub Discussions](https://github.com/ElementAstro/cobalt-skymap/discussions)
 - **诊断附件流程**: 建议先在应用内反馈对话框下载诊断包，再在 Issue 页面手动上传附件
 
 ## 许可证
@@ -195,3 +195,4 @@ pnpm tauri build
 
 ---
 **开始使用**: [快速开始指南](getting-started/index.md)
+

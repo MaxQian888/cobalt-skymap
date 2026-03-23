@@ -36,6 +36,10 @@ let mountState: {
     trackingRate?: boolean;
     abortSlew?: boolean;
   };
+  selectedDevice?: {
+    id: string;
+    name: string;
+  } | null;
   connectionConfig: {
     protocol: string;
     host: string;
@@ -71,6 +75,7 @@ let mountState: {
     equatorialSystem: '',
   },
   actionAvailability: {},
+  selectedDevice: null,
   connectionConfig: {
     protocol: 'simulator',
     host: 'localhost',
@@ -277,6 +282,7 @@ describe('StellariumMount', () => {
         equatorialSystem: '',
       },
       actionAvailability: {},
+      selectedDevice: null,
       connectionConfig: {
         protocol: 'simulator',
         host: 'localhost',
@@ -337,6 +343,18 @@ describe('StellariumMount', () => {
     expect(container.textContent).toContain('+00° 00\' 00"');
   });
 
+  it('shows selected device name in the connected header', () => {
+    mountState.mountInfo.Connected = true;
+    mountState.selectedDevice = {
+      id: 'alpaca://192.168.1.10:11111/telescope/0',
+      name: 'Rooftop Mount',
+    };
+    mountOverlayReturn.connected = true;
+
+    const { container } = render(<StellariumMount />);
+    expect(container.textContent).toContain('Rooftop Mount');
+  });
+
   it('shows tracking badge when tracking is active', () => {
     mountState.mountInfo.Connected = true;
     mountState.mountInfo.Tracking = true;
@@ -346,6 +364,44 @@ describe('StellariumMount', () => {
 
     const { container } = render(<StellariumMount />);
     expect(container.textContent).toContain('rate.sidereal');
+  });
+
+  it('renders static tracking badge when tracking-rate change is explicitly unavailable', () => {
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Tracking = true;
+    mountState.mountInfo.TrackMode = 'solar';
+    mountState.actionAvailability = { trackingRate: false };
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.tracking = true;
+
+    const { container, queryAllByRole } = render(<StellariumMount />);
+    expect(container.textContent).toContain('rate.solar');
+    expect(queryAllByRole('menuitem')).toHaveLength(0);
+  });
+
+  it('falls back to sidereal label when track mode is missing and tracking rate cannot change', () => {
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Tracking = true;
+    mountState.mountInfo.TrackMode = undefined;
+    mountState.actionAvailability = { trackingRate: false };
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.tracking = true;
+
+    const { container } = render(<StellariumMount />);
+    expect(container.textContent).toContain('rate.sidereal');
+  });
+
+  it('uses sidereal fallback in tracking-rate menu when track mode is missing', () => {
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Tracking = true;
+    mountState.mountInfo.TrackMode = undefined;
+    mountState.actionAvailability = { trackingRate: true };
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.tracking = true;
+
+    const { container, getAllByRole } = render(<StellariumMount />);
+    expect(container.textContent).toContain('rate.sidereal');
+    expect(getAllByRole('menuitem').length).toBeGreaterThan(0);
   });
 
   it('shows slewing badge when slewing', () => {
@@ -396,6 +452,17 @@ describe('StellariumMount', () => {
     const { container } = render(<StellariumMount />);
     // Should have startTracking or stopTracking tooltip text
     expect(container.textContent).toContain('startTracking');
+  });
+
+  it('shows stopTracking text when tracking is already active', () => {
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Tracking = true;
+    mountState.capabilities.canSetTracking = true;
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.tracking = true;
+
+    const { container } = render(<StellariumMount />);
+    expect(container.textContent).toContain('stopTracking');
   });
 
   it('hides tracking toggle button when canSetTracking is false', () => {
@@ -572,6 +639,32 @@ describe('StellariumMount', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  it('handleToggleTracking converts non-Error failures to string', async () => {
+    mockIsTauri.mockReturnValue(true);
+    mockSetTracking.mockRejectedValueOnce('tracking-string-error');
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Tracking = false;
+    mountState.capabilities.canSetTracking = true;
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.tracking = false;
+
+    const { getAllByRole } = render(<StellariumMount />);
+    const buttons = getAllByRole('button');
+    const trackingBtn = buttons.find((btn) => {
+      const nextSpan = btn.nextElementSibling;
+      return nextSpan?.textContent === 'startTracking';
+    });
+
+    await act(async () => {
+      fireEvent.click(trackingBtn!);
+    });
+
+    const { toast } = jest.requireMock('sonner');
+    expect(toast.error).toHaveBeenCalledWith('operationFailed', expect.objectContaining({
+      description: 'tracking-string-error',
+    }));
+  });
+
   it('handlePark error shows toast', async () => {
     mockIsTauri.mockReturnValue(true);
     mockPark.mockRejectedValueOnce(new Error('Park error'));
@@ -597,6 +690,32 @@ describe('StellariumMount', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  it('handlePark converts non-Error failures to string', async () => {
+    mockIsTauri.mockReturnValue(true);
+    mockPark.mockRejectedValueOnce('park-string-error');
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Parked = false;
+    mountState.capabilities.canPark = true;
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.parked = false;
+
+    const { getAllByRole } = render(<StellariumMount />);
+    const buttons = getAllByRole('button');
+    const parkBtn = buttons.find((btn) => {
+      const nextSpan = btn.nextElementSibling;
+      return nextSpan?.textContent === 'park';
+    });
+
+    await act(async () => {
+      fireEvent.click(parkBtn!);
+    });
+
+    const { toast } = jest.requireMock('sonner');
+    expect(toast.error).toHaveBeenCalledWith('operationFailed', expect.objectContaining({
+      description: 'park-string-error',
+    }));
+  });
+
   it('handleAbort error shows toast', async () => {
     mockIsTauri.mockReturnValue(true);
     mockAbortSlew.mockRejectedValueOnce(new Error('Abort error'));
@@ -619,6 +738,31 @@ describe('StellariumMount', () => {
 
     const { toast } = jest.requireMock('sonner');
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('handleAbort converts non-Error failures to string', async () => {
+    mockIsTauri.mockReturnValue(true);
+    mockAbortSlew.mockRejectedValueOnce('abort-string-error');
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Slewing = true;
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.slewing = true;
+
+    const { getAllByRole } = render(<StellariumMount />);
+    const buttons = getAllByRole('button');
+    const abortBtn = buttons.find((btn) => {
+      const nextSpan = btn.nextElementSibling;
+      return nextSpan?.textContent === 'abortSlew';
+    });
+
+    await act(async () => {
+      fireEvent.click(abortBtn!);
+    });
+
+    const { toast } = jest.requireMock('sonner');
+    expect(toast.error).toHaveBeenCalledWith('operationFailed', expect.objectContaining({
+      description: 'abort-string-error',
+    }));
   });
 
   it('handleTrackingRate calls mountApi.setTrackingRate', async () => {
@@ -661,6 +805,29 @@ describe('StellariumMount', () => {
 
     const { toast } = jest.requireMock('sonner');
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  it('handleTrackingRate converts non-Error failures to string', async () => {
+    mockIsTauri.mockReturnValue(true);
+    mockSetTrackingRate.mockRejectedValueOnce('rate-string-error');
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Tracking = true;
+    mountState.mountInfo.TrackMode = 'sidereal';
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.tracking = true;
+
+    const { getAllByRole } = render(<StellariumMount />);
+    const menuItems = getAllByRole('menuitem');
+    const solarItem = menuItems.find((el) => el.textContent?.includes('rate.solar'));
+
+    await act(async () => {
+      fireEvent.click(solarItem!);
+    });
+
+    const { toast } = jest.requireMock('sonner');
+    expect(toast.error).toHaveBeenCalledWith('operationFailed', expect.objectContaining({
+      description: 'rate-string-error',
+    }));
   });
 
   it('handleToggleTracking does nothing when isTauri is false', async () => {
@@ -786,5 +953,17 @@ describe('StellariumMount', () => {
 
     const { container } = render(<StellariumMount />);
     expect(container.textContent).toContain('goToMountPosition');
+  });
+
+  it('shows compact slewing trigger with pulse class when mount is slewing', () => {
+    mountState.mountInfo.Connected = true;
+    mountState.mountInfo.Slewing = true;
+    mountOverlayReturn.connected = true;
+    mountOverlayReturn.slewing = true;
+
+    const { getAllByRole } = render(<StellariumMount compact />);
+    const buttons = getAllByRole('button');
+    const compactTrigger = buttons[0];
+    expect(compactTrigger.className).toContain('animate-pulse');
   });
 });

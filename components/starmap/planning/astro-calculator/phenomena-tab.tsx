@@ -15,7 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { searchPhenomena, type PhenomenaEvent } from '@/lib/astronomy/engine';
+import { type PhenomenaEvent } from '@/lib/astronomy/engine';
+import { runCalculatorPhenomena, type CalculatorMetaSummary } from './orchestrator';
 
 interface PhenomenaTabProps {
   latitude: number;
@@ -55,6 +56,7 @@ export function PhenomenaTab({ latitude, longitude }: PhenomenaTabProps) {
   const [daysAhead, setDaysAhead] = useState(30);
   const [showMinor, setShowMinor] = useState(false);
   const [events, setEvents] = useState<PhenomenaEvent[]>([]);
+  const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,7 +74,7 @@ export function PhenomenaTab({ latitude, longitude }: PhenomenaTabProps) {
       setIsLoading(true);
       setError(null);
       try {
-        const result = await searchPhenomena({
+        const result = await runCalculatorPhenomena({
           startDate: dateRange.startDate,
           endDate: dateRange.endDate,
           observer: { latitude, longitude },
@@ -80,11 +82,24 @@ export function PhenomenaTab({ latitude, longitude }: PhenomenaTabProps) {
         });
 
         if (!cancelled) {
-          setEvents(result.events);
+          setEvents(result.response.events);
+          setMetaSummary({
+            total: 1,
+            sourceCounts: {
+              tauri: result.meta.source === 'tauri' ? 1 : 0,
+              fallback: result.meta.source === 'fallback' ? 1 : 0,
+            },
+            cacheHits: result.meta.cache === 'hit' ? 1 : 0,
+            cacheMisses: result.meta.cache === 'miss' ? 1 : 0,
+            degradedCount: result.meta.degraded ? 1 : 0,
+            warningsCount: result.meta.warnings?.length ?? 0,
+            latestComputedAt: result.meta.computedAt,
+          });
         }
       } catch (runError) {
         if (!cancelled) {
           setEvents([]);
+          setMetaSummary(null);
           setError(runError instanceof Error ? runError.message : t('astroCalc.calculationFailed'));
         }
       } finally {
@@ -127,6 +142,11 @@ export function PhenomenaTab({ latitude, longitude }: PhenomenaTabProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {metaSummary && (
+            <Badge variant="secondary" className="text-[10px]" data-testid="phenomena-meta">
+              {`src:${metaSummary.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${metaSummary.cacheHits}/${metaSummary.total}`}
+            </Badge>
+          )}
           {isLoading && <Badge variant="secondary">{t('astroCalc.calculating')}</Badge>}
           <Badge variant="outline">{events.length} {t('astroCalc.events')}</Badge>
         </div>

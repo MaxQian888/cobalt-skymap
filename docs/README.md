@@ -1,6 +1,6 @@
-# SkyMap Test 文档
+# SkyMap 文档
 
-这是 SkyMap Test 天文观测桌面应用的完整文档。
+这是 SkyMap 天文观测桌面应用的完整文档。
 
 ## 文档结构
 
@@ -84,5 +84,6 @@ graph TD
 
 ## 联系方式
 
-- GitHub: https://github.com/yourusername/skymap-test
+- GitHub: https://github.com/ElementAstro/cobalt-skymap
 - Email: support@example.com
+

@@ -13,6 +13,7 @@ import {
   DEFAULT_NOTIFICATIONS,
   DEFAULT_PERFORMANCE,
   DEFAULT_PREFERENCES,
+  DEFAULT_PROXY,
   DEFAULT_SEARCH,
   useSettingsStore,
 } from '@/lib/stores/settings-store';
@@ -36,6 +37,7 @@ export interface SettingsLocationDraft {
 export interface SettingsDraft {
   connection: SettingsState['connection'];
   backendProtocol: SettingsState['backendProtocol'];
+  proxy: SettingsState['proxy'];
   preferences: AppPreferences;
   performance: PerformanceSettings;
   accessibility: AccessibilitySettings;
@@ -48,6 +50,7 @@ export type SettingsDraftPath =
   | 'connection.ip'
   | 'connection.port'
   | 'backendProtocol'
+  | `proxy.${keyof SettingsState['proxy'] & string}`
   | `preferences.${keyof AppPreferences & string}`
   | `performance.${keyof PerformanceSettings & string}`
   | `accessibility.${keyof AccessibilitySettings & string}`
@@ -83,6 +86,7 @@ export function createDefaultSettingsDraft(): SettingsDraft {
   return {
     connection: { ...DEFAULT_CONNECTION },
     backendProtocol: DEFAULT_BACKEND_PROTOCOL,
+    proxy: { ...DEFAULT_PROXY },
     preferences: { ...DEFAULT_PREFERENCES },
     performance: { ...DEFAULT_PERFORMANCE },
     accessibility: { ...DEFAULT_ACCESSIBILITY },
@@ -100,6 +104,7 @@ export function createSettingsDraftSnapshot(): SettingsDraft {
   return {
     connection: { ...settingsState.connection },
     backendProtocol: settingsState.backendProtocol,
+    proxy: { ...settingsState.proxy },
     preferences: { ...settingsState.preferences },
     performance: { ...settingsState.performance },
     accessibility: { ...settingsState.accessibility },
@@ -117,6 +122,7 @@ export function cloneSettingsDraft(draft: SettingsDraft): SettingsDraft {
   return {
     connection: { ...draft.connection },
     backendProtocol: draft.backendProtocol,
+    proxy: { ...draft.proxy },
     preferences: { ...draft.preferences },
     performance: { ...draft.performance },
     accessibility: { ...draft.accessibility },
@@ -140,6 +146,18 @@ export function computeDirtyFieldPaths(
   }
   if (baseline.backendProtocol !== draft.backendProtocol) {
     paths.push('backendProtocol');
+  }
+  if (baseline.proxy.mode !== draft.proxy.mode) {
+    paths.push('proxy.mode');
+  }
+  if (baseline.proxy.manualUrl !== draft.proxy.manualUrl) {
+    paths.push('proxy.manualUrl');
+  }
+  if (
+    baseline.proxy.fallbackToDirectOnFailure
+    !== draft.proxy.fallbackToDirectOnFailure
+  ) {
+    paths.push('proxy.fallbackToDirectOnFailure');
   }
 
   for (const key of PREFERENCE_KEYS) {
@@ -188,7 +206,7 @@ export function computeDirtyFieldPaths(
 export function deriveDirtyCategories(paths: readonly SettingsDraftPath[]): SettingsDraftCategory[] {
   const categories = new Set<SettingsDraftCategory>();
   for (const path of paths) {
-    if (path === 'backendProtocol') {
+    if (path === 'backendProtocol' || path.startsWith('proxy.')) {
       categories.add('connection');
       continue;
     }
@@ -211,6 +229,7 @@ export function resetDraftCategory(
         ...draft,
         connection: { ...defaults.connection },
         backendProtocol: defaults.backendProtocol,
+        proxy: { ...defaults.proxy },
       };
     case 'preferences':
       return { ...draft, preferences: { ...defaults.preferences } };
@@ -228,4 +247,3 @@ export function resetDraftCategory(
       return draft;
   }
 }
-

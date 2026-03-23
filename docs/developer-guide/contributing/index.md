@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢您对 SkyMap Test 项目的关注！我们欢迎各种形式的贡献。
+感谢您对 SkyMap 项目的关注！我们欢迎各种形式的贡献。
 
 ## 贡献方式
 
@@ -8,7 +8,7 @@
 
 发现问题？请创建 Issue：
 
-1. 访问 [GitHub Issue 表单](https://github.com/AstroAir/skymap-test/issues/new)
+1. 访问 [GitHub Issue 表单](https://github.com/ElementAstro/cobalt-skymap/issues/new)
 2. 搜索是否已有相同问题
 3. 如果没有，创建新 Issue
 4. 详细描述问题
@@ -48,9 +48,9 @@
 
 ```bash
 # 在 GitHub 上 Fork 项目
-git clone https://github.com/YOUR_USERNAME/skymap-test.git
-cd skymap-test
-git remote add upstream https://github.com/ORIGINAL_OWNER/skymap-test.git
+git clone https://github.com/ElementAstro/cobalt-skymap.git
+cd cobalt-skymap
+git remote add upstream https://github.com/ElementAstro/cobalt-skymap.git
 ```
 
 2. **创建分支**
@@ -473,7 +473,7 @@ MAJOR.MINOR.PATCH
 
 我们会在以下地方认可贡献者：
 
-- [ Contributors](https://github.com/AstroAir/skymap-test/graphs/contributors) 部分
+- [ Contributors](https://github.com/ElementAstro/cobalt-skymap/graphs/contributors) 部分
 - Release Notes 中
 - 项目网站上的贡献者列表
 
@@ -483,6 +483,7 @@ MAJOR.MINOR.PATCH
 
 ---
 
-感谢您的贡献！一起让 SkyMap Test 变得更好！
+感谢您的贡献！一起让 SkyMap 变得更好！
 
 返回：[开发指南](../index.md)
+

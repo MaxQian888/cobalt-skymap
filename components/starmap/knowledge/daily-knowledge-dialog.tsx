@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Heart,
   History,
+  RefreshCw,
   SearchX,
   Shuffle,
   Share2,
@@ -80,9 +81,11 @@ export function DailyKnowledgeDialog() {
   const history = useDailyKnowledgeStore((state) => state.history);
   const sourceStatuses = useDailyKnowledgeStore((state) => state.sourceStatuses);
   const usedCuratedFallback = useDailyKnowledgeStore((state) => state.usedCuratedFallback);
+  const resolutionMode = useDailyKnowledgeStore((state) => state.resolutionMode);
   const filters = useDailyKnowledgeStore((state) => state.filters);
   const closeDialog = useDailyKnowledgeStore((state) => state.closeDialog);
   const loadDaily = useDailyKnowledgeStore((state) => state.loadDaily);
+  const refreshCurrentDate = useDailyKnowledgeStore((state) => state.refreshCurrentDate);
   const next = useDailyKnowledgeStore((state) => state.next);
   const prev = useDailyKnowledgeStore((state) => state.prev);
   const random = useDailyKnowledgeStore((state) => state.random);
@@ -176,7 +179,7 @@ export function DailyKnowledgeDialog() {
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
   const lastSearchHistoryKeyRef = useRef<string | null>(null);
   const degradedSourceStatuses = useMemo(
-    () => sourceStatuses.filter((status) => status.state !== 'ready'),
+    () => sourceStatuses.filter((status) => status.state !== 'healthy' && status.reason !== 'success'),
     [sourceStatuses]
   );
 
@@ -288,7 +291,7 @@ export function DailyKnowledgeDialog() {
           <ResponsiveDialogDescription>{t('dailyKnowledge.subtitle')}</ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto_auto]">
+        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto_auto_auto]">
           <SearchInput
             value={filters.query}
             onChange={(value) => setFilters({ query: value })}
@@ -333,6 +336,16 @@ export function DailyKnowledgeDialog() {
             <Heart className={cn('h-4 w-4', filters.favoritesOnly && 'fill-current')} />
             {t('dailyKnowledge.favorites')}
           </Toggle>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void refreshCurrentDate('manual')}
+            disabled={loading}
+            aria-label={t('dailyKnowledge.refreshCurrentDate')}
+          >
+            <RefreshCw className="h-4 w-4" />
+            {t('dailyKnowledge.refreshCurrentDate')}
+          </Button>
           <div className="flex items-center gap-1 md:justify-self-end" role="group" aria-label="view-mode">
             <Button
               type="button"
@@ -422,6 +435,7 @@ export function DailyKnowledgeDialog() {
               {t('dailyKnowledge.wheelPaging')}
             </Toggle>
           )}
+          <Badge variant="outline">{t(`dailyKnowledge.freshness.${resolutionMode}`)}</Badge>
           <div className="ml-auto text-xs text-muted-foreground">
             {t('dailyKnowledge.resultCount', { count: filteredItems.length })}
           </div>

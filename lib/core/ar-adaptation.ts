@@ -49,6 +49,8 @@ const MOBILE_SHELL_LANDSCAPE_MAX_WIDTH = 1200;
 const MOBILE_SHELL_LANDSCAPE_MAX_HEIGHT = 640;
 const COMPACT_PHONE_MAX_WIDTH = 430;
 const COMPACT_PHONE_MAX_HEIGHT = 420;
+const TABLET_PORTRAIT_MIN_WIDTH = 768;
+const TABLET_PORTRAIT_MIN_HEIGHT = 900;
 
 function isMobileLikeViewport(width: number, height: number): boolean {
   return width <= MOBILE_SHELL_MAX_WIDTH || (
@@ -123,6 +125,10 @@ export function deriveARAdaptationContext(input: ARAdaptationInput): ARAdaptatio
   const isMobileLike = isMobileLikeViewport(input.viewportWidth, input.viewportHeight);
   const isShortViewport = input.viewportHeight <= COMPACT_PHONE_MAX_HEIGHT;
   const isNarrowViewport = input.viewportWidth <= COMPACT_PHONE_MAX_WIDTH;
+  const isTabletPortrait =
+    !isLandscape &&
+    input.viewportWidth >= TABLET_PORTRAIT_MIN_WIDTH &&
+    input.viewportHeight >= TABLET_PORTRAIT_MIN_HEIGHT;
   const hasLargeInsets = (
     input.safeAreaInsets.top +
     input.safeAreaInsets.bottom +
@@ -137,7 +143,11 @@ export function deriveARAdaptationContext(input: ARAdaptationInput): ARAdaptatio
       : 'browser-desktop';
 
   const layoutTier: ARAdaptationLayoutTier = isMobileLike
-    ? (isNarrowViewport || isShortViewport || isLandscape ? 'phone-compact' : 'phone')
+    ? (
+      isTabletPortrait
+        ? 'tablet'
+        : (isNarrowViewport || isShortViewport || isLandscape ? 'phone-compact' : 'phone')
+    )
     : input.viewportWidth <= 1280
       ? 'tablet'
       : 'desktop';

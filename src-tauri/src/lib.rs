@@ -177,9 +177,9 @@ use cache::{
 
 #[cfg(not(test))]
 use network::{
-    cancel_request, get_active_requests, get_http_config, http_batch_download,
-    http_cancel_all_requests, http_cancel_request, http_check_url, http_download, http_get,
-    http_head, http_post, http_request, set_http_config,
+    cancel_request, get_active_requests, get_effective_proxy_state, get_http_config,
+    http_batch_download, http_cancel_all_requests, http_cancel_request, http_check_url,
+    http_download, http_get, http_head, http_post, http_request, set_http_config,
 };
 
 #[cfg(not(test))]
@@ -508,6 +508,7 @@ pub fn run() {
             http_download,
             cancel_request,
             get_active_requests,
+            get_effective_proxy_state,
             get_http_config,
             set_http_config,
             http_get,

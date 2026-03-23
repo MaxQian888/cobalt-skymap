@@ -44,7 +44,14 @@ const mockToggleCatalogLayer = jest.fn();
 const mockToggleImageOverlayLayer = jest.fn();
 const mockToggleMocLayer = jest.fn();
 const mockToggleFitsLayer = jest.fn();
+const mockSetFovEnabled = jest.fn();
+const mockSetRotationAngle = jest.fn();
+const mockSetMosaic = jest.fn();
+const mockClipboardWriteText = jest.fn();
+const mockGetCurrentViewDirection = jest.fn(() => ({ ra: Math.PI / 6, dec: Math.PI / 12 }));
 let mockSkyEngine: 'stellarium' | 'aladin' = 'aladin';
+let mockFovSimEnabled = false;
+let mockMosaic = { enabled: false };
 
 jest.mock('@/lib/stores', () => ({
   useSettingsStore: jest.fn((selector: (s: Record<string, unknown>) => unknown) =>
@@ -77,15 +84,38 @@ jest.mock('@/lib/stores', () => ({
       toggleFitsLayer: mockToggleFitsLayer,
     })
   ),
-  useEquipmentStore: jest.fn(() => ({ setFOVEnabled: jest.fn(), setRotationAngle: jest.fn(), setMosaic: jest.fn() })),
-  useStellariumStore: jest.fn(() => ({ setViewDirection: jest.fn() })),
+  useEquipmentStore: jest.fn((selector: (s: Record<string, unknown>) => unknown) =>
+    selector({
+      setFOVEnabled: mockSetFovEnabled,
+      setRotationAngle: mockSetRotationAngle,
+      setMosaic: mockSetMosaic,
+    })
+  ),
+  useStellariumStore: Object.assign(
+    jest.fn((selector: (s: Record<string, unknown>) => unknown) =>
+      selector({
+        setViewDirection: jest.fn(),
+      })
+    ),
+    {
+      getState: jest.fn(() => ({
+        getCurrentViewDirection: mockGetCurrentViewDirection,
+      })),
+    }
+  ),
 }));
 
 jest.mock('@/lib/hooks/use-equipment-fov-props', () => ({
   useEquipmentFOVRead: jest.fn(() => ({
-    fovSimEnabled: false,
-    mosaic: { enabled: false },
+    fovSimEnabled: mockFovSimEnabled,
+    mosaic: mockMosaic,
   })),
+}));
+
+jest.mock('@/lib/services/clipboard-service', () => ({
+  clipboardService: {
+    writeText: (...args: [string]) => mockClipboardWriteText(...args),
+  },
 }));
 
 jest.mock('@/components/starmap/mount/slew-confirm-dialog', () => ({
@@ -98,10 +128,49 @@ jest.mock('@/components/starmap/mount/slew-confirm-dialog', () => ({
   }) => open ? <div data-testid="mount-target-dialog">{targetName}</div> : null,
 }));
 
+const defaultSettings = {
+  constellationsLinesVisible: false,
+  equatorialLinesVisible: false,
+  azimuthalLinesVisible: false,
+  dsosVisible: false,
+  surveyEnabled: false,
+  atmosphereVisible: false,
+};
+
+function renderContextMenu(
+  overrides: Partial<React.ComponentProps<typeof CanvasContextMenu>> = {},
+) {
+  return render(
+    <CanvasContextMenu
+      open={true}
+      position={{ x: 10, y: 10 }}
+      coords={null}
+      selectedObject={null}
+      mountConnected={false}
+      stellariumSettings={defaultSettings}
+      onOpenChange={jest.fn()}
+      onAddToTargetList={jest.fn()}
+      onNavigateToCoords={jest.fn()}
+      onOpenGoToDialog={jest.fn()}
+      onSetPendingMarkerCoords={jest.fn()}
+      onSetFramingCoordinates={jest.fn()}
+      onZoomIn={jest.fn()}
+      onZoomOut={jest.fn()}
+      onSetFov={jest.fn()}
+      onToggleStellariumSetting={jest.fn()}
+      onToggleSearch={jest.fn()}
+      onResetView={jest.fn()}
+      {...overrides}
+    />
+  );
+}
+
 describe('CanvasContextMenu (Aladin mode)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSkyEngine = 'aladin';
+    mockFovSimEnabled = false;
+    mockMosaic = { enabled: false };
   });
 
   it('renders full Aladin layer controls in display submenu and supports toggles', () => {
@@ -306,12 +375,28 @@ describe('CanvasContextMenu (Aladin mode)', () => {
     fireEvent.click(screen.getByText('30°'));
     expect(onSetFov).toHaveBeenCalledWith(30);
   });
+
+  it('copies click coordinates and closes the menu', () => {
+    const onOpenChange = jest.fn();
+
+    renderContextMenu({
+      coords: { ra: 10, dec: 20, raStr: '00h40m', decStr: '+20d00m' },
+      onOpenChange,
+    });
+
+    fireEvent.click(screen.getByText('coordinates.copyClickPosition'));
+
+    expect(mockClipboardWriteText).toHaveBeenCalledWith('00h40m +20d00m');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
 });
 
 describe('CanvasContextMenu (Stellarium mode)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSkyEngine = 'stellarium';
+    mockFovSimEnabled = false;
+    mockMosaic = { enabled: false };
   });
 
   it('renders Stellarium display settings toggles', () => {
@@ -454,5 +539,85 @@ describe('CanvasContextMenu (Stellarium mode)', () => {
     fireEvent.click(screen.getByText('actions.slewToObject'));
     expect(onSetFramingCoordinates).not.toHaveBeenCalled();
     expect(screen.getByTestId('mount-target-dialog')).toHaveTextContent('M42');
+  });
+
+  it('copies the current view center from the Stellarium store and closes the menu', () => {
+    const onOpenChange = jest.fn();
+
+    renderContextMenu({
+      onOpenChange,
+    });
+
+    fireEvent.click(screen.getByText('coordinates.copyViewCenter'));
+
+    expect(mockGetCurrentViewDirection).toHaveBeenCalledTimes(1);
+    expect(mockClipboardWriteText).toHaveBeenCalledWith(expect.stringMatching(/^2:00:00\.0 \+14:59:60\.0$/));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('copies object coordinates and closes the menu', () => {
+    const onOpenChange = jest.fn();
+
+    renderContextMenu({
+      onOpenChange,
+      selectedObject: { names: ['M31'], ra: '00h42m', dec: '+41d16m', raDeg: 10.68, decDeg: 41.27 } as never,
+    });
+
+    fireEvent.click(screen.getByText('coordinates.copyObjectCoordinates'));
+
+    expect(mockClipboardWriteText).toHaveBeenCalledWith('00h42m +41d16m');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('adds a marker, opens the go-to dialog, centers the view, and adds the target list entry', () => {
+    const onOpenChange = jest.fn();
+    const onSetPendingMarkerCoords = jest.fn();
+    const onNavigateToCoords = jest.fn();
+    const onOpenGoToDialog = jest.fn();
+    const onAddToTargetList = jest.fn();
+
+    renderContextMenu({
+      coords: { ra: 10, dec: 20, raStr: '00h40m', decStr: '+20d00m' },
+      onOpenChange,
+      onSetPendingMarkerCoords,
+      onNavigateToCoords,
+      onOpenGoToDialog,
+      onAddToTargetList,
+    });
+
+    fireEvent.click(screen.getByText('markers.addMarkerHere'));
+    fireEvent.click(screen.getByText('actions.centerViewHere'));
+    fireEvent.click(screen.getByText('coordinates.goToCoordinates'));
+    fireEvent.click(screen.getByText('actions.addToTargetList'));
+
+    expect(onSetPendingMarkerCoords).toHaveBeenCalledWith({
+      ra: 10,
+      dec: 20,
+      raString: '00h40m',
+      decString: '+20d00m',
+    });
+    expect(onNavigateToCoords).toHaveBeenCalledTimes(1);
+    expect(onOpenGoToDialog).toHaveBeenCalledTimes(1);
+    expect(onAddToTargetList).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('toggles the FOV overlay, resets rotation, and updates mosaic state in Stellarium mode', () => {
+    mockFovSimEnabled = true;
+    mockMosaic = { enabled: false };
+    const onOpenChange = jest.fn();
+
+    renderContextMenu({
+      onOpenChange,
+    });
+
+    fireEvent.click(screen.getByText('fov.showFovOverlay'));
+    fireEvent.click(screen.getByText('fov.resetRotation'));
+    fireEvent.click(screen.getByText('fov.enableMosaic'));
+
+    expect(mockSetFovEnabled).toHaveBeenCalledWith(true);
+    expect(mockSetRotationAngle).toHaveBeenCalledWith(0);
+    expect(mockSetMosaic).toHaveBeenCalledWith({ enabled: true });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

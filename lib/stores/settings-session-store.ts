@@ -47,6 +47,7 @@ interface SettingsSessionState {
 
   setConnection: (connection: Partial<SettingsDraft['connection']>) => void;
   setBackendProtocol: (protocol: SettingsDraft['backendProtocol']) => void;
+  setProxySettings: (proxy: Partial<SettingsDraft['proxy']>) => void;
   setPreference: <K extends keyof SettingsDraft['preferences']>(
     key: K,
     value: SettingsDraft['preferences'][K],
@@ -234,6 +235,17 @@ export const useSettingsSessionStore = create<SettingsSessionState>()((set, get)
     get().updateDraft((current) => ({
       ...current,
       backendProtocol: protocol,
+    }));
+  },
+
+  setProxySettings: (proxy) => {
+    get().updateDraft((current) => ({
+      ...current,
+      proxy: {
+        ...current.proxy,
+        ...proxy,
+        manualUrl: (proxy.manualUrl ?? current.proxy.manualUrl).trim(),
+      },
     }));
   },
 

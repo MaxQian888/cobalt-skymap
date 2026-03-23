@@ -23,6 +23,7 @@ import {
   DEFAULT_NOTIFICATIONS,
   DEFAULT_PERFORMANCE,
   DEFAULT_PREFERENCES,
+  DEFAULT_PROXY,
   DEFAULT_SEARCH,
   useSettingsStore,
 } from '@/lib/stores/settings-store';
@@ -33,6 +34,7 @@ function resetStores() {
   useSettingsStore.setState({
     connection: { ...DEFAULT_CONNECTION },
     backendProtocol: DEFAULT_BACKEND_PROTOCOL,
+    proxy: { ...DEFAULT_PROXY },
     preferences: { ...DEFAULT_PREFERENCES },
     performance: { ...DEFAULT_PERFORMANCE },
     accessibility: { ...DEFAULT_ACCESSIBILITY },
@@ -54,6 +56,11 @@ function startSessionWithDraft() {
   const snapshot = createDefaultSettingsDraft();
   snapshot.connection = { ip: '10.0.0.5', port: '6789' };
   snapshot.backendProtocol = 'https';
+  snapshot.proxy = {
+    mode: 'manual',
+    manualUrl: 'http://127.0.0.1:7890',
+    fallbackToDirectOnFailure: false,
+  };
   snapshot.preferences.locale = 'zh';
   snapshot.performance.renderQuality = 'ultra';
   snapshot.accessibility.highContrast = true;
@@ -128,10 +135,15 @@ describe('useSettingsDraft hooks', () => {
 
     expect(inactiveHook.result.current.connection).toEqual(DEFAULT_CONNECTION);
     expect(inactiveHook.result.current.backendProtocol).toBe(DEFAULT_BACKEND_PROTOCOL);
+    expect(inactiveHook.result.current.proxy).toEqual(DEFAULT_PROXY);
 
     act(() => {
       inactiveHook.result.current.setConnection({ ip: '127.0.0.1' });
       inactiveHook.result.current.setBackendProtocol('https');
+      inactiveHook.result.current.setProxySettings({
+        mode: 'manual',
+        manualUrl: ' http://127.0.0.1:8888 ',
+      });
     });
 
     expect(useSettingsStore.getState().connection).toEqual({
@@ -139,6 +151,11 @@ describe('useSettingsDraft hooks', () => {
       port: DEFAULT_CONNECTION.port,
     });
     expect(useSettingsStore.getState().backendProtocol).toBe('https');
+    expect(useSettingsStore.getState().proxy).toEqual({
+      mode: 'manual',
+      manualUrl: 'http://127.0.0.1:8888',
+      fallbackToDirectOnFailure: true,
+    });
     inactiveHook.unmount();
 
     act(() => {
@@ -153,14 +170,24 @@ describe('useSettingsDraft hooks', () => {
       port: '6789',
     });
     expect(activeHook.result.current.backendProtocol).toBe('https');
+    expect(activeHook.result.current.proxy).toEqual({
+      mode: 'manual',
+      manualUrl: 'http://127.0.0.1:7890',
+      fallbackToDirectOnFailure: false,
+    });
 
     act(() => {
       activeHook.result.current.setConnection({ port: '6790' });
       activeHook.result.current.setBackendProtocol('http');
+      activeHook.result.current.setProxySettings({
+        mode: 'off',
+        fallbackToDirectOnFailure: true,
+      });
     });
 
     expect(useSettingsSessionStore.getState().draft?.connection.port).toBe('6790');
     expect(useSettingsSessionStore.getState().draft?.backendProtocol).toBe('http');
+    expect(useSettingsSessionStore.getState().draft?.proxy.mode).toBe('off');
     expect(useSettingsStore.getState().connection).toEqual(DEFAULT_CONNECTION);
   });
 

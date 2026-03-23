@@ -8,8 +8,10 @@ import { FitsMetadataPanel } from '../fits-metadata-panel';
 import type { ImageMetadata } from '@/types/starmap/plate-solving';
 
 // Mock next-intl
+const mockTranslate = jest.fn((key: string) => key);
+
 jest.mock('next-intl', () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => mockTranslate,
 }));
 
 // Mock plate-solver-api formatFileSize
@@ -74,6 +76,10 @@ describe('FitsMetadataPanel', () => {
       },
     } as ImageMetadata['fitsData'],
   };
+
+  beforeEach(() => {
+    mockTranslate.mockImplementation((key: string) => key);
+  });
 
   it('should render file name and dimensions', () => {
     render(<FitsMetadataPanel metadata={basicMetadata} />);
@@ -278,5 +284,20 @@ describe('FitsMetadataPanel', () => {
     expect(screen.getByText('2024-06-15T01:00:00')).toBeInTheDocument();
     expect(screen.getByText('300s')).toBeInTheDocument();
     expect(screen.getByText('Ha')).toBeInTheDocument();
+  });
+
+  it('should use fallback English labels when translations are missing', () => {
+    mockTranslate.mockImplementation(() => '');
+
+    render(<FitsMetadataPanel metadata={fitsMetadata} />);
+
+    fireEvent.click(screen.getByText('FITS Metadata'));
+
+    expect(screen.getByText('WCS Coordinates')).toBeInTheDocument();
+    expect(screen.getByText('Observation Info')).toBeInTheDocument();
+    expect(screen.getByText('Image Info')).toBeInTheDocument();
+    expect(screen.getByText(/Projection/)).toBeInTheDocument();
+    expect(screen.getByText(/Exposure/)).toBeInTheDocument();
+    expect(screen.getByText(/Bit Depth/)).toBeInTheDocument();
   });
 });

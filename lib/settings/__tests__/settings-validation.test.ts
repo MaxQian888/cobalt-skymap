@@ -50,6 +50,8 @@ describe('settings-validation', () => {
     draft.backendProtocol = 'ftp' as 'http';
     draft.connection.ip = ' ';
     draft.connection.port = '70000';
+    draft.proxy.mode = 'invalid' as 'auto';
+    draft.proxy.manualUrl = 'proxy.local:3128';
     draft.preferences.timeFormat = '11h' as '24h';
     draft.preferences.dateFormat = 'lunar' as 'iso';
     draft.preferences.coordinateFormat = 'xyz' as 'dms';
@@ -73,6 +75,8 @@ describe('settings-validation', () => {
     expect(result.fieldErrors['backendProtocol']).toBeDefined();
     expect(result.fieldErrors['connection.ip']).toBeDefined();
     expect(result.fieldErrors['connection.port']).toBeDefined();
+    expect(result.fieldErrors['proxy.mode']).toBeDefined();
+    expect(result.fieldErrors['proxy.manualUrl']).toBeDefined();
     expect(result.fieldErrors['preferences.timeFormat']).toBeDefined();
     expect(result.fieldErrors['preferences.dateFormat']).toBeDefined();
     expect(result.fieldErrors['preferences.coordinateFormat']).toBeDefined();
@@ -90,5 +94,15 @@ describe('settings-validation', () => {
     expect(result.fieldErrors['location.elevation']).toBeDefined();
     expect(getCategoryValidationStatus(result, 'search')).toBe('invalid');
     expect(getCategoryValidationStatus(result, 'accessibility')).toBe('valid');
+  });
+
+  it('requires a manual proxy URL when proxy mode is manual', () => {
+    const draft = createDefaultSettingsDraft();
+    draft.proxy.mode = 'manual';
+    draft.proxy.manualUrl = '';
+
+    const result = validateSettingsDraft(draft);
+    expect(result.isValid).toBe(false);
+    expect(result.fieldErrors['proxy.manualUrl']).toBeDefined();
   });
 });

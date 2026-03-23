@@ -1,6 +1,6 @@
 # 用户指南
 
-欢迎使用 SkyMap Test 用户指南！本章节详细介绍应用的所有功能。
+欢迎使用 SkyMap 用户指南！本章节详细介绍应用的所有功能。
 
 ## 章节内容
 
@@ -47,7 +47,7 @@
 
 ### 新手入门
 
-如果您是第一次使用 SkyMap Test：
+如果您是第一次使用 SkyMap：
 
 1. 阅读[快速开始](../getting-started/index.md)
 2. 了解[基本概念](../getting-started/basic-concepts.md)
@@ -118,8 +118,8 @@
 
 ### 社区支持
 
-- [GitHub Issue 表单](https://github.com/AstroAir/skymap-test/issues/new) - 报告问题
-- [GitHub Discussions](https://github.com/AstroAir/skymap-test/discussions) - 讨论交流
+- [GitHub Issue 表单](https://github.com/ElementAstro/cobalt-skymap/issues/new) - 报告问题
+- [GitHub Discussions](https://github.com/ElementAstro/cobalt-skymap/discussions) - 讨论交流
 
 ## 反馈和建议
 
@@ -140,3 +140,4 @@
 ---
 
 开始使用：[星图概览](starmap/index.md)
+

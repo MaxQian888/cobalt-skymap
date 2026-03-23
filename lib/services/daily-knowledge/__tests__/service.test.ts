@@ -108,6 +108,7 @@ describe('daily-knowledge/service', () => {
     const result = await getDailyKnowledge('2026-02-20', 'en', { onlineEnhancement: true });
 
     expect(result.selected.id).toBe('apod-2026-02-20');
+    expect(result.resolutionMode).toBe('fresh-online');
     expect(result.items.some((item) => item.id === 'apod-2026-02-20')).toBe(true);
     expect(mockFetchApodItem).toHaveBeenCalledTimes(1);
   });
@@ -232,7 +233,7 @@ describe('daily-knowledge/service', () => {
         {
           source: 'nasa-image-library',
           transport: 'api',
-          state: 'ready',
+          state: 'healthy',
           reason: 'success',
           itemCount: 1,
         },
@@ -242,9 +243,10 @@ describe('daily-knowledge/service', () => {
     const result = await getDailyKnowledge('2026-02-20', 'en', { onlineEnhancement: true });
 
     expect(result.items.some((item) => item.id === 'nasa-lib-item')).toBe(true);
+    expect(result.resolutionMode).toBe('fresh-online');
     expect(result.sourceStatuses).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ source: 'nasa-image-library', state: 'ready' }),
+        expect.objectContaining({ source: 'nasa-image-library', state: 'healthy' }),
         expect.objectContaining({ source: 'nasa-apod' }),
         expect.objectContaining({ source: 'wikimedia' }),
       ])
@@ -270,9 +272,57 @@ describe('daily-knowledge/service', () => {
 
     expect(result.selected.id).toBe('curated-daily');
     expect(result.usedCuratedFallback).toBe(true);
+    expect(result.resolutionMode).toBe('curated-fallback');
     expect(result.sourceStatuses).toEqual(
       expect.arrayContaining([expect.objectContaining({ source: 'esa-science', state: 'failed' })])
     );
+  });
+
+  it('uses stale cache when an expired fresh online result exists and current sources degrade', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-02-20T12:00:00.000Z'));
+
+    const apod = makeItem({
+      id: 'apod-stale-cache',
+      source: 'nasa-apod',
+      title: 'APOD Fresh',
+    });
+
+    mockFetchApodItem
+      .mockResolvedValueOnce(apod)
+      .mockRejectedValueOnce(new Error('apod failed'));
+    mockFetchDailyKnowledgeRegistryItems.mockResolvedValue({
+      items: [],
+      sourceStatuses: [
+        {
+          source: 'esa-science',
+          transport: 'rss',
+          state: 'degraded',
+          reason: 'empty',
+          itemCount: 0,
+        },
+      ],
+    });
+
+    const first = await getDailyKnowledge('2026-02-20', 'en', { onlineEnhancement: true });
+    expect(first.selected.id).toBe('apod-stale-cache');
+    expect(first.resolutionMode).toBe('fresh-online');
+
+    jest.setSystemTime(new Date('2026-02-21T00:01:00.000Z'));
+
+    const second = await getDailyKnowledge('2026-02-20', 'en', { onlineEnhancement: true });
+
+    expect(second.selected.id).toBe('apod-stale-cache');
+    expect(second.usedCuratedFallback).toBe(false);
+    expect(second.resolutionMode).toBe('stale-cache');
+    expect(second.sourceStatuses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: 'nasa-apod', state: 'stale' }),
+        expect.objectContaining({ source: 'esa-science', state: 'degraded' }),
+      ])
+    );
+
+    jest.useRealTimers();
   });
 
   it('passes recent history options to curated daily selector', async () => {

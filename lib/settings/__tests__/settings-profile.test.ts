@@ -16,6 +16,7 @@ jest.mock('@/lib/storage', () => ({
 const settingsStoreState = {
   connection: { ip: 'localhost', port: '1888' },
   backendProtocol: 'http',
+  proxy: { mode: 'auto', manualUrl: '', fallbackToDirectOnFailure: true },
   skyEngine: 'stellarium',
   stellarium: { nightMode: false, atmosphere: true },
   preferences: {
@@ -256,6 +257,7 @@ describe('settings-profile', () => {
     jest.clearAllMocks();
     settingsStoreState.connection = { ip: 'localhost', port: '1888' };
     settingsStoreState.backendProtocol = 'http';
+    settingsStoreState.proxy = { mode: 'auto', manualUrl: '', fallbackToDirectOnFailure: true };
     settingsStoreState.preferences.locale = 'en';
     settingsStoreState.search.maxSearchResults = 50;
     themeStoreState.customization = {
@@ -354,6 +356,11 @@ describe('settings-profile', () => {
       domains: ['settings', 'theme', 'eventSources', 'dailyKnowledge'],
     });
     expect(profile.settings?.connection).toEqual({ ip: 'localhost', port: '1888' });
+    expect(profile.settings?.proxy).toEqual({
+      mode: 'auto',
+      manualUrl: '',
+      fallbackToDirectOnFailure: true,
+    });
     expect(profile.themeMode).toBe('dark');
     expect(profile.theme).toEqual(expect.objectContaining({
       componentStyle: {

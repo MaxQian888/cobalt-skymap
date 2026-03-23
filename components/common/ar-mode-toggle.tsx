@@ -15,6 +15,10 @@ import { useARSessionStatus } from '@/lib/hooks/use-ar-session-status';
 import { useDeviceOrientation } from '@/lib/hooks/use-device-orientation';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
+import {
+  deriveARInvocationSeed,
+  getARLaunchAssistantReason,
+} from '@/lib/core/ar-invocation';
 import { cn } from '@/lib/utils';
 
 interface ARModeToggleProps {
@@ -70,49 +74,16 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
       setStellariumSetting('landscapesVisible', false);
       setStellariumSetting('fogVisible', false);
       setStellariumSetting('milkyWayVisible', false);
-      openLaunchAssistant('enter-ar');
+      openLaunchAssistant(getARLaunchAssistantReason('enter-ar'));
 
-      // Keep AR camera usable even when sensors are unavailable/denied.
-      if (!isSupported) {
-        setStellariumSetting('sensorControl', false);
-        setSensorRuntime({
-          isSupported: false,
-          isPermissionGranted: false,
-          status: 'unsupported',
-          calibrationRequired: stellarium.sensorCalibrationRequired,
-          degradedReason: null,
-          source: 'none',
-          accuracyDeg: null,
-          error: 'Device orientation not supported',
-        });
-        return;
-      }
+      const invocationSeed = deriveARInvocationSeed({
+        sensorSupported: isSupported,
+        sensorPermissionGranted: isPermissionGranted,
+        sensorCalibrationRequired: stellarium.sensorCalibrationRequired,
+      });
 
-      if (isPermissionGranted) {
-        setStellariumSetting('sensorControl', true);
-        setSensorRuntime({
-          isSupported: true,
-          isPermissionGranted: true,
-          status: stellarium.sensorCalibrationRequired ? 'calibration-required' : 'idle',
-          calibrationRequired: stellarium.sensorCalibrationRequired,
-          degradedReason: null,
-          source: 'none',
-          accuracyDeg: null,
-          error: null,
-        });
-      } else {
-        setStellariumSetting('sensorControl', false);
-        setSensorRuntime({
-          isSupported: true,
-          isPermissionGranted: false,
-          status: 'permission-required',
-          calibrationRequired: stellarium.sensorCalibrationRequired,
-          degradedReason: null,
-          source: 'none',
-          accuracyDeg: null,
-          error: null,
-        });
-      }
+      setStellariumSetting('sensorControl', invocationSeed.sensorControlEnabled);
+      setSensorRuntime(invocationSeed.sensorRuntime);
     } else {
       // Exit AR mode
       setStellariumSetting('arMode', false);

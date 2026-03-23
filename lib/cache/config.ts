@@ -3,6 +3,8 @@
  * Centralized configuration for all caching systems in the application
  */
 
+import type { StarmapDataTier } from '@/lib/core/starmap-data-tier';
+
 // Time constants
 const SECOND = 1000;
 const MINUTE = 60 * SECOND;
@@ -129,11 +131,31 @@ export const CACHEABLE_URL_PATTERNS = [
 /**
  * Critical resources to prefetch on startup
  */
+export const STARMAP_TIER_PREFETCH_RESOURCES: Readonly<Record<StarmapDataTier, readonly string[]>> = {
+  core: [
+    // WASM is intentionally excluded — the Stellarium engine fetches it directly
+    // via WebAssembly.instantiateStreaming, and the browser handles code caching.
+    '/stellarium-js/stellarium-web-engine.js',
+  ],
+  catalog: [
+    '/stellarium-data/stars/info.json',
+    '/stellarium-data/dso/info.json',
+  ],
+  survey: [
+    '/stellarium-data/surveys/dss/info.json',
+  ],
+  enrichment: [],
+} as const;
+
 export const PREFETCH_RESOURCES = [
-  // WASM is intentionally excluded — the Stellarium engine fetches it directly
-  // via WebAssembly.instantiateStreaming, and the browser handles code caching.
-  '/stellarium-js/stellarium-web-engine.js',
+  ...STARMAP_TIER_PREFETCH_RESOURCES.core,
+  ...STARMAP_TIER_PREFETCH_RESOURCES.catalog,
+  ...STARMAP_TIER_PREFETCH_RESOURCES.survey,
 ] as const;
+
+export function getStarmapTierPrefetchResources(tier: StarmapDataTier): readonly string[] {
+  return STARMAP_TIER_PREFETCH_RESOURCES[tier];
+}
 
 /**
  * Get TTL in milliseconds from hours

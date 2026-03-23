@@ -16,14 +16,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { computeEphemeris, computeRiseTransitSet, type EngineBody } from '@/lib/astronomy/engine';
+import { type EngineBody } from '@/lib/astronomy/engine';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
 import { formatTimeShort } from '@/lib/astronomy/time/formats';
 import { cn } from '@/lib/utils';
+import {
+  runCalculatorEphemerisBatch,
+  runCalculatorRiseTransitSetBatch,
+  summarizeCalculatorMeta,
+  type CalculatorMetaSummary,
+} from './orchestrator';
 
 interface SolarSystemTabProps {
   latitude: number;
   longitude: number;
+  sharedDate?: string;
+  sharedTime?: string;
+  onSharedDateChange?: (nextDate: string) => void;
+  onSharedTimeChange?: (nextTime: string) => void;
 }
 
 interface SolarSystemRow {
@@ -58,17 +68,37 @@ function toDateInput(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function SolarSystemTab({ latitude, longitude }: SolarSystemTabProps) {
+export function SolarSystemTab({
+  latitude,
+  longitude,
+  sharedDate,
+  sharedTime,
+  onSharedDateChange,
+  onSharedTimeChange,
+}: SolarSystemTabProps) {
   const t = useTranslations();
-  const [date, setDate] = useState(toDateInput(new Date()));
-  const [time, setTime] = useState('22:00');
+  const [date, setDate] = useState(sharedDate ?? toDateInput(new Date()));
+  const [time, setTime] = useState(sharedTime ?? '22:00');
   const [includePluto, setIncludePluto] = useState(true);
   const [rows, setRows] = useState<SolarSystemRow[]>([]);
+  const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const dateTime = useMemo(() => new Date(`${date}T${time}:00`), [date, time]);
   const bodies = useMemo(() => includePluto ? [...BASE_BODIES, 'Pluto' as const] : BASE_BODIES, [includePluto]);
+
+  useEffect(() => {
+    if (sharedDate && sharedDate !== date) {
+      setDate(sharedDate);
+    }
+  }, [sharedDate, date]);
+
+  useEffect(() => {
+    if (sharedTime && sharedTime !== time) {
+      setTime(sharedTime);
+    }
+  }, [sharedTime, time]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,45 +108,59 @@ export function SolarSystemTab({ latitude, longitude }: SolarSystemTabProps) {
       setError(null);
 
       try {
-        const nextRows = await Promise.all(
-          bodies.map(async (body): Promise<SolarSystemRow> => {
-            const [ephemeris, rts] = await Promise.all([
-              computeEphemeris({
-                body,
-                observer: { latitude, longitude },
-                startDate: dateTime,
-                stepHours: 24,
-                steps: 1,
-              }),
-              computeRiseTransitSet({
-                body,
-                observer: { latitude, longitude },
-                date: dateTime,
-              }),
-            ]);
-
-            const point = ephemeris.points[0];
-            return {
+        const [ephemerisResults, rtsResults] = await Promise.all([
+          runCalculatorEphemerisBatch(
+            bodies.map((body) => ({
               body,
-              ra: point.ra,
-              dec: point.dec,
-              altitude: point.altitude,
-              azimuth: point.azimuth,
-              magnitude: point.magnitude,
-              phaseFraction: point.phaseFraction,
-              riseTime: rts.riseTime,
-              transitTime: rts.transitTime,
-              setTime: rts.setTime,
-            };
-          })
-        );
+              observer: { latitude, longitude },
+              startDate: dateTime,
+              stepHours: 24,
+              steps: 1,
+            })),
+            { concurrency: 3 },
+          ),
+          runCalculatorRiseTransitSetBatch(
+            bodies.map((body) => ({
+              body,
+              observer: { latitude, longitude },
+              date: dateTime,
+            })),
+            { concurrency: 3 },
+          ),
+        ]);
+
+        const nextRows = bodies.map((body, index): SolarSystemRow => {
+          const ephemeris = ephemerisResults[index].response;
+          const rts = rtsResults[index].response;
+          const point = ephemeris.points[0];
+
+          return {
+            body,
+            ra: point.ra,
+            dec: point.dec,
+            altitude: point.altitude,
+            azimuth: point.azimuth,
+            magnitude: point.magnitude,
+            phaseFraction: point.phaseFraction,
+            riseTime: rts.riseTime,
+            transitTime: rts.transitTime,
+            setTime: rts.setTime,
+          };
+        });
+
+        const combinedMeta = summarizeCalculatorMeta([
+          ...ephemerisResults.map(item => item.meta),
+          ...rtsResults.map(item => item.meta),
+        ]);
 
         if (!cancelled) {
           setRows(nextRows);
+          setMetaSummary(combinedMeta);
         }
       } catch (runError) {
         if (!cancelled) {
           setRows([]);
+          setMetaSummary(null);
           setError(runError instanceof Error ? runError.message : t('astroCalc.calculationFailed'));
         }
       } finally {
@@ -137,11 +181,29 @@ export function SolarSystemTab({ latitude, longitude }: SolarSystemTabProps) {
       <div className="grid grid-cols-4 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.date')}</Label>
-          <Input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="h-8" />
+          <Input
+            type="date"
+            value={date}
+            onChange={(event) => {
+              const value = event.target.value;
+              setDate(value);
+              onSharedDateChange?.(value);
+            }}
+            className="h-8"
+          />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.time')}</Label>
-          <Input type="time" value={time} onChange={(event) => setTime(event.target.value)} className="h-8" />
+          <Input
+            type="time"
+            value={time}
+            onChange={(event) => {
+              const value = event.target.value;
+              setTime(value);
+              onSharedTimeChange?.(value);
+            }}
+            className="h-8"
+          />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.includePluto')}</Label>
@@ -151,6 +213,11 @@ export function SolarSystemTab({ latitude, longitude }: SolarSystemTabProps) {
           </div>
         </div>
         <div className="flex items-end justify-end gap-2">
+          {metaSummary && (
+            <Badge variant="secondary" className="text-[10px]" data-testid="solar-system-meta">
+              {`src:${metaSummary.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${metaSummary.cacheHits}/${metaSummary.total}`}
+            </Badge>
+          )}
           {isLoading && <Badge variant="secondary">{t('astroCalc.calculating')}</Badge>}
           <Badge variant="outline">{rows.length} {t('astroCalc.objects')}</Badge>
         </div>

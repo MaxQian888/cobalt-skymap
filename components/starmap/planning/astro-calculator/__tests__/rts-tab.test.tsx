@@ -14,6 +14,7 @@ jest.mock('next-intl', () => ({
 
 jest.mock('@/lib/astronomy/engine', () => ({
   computeRiseTransitSet: (...args: unknown[]) => mockComputeRiseTransitSet(...args),
+  serializeCacheKey: (payload: unknown) => JSON.stringify(payload),
 }));
 
 jest.mock('@/lib/astronomy/time/formats', () => ({

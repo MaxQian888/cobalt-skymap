@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { UseObjectSearchReturn } from '@/lib/hooks/use-object-search';
 
 // ============================================================================
@@ -218,6 +218,18 @@ jest.mock('@/components/ui/textarea', () => ({
   Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea data-testid="textarea" {...props} />,
 }));
 
+jest.mock('../grouped-results-list', () => ({
+  GroupedResultsList: ({ onSelect }: { onSelect?: (item: { Name: string; Type: string }) => void }) => (
+    <button
+      data-testid="grouped-results-list"
+      onClick={() => onSelect?.({ Name: 'M31', Type: 'DSO' })}
+      type="button"
+    >
+      grouped-results
+    </button>
+  ),
+}));
+
 import { AdvancedSearchDialog } from '../advanced-search-dialog';
 
 describe('AdvancedSearchDialog', () => {
@@ -421,6 +433,53 @@ describe('AdvancedSearchDialog', () => {
     expect(screen.getByTestId('dialog')).toBeInTheDocument();
   });
 
+  it('imports a batch file and normalizes the textarea content', async () => {
+    const originalFileReader = global.FileReader;
+
+    function MockFileReader(this: Record<string, unknown>) {
+      this.readAsText = jest.fn(function(this: Record<string, unknown>) {
+        this.result = ' M31 ,\nNGC7000\n\n Mars ';
+        if (this.onload) {
+          (this.onload as () => void)();
+        }
+      });
+    }
+
+    global.FileReader = MockFileReader as unknown as typeof FileReader;
+
+    try {
+      const { container } = render(<AdvancedSearchDialog {...defaultProps} />);
+      const fileInput = container.querySelector('input[type="file"][accept=".txt,.csv"]') as HTMLInputElement;
+      const file = new File(['M31'], 'targets.txt', { type: 'text/plain' });
+
+      Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+      fireEvent.change(fileInput);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('textarea')).toHaveValue('M31\nNGC7000\nMars');
+      });
+    } finally {
+      global.FileReader = originalFileReader;
+    }
+  });
+
+  it('runs batch search with normalized entries', () => {
+    const mockSetQuery = jest.fn();
+    const sharedHook = createMockSearchHook({ setQuery: mockSetQuery, setFilters: jest.fn() });
+    const { useObjectSearch } = jest.requireMock('@/lib/hooks');
+
+    useObjectSearch.mockReturnValue(createMockSearchHook());
+
+    render(<AdvancedSearchDialog {...defaultProps} searchHook={sharedHook} />);
+
+    fireEvent.change(screen.getByTestId('textarea'), {
+      target: { value: ' M31 \n\nNGC7000, Mars ' },
+    });
+    fireEvent.click(screen.getByText('search.runBatchSearch'));
+
+    expect(mockSetQuery).toHaveBeenCalledWith('M31\nNGC7000\nMars');
+  });
+
   it('presses Enter in search input', () => {
     const mockSetQuery = jest.fn();
     const sharedHook = createMockSearchHook({ setQuery: mockSetQuery, setFilters: jest.fn() });
@@ -476,6 +535,25 @@ describe('AdvancedSearchDialog', () => {
     useObjectSearch.mockReturnValue(createMockSearchHook({ isOnlineSearching: true }));
     render(<AdvancedSearchDialog {...defaultProps} />);
     expect(screen.getByTestId('dialog')).toBeInTheDocument();
+  });
+
+  it('selects a grouped result and closes the dialog', () => {
+    const onOpenChange = jest.fn();
+    const selectTarget = jest.fn();
+    const { useObjectSearch, useSelectTarget } = jest.requireMock('@/lib/hooks');
+
+    useObjectSearch.mockReturnValue(createMockSearchHook({
+      results: [{ Name: 'M31', Type: 'DSO' }],
+      groupedResults: new Map([['DSO', [{ Name: 'M31', Type: 'DSO' }]]]),
+    }));
+    useSelectTarget.mockReturnValue(selectTarget);
+
+    render(<AdvancedSearchDialog open onOpenChange={onOpenChange} onSelect={jest.fn()} />);
+
+    fireEvent.click(screen.getByTestId('grouped-results-list'));
+
+    expect(selectTarget).toHaveBeenCalledWith(expect.objectContaining({ Name: 'M31', Type: 'DSO' }));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
 });

@@ -8,4 +8,18 @@ export { CoordinateTab } from './coordinate-tab';
 export { TimeTab } from './time-tab';
 export { SolarSystemTab } from './solar-system-tab';
 export { SortableHeader } from './sortable-header';
+export {
+  ASTRO_CALCULATOR_CAPABILITY_MATRIX,
+  ASTRO_CALCULATOR_TAB_ORDER,
+} from './capability-matrix';
+export {
+  runCalculatorAlmanac,
+  runCalculatorCoordinates,
+  runCalculatorEphemeris,
+  runCalculatorEphemerisBatch,
+  runCalculatorPhenomena,
+  runCalculatorRiseTransitSet,
+  runCalculatorRiseTransitSetBatch,
+  summarizeCalculatorMeta,
+} from './orchestrator';
 export type { CelestialPosition, EphemerisEntry, WUTObject, PhenomenaEvent } from './types';

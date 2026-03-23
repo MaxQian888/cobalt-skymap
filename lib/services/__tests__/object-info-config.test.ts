@@ -13,6 +13,7 @@ import {
   generateImageUrl,
   getActiveImageSources,
   getActiveDataSources,
+  getObjectInfoConfigMigratedState,
   startHealthChecks,
   stopHealthChecks,
   type ImageSourceConfig,
@@ -76,6 +77,13 @@ describe('object-info-config', () => {
       const skyview = DEFAULT_IMAGE_SOURCES.find(s => s.type === 'skyview');
       expect(skyview).toBeDefined();
     });
+
+    it('should tag image sources with survey render metadata', () => {
+      DEFAULT_IMAGE_SOURCES.forEach((source) => {
+        expect(source.renderTier).toBe('survey');
+        expect(source.fallbackRole).toBeTruthy();
+      });
+    });
   });
 
   describe('DEFAULT_DATA_SOURCES', () => {
@@ -101,6 +109,40 @@ describe('object-info-config', () => {
       const simbad = DEFAULT_DATA_SOURCES.find(s => s.id === 'simbad');
       expect(simbad).toBeDefined();
       expect(simbad?.type).toBe('simbad');
+    });
+
+    it('should include render metadata from provider defaults', () => {
+      DEFAULT_DATA_SOURCES.forEach((source) => {
+        expect(source.renderTier).toBe('enrichment');
+        expect(source.fallbackRole).toBeTruthy();
+      });
+    });
+  });
+
+  describe('getObjectInfoConfigMigratedState', () => {
+    it('fills missing render metadata for persisted legacy state', () => {
+      const migrated = getObjectInfoConfigMigratedState({
+        imageSources: [
+          {
+            ...DEFAULT_IMAGE_SOURCES[0],
+            renderTier: undefined,
+            fallbackRole: undefined,
+          },
+        ],
+        dataSources: [
+          {
+            ...DEFAULT_DATA_SOURCES[0],
+            renderTier: undefined,
+            fallbackRole: undefined,
+          },
+        ],
+        settings: DEFAULT_SETTINGS,
+      });
+
+      expect(migrated.imageSources[0].renderTier).toBe('survey');
+      expect(migrated.imageSources[0].fallbackRole).toBeTruthy();
+      expect(migrated.dataSources[0].renderTier).toBe('enrichment');
+      expect(migrated.dataSources[0].fallbackRole).toBeTruthy();
     });
   });
 

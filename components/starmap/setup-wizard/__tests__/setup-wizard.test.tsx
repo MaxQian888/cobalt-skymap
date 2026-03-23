@@ -1,8 +1,15 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { act } from 'react';
+import * as setupWizardExports from '../index';
+import * as setupWizardStepExports from '../steps';
 import { SetupWizard } from '../setup-wizard';
 import { SetupWizardButton } from '../setup-wizard-button';
+import { CompleteStep } from '../steps/complete-step';
+import { EquipmentStep } from '../steps/equipment-step';
+import { LocationStep } from '../steps/location-step';
+import { PreferencesStep } from '../steps/preferences-step';
+import { WelcomeStep } from '../steps/welcome-step';
 import { useSetupWizardStore } from '@/lib/stores/setup-wizard-store';
 
 // Mock next-intl
@@ -893,5 +900,20 @@ describe('SetupWizardButton', () => {
     fireEvent.click(button);
 
     expect(useSetupWizardStore.getState().currentStep).toBe('welcome');
+  });
+});
+
+describe('setup-wizard barrel exports', () => {
+  it('re-exports the root setup wizard components', () => {
+    expect(setupWizardExports.SetupWizard).toBe(SetupWizard);
+    expect(setupWizardExports.SetupWizardButton).toBe(SetupWizardButton);
+  });
+
+  it('re-exports each setup wizard step component', () => {
+    expect(setupWizardStepExports.WelcomeStep).toBe(WelcomeStep);
+    expect(setupWizardStepExports.LocationStep).toBe(LocationStep);
+    expect(setupWizardStepExports.EquipmentStep).toBe(EquipmentStep);
+    expect(setupWizardStepExports.PreferencesStep).toBe(PreferencesStep);
+    expect(setupWizardStepExports.CompleteStep).toBe(CompleteStep);
   });
 });

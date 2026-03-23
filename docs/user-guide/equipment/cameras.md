@@ -1,6 +1,6 @@
 # 相机配置
 
-本文档介绍如何在 SkyMap Test 中配置和管理天文相机。
+本文档介绍如何在 SkyMap 中配置和管理天文相机。
 
 ## 相机管理
 
@@ -351,3 +351,4 @@ FOV（角度）= 2 × arctan(传感器尺寸 / (2 × 焦距))
 - [设备概览](index.md)
 - [望远镜配置](telescopes.md)
 - [曝光计算](../observation-planning/index.md)
+

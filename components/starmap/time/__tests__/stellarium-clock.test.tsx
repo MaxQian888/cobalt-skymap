@@ -25,8 +25,10 @@ const mockUseStellariumStore = jest.fn((selector) => {
 
 let mockTimeFormat: string = '24h';
 let mockDateFormat: string = 'iso';
+let mockSkyEngine: string = 'stellarium';
 const mockUseSettingsStore = jest.fn((selector) => {
   const state = {
+    skyEngine: mockSkyEngine,
     preferences: {
       timeFormat: mockTimeFormat,
       dateFormat: mockDateFormat,
@@ -35,11 +37,12 @@ const mockUseSettingsStore = jest.fn((selector) => {
   return selector ? selector(state) : state;
 });
 
+let mockLongitude: number | undefined = 116.4;
 const mockUseMountStore = jest.fn((selector) => {
   const state = {
     profileInfo: {
       AstrometrySettings: {
-        Longitude: 116.4,
+        Longitude: mockLongitude,
         Latitude: 39.9,
         Elevation: 0,
       },
@@ -84,7 +87,17 @@ jest.mock('@/components/ui/button', () => ({
 }));
 
 jest.mock('@/components/ui/popover', () => ({
-  Popover: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Popover: ({ children, onOpenChange }: { children: React.ReactNode; onOpenChange?: (open: boolean) => void }) => (
+    <div>
+      <button type="button" data-testid="popover-open" onClick={() => onOpenChange?.(true)}>
+        open
+      </button>
+      <button type="button" data-testid="popover-close" onClick={() => onOpenChange?.(false)}>
+        close
+      </button>
+      {children}
+    </div>
+  ),
   PopoverContent: ({ children }: { children: React.ReactNode }) => <div data-testid="popover-content">{children}</div>,
   PopoverTrigger: ({ children }: { children: React.ReactNode }) => <div data-testid="popover-trigger">{children}</div>,
 }));
@@ -107,8 +120,15 @@ jest.mock('@/components/ui/tooltip', () => ({
 }));
 
 jest.mock('@/components/ui/slider', () => ({
-  Slider: ({ value, onValueChange, ...props }: { value: number[]; onValueChange: (v: number[]) => void; 'aria-label'?: string }) => (
-    <input type="range" value={value?.[0] || 0} onChange={(e) => onValueChange?.([Number(e.target.value)])} data-testid="slider" aria-label={props['aria-label']} />
+  Slider: ({ value, onValueChange, disabled, ...props }: { value: number[]; onValueChange: (v: number[]) => void; disabled?: boolean; 'aria-label'?: string }) => (
+    <input
+      type="range"
+      value={value?.[0] || 0}
+      onChange={(e) => onValueChange?.([Number(e.target.value)])}
+      data-testid="slider"
+      aria-label={props['aria-label']}
+      disabled={disabled}
+    />
   ),
 }));
 
@@ -131,10 +151,17 @@ describe('StellariumClock', () => {
     mockStel = null;
     mockTimeFormat = '24h';
     mockDateFormat = 'iso';
+    mockSkyEngine = 'stellarium';
+    mockLongitude = 116.4;
+    mockMjdToUTC.mockImplementation(() => new Date('2024-06-15T12:00:00Z'));
+    mockUtcToMJD.mockImplementation(() => 60000.5);
+    mockFormatDateForInput.mockImplementation(() => '2024-06-15');
+    mockFormatTimeForInput.mockImplementation(() => '12:00:00');
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   it('renders nothing when stel is null', () => {
@@ -149,6 +176,58 @@ describe('StellariumClock', () => {
     // Should render the popover structure
     expect(screen.getByTestId('popover-content')).toBeInTheDocument();
     expect(screen.getByTestId('popover-trigger')).toBeInTheDocument();
+  });
+
+  it('renders Aladin mode with disabled controls and system-time note', () => {
+    mockSkyEngine = 'aladin';
+    mockLongitude = undefined;
+    render(<StellariumClock />);
+
+    expect(screen.getByText('time.aladinSystemTimeNote')).toBeInTheDocument();
+    expect(screen.getByLabelText('time.date')).toBeDisabled();
+    expect(screen.getByLabelText('time.time')).toBeDisabled();
+    expect(screen.getByTestId('slider')).toBeDisabled();
+    expect(screen.getByText('time.minus1Week').closest('button')).toBeDisabled();
+    expect(mockUtcToMJD).toHaveBeenCalled();
+  });
+
+  it('swallows Aladin LST calculation errors during refresh', () => {
+    mockSkyEngine = 'aladin';
+    mockUtcToMJD.mockImplementation(() => {
+      throw new Error('bad lst');
+    });
+
+    expect(() => render(<StellariumClock />)).not.toThrow();
+    expect(screen.getByText('time.aladinSystemTimeNote')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['us', 'en-US'],
+    ['eu', 'en-GB'],
+  ])('formats the date using the %s locale preference', (dateFormat, expectedLocale) => {
+    mockStel = createMockStel();
+    mockDateFormat = dateFormat;
+    const toLocaleSpy = jest.spyOn(Date.prototype, 'toLocaleString').mockImplementation(function (locale, options) {
+      if (options && typeof options === 'object' && 'year' in options) {
+        return String(locale);
+      }
+      if (options && typeof options === 'object' && 'timeZone' in options) {
+        return 'UTC TIME';
+      }
+      return 'LOCAL TIME';
+    });
+
+    render(<StellariumClock />);
+
+    expect(screen.getByText(expectedLocale)).toBeInTheDocument();
+    expect(toLocaleSpy).toHaveBeenCalledWith(
+      expectedLocale,
+      expect.objectContaining({
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+    );
   });
 
   it('renders time jump buttons', () => {
@@ -586,6 +665,24 @@ describe('StellariumClock', () => {
     mockStel = createMockStel({ utc: 59999.0 });
     render(<StellariumClock />);
     expect(mockMjdToUTC).toHaveBeenCalledWith(59999.0);
+  });
+
+  it('syncs date and time inputs from Stellarium when the popover opens', () => {
+    mockStel = createMockStel({ utc: 60234.25 });
+    mockMjdToUTC.mockImplementation(() => new Date('2025-01-02T03:04:05Z'));
+    mockFormatDateForInput.mockImplementation(() => '2025-01-02');
+    mockFormatTimeForInput.mockImplementation(() => '03:04:05');
+    render(<StellariumClock />);
+
+    const dateInput = screen.getByLabelText('time.date') as HTMLInputElement;
+    const timeInput = screen.getByLabelText('time.time') as HTMLInputElement;
+    fireEvent.change(dateInput, { target: { value: '2024-12-31' } });
+    fireEvent.change(timeInput, { target: { value: '23:59:59' } });
+
+    fireEvent.click(screen.getByTestId('popover-open'));
+
+    expect(dateInput.value).toBe('2025-01-02');
+    expect(timeInput.value).toBe('03:04:05');
   });
 
   // --- Speed display text ---

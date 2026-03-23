@@ -52,6 +52,8 @@ describe('SourceItem', () => {
     baseUrl: 'https://simbad.u-strasbg.fr',
     apiEndpoint: '/api',
     timeout: 5000,
+    renderTier: 'enrichment' as const,
+    fallbackRole: 'primary' as const,
   };
 
   const defaultProps = {

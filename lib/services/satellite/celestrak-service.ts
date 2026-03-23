@@ -5,6 +5,7 @@
 
 import type { SatelliteData, SatelliteType } from '@/lib/core/types';
 import { parseTLE, calculatePosition, type ObserverLocation } from '@/lib/services/satellite-propagator';
+import { smartFetch } from '@/lib/services/http-fetch';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('celestrak-service');
@@ -52,6 +53,15 @@ interface CacheEntry {
   timestamp: number;
 }
 
+interface CelesTrakGpRecord {
+  OBJECT_NAME: string;
+  NORAD_CAT_ID: number;
+  MEAN_MOTION: number;
+  INCLINATION: number;
+  TLE_LINE1: string;
+  TLE_LINE2: string;
+}
+
 const cache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 3600 * 1000; // 1 hour
 
@@ -97,23 +107,22 @@ export async function fetchSatellitesFromCelesTrak(
   }
 
   try {
-    const response = await fetch(
-      `https://celestrak.org/NORAD/elements/gp.php?GROUP=${category}&FORMAT=json`
+    const response = await smartFetch(
+      `https://celestrak.org/NORAD/elements/gp.php?GROUP=${category}&FORMAT=json`,
+      {
+        method: 'GET',
+        timeout: 30000,
+        cachePolicy: 'satellite-tle',
+        cacheTtl: CACHE_TTL_MS,
+      }
     );
 
     if (!response.ok) throw new Error('CelesTrak API error');
 
-    const data = await response.json();
+    const data = await response.json<CelesTrakGpRecord[]>();
     const now = new Date();
 
-    const satellites: SatelliteData[] = data.map((sat: {
-      OBJECT_NAME: string;
-      NORAD_CAT_ID: number;
-      MEAN_MOTION: number;
-      INCLINATION: number;
-      TLE_LINE1: string;
-      TLE_LINE2: string;
-    }) => {
+    const satellites: SatelliteData[] = data.map((sat) => {
       const meanMotion = sat.MEAN_MOTION;
       const period = 1440 / meanMotion;
       const altitude = Math.pow((398600.4418 * Math.pow(period * 60 / (2 * Math.PI), 2)), 1/3) - 6371;

@@ -1,6 +1,6 @@
 # API 参考文档
 
-SkyMap Test 的 API 参考文档，包括前端和后端接口说明。
+SkyMap 的 API 参考文档，包括前端和后端接口说明。
 
 ## 文档结构
 
@@ -60,3 +60,4 @@ graph TD
 - [数据流设计](../architecture/data-flow.md)
 - [组件开发](../frontend-development/react-components.md)
 - [后端开发](../backend-development/index.md)
+
