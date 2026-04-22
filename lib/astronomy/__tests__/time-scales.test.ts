@@ -15,6 +15,8 @@ const toMjd = (date: Date): number => dateToJulianDate(date) - 2400000.5;
 
 async function loadFreshTimeScaleModule() {
   jest.resetModules();
+  const { logManager } = await import('@/lib/logger');
+  logManager.initialize({ enableConsole: false, enablePersistence: false });
   return import('../time-scales');
 }
 
@@ -262,6 +264,59 @@ describe('time-scale refresh flows', () => {
 
     triggerBackgroundEopRefresh(staleDate);
     await flushAsyncWork();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('deduplicates repeated stale background refresh requests while one refresh cycle is already in flight', async () => {
+    const staleDate = new Date('2035-01-01T00:00:00Z');
+    const localStorage = {
+      getItem: jest.fn(() => null),
+      setItem: jest.fn(),
+    };
+    let releaseFirstFetch!: () => void;
+    const firstFetch = new Promise<{ ok: boolean; text: () => Promise<string> }>((resolve) => {
+      releaseFirstFetch = () => resolve({
+        ok: false,
+        text: async () => '',
+      });
+    });
+    const fetchMock = jest
+      .fn()
+      .mockImplementationOnce(() => firstFetch)
+      .mockResolvedValueOnce({
+        ok: false,
+        text: async () => '',
+      });
+
+    Object.defineProperty(globalThis, 'window', {
+      value: { localStorage },
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { onLine: true },
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(globalThis, 'fetch', {
+      value: fetchMock,
+      configurable: true,
+      writable: true,
+    });
+
+    const { triggerBackgroundEopRefresh } = await loadFreshTimeScaleModule();
+
+    triggerBackgroundEopRefresh(staleDate);
+    triggerBackgroundEopRefresh(staleDate);
+    triggerBackgroundEopRefresh(staleDate);
+
+    await flushAsyncWork();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    releaseFirstFetch();
+    await flushAsyncWork();
+    await flushAsyncWork();
+
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

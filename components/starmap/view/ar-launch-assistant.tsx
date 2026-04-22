@@ -147,6 +147,20 @@ export function ARLaunchAssistant() {
     : adaptation.sensorPath === 'manual-only'
       ? 'settings.arAdaptationManualOnly'
       : null;
+  const orderedSummaryActions = adaptation.operatingMode === 'sensor-first'
+    ? launchAssistant.summaryActions
+    : [...launchAssistant.summaryActions].sort((left, right) => {
+        const desktopPriority: Record<ARRecoveryAction, number> = {
+          'retry-camera': 0,
+          'switch-camera': 1,
+          'open-camera-settings': 2,
+          'revert-last-known-good-profile': 3,
+          'request-sensor-permission': 4,
+          'calibrate-sensor': 5,
+          'disable-ar': 6,
+        };
+        return desktopPriority[left] - desktopPriority[right];
+      });
 
   return (
     <div
@@ -162,6 +176,7 @@ export function ARLaunchAssistant() {
       data-testid="ar-launch-assistant"
       data-ar-assistant-mode={adaptation.assistantMode}
       data-ar-sensor-path={adaptation.sensorPath}
+      data-ar-operating-mode={adaptation.operatingMode}
       data-ar-sticky-actions={String(layoutTokens.stickyActions)}
     >
       <div
@@ -264,14 +279,14 @@ export function ARLaunchAssistant() {
           </div>
         )}
 
-        {launchAssistant.summaryActions.length > 0 && (
+        {orderedSummaryActions.length > 0 && (
           <div
             className={cn(
               'mt-3 flex flex-wrap gap-2',
               layoutTokens.stickyActions && 'sticky bottom-0 -mx-4 bg-black/90 px-4 pb-[calc(var(--safe-area-bottom)+0.25rem)] pt-2 backdrop-blur-sm',
             )}
           >
-            {launchAssistant.summaryActions.map((action) => (
+            {orderedSummaryActions.map((action) => (
               <Button
                 key={action}
                 variant="secondary"
@@ -318,7 +333,13 @@ export function ARLaunchAssistant() {
           <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
             <div className="flex items-center gap-2">
               <Compass className="h-4 w-4" />
-              <span>{t('settings.arLaunchDegradedSummary')}</span>
+              <span>
+                {adaptation.operatingMode === 'manual-first'
+                  ? t('settings.arAdaptationManualOnly')
+                  : adaptation.operatingMode === 'camera-first'
+                    ? t('settings.arAdaptationCameraFirst')
+                    : t('settings.arLaunchDegradedSummary')}
+              </span>
             </div>
             <Button
               size="sm"

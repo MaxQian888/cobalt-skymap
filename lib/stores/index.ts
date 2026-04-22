@@ -25,6 +25,17 @@ export { useSettingsImportRestoreStore } from './settings-import-restore-store';
 export { useAutostartStore } from './autostart-store';
 export { useFramingStore } from './framing-store';
 export { useMountStore } from './mount-store';
+export {
+  useMapInteractionStore,
+  buildContinuityTargetSummary,
+  buildContinuityActions,
+  type MapInteractionAction,
+  type MapInteractionCoordinates,
+  type MapInteractionSiteContext,
+  type MapInteractionSummaryStatus,
+  type MapInteractionSourceSurface,
+  type MapInteractionTargetSummary,
+} from './map-interaction-store';
 
 // Target and marker stores
 export { 

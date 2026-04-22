@@ -7,8 +7,28 @@ import zhMessages from '@/i18n/messages/zh.json';
 const COMPONENT_PATHS = [
   path.join(process.cwd(), 'components/common/log-panel.tsx'),
   path.join(process.cwd(), 'components/common/log-viewer.tsx'),
+  path.join(process.cwd(), 'components/common/ar-mode-toggle.tsx'),
+  path.join(process.cwd(), 'components/common/sensor-control-toggle.tsx'),
+  path.join(process.cwd(), 'components/starmap/overlays/ar-camera-background.tsx'),
+  path.join(process.cwd(), 'components/starmap/onboarding/welcome-dialog.tsx'),
+  path.join(process.cwd(), 'components/starmap/view/ar-launch-assistant.tsx'),
+  path.join(process.cwd(), 'components/starmap/view/ar-recovery-panel.tsx'),
+  path.join(process.cwd(), 'components/starmap/settings/preferences-tab-content.tsx'),
+  path.join(process.cwd(), 'components/starmap/knowledge/daily-knowledge-dialog.tsx'),
   path.join(process.cwd(), 'components/starmap/management/location-manager.tsx'),
   path.join(process.cwd(), 'components/starmap/map/map-provider-settings.tsx'),
+  path.join(process.cwd(), 'components/starmap/overlays/fov-simulator.tsx'),
+  path.join(process.cwd(), 'components/starmap/planning/observation-log.tsx'),
+];
+
+const EXPLICIT_REQUIRED_KEYS = [
+  'dailyKnowledge.difficultyBadge.beginner',
+  'dailyKnowledge.difficultyBadge.intermediate',
+  'dailyKnowledge.difficultyBadge.advanced',
+  'dailyKnowledge.difficultyBadge.expert',
+  'onboarding.restartAll',
+  'settingsNew.notifications.title',
+  'settingsNew.search.title',
 ];
 
 const TRANSLATION_HOOK_PATTERN = /\bconst\s+(\w+)\s*=\s*useTranslations(?:\('([^']+)'\))?/g;
@@ -44,7 +64,12 @@ function getMessageValue(messages: Record<string, unknown>, dottedKey: string): 
 }
 
 describe('starmap locale messages', () => {
-  const requiredKeys = [...new Set(COMPONENT_PATHS.flatMap(extractTranslationKeys))];
+  const requiredKeys = [
+    ...new Set([
+      ...COMPONENT_PATHS.flatMap(extractTranslationKeys),
+      ...EXPLICIT_REQUIRED_KEYS,
+    ]),
+  ];
 
   it.each([
     ['en', enMessages],

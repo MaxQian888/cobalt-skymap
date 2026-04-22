@@ -6,12 +6,11 @@ import {
   Info,
   FileText,
   Package,
-  Github,
   ExternalLink,
   Heart,
   MessageCircleWarning,
 } from 'lucide-react';
-import { SkyMapLogo } from '@/components/icons';
+import { GitHubIcon, SkyMapLogo } from '@/components/icons';
 import {
   Accordion,
   AccordionContent,
@@ -33,7 +32,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,11 +43,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { isTauri } from '@/lib/storage/platform';
 import { cn } from '@/lib/utils';
 import type { LicenseInfo, DataCreditInfo, DependencyGroup } from '@/types/about';
@@ -222,24 +215,16 @@ export function AboutDialog() {
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DialogTrigger asChild>
-              <Button
-                data-testid="about-button"
-                variant="ghost"
-                size="icon"
-                className={STARMAP_DIALOG_ICON_TRIGGER_CLASS}
-                aria-label={t('about.title')}
-              >
-                <Info className="h-5 w-5" />
-              </Button>
-            </DialogTrigger>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{t('about.title')}</p>
-          </TooltipContent>
-        </Tooltip>
+        <Button
+          data-testid="about-button"
+          variant="ghost"
+          size="icon"
+          className={STARMAP_DIALOG_ICON_TRIGGER_CLASS}
+          aria-label={t('about.title')}
+          onClick={() => setOpen(true)}
+        >
+          <Info className="h-5 w-5" />
+        </Button>
 
         <DialogContent data-testid="about-dialog" className="flex max-h-[85vh] max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]">
           <DialogHeader className="shrink-0 p-6 pb-0">
@@ -301,7 +286,7 @@ export function AboutDialog() {
                         className="h-auto justify-start gap-3 p-3"
                       >
                         <a href={APP_INFO.repository} target="_blank" rel="noopener noreferrer">
-                          <Github className="h-5 w-5" />
+                          <GitHubIcon className="h-5 w-5" />
                           <div className="text-left">
                             <p className="text-sm font-medium">{t('about.sourceCode')}</p>
                             <p className="text-xs text-muted-foreground">GitHub</p>

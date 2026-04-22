@@ -86,6 +86,7 @@ export function useAladinCatalogs({
 
   const catalogLayers = useAladinStore((state) => state.catalogLayers);
   const toggleCatalogLayer = useAladinStore((state) => state.toggleCatalogLayer);
+  const updateCatalogLayer = useAladinStore((state) => state.updateCatalogLayer);
 
   const activeCatalogsRef = useRef<Map<string, AladinCatalog>>(new Map());
   const signatureMapRef = useRef<Map<string, string>>(new Map());
@@ -181,6 +182,7 @@ export function useAladinCatalogs({
         signatures.set(layer.id, nextSignature);
       } catch (error) {
         logger.warn(`Failed to apply catalog layer ${layer.name}`, error);
+        updateCatalogLayer(layer.id, { enabled: false });
       }
     }
 
@@ -191,7 +193,7 @@ export function useAladinCatalogs({
       active.delete(id);
       signatures.delete(id);
     }
-  }, [aladinRef, catalogLayers, createCatalog, engineReady, refreshTick, skyEngine, staticApiReady]);
+  }, [aladinRef, catalogLayers, createCatalog, engineReady, refreshTick, skyEngine, staticApiReady, updateCatalogLayer]);
 
   const loadAutoSimbad = useCallback((ra: number, dec: number) => {
     const aladin = aladinRef.current;

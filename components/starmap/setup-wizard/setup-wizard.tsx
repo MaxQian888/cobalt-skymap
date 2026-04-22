@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
@@ -150,6 +151,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
         <DialogTitle className="sr-only">
           {t('setupWizard.title')}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          {t(`setupWizard.steps.${currentStep}.subtitle`)}
+        </DialogDescription>
         {/* Header with progress */}
         <div className="relative">
           {/* Background decoration */}

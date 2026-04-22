@@ -107,6 +107,7 @@ describe('daily-knowledge/service', () => {
 
     const result = await getDailyKnowledge('2026-02-20', 'en', { onlineEnhancement: true });
 
+    expect(result.requestedDateKey).toBe('2026-02-20');
     expect(result.selected.id).toBe('apod-2026-02-20');
     expect(result.resolutionMode).toBe('fresh-online');
     expect(result.items.some((item) => item.id === 'apod-2026-02-20')).toBe(true);
@@ -280,7 +281,7 @@ describe('daily-knowledge/service', () => {
 
   it('uses stale cache when an expired fresh online result exists and current sources degrade', async () => {
     jest.useFakeTimers();
-    jest.setSystemTime(new Date('2026-02-20T12:00:00.000Z'));
+    jest.setSystemTime(new Date('2026-02-20T12:00:00.000Z').getTime());
 
     const apod = makeItem({
       id: 'apod-stale-cache',
@@ -308,10 +309,11 @@ describe('daily-knowledge/service', () => {
     expect(first.selected.id).toBe('apod-stale-cache');
     expect(first.resolutionMode).toBe('fresh-online');
 
-    jest.setSystemTime(new Date('2026-02-21T00:01:00.000Z'));
+    jest.setSystemTime(new Date('2026-02-21T00:01:00.000Z').getTime());
 
     const second = await getDailyKnowledge('2026-02-20', 'en', { onlineEnhancement: true });
 
+    expect(second.requestedDateKey).toBe('2026-02-20');
     expect(second.selected.id).toBe('apod-stale-cache');
     expect(second.usedCuratedFallback).toBe(false);
     expect(second.resolutionMode).toBe('stale-cache');

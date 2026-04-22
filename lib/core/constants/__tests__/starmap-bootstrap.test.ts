@@ -38,15 +38,25 @@ describe('STARMAP_BOOTSTRAP_RESOURCES', () => {
     const criticalResources = STARMAP_BOOTSTRAP_RESOURCES.filter((resource) => resource.critical);
     const optionalResources = STARMAP_BOOTSTRAP_RESOURCES.filter((resource) => !resource.critical);
 
-    expect(criticalResources).toHaveLength(3);
+    expect(criticalResources).toHaveLength(2);
     expect(criticalResources.every((resource) => resource.tier === 'core')).toBe(true);
-    expect(optionalResources).toHaveLength(1);
-    expect(optionalResources[0]).toMatchObject({
-      id: 'online_metadata',
-      tier: 'enrichment',
-      critical: false,
-      fallbackOrder: 3,
-    });
+    expect(optionalResources).toHaveLength(2);
+    expect(optionalResources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'cache_index',
+          tier: 'core',
+          critical: false,
+          fallbackOrder: 2,
+        }),
+        expect.objectContaining({
+          id: 'online_metadata',
+          tier: 'enrichment',
+          critical: false,
+          fallbackOrder: 3,
+        }),
+      ])
+    );
   });
 });
 
@@ -57,6 +67,7 @@ describe('STARMAP_BOOTSTRAP_CRITICAL_RESOURCE_IDS', () => {
       .map((resource) => resource.id);
 
     expect(STARMAP_BOOTSTRAP_CRITICAL_RESOURCE_IDS).toEqual(expectedCriticalIds);
+    expect(STARMAP_BOOTSTRAP_CRITICAL_RESOURCE_IDS).not.toContain('cache_index');
     expect(STARMAP_BOOTSTRAP_CRITICAL_RESOURCE_IDS).not.toContain('online_metadata');
   });
 });

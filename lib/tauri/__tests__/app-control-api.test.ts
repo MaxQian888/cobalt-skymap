@@ -142,10 +142,12 @@ describe('app-control-api', () => {
 
     it('should reload window.location in non-Tauri environment', async () => {
       delete tauriGlobal.__TAURI__;
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
 
       await reloadWebview();
 
       expect(mockInvoke).not.toHaveBeenCalled();
+      consoleSpy.mockRestore();
     });
   });
 

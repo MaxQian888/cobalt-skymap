@@ -6,7 +6,7 @@ import {
   X, ChevronDown, ChevronUp, Crosshair, Plus,
   Compass, TrendingUp, ArrowUp, Info, Sun, Ruler, ShieldAlert, Clock3,
 } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -28,13 +28,19 @@ import { RiseTransitSetGrid } from './rise-transit-set-grid';
 import { FeasibilityBadge } from '../planning/feasibility-badge';
 import { SlewConfirmDialog } from '../mount/slew-confirm-dialog';
 import { useMountStore } from '@/lib/stores';
+import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 import { useCelestialName, useCelestialNames, useAdaptivePosition, useAstroEnvironment, useTargetAstroData, useObjectActions } from '@/lib/hooks';
+import { getCachedObjectInfo, type ObjectDetailedInfo } from '@/lib/services/object-info-service';
 import { cn } from '@/lib/utils';
 import { getObjectTypeIcon, getObjectTypeColor } from '@/lib/astronomy/object-type-utils';
 import {
   buildTargetDisplayModel,
   getAltitudeStateTextClass,
+  getCalculationSourceLabelKey,
+  getCalculationStateLabelKey,
   getMoonInterferenceTextClass,
+  getSelectionFallbackLabelKey,
+  getSelectionSourceLabelKey,
 } from '@/lib/astronomy/target-display-model';
 import type { InfoPanelProps } from '@/types/starmap/objects';
 
@@ -51,9 +57,12 @@ export const InfoPanel = memo(function InfoPanel({
   const [currentTime, setCurrentTime] = useState(new Date());
   const [objectExpanded, setObjectExpanded] = useState(true);
   const [chartExpanded, setChartExpanded] = useState(true);
+  const [cachedObjectInfo, setCachedObjectInfo] = useState<ObjectDetailedInfo | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   
   const profileInfo = useMountStore((state) => state.profileInfo);
+  const siteContext = useMapInteractionStore((state) => state.siteContext);
+  const targetContext = useMapInteractionStore((state) => state.targetContext);
   
   const latitude = profileInfo.AstrometrySettings.Latitude || 0;
   const longitude = profileInfo.AstrometrySettings.Longitude || 0;
@@ -91,6 +100,41 @@ export const InfoPanel = memo(function InfoPanel({
     }, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!selectedObject) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void getCachedObjectInfo(
+      selectedObject.names,
+      selectedObject.raDeg,
+      selectedObject.decDeg,
+      selectedObject.ra,
+      selectedObject.dec,
+      {
+        type: selectedObject.type,
+        magnitude: selectedObject.magnitude,
+        size: selectedObject.size,
+        constellation: selectedObject.constellation,
+      }
+    ).then((info) => {
+      if (!cancelled) {
+        setCachedObjectInfo(info);
+      }
+    }).catch(() => {
+      void cancelled;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedObject]);
+  const objectInfo = selectedObject && cachedObjectInfo?.names.some((name) => selectedObject.names.includes(name))
+    ? cachedObjectInfo
+    : null;
 
   // Escape key to close panel
   useEffect(() => {
@@ -136,13 +180,17 @@ export const InfoPanel = memo(function InfoPanel({
   const displayModel = buildTargetDisplayModel({
     selectedObject,
     targetData,
+    objectInfo,
     translatedPrimaryName: primaryName,
     translatedSecondaryNames: secondaryNames,
   });
   const identitySection = displayModel?.sections.identity;
   const liveStatusSection = displayModel?.sections.liveStatus;
   const planningSection = displayModel?.sections.planningMetrics;
+  const selectionMetadataSection = displayModel?.sections.selectionMetadata;
   const advancedMetadataSection = displayModel?.sections.advancedMetadata;
+  const descriptionProvenance = objectInfo?.provenance.description;
+  const unsupportedDiagnostics = objectInfo?.diagnostics.filter((diagnostic) => diagnostic.status === 'unsupported') ?? [];
 
   const getRiskHintLabel = (risk: string) => {
     const riskHintKeyMap: Record<string, string> = {
@@ -212,7 +260,8 @@ export const InfoPanel = memo(function InfoPanel({
                 </div>
                 
                 <CollapsibleContent className="mt-2 space-y-2">
-                  <div data-testid="info-panel-section-identity" className="space-y-2">
+                  <Card data-testid="info-panel-section-identity" className="gap-2 border-border/70 bg-muted/20 py-3 shadow-none">
+                    <CardContent className="space-y-2 px-3">
                     {/* Names and Type Badge */}
                     <div className="flex items-center gap-2 flex-wrap">
                       {identitySection?.type && (
@@ -265,11 +314,59 @@ export const InfoPanel = memo(function InfoPanel({
                         <span className="font-mono text-foreground">{identitySection?.coordinates.dec ?? selectedObject.dec}</span>
                       </div>
                     </div>
-                  </div>
+
+                    {selectionMetadataSection && (
+                      <div className="flex flex-wrap gap-1 text-[10px]">
+                        <Badge variant="outline" className="text-[10px]">
+                          {t(getSelectionSourceLabelKey(selectionMetadataSection.selectionSource))}
+                        </Badge>
+                        <Badge variant="outline" className="text-[10px]">
+                          {t(getSelectionFallbackLabelKey(selectionMetadataSection.selectionFallback))}
+                        </Badge>
+                      </div>
+                    )}
+
+                    {descriptionProvenance && (
+                      <div className="rounded-md border border-border/70 bg-muted/30 p-2 text-[11px] space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">{t('objectDetail.acceptedSource')}</span>
+                          <span className="text-foreground">{descriptionProvenance.acceptedSource}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">{t(`objectDetail.sourceAuthority.${descriptionProvenance.authorityLevel}`)}</span>
+                          {descriptionProvenance.contributors.length > 1 && (
+                            <span className="font-mono text-foreground">
+                              {descriptionProvenance.contributors.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                        {unsupportedDiagnostics.length > 0 && (
+                          <div className="text-amber-300">{t('objectDetail.unsupportedSourceState')}</div>
+                        )}
+                      </div>
+                    )}
+                    </CardContent>
+                  </Card>
 
                   {targetData && liveStatusSection && planningSection && (
                     <>
-                      <div data-testid="info-panel-section-live-status" className="space-y-2">
+                      {(siteContext?.displayName || targetContext?.siteName) && (
+                        <div
+                          data-testid="info-panel-continuity-context"
+                          className="rounded-md border border-border/70 bg-muted/30 p-2 text-[11px]"
+                        >
+                          <span className="text-muted-foreground">{t('starmap.context.activeSite') || 'Active site'}: </span>
+                          <span className="text-foreground">{targetContext?.siteName ?? siteContext?.displayName}</span>
+                        </div>
+                      )}
+                      <Card data-testid="info-panel-section-live-status" className="gap-2 border-border/70 bg-muted/20 py-3 shadow-none">
+                        <CardHeader className="px-3 py-0">
+                          <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+                            <ArrowUp className="h-4 w-4 text-muted-foreground" />
+                            {t('objectDetail.observation')}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 px-3">
                         {/* Current Position */}
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="flex items-center gap-1">
@@ -298,7 +395,7 @@ export const InfoPanel = memo(function InfoPanel({
                           </Badge>
                           {liveStatusSection.calculationState === 'degraded' && (
                             <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-300">
-                              degraded
+                              {t(getCalculationStateLabelKey(liveStatusSection.calculationState))}
                             </Badge>
                           )}
                         </div>
@@ -318,9 +415,17 @@ export const InfoPanel = memo(function InfoPanel({
                             </div>
                           </div>
                         )}
-                      </div>
+                        </CardContent>
+                      </Card>
 
-                      <div data-testid="info-panel-section-planning-metrics" className="space-y-2">
+                      <Card data-testid="info-panel-section-planning-metrics" className="gap-2 border-border/70 bg-muted/20 py-3 shadow-none">
+                        <CardHeader className="px-3 py-0">
+                          <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                            {t('objectDetail.tonightSummary')}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 px-3">
                         {/* Rise/Transit/Set */}
                         <RiseTransitSetGrid visibility={planningSection.visibility} variant="compact" />
 
@@ -340,31 +445,71 @@ export const InfoPanel = memo(function InfoPanel({
 
                         {/* Feasibility Score */}
                         <FeasibilityBadge feasibility={planningSection.feasibility} variant="inline" tooltipSide="right" />
-                      </div>
+                        </CardContent>
+                      </Card>
 
                       {/* Coordinate metadata */}
-                      {advancedMetadataSection && (
-                        <div
+                      {(advancedMetadataSection || selectionMetadataSection) && (
+                        <Card
                           data-testid="info-panel-section-advanced-metadata"
-                          className="hidden sm:block rounded-md border border-border/70 bg-muted/30 p-2 text-[11px] space-y-1"
+                          className="hidden gap-2 border-border/70 bg-muted/20 py-3 text-[11px] shadow-none sm:block"
                         >
-                          <div className="flex items-center justify-between">
+                          <CardHeader className="px-3 py-0">
+                            <CardTitle className="text-sm font-medium flex items-center gap-1 text-muted-foreground">
+                              <Info className="h-3 w-3" />
+                              <span>{t('objectDetail.systemMetadata')}</span>
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-1 px-3">
+                            <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">{t('objectDetail.frameTimeScale')}</span>
-                            <span className="font-mono text-foreground">{advancedMetadataSection.frame} / {advancedMetadataSection.timeScale}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-foreground">
+                              {advancedMetadataSection ? `${advancedMetadataSection.frame} / ${advancedMetadataSection.timeScale}` : '--'}
+                            </span>
+                            </div>
+                            <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">{t('objectDetail.qualityEop')}</span>
-                            <span className="font-mono text-foreground">{advancedMetadataSection.qualityFlag} / {advancedMetadataSection.dataFreshness}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground">Calc</span>
-                            <span className="font-mono text-foreground">{advancedMetadataSection.calculationSource} / {advancedMetadataSection.calculationState}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-foreground">
+                              {advancedMetadataSection ? `${advancedMetadataSection.qualityFlag} / ${advancedMetadataSection.dataFreshness}` : '--'}
+                            </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">{t('objectDetail.calculationSummary')}</span>
+                            <span className="font-mono text-foreground">
+                              {advancedMetadataSection
+                                ? `${t(getCalculationSourceLabelKey(advancedMetadataSection.calculationSource))} / ${t(getCalculationStateLabelKey(advancedMetadataSection.calculationState))}`
+                                : '--'}
+                            </span>
+                            </div>
+                            {selectionMetadataSection && (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">{t('objectDetail.selectionSourceLabel')}</span>
+                                <span className="font-mono text-foreground">{t(getSelectionSourceLabelKey(selectionMetadataSection.selectionSource))}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">{t('objectDetail.selectionFallbackLabel')}</span>
+                                <span className="font-mono text-foreground">{t(getSelectionFallbackLabelKey(selectionMetadataSection.selectionFallback))}</span>
+                              </div>
+                            </>
+                            )}
+                            {selectionMetadataSection?.sourceCatalog && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">{t('objectDetail.sourceCatalog')}</span>
+                              <span className="font-mono text-foreground">{selectionMetadataSection.sourceCatalog}</span>
+                            </div>
+                            )}
+                            <div className="flex items-center justify-between">
                             <span className="text-muted-foreground flex items-center gap-1"><Clock3 className="h-3 w-3" /> {t('objectDetail.timestamp')}</span>
-                            <span className="font-mono text-foreground">{advancedMetadataSection.calculationTimestamp ?? advancedMetadataSection.updatedAt}</span>
-                          </div>
-                        </div>
+                            <span className="font-mono text-foreground">
+                              {advancedMetadataSection?.calculationTimestamp
+                                ?? advancedMetadataSection?.updatedAt
+                                ?? selectionMetadataSection?.selectionTimestamp
+                                ?? '--'}
+                            </span>
+                            </div>
+                          </CardContent>
+                        </Card>
                       )}
                     </>
                   )}

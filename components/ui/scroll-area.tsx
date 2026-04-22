@@ -23,7 +23,7 @@ function ScrollArea({
         {children}
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar />
-      <ScrollAreaPrimitive.Corner />
+      <ScrollAreaPrimitive.Corner className="rounded-[inherit] bg-[var(--scrollbar-track)]" />
     </ScrollAreaPrimitive.Root>
   )
 }
@@ -38,18 +38,25 @@ function ScrollBar({
       data-slot="scroll-area-scrollbar"
       orientation={orientation}
       className={cn(
-        "flex touch-none p-px transition-colors select-none",
+        "flex touch-none p-0.5 transition-[background-color,opacity,box-shadow] duration-200 select-none opacity-75 hover:opacity-100",
         orientation === "vertical" &&
-          "h-full w-2.5 border-l border-l-transparent",
+          "h-full w-3 border-l border-l-transparent",
         orientation === "horizontal" &&
-          "h-2.5 flex-col border-t border-t-transparent",
+          "h-3 flex-col border-t border-t-transparent",
+        "rounded-full bg-[var(--scrollbar-track)] shadow-[inset_0_0_0_1px_var(--scrollbar-track-border)] hover:bg-[var(--scrollbar-track-hover)]",
         className
       )}
       {...props}
     >
       <ScrollAreaPrimitive.ScrollAreaThumb
         data-slot="scroll-area-thumb"
-        className="bg-border relative flex-1 rounded-full"
+        className={cn(
+          "relative flex-1 rounded-full border border-transparent",
+          "bg-[var(--scrollbar-thumb)] shadow-[var(--scrollbar-thumb-shadow)]",
+          "before:absolute before:inset-x-0.5 before:top-0.5 before:h-1/3 before:rounded-full before:bg-white/20 before:content-['']",
+          "transition-[background-color,transform] duration-200",
+          "hover:bg-[var(--scrollbar-thumb-hover)] active:bg-[var(--scrollbar-thumb-active)] active:scale-[0.98]"
+        )}
       />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   )

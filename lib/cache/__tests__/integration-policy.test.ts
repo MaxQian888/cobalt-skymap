@@ -139,8 +139,8 @@ describe('cache integration policy', () => {
   describe('resolveCachePolicyForPrefetchResource', () => {
     it('maps known starmap prefetch resources to declared policies', () => {
       expect(resolveCachePolicyForPrefetchResource('/stellarium-js/stellarium-web-engine.js')).toBe('starmap-core-bootstrap');
-      expect(resolveCachePolicyForPrefetchResource('https://example.com/stellarium-data/stars/info.json')).toBe('starmap-catalog-bootstrap');
-      expect(resolveCachePolicyForPrefetchResource('/stellarium-data/surveys/dss/info.json?ts=1')).toBe('starmap-survey-manifest');
+      expect(resolveCachePolicyForPrefetchResource('https://example.com/stellarium-data/stars/properties')).toBe('starmap-catalog-bootstrap');
+      expect(resolveCachePolicyForPrefetchResource('/stellarium-data/surveys/dss/properties?ts=1')).toBe('starmap-survey-manifest');
     });
 
     it('returns null for resources without declared tier policy', () => {

@@ -92,6 +92,7 @@ jest.mock('@/components/icons', () => {
 
   return {
     SkyMapLogo: MockIcon,
+    GitHubIcon: MockIcon,
     WindowsIcon: MockIcon,
     AppleIcon: MockIcon,
     LinuxIcon: MockIcon,

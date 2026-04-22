@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAladinStore } from '@/lib/stores/aladin-store';
 
 // Mock logger
@@ -84,5 +84,34 @@ describe('useAladinMOC', () => {
       })
     );
     expect(aladinMock.MOCFromURL).not.toHaveBeenCalled();
+  });
+
+  it('hides a MOC layer when addMOC fails so the base canvas remains usable', async () => {
+    const { useAladinMOC } = await import('../use-aladin-moc');
+    const aladinRef = {
+      current: {
+        addMOC: jest.fn(() => {
+          throw new Error('moc failed');
+        }),
+      },
+    };
+
+    useAladinStore.getState().addMocLayer({
+      id: 'broken-moc',
+      name: 'Broken MOC',
+      url: 'https://example.com/moc',
+      color: '#3b82f6',
+      opacity: 0.3,
+      lineWidth: 1,
+      visible: true,
+    });
+
+    renderHook(() =>
+      useAladinMOC({ aladinRef: aladinRef as never, engineReady: true })
+    );
+
+    await waitFor(() => {
+      expect(useAladinStore.getState().mocLayers.find((layer) => layer.id === 'broken-moc')?.visible).toBe(false);
+    });
   });
 });

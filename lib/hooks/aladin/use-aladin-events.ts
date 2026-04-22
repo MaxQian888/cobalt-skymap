@@ -19,6 +19,27 @@ const logger = createLogger('aladin-events');
 // Objects farther than this from the click point are rejected.
 const MAX_MATCH_SEPARATION_DEG = 0.25;
 
+function buildSelectionTimestamp(): string {
+  return new Date().toISOString();
+}
+
+function resolveCatalogLabel(object: Record<string, unknown>, data: Record<string, unknown>): string | null {
+  const candidates = [
+    data.catalog,
+    data.catalogName,
+    data.source,
+    data.sourceCatalog,
+    object.catalog,
+    object.catalogName,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+  return 'Aladin catalog';
+}
+
 /** Haversine angular distance in degrees between two sky positions (both in degrees). */
 function angularSeparation(ra1: number, dec1: number, ra2: number, dec2: number): number {
   const toRad = Math.PI / 180;
@@ -125,6 +146,10 @@ export function useAladinEvents({
           dec: formatDecString(dec),
           raDeg: ra,
           decDeg: dec,
+          selectionSource: 'catalog',
+          selectionFallback: name === 'Unknown' ? 'catalog_partial' : 'resolved',
+          sourceCatalog: resolveCatalogLabel(obj, data),
+          selectionTimestamp: buildSelectionTimestamp(),
           type: typeof data.type === 'string' ? data.type : undefined,
           magnitude: typeof data.mag === 'number' ? data.mag : undefined,
         };
@@ -179,6 +204,10 @@ export function useAladinEvents({
         dec: formatDecString(dec),
         raDeg: ra,
         decDeg: dec,
+        selectionSource: 'coordinate',
+        selectionFallback: 'coordinate_fallback',
+        sourceCatalog: null,
+        selectionTimestamp: buildSelectionTimestamp(),
       });
 
       // Cancel any in-flight SIMBAD query from a previous click
@@ -230,6 +259,10 @@ export function useAladinEvents({
             dec: best.decString ?? formatDecString(best.dec),
             raDeg: best.ra,
             decDeg: best.dec,
+            selectionSource: 'enriched',
+            selectionFallback: 'resolved',
+            sourceCatalog: 'SIMBAD',
+            selectionTimestamp: buildSelectionTimestamp(),
             type: best.type !== 'Unknown' ? best.type : undefined,
             magnitude: best.magnitude,
           };

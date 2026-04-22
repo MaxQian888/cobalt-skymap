@@ -135,6 +135,7 @@ describe('StellariumCanvas Ref Methods', () => {
     jest.useFakeTimers();
     mockStelEngine.core.selection = null;
     delete (window as { StelWebEngine?: unknown }).StelWebEngine;
+    HTMLCanvasElement.prototype.toDataURL = jest.fn(() => 'data:image/png;base64,mock');
     Element.prototype.getBoundingClientRect = jest.fn(() => ({
       width: 800, height: 600,
       top: 0, left: 0, bottom: 600, right: 800, x: 0, y: 0,

@@ -151,7 +151,7 @@ describe('LoadingOverlay', () => {
   describe('timing hints', () => {
     beforeEach(() => {
       jest.useFakeTimers();
-      jest.setSystemTime(new Date('2026-01-01T00:00:20.000Z'));
+      jest.setSystemTime(new Date('2026-01-01T00:00:20.000Z').getTime());
     });
 
     afterEach(() => {

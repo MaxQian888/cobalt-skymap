@@ -212,6 +212,7 @@ export async function computeCoordinates(input: CoordinateComputationInput): Pro
   const requestKey = serializeCacheKey({
     coordinate: normalized.coordinate,
     refraction: normalized.refraction ?? 'normal',
+    contextKey: normalized.contextKey ?? null,
   });
   const context = buildNormalizedContext(normalized.observer, normalized.date, requestKey);
   const fingerprint = buildContextFingerprint('coordinates', {
@@ -247,6 +248,7 @@ export async function computeEphemeris(request: EphemerisRequest): Promise<Ephem
     steps: normalized.steps,
     refraction: normalized.refraction ?? 'normal',
     customCoordinate: normalized.customCoordinate,
+    contextKey: normalized.contextKey ?? null,
   });
   const context = buildNormalizedContext(normalized.observer, normalized.startDate, requestKey);
   const fingerprint = buildContextFingerprint('ephemeris', {
@@ -273,6 +275,7 @@ export async function computeRiseTransitSet(request: RiseTransitSetRequest): Pro
     body: normalized.body,
     minAltitude: normalized.minAltitude ?? 0,
     customCoordinate: normalized.customCoordinate,
+    contextKey: normalized.contextKey ?? null,
   });
   const context = buildNormalizedContext(normalized.observer, normalized.date, requestKey);
   const fingerprint = buildContextFingerprint('riseTransitSet', {
@@ -297,6 +300,7 @@ export async function searchPhenomena(request: PhenomenaRequest): Promise<Phenom
   const normalized = normalizePhenomenaRequest(request);
   const requestKey = serializeCacheKey({
     includeMinor: normalized.includeMinor ?? false,
+    contextKey: normalized.contextKey ?? null,
   });
   const context = buildNormalizedContext(
     normalized.observer,
@@ -325,6 +329,7 @@ export async function computeAlmanac(request: AlmanacRequest): Promise<AlmanacRe
   const normalized = normalizeAlmanacRequest(request);
   const requestKey = serializeCacheKey({
     refraction: normalized.refraction ?? 'normal',
+    contextKey: normalized.contextKey ?? null,
   });
   const context = buildNormalizedContext(normalized.observer, normalized.date, requestKey);
   const fingerprint = buildContextFingerprint('almanac', {

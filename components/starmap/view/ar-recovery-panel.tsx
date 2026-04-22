@@ -12,6 +12,7 @@ import {
 } from '@/lib/core/ar-invocation';
 import type { ARRecoveryAction, ARSessionStatus } from '@/lib/core/ar-session';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
+import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 import { useOnboardingBridgeStore, useSettingsStore } from '@/lib/stores';
 import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
 import { getARSurfaceLayoutTokens, withSafeAreaInset } from '@/lib/constants/ar-layout';
@@ -77,12 +78,28 @@ export function ARRecoveryPanel({
   const cameraRuntime = useARRuntimeStore((state) => state.camera);
   const launchAssistantVisible = useARRuntimeStore((state) => state.launchAssistant.visible);
   const openLaunchAssistant = useARRuntimeStore((state) => state.openLaunchAssistant);
+  const siteContext = useMapInteractionStore((state) => state.siteContext);
+  const targetContext = useMapInteractionStore((state) => state.targetContext);
 
   const recoveryActionLastFiredAt = useARRuntimeStore((state) => state.recoveryActionLastFiredAt);
   const [now, setNow] = useState(0);
   const diagnosticSummary = deriveARCameraDiagnosticSummary(cameraRuntime);
 
   const actions = Array.from(new Set(recoveryActions));
+  const orderedActions = adaptation.operatingMode === 'sensor-first'
+    ? actions
+    : [...actions].sort((left, right) => {
+        const desktopPriority: Record<ARRecoveryAction, number> = {
+          'retry-camera': 0,
+          'switch-camera': 1,
+          'open-camera-settings': 2,
+          'revert-last-known-good-profile': 3,
+          'request-sensor-permission': 4,
+          'calibrate-sensor': 5,
+          'disable-ar': 6,
+        };
+        return desktopPriority[left] - desktopPriority[right];
+      });
 
   const handlers: ARRecoveryActionHandlers = {
     onRetryCamera: () => requestRecoveryAction('retry-camera'),
@@ -168,9 +185,19 @@ export function ARRecoveryPanel({
       }}
       data-testid="ar-recovery-panel"
       data-ar-recovery-mode={adaptation.recoveryMode}
+      data-ar-operating-mode={adaptation.operatingMode}
       data-ar-sticky-actions={String(layoutTokens.stickyActions)}
     >
       <p className="text-xs font-medium">{t(getStatusTextKey(status))}</p>
+      {adaptation.operatingMode !== 'sensor-first' && (
+        <p className="text-[11px] text-sky-100" data-testid="ar-recovery-operating-mode">
+          {t(
+            adaptation.operatingMode === 'manual-first'
+              ? 'settings.arAdaptationManualOnly'
+              : 'settings.arAdaptationCameraFirst',
+          )}
+        </p>
+      )}
       {(diagnosticSummary.deviceLabel || diagnosticSummary.lastFailureStage || diagnosticSummary.usedRememberedPlan) && (
         <p className="text-[11px] text-white/80" data-testid="ar-recovery-diagnostics">
           {[
@@ -179,6 +206,16 @@ export function ARRecoveryPanel({
             diagnosticSummary.usedRememberedPlan ? t('settings.arCameraRememberedPlan') : null,
             diagnosticSummary.lastFailureStage
               ? `${t('settings.arCameraLastFailureStage')}: ${diagnosticSummary.lastFailureStage}`
+              : null,
+          ].filter(Boolean).join(' · ')}
+        </p>
+      )}
+      {(targetContext?.primaryName || siteContext?.displayName) && (
+        <p className="text-[11px] text-white/85" data-testid="ar-recovery-observing-context">
+          {[
+            targetContext?.primaryName ? `${t('starmap.context.activeTarget') || 'Target'}: ${targetContext.primaryName}` : null,
+            (targetContext?.siteName ?? siteContext?.displayName)
+              ? `${t('starmap.context.activeSite') || 'Active site'}: ${targetContext?.siteName ?? siteContext?.displayName}`
               : null,
           ].filter(Boolean).join(' · ')}
         </p>
@@ -194,7 +231,7 @@ export function ARRecoveryPanel({
           >
             {t('settings.arLaunchOpenAssistant')}
           </Button>
-          {actions.map((action) => (
+          {orderedActions.map((action) => (
             <Button
               key={action}
               variant="secondary"
@@ -214,6 +251,17 @@ export function ARRecoveryPanel({
               {t(getActionTextKey(action))}
             </Button>
           ))}
+          {targetContext && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 rounded-full bg-white/15 px-3 text-xs text-white hover:bg-white/25"
+              onClick={() => setStellariumSetting('arMode', false)}
+              data-testid="ar-recovery-return-to-target"
+            >
+              {t('starmap.context.returnToTarget') || 'Return to target'}
+            </Button>
+          )}
         </div>
       )}
       {recoveryNoticeKey && (

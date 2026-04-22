@@ -86,12 +86,33 @@ jest.mock('@/lib/stores/target-list-store', () => ({
     }),
 }));
 
+jest.mock('@/lib/hooks/use-canonical-observation-location', () => ({
+  useCanonicalObservationLocationState: () => ({
+    currentLocation: {
+      id: 'loc-1',
+      name: 'Mountain Base',
+      latitude: 35.1234,
+      longitude: 117.9876,
+      altitude: 1250,
+      timezone: 'America/Los_Angeles',
+      is_current: true,
+      is_default: true,
+    },
+    hasSavedLocation: true,
+    loading: false,
+    isTauriManaged: true,
+  }),
+}));
+
 jest.mock('@/lib/astronomy/starmap-utils', () => ({
   degreesToHMS: (value: number) => `${value}h`,
   degreesToDMS: (value: number) => `${value}d`,
 }));
 
-jest.mock('../astro-calculator', () => ({
+jest.mock('../astro-calculator', () => {
+  const observerContext = jest.requireActual('../astro-calculator/observer-context');
+
+  return {
   PositionsTab: ({
     onSelectObject,
     onAddToList,
@@ -108,7 +129,17 @@ jest.mock('../astro-calculator', () => ({
       </button>
     </div>
   ),
-  WUTTab: () => <div data-testid="tab-wut" />,
+  WUTTab: ({
+    observerContext,
+  }: {
+    observerContext?: { locationName?: string; timezone?: string; elevation?: number };
+  }) => (
+    <div data-testid="tab-wut">
+      <span data-testid="wut-observer-context">
+        {observerContext?.locationName ?? 'missing'}|{observerContext?.timezone ?? 'missing'}|{observerContext?.elevation ?? 'missing'}
+      </span>
+    </div>
+  ),
   RTSTab: () => <div data-testid="tab-rts" />,
   EphemerisTab: () => <div data-testid="tab-ephemeris" />,
   AlmanacTab: () => <div data-testid="tab-almanac" />,
@@ -138,14 +169,19 @@ jest.mock('../astro-calculator', () => ({
     time: { labelKey: 'astroCalc.timeCalc' },
     'solar-system': { labelKey: 'astroCalc.solarSystem' },
   },
-}));
+    buildAstroCalculatorObserverContext: observerContext.buildAstroCalculatorObserverContext,
+    DEFAULT_ASTRO_CALCULATOR_OBSERVER_CONSTRAINTS: observerContext.DEFAULT_ASTRO_CALCULATOR_OBSERVER_CONSTRAINTS,
+  };
+});
 
 describe('AstroCalculatorDialog', () => {
   it('renders the dialog trigger, title, location badge, and all tab labels', () => {
     render(<AstroCalculatorDialog />);
 
     expect(screen.getAllByText('astroCalc.title').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByText('39.90°, 116.41°')).toBeInTheDocument();
+    expect(screen.getByText('35.12°, 117.99°')).toBeInTheDocument();
+    expect(screen.getByText('Mountain Base')).toBeInTheDocument();
+    expect(screen.getByText('America/Los_Angeles')).toBeInTheDocument();
     expect(screen.getByText('astroCalc.wut')).toBeInTheDocument();
     expect(screen.getByText('astroCalc.positions')).toBeInTheDocument();
     expect(screen.getByText('astroCalc.rts')).toBeInTheDocument();
@@ -170,6 +206,9 @@ describe('AstroCalculatorDialog', () => {
     expect(screen.getByTestId('tab-coordinate')).toBeInTheDocument();
     expect(screen.getByTestId('tab-time')).toBeInTheDocument();
     expect(screen.getByTestId('tab-solar-system')).toBeInTheDocument();
+    expect(screen.getByTestId('wut-observer-context')).toHaveTextContent(
+      'Mountain Base|America/Los_Angeles|1250',
+    );
   });
 
   it('wires selection and add-to-list callbacks through the tab props', () => {

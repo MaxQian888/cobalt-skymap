@@ -2,14 +2,20 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ARRecoveryPanel } from '../ar-recovery-panel';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
+import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
+
+const originalConsoleError = console.error;
 
 const mockSetStellariumSetting = jest.fn();
 const mockOpenSettingsDrawer = jest.fn();
 let mockRecoveryMode: 'floating-card' | 'edge-sheet' | 'compact-strip' = 'compact-strip';
+let mockRuntimeClass: 'browser-mobile' | 'browser-desktop' | 'tauri-desktop' = 'browser-mobile';
+let mockSensorPath: 'sensor-primary' | 'camera-primary' | 'manual-only' = 'sensor-primary';
+let mockOperatingMode: 'sensor-first' | 'camera-first' | 'manual-first' = 'sensor-first';
 
 jest.mock('@/lib/stores', () => ({
   useSettingsStore: (selector: (state: { setStellariumSetting: (key: string, value: unknown) => void }) => unknown) =>
@@ -27,8 +33,9 @@ jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
     assistantMode: 'edge-sheet',
     recoveryMode: mockRecoveryMode,
     cameraControlMode: 'compact-strip',
-    sensorPath: 'sensor-primary',
-    runtimeClass: 'browser-mobile',
+    sensorPath: mockSensorPath,
+    runtimeClass: mockRuntimeClass,
+    operatingMode: mockOperatingMode,
     layoutTier: 'phone-compact',
     controlDensity: 'compact',
     capabilityTier: 'limited',
@@ -43,8 +50,23 @@ jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
 describe('ARRecoveryPanel', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const [firstArg] = args;
+      if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) {
+        return;
+      }
+      originalConsoleError(...args as Parameters<typeof console.error>);
+    });
     mockRecoveryMode = 'compact-strip';
+    mockRuntimeClass = 'browser-mobile';
+    mockSensorPath = 'sensor-primary';
+    mockOperatingMode = 'sensor-first';
     useARRuntimeStore.getState().resetRecoveryState();
+    useMapInteractionStore.getState().reset();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('renders nothing when status is ready', () => {
@@ -80,7 +102,9 @@ describe('ARRecoveryPanel', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('ar-recovery-open-launch-assistant'));
+    act(() => {
+      fireEvent.click(screen.getByTestId('ar-recovery-open-launch-assistant'));
+    });
     expect(useARRuntimeStore.getState().launchAssistant.visible).toBe(true);
   });
 
@@ -128,7 +152,9 @@ describe('ARRecoveryPanel', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('ar-recovery-action-disable-ar'));
+    act(() => {
+      fireEvent.click(screen.getByTestId('ar-recovery-action-disable-ar'));
+    });
     expect(mockSetStellariumSetting).toHaveBeenCalledWith('arMode', false);
   });
   it('dispatches switch-camera recovery action through shared handlers', async () => {
@@ -212,7 +238,9 @@ describe('ARRecoveryPanel', () => {
     );
 
     const before = Date.now();
-    fireEvent.click(screen.getByTestId('ar-recovery-action-retry-camera'));
+    act(() => {
+      fireEvent.click(screen.getByTestId('ar-recovery-action-retry-camera'));
+    });
     const after = Date.now();
 
     const lastFired = useARRuntimeStore.getState().recoveryActionLastFiredAt['retry-camera'];
@@ -232,6 +260,23 @@ describe('ARRecoveryPanel', () => {
     expect(screen.getByTestId('ar-recovery-panel')).toHaveAttribute('data-ar-sticky-actions', 'true');
   });
 
+  it('surfaces manual-first desktop recovery guidance when sensor-driven AR is unavailable', () => {
+    mockRecoveryMode = 'floating-card';
+    mockRuntimeClass = 'tauri-desktop';
+    mockSensorPath = 'manual-only';
+    mockOperatingMode = 'manual-first';
+
+    render(
+      <ARRecoveryPanel
+        status="blocked"
+        recoveryActions={['retry-camera', 'disable-ar']}
+      />
+    );
+
+    expect(screen.getByTestId('ar-recovery-panel')).toHaveAttribute('data-ar-operating-mode', 'manual-first');
+    expect(screen.getByText('settings.arAdaptationManualOnly')).toBeInTheDocument();
+  });
+
   it('opens camera settings from the shared recovery handler', async () => {
     const user = userEvent.setup();
 
@@ -248,6 +293,46 @@ describe('ARRecoveryPanel', () => {
     await waitFor(() => {
       expect(useARRuntimeStore.getState().recoveryNoticeKey).toBe('settings.arRecoveryNoticeOpenCameraSettingsRequested');
     });
+  });
+
+  it('renders preserved observing context and allows returning to the target workflow', async () => {
+    const user = userEvent.setup();
+
+    useMapInteractionStore.getState().setSiteContext({
+      kind: 'committed',
+      sourceSurface: 'starmap',
+      coordinates: { latitude: 35.6762, longitude: 139.6503 },
+      summaryStatus: 'ready',
+      displayName: 'Tokyo',
+      actions: ['open-target-details'],
+    });
+    useMapInteractionStore.getState().setTargetContext({
+      objectName: 'M31',
+      primaryName: 'M31',
+      aliases: ['Andromeda Galaxy'],
+      ra: '00h 42m 44s',
+      dec: '+41° 16\' 09"',
+      raDeg: 10.6847,
+      decDeg: 41.2689,
+      type: 'Galaxy',
+      sourceQuality: 'normal',
+      siteName: 'Tokyo',
+      siteCoordinates: { latitude: 35.6762, longitude: 139.6503 },
+    });
+
+    render(
+      <ARRecoveryPanel
+        status="blocked"
+        recoveryActions={['retry-camera']}
+      />
+    );
+
+    expect(screen.getByText(/M31/)).toBeInTheDocument();
+    expect(screen.getByText(/Tokyo/)).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('ar-recovery-return-to-target'));
+
+    expect(mockSetStellariumSetting).toHaveBeenCalledWith('arMode', false);
   });
 
   it('requests profile revert and renders stabilizing hint when asked', async () => {
@@ -270,16 +355,20 @@ describe('ARRecoveryPanel', () => {
     });
   });
 
-  it('clears a stale recovery notice once the session returns to ready', () => {
-    useARRuntimeStore.getState().setRecoveryNoticeKey('settings.arRecoveryNoticeRetryCameraRequested');
+  it('clears a stale recovery notice once the session returns to ready', async () => {
+    await act(async () => {
+      useARRuntimeStore.getState().setRecoveryNoticeKey('settings.arRecoveryNoticeRetryCameraRequested');
 
-    render(
-      <ARRecoveryPanel
-        status="ready"
-        recoveryActions={[]}
-      />
-    );
+      render(
+        <ARRecoveryPanel
+          status="ready"
+          recoveryActions={[]}
+        />
+      );
+    });
 
-    expect(useARRuntimeStore.getState().recoveryNoticeKey).toBeNull();
+    await waitFor(() => {
+      expect(useARRuntimeStore.getState().recoveryNoticeKey).toBeNull();
+    });
   });
 });

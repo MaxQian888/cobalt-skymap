@@ -7,6 +7,8 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { IndexManager } from '../index-manager';
 import { usePlateSolverStore } from '@/lib/stores/plate-solver-store';
 
+const originalConsoleError = console.error;
+
 // Mock next-intl — return key as text
 const mockTranslate = jest.fn((key: string) => key);
 
@@ -214,10 +216,22 @@ describe('IndexManager', () => {
         solver_type: 'astap',
       },
     ]);
+
+    jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const [firstArg] = args;
+      if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) {
+        return;
+      }
+      originalConsoleError(...args as Parameters<typeof console.error>);
+    });
   });
 
   beforeEach(() => {
     activeTab = 'installed';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('should not render for online solver', () => {

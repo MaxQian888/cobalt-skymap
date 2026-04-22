@@ -17,8 +17,8 @@ describe('ScreenshotCarousel', () => {
     expect(screen.getByRole('tablist', { name: 'Screenshot categories' })).toBeInTheDocument();
     expect(screen.getAllByRole('tab')).toHaveLength(4);
     expect(screen.getAllByRole('tabpanel')).toHaveLength(4);
-    expect(screen.getByRole('button', { name: 'Previous slide' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Next slide' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Previous slide' }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole('button', { name: 'Next slide' }).length).toBeGreaterThanOrEqual(1);
   });
 
   it('scrolls the carousel when a tab is clicked and reacts to selection events', async () => {

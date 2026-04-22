@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { buildContinuityActions, useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 import { mapConfig } from '@/lib/services/map-config';
 import { geocodingService } from '@/lib/services/geocoding-service';
 import { TILE_LAYER_CONFIGS, type TileLayerType } from '@/lib/constants/map';
@@ -168,6 +169,7 @@ function MapLocationPickerComponent({
   const pendingSelectionRef = useRef<LocationResult | null>(null);
   const latInputRef = useRef<HTMLInputElement>(null);
   const lngInputRef = useRef<HTMLInputElement>(null);
+  const setSiteContext = useMapInteractionStore((state) => state.setSiteContext);
 
   const currentLocation = commitMode === 'staged' ? draftLocation : committedLocation;
   const hasPendingChanges = commitMode === 'staged' && !areCoordinatesEqual(draftLocation, committedLocation);
@@ -351,6 +353,28 @@ function MapLocationPickerComponent({
       ? draftMetadataState
       : null;
   }, [draftMetadataState, currentLocation]);
+
+  useEffect(() => {
+    const summaryStatus = activeDraftMetadata?.summaryStatus ?? 'ready';
+    const hasRecoverableMetadata = summaryStatus === 'partial' || summaryStatus === 'error';
+    const nextKind = commitMode === 'staged' && hasPendingChanges ? 'draft' : 'committed';
+
+    setSiteContext({
+      kind: nextKind,
+      sourceSurface: 'map-picker',
+      coordinates: currentLocation,
+      summaryStatus,
+      displayName: pendingSelectionRef.current?.displayName ?? pendingSelectionRef.current?.address,
+      issues: activeDraftMetadata?.issues.map((issue) => issue.message) ?? [],
+      actions: buildContinuityActions({
+        sourceSurface: 'map-picker',
+        hasDraftSite: nextKind === 'draft',
+        hasRecoverableMetadata,
+        hasTarget: false,
+        arStatus: 'idle',
+      }),
+    });
+  }, [activeDraftMetadata, commitMode, currentLocation, hasPendingChanges, setSiteContext]);
 
   const draftMetadataStatusText = useMemo(() => {
     if (!activeDraftMetadata) return null;

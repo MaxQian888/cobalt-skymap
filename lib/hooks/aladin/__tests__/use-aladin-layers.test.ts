@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAladinStore } from '@/lib/stores/aladin-store';
 
 // Mock logger
@@ -77,5 +77,33 @@ describe('useAladinLayers', () => {
       })
     );
     expect(aladinMock.imageHiPS).not.toHaveBeenCalled();
+  });
+
+  it('disables an overlay layer when Aladin rejects it', async () => {
+    const { useAladinLayers } = await import('../use-aladin-layers');
+    const aladinRef = {
+      current: {
+        setOverlayImageLayer: jest.fn(() => {
+          throw new Error('overlay failed');
+        }),
+      },
+    };
+
+    useAladinStore.getState().addImageOverlayLayer({
+      id: 'broken-overlay',
+      name: 'Broken',
+      surveyId: 'CDS/P/DSS2/color',
+      enabled: true,
+      opacity: 0.5,
+      additive: false,
+    });
+
+    renderHook(() =>
+      useAladinLayers({ aladinRef: aladinRef as never, engineReady: true })
+    );
+
+    await waitFor(() => {
+      expect(useAladinStore.getState().imageOverlayLayers.find((layer) => layer.id === 'broken-overlay')?.enabled).toBe(false);
+    });
   });
 });

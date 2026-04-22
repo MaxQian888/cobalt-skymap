@@ -275,4 +275,18 @@ describe('SplashScreen', () => {
     expect(splash).not.toHaveAttribute('aria-label');
     expect(screen.getByText('splash.tagline', { selector: '.sr-only' })).toBeInTheDocument();
   });
+
+  it('renders a non-blocking completion hint before dismissing', () => {
+    render(
+      <SplashScreen
+        minDuration={5000}
+        isReady={true}
+        completionHint="Cache warmup will continue in the background"
+      />
+    );
+
+    expect(screen.getByTestId('splash-completion-hint')).toHaveTextContent(
+      'Cache warmup will continue in the background'
+    );
+  });
 });

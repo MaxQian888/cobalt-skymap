@@ -46,6 +46,59 @@ interface ARRuntimeStoreState {
   resetRecoveryState: () => void;
 }
 
+function mergeIfChanged<T extends object>(current: T, next: Partial<T>): T {
+  let changed = false;
+  const merged = { ...current } as T;
+
+  for (const [key, value] of Object.entries(next) as [keyof T, T[keyof T]][]) {
+    if (!areValuesEqual(current[key], value)) {
+      changed = true;
+      merged[key] = value;
+    }
+  }
+
+  return changed ? merged : current;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
+function areValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) {
+    return true;
+  }
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    return left.every((item, index) => areValuesEqual(item, right[index]));
+  }
+
+  if (isPlainObject(left) && isPlainObject(right)) {
+    const leftEntries = Object.entries(left);
+    const rightEntries = Object.entries(right);
+
+    if (leftEntries.length !== rightEntries.length) {
+      return false;
+    }
+
+    return leftEntries.every(([key, value]) =>
+      Object.prototype.hasOwnProperty.call(right, key)
+      && areValuesEqual(value, right[key]),
+    );
+  }
+
+  return false;
+}
+
 export const useARRuntimeStore = create<ARRuntimeStoreState>((set) => ({
   camera: DEFAULT_AR_CAMERA_RUNTIME_STATE,
   sensor: DEFAULT_AR_SENSOR_RUNTIME_STATE,
@@ -70,19 +123,15 @@ export const useARRuntimeStore = create<ARRuntimeStoreState>((set) => ({
     'disable-ar': 0,
   },
   setCameraRuntime: (next) =>
-    set((state) => ({
-      camera: {
-        ...state.camera,
-        ...next,
-      },
-    })),
+    set((state) => {
+      const camera = mergeIfChanged(state.camera, next);
+      return camera === state.camera ? state : { camera };
+    }),
   setSensorRuntime: (next) =>
-    set((state) => ({
-      sensor: {
-        ...state.sensor,
-        ...next,
-      },
-    })),
+    set((state) => {
+      const sensor = mergeIfChanged(state.sensor, next);
+      return sensor === state.sensor ? state : { sensor };
+    }),
   openLaunchAssistant: (reason = 'enter-ar') =>
     set((state) => ({
       launchAssistant: {

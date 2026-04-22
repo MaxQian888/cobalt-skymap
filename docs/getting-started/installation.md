@@ -6,7 +6,7 @@
 
 ### Windows
 
-- Windows 10 或更高版本（64位）
+- Windows 10 或更高版本（64 位）
 - 至少 4GB 内存
 - 500MB 可用磁盘空间
 
@@ -19,7 +19,7 @@
 
 ### Linux
 
-- 主流 Linux 发行版（Ubuntu 20.04+, Fedora 33+, 等）
+- 主流 Linux 发行版（Ubuntu 20.04+、Fedora 33+ 等）
 - 至少 4GB 内存
 - 500MB 可用磁盘空间
 
@@ -48,13 +48,13 @@
 3. 添加执行权限：
 
 ```bash
-chmod +x SkyMapTest-*.AppImage
+chmod +x SkyMap-*.AppImage
 ```
 
 4. 运行：
 
 ```bash
-./SkyMapTest-*.AppImage
+./SkyMap-*.AppImage
 ```
 
 ### 方式二：从源代码构建
@@ -63,12 +63,12 @@ chmod +x SkyMapTest-*.AppImage
 
 ## 自动更新
 
-桌面版本支持从 GitHub Releases 检测正式发布的更新。
+桌面版本支持从 GitHub Releases 检测正式发布的更新：
 
-- 可在设置中手动点击“检查更新”
-- 开启“自动更新”后，应用启动时会自动检查
-- 只有已经 publish 的 release 会被检测到，draft release 不会推送给客户端
-- 如果自动更新不可用，应用会提供打开 GitHub Releases 页面手动下载
+- 可在设置中手动点击「检查更新」
+- 开启「自动更新」后，应用启动时会自动检查
+- 只有已 publish 的 release 会被检测到，draft release 不会推送给客户端
+- 如果自动更新不可用，应用会提供打开 GitHub Releases 页面手动下载的链接
 
 ## 初次运行
 
@@ -79,12 +79,14 @@ chmod +x SkyMapTest-*.AppImage
 1. **设置观测位置**
    - 输入您的经纬度坐标
    - 或从预设城市列表中选择
+   - 使用 Leaflet 地图选择器点击定位
    - 设置时区
 
 2. **配置显示选项**
-   - 选择默认星图 survey
+   - 选择默认星图 survey（DSS、SDSS 等）
    - 设置星等限制
    - 配置星座连线的显示
+   - 选择界面语言（中文/英文）
 
 3. **下载基础数据**
    - 应用会自动下载基础星表数据
@@ -99,14 +101,15 @@ chmod +x SkyMapTest-*.AppImage
 2. 看到星图界面
 3. 通过鼠标拖动旋转星图
 4. 搜索并定位天体
+5. 切换 Stellarium / Aladin Lite 双引擎
 
 ## 卸载
 
 ### Windows
 
-1. 打开"控制面板" > "程序和功能"
-2. 找到 "SkyMap"
-3. 右键点击 > "卸载"
+1. 打开「控制面板」>「程序和功能」
+2. 找到 SkyMap
+3. 右键点击 >「卸载」
 
 ### macOS
 
@@ -126,16 +129,26 @@ rm -rf ~/.config/SkyMapTest
 
 ### Windows: "Windows 保护了你的电脑"
 
-这是 Windows SmartScreen 的警告。点击"更多信息" > "仍要运行"即可。
+这是 Windows SmartScreen 的警告。点击「更多信息」>「仍要运行」即可。
 
 ### macOS: "无法打开，因为无法验证开发者"
 
-1. 打开"系统偏好设置" > "安全性与隐私"
-2. 在"通用"选项卡中，点击"仍要打开"
+1. 打开「系统偏好设置」>「安全性与隐私」
+2. 在「通用」选项卡中，点击「仍要打开」
 
 ### Linux: 缺少依赖
 
-某些 Linux 发行版可能需要安装额外的依赖库，请参考[故障排除](../reference/troubleshooting.md)。
+某些 Linux 发行版可能需要安装额外的依赖库：
+
+```bash
+# Ubuntu/Debian
+sudo apt install libwebkit2gtk-4.1-dev build-essential
+
+# Fedora
+sudo dnf install webkit2gtk3-devel openssl-devel
+```
+
+详情请参考[故障排除](../reference/faq.md)。
 
 ## 下一步
 
@@ -145,5 +158,4 @@ rm -rf ~/.config/SkyMapTest
 
 - [开发环境搭建](../developer-guide/development-environment/setup.md)
 - [构建指南](../deployment/desktop/building.md)
-- [故障排除](../reference/troubleshooting.md)
-
+- [故障排除](../reference/faq.md)

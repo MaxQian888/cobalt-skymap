@@ -60,6 +60,7 @@ import type { ImageMetadata } from '@/types/starmap/plate-solving';
 import { SolverSettings } from './solver-settings';
 import { IndexManager } from './index-manager';
 import { 
+  buildSolveHistoryResultSummary,
   classifyOnlineSolveError,
   createErrorResult,
   createInitialOnlineSolveSessionState,
@@ -74,10 +75,14 @@ import type { PlateSolveResult } from '@/lib/plate-solving';
 import type { PlateSolverUnifiedProps, SolveMode } from '@/types/starmap/plate-solving';
 import { SolveResultCard } from './solve-result-card';
 import { isTauri } from '@/lib/tauri/app-control-api';
+import type { SelectedObjectData } from '@/lib/core/types';
 import {
   usePlateSolverStore,
   selectActiveSolver,
 } from '@/lib/stores/plate-solver-store';
+import { resolveObjectNameLocally } from '@/lib/services/local-resolve-service';
+import { useMarkerStore } from '@/lib/stores';
+import { formatRA, formatDec } from '@/lib/astronomy/coordinates/formats';
 import {
   solveImageLocal,
   convertToLegacyResult,
@@ -97,6 +102,7 @@ export type { PlateSolverUnifiedProps, SolveMode } from '@/types/starmap/plate-s
 export function PlateSolverUnified({ 
   onSolveComplete, 
   onGoToCoordinates,
+  onSelectObject,
   trigger, 
   className,
   autoOpenRequestId,
@@ -119,7 +125,11 @@ export function PlateSolverUnified({
     addToHistory,
     solveHistory,
     clearHistory,
+    analyseImage,
+    clearImageAnalysis,
   } = usePlateSolverStore();
+  const imageAnalysis = usePlateSolverStore((state) => state.imageAnalysis);
+  const addMarker = useMarkerStore((state) => state.addMarker);
   const config = storeConfig ?? DEFAULT_SOLVER_CONFIG;
   const activeSolver = usePlateSolverStore(selectActiveSolver);
   const canSolveLocal = usePlateSolverStore((state) => {
@@ -135,6 +145,7 @@ export function PlateSolverUnified({
   // Ref to hold latest handleImageCapture for use in effects without stale closures
   const handleImageCaptureRef = useRef<((file: File, metadata?: ImageMetadata) => Promise<void>) | undefined>(undefined);
   const handledAutoOpenRef = useRef(0);
+  const handledDefaultImageLoadRef = useRef<string | null>(null);
 
   // Local state
   const [open, setOpen] = useState(false);
@@ -172,7 +183,18 @@ export function PlateSolverUnified({
 
   // Auto-load default image when dialog opens with a defaultImagePath
   useEffect(() => {
+    if (!open) {
+      handledDefaultImageLoadRef.current = null;
+      return;
+    }
+
     if (open && defaultImagePath && isDesktop && !solving) {
+      const autoLoadKey = `${autoOpenRequestId ?? 0}:${defaultImagePath}`;
+      if (handledDefaultImageLoadRef.current === autoLoadKey) {
+        return;
+      }
+
+      handledDefaultImageLoadRef.current = autoLoadKey;
       (async () => {
         try {
           const { readFile } = await import('@tauri-apps/plugin-fs');
@@ -185,7 +207,7 @@ export function PlateSolverUnified({
         }
       })();
     }
-  }, [open, defaultImagePath, isDesktop, solving]);
+  }, [open, defaultImagePath, isDesktop, solving, autoOpenRequestId]);
 
   useEffect(() => {
     if (!autoOpenRequestId || autoOpenRequestId === handledAutoOpenRef.current) {
@@ -232,10 +254,13 @@ export function PlateSolverUnified({
     }
 
     let cleanup: undefined | (() => Promise<void>);
+    let analysisPromise: Promise<void> | null = null;
 
     try {
       const persisted = await persistFileForLocalSolve(file);
       cleanup = persisted.cleanup;
+      clearImageAnalysis();
+      analysisPromise = analyseImage(persisted.filePath).catch(() => undefined);
 
       setLocalProgress(10);
       setLocalMessage(t('plateSolving.solving') || 'Solving...');
@@ -252,6 +277,7 @@ export function PlateSolverUnified({
           timeout: config.timeout_seconds,
         }
       );
+      await analysisPromise;
 
       setLocalProgress(100);
       setLocalMessage(solveResult.success 
@@ -259,10 +285,18 @@ export function PlateSolverUnified({
         : (t('plateSolving.failed') || 'Failed'));
 
       const legacyResult = convertToLegacyResult(solveResult);
+      const latestImageAnalysis = usePlateSolverStore.getState().imageAnalysis;
       setResult(legacyResult);
-      addToHistory({ imageName: file.name, solveMode: 'local', result: legacyResult });
+      addToHistory({
+        imageName: file.name,
+        solveMode: 'local',
+        result: legacyResult,
+        consumption: buildSolveHistoryResultSummary(legacyResult, latestImageAnalysis),
+      });
       onSolveComplete?.(legacyResult);
     } catch (error) {
+      await analysisPromise;
+      const latestImageAnalysis = usePlateSolverStore.getState().imageAnalysis;
       setLocalProgress(100);
       setLocalMessage(t('plateSolving.failed') || 'Failed');
       const errorResult = createErrorResult(
@@ -270,7 +304,12 @@ export function PlateSolverUnified({
         error instanceof Error ? error.message : t('plateSolving.unknownError'),
       );
       setResult(errorResult);
-      addToHistory({ imageName: file.name, solveMode: 'local', result: errorResult });
+      addToHistory({
+        imageName: file.name,
+        solveMode: 'local',
+        result: errorResult,
+        consumption: buildSolveHistoryResultSummary(errorResult, latestImageAnalysis),
+      });
     } finally {
       unlistenProgress?.();
       if (cleanup) {
@@ -278,7 +317,7 @@ export function PlateSolverUnified({
       }
       setSolving(false);
     }
-  }, [isDesktop, canSolveLocal, config, raHint, decHint, fovHint, activeSolver, onSolveComplete, addToHistory, t]);
+  }, [isDesktop, canSolveLocal, config, raHint, decHint, fovHint, activeSolver, onSolveComplete, addToHistory, analyseImage, clearImageAnalysis, t]);
 
   // Handle online solve through the shared dispatcher for both runtimes
   const handleOnlineSolve = useCallback(async (file: File, effectiveRaHint?: number, effectiveDecHint?: number) => {
@@ -311,6 +350,7 @@ export function PlateSolverUnified({
         solveMode: 'online',
         result: solveResult,
         diagnostics,
+        consumption: buildSolveHistoryResultSummary(solveResult, imageAnalysis),
       });
 
       if (solveResult.success) {
@@ -346,12 +386,13 @@ export function PlateSolverUnified({
           operationId: null,
           artifactSummary: null,
         },
+        consumption: buildSolveHistoryResultSummary(errorResult, imageAnalysis),
       });
     } finally {
       cancelClientRef.current = null;
       setSolving(false);
     }
-  }, [onlineApiKey, options, onSolveComplete, config, addToHistory, t, isDesktop, updateOnlineSession]);
+  }, [onlineApiKey, options, onSolveComplete, config, addToHistory, imageAnalysis, t, isDesktop, updateOnlineSession]);
 
   // Handle image capture with optional FITS WCS hints
   const handleImageCapture = useCallback(async (file: File, metadata?: ImageMetadata) => {
@@ -413,6 +454,51 @@ export function PlateSolverUnified({
       setOpen(false);
     }
   }, [result, onGoToCoordinates]);
+
+  const handleSelectObject = useCallback((objectName: string) => {
+    if (!onSelectObject) return;
+
+    const resolved = resolveObjectNameLocally(objectName);
+    if (!resolved) {
+      return;
+    }
+
+    const selection: SelectedObjectData = {
+      names: [resolved.name, ...(resolved.alternateNames ?? [])],
+      ra: resolved.raString ?? formatRA(resolved.ra),
+      dec: resolved.decString ?? formatDec(resolved.dec),
+      raDeg: resolved.ra,
+      decDeg: resolved.dec,
+      selectionSource: 'catalog',
+      selectionFallback: 'resolved',
+      sourceCatalog: resolved.source.toUpperCase(),
+      selectionTimestamp: new Date().toISOString(),
+      type: resolved.type,
+      magnitude: resolved.magnitude,
+      size: resolved.angularSize,
+      constellation: resolved.constellation,
+    };
+
+    onSelectObject(selection);
+    setOpen(false);
+  }, [onSelectObject]);
+
+  const handleCreateMarkerFromAnnotation = useCallback((payload: { ra: number; dec: number; name: string }) => {
+    const markerId = addMarker({
+      name: payload.name,
+      ra: payload.ra,
+      dec: payload.dec,
+      raString: formatRA(payload.ra),
+      decString: formatDec(payload.dec),
+      color: '#f59e0b',
+      icon: 'pin',
+      visible: true,
+    });
+
+    if (markerId) {
+      setOpen(false);
+    }
+  }, [addMarker]);
 
   // Progress text/percent delegated to lib/plate-solving/solve-utils
   const progressText = getProgressText(progress, t);
@@ -661,7 +747,11 @@ export function PlateSolverUnified({
           {result && (
             <SolveResultCard
               result={result}
+              consumption={buildSolveHistoryResultSummary(result, imageAnalysis)}
               onGoTo={onGoToCoordinates ? handleGoTo : undefined}
+              onSelectObject={onSelectObject ? handleSelectObject : undefined}
+              onNavigateAnnotation={onGoToCoordinates ? (coordinates) => onGoToCoordinates(coordinates.ra, coordinates.dec) : undefined}
+              onCreateMarkerFromAnnotation={handleCreateMarkerFromAnnotation}
             />
           )}
 
@@ -712,6 +802,19 @@ export function PlateSolverUnified({
                                 )}
                                 {entry.diagnostics.jobId !== null && entry.diagnostics.jobId !== undefined && (
                                   <span className="ml-1">路 job:{entry.diagnostics.jobId}</span>
+                                )}
+                              </div>
+                            )}
+                            {entry.consumption && (
+                              <div className="text-muted-foreground">
+                                {t('plateSolving.detectedObjects') || 'Detected Objects'} 路 {entry.consumption.objects.count}
+                                <span className="ml-1">
+                                  {t('plateSolving.annotationCount') || 'Annotations'} 路 {entry.consumption.artifacts.annotationCount}
+                                </span>
+                                {entry.consumption.analysis.available && (
+                                  <span className="ml-1">
+                                    {t('plateSolving.analysisStars') || 'Stars'} 路 {entry.consumption.analysis.starCount}
+                                  </span>
                                 )}
                               </div>
                             )}

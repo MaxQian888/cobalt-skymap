@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, type RefObject } from 'react';
 import type A from 'aladin-lite';
 import type { LoadingState } from '@/types/stellarium-canvas';
 import { raDecToAltAzAtTime } from '@/lib/astronomy/coordinates/transforms';
+import { destroyAladinCompat } from '@/lib/aladin/aladin-compat';
 import { useMountStore, useStellariumStore } from '@/lib/stores';
 import { ALADIN_INIT_TIMEOUT, ALADIN_DEFAULT_FOV, ALADIN_DEFAULT_SURVEY, ALADIN_DEFAULT_PROJECTION, ALADIN_DEFAULT_COO_FRAME, ALADIN_NAVIGATE_DURATION } from '@/lib/core/constants/aladin-canvas';
 import { createLogger } from '@/lib/logger';
@@ -225,22 +226,27 @@ export function useAladinLoader({
     }
   }, [containerRef]);
 
+  const cleanupAladinInstance = useCallback(() => {
+    destroyAladinCompat(aladinRef.current);
+    aladinRef.current = null;
+  }, [aladinRef]);
+
   const handleRetry = useCallback(() => {
     retryCountRef.current += 1;
     loadingRef.current = false;
-    aladinRef.current = null;
+    cleanupAladinInstance();
     cleanupContainer();
     initAladin();
-  }, [initAladin, aladinRef, cleanupContainer]);
+  }, [cleanupAladinInstance, cleanupContainer, initAladin]);
 
   const reloadEngine = useCallback(() => {
     retryCountRef.current = 0;
     loadingRef.current = false;
-    aladinRef.current = null;
+    cleanupAladinInstance();
     setEngineReady(false);
     cleanupContainer();
     initAladin();
-  }, [initAladin, aladinRef, cleanupContainer]);
+  }, [cleanupAladinInstance, cleanupContainer, initAladin]);
 
   return {
     loadingState,

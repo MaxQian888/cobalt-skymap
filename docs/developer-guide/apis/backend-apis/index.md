@@ -22,11 +22,14 @@ graph TD
         E --> H[astronomy/calculations.rs]
         E --> I[cache/unified.rs]
         E --> J[network/http_client.rs]
+        E --> K[mount/commands.rs]
+        E --> L[platform/secret_vault.rs]
     end
 
     subgraph 数据层
-        F --> K[(JSON Stores)]
-        I --> L[文件缓存]
+        F --> M[(JSON Stores)]
+        I --> N[文件缓存]
+        L --> O[系统钥匙串]
     end
 ```
 
@@ -45,19 +48,21 @@ graph TD
 | **目标列表** | `data/targets.rs` | 17 | 观测目标管理 |
 | **标记管理** | `data/markers.rs` | 13 | 天空标记管理 |
 | **导入导出** | `data/target_io.rs` | 2 | 目标列表导入导出 |
-| **HTTP客户端** | `network/http_client.rs` | 10 | 安全HTTP请求 |
+| **HTTP 客户端** | `network/http_client.rs` | 10 | 安全 HTTP 请求 |
 | **应用设置** | `platform/app_settings.rs` | 9 | 窗口状态、偏好设置 |
 | **应用控制** | `platform/app_control.rs` | 4 | 应用重启、退出等 |
 | **自动更新** | `platform/updater.rs` | 8 | 应用更新管理 |
-| **板求解** | `platform/plate_solver.rs` | 10 | 天文板求解 |
+| **解板** | `platform/plate_solver.rs` | 10 | 天文解板 |
+| **密钥保险箱** | `platform/secret_vault.rs` | 3 | API 密钥安全存储 |
+| **赤道仪控制** | `mount/commands.rs` | 12 | ALPACA 连接与 slew |
 
-**总计: 130+ 个 Tauri 命令**
+**总计: 150+ 个 Tauri 命令**
 
 ## API 分类
 
 ### 数据管理 API
 
-- **[Tauri 命令](tauri-commands.md)** - 完整的 Tauri 命令参考
+- **[Tauri 命令](tauri-commands.md)** — 完整的 Tauri 命令参考
   - 存储 API
   - 设备管理 API
   - 位置管理 API
@@ -67,13 +72,18 @@ graph TD
 
 ### 计算 API
 
-- **[天文计算](tauri-commands.md#天文计算-api)** - 坐标转换、可见性计算
-- **[天文事件](tauri-commands.md#天文事件-api)** - 月相、流星雨预测
+- **[天文计算](tauri-commands.md#天文计算-api)** — 坐标转换、可见性计算
+- **[天文事件](tauri-commands.md#天文事件-api)** — 月相、流星雨预测
 
 ### 基础设施 API
 
-- **[缓存系统](tauri-commands.md#离线缓存-api)** - 离线缓存和统一缓存
-- **[HTTP客户端](tauri-commands.md#http-客户端-api)** - 安全的网络请求
+- **[缓存系统](tauri-commands.md#离线缓存-api)** — 离线缓存和统一缓存
+- **[HTTP 客户端](tauri-commands.md#http-客户端-api)** — 安全的网络请求
+- **[密钥保险箱](tauri-commands.md#密钥保险箱-api)** — 安全凭证存储
+
+### 赤道仪 API
+
+- **[赤道仪控制](tauri-commands.md#赤道仪-api)** — ALPACA 连接、 slew、同步
 
 ## 调用示例
 
@@ -98,7 +108,7 @@ await invoke('add_telescope', {
 ### 使用封装的 API
 
 ```typescript
-import { equipmentApi, astronomyApi, targetListApi } from '@/lib/tauri';
+import { equipmentApi, astronomyApi, targetListApi, mountApi } from '@/lib/tauri';
 
 // 设备 API
 const equipment = await equipmentApi.loadEquipment();
@@ -110,6 +120,10 @@ const { alt, az } = await astronomyApi.equatorialToHorizontal(ra, dec, lat, lon,
 // 目标列表 API
 const targets = await targetListApi.loadTargetList();
 await targetListApi.addTarget(target);
+
+// 赤道仪 API
+await mountApi.connect('http://192.168.1.100:11111');
+await mountApi.slewToRaDec(ra, dec);
 ```
 
 ## 错误处理
@@ -135,7 +149,6 @@ try {
 ```rust
 #[tauri::command]
 pub fn add_telescope(telescope: Telescope) -> Result<Telescope, String> {
-    // 验证口径
     if telescope.aperture <= 0.0 {
         return Err("口径必须大于 0".to_string());
     }
@@ -161,7 +174,7 @@ const ALLOWED_DOMAINS: &[&str] = &[
 防止 API 滥用：
 
 ```rust
-// 默认速率限制
+// 滑动窗口速率限制
 const DEFAULT_RATE_LIMIT: RateLimitConfig = RateLimitConfig {
     requests_per_second: 10,
     burst_size: 20,
@@ -172,9 +185,9 @@ const DEFAULT_RATE_LIMIT: RateLimitConfig = RateLimitConfig {
 
 ### 缓存策略
 
-- **LRU 缓存** - 内存中的热数据缓存
-- **TTL 过期** - 自动清理过期数据
-- **磁盘缓存** - HiPS 瓦片持久化
+- **LRU 缓存** — 内存中的热数据缓存
+- **TTL 过期** — 自动清理过期数据
+- **磁盘缓存** — HiPS 瓦片持久化
 
 ### 批量操作
 
@@ -190,11 +203,10 @@ await targetListApi.setTargetsStatusBatch(ids, 'completed');
 
 ## 相关文档
 
-- **[Tauri 命令详解](tauri-commands.md)** - 完整命令参考
-- **[前端 API](../frontend-apis/stores.md)** - Zustand Stores
-- **[数据存储](../../data-management/storage.md)** - 存储架构
+- **[Tauri 命令详解](tauri-commands.md)** — 完整命令参考
+- **[前端 API](../frontend-apis/stores.md)** — Zustand Stores
+- **[数据存储](../../data-management/storage.md)** — 存储架构
 
 ---
 
-返回：[API参考](../index.md)
-
+返回：[API 参考](../index.md)

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAladinStore } from '@/lib/stores/aladin-store';
 
 // Mock logger
@@ -121,5 +121,35 @@ describe('useAladinFits', () => {
 
     // Layer is in store but aladin engine should not be invoked
     expect(aladinMock.imageHiPS).not.toHaveBeenCalled();
+  });
+
+  it('disables a FITS layer when mounting it fails', async () => {
+    const { useAladinFits } = await import('../use-aladin-fits');
+    const aladinRef = {
+      current: {
+        setOverlayImageLayer: jest.fn(() => {
+          throw new Error('fits failed');
+        }),
+        setBaseImageLayer: jest.fn(),
+        newImageSurvey: jest.fn(),
+      },
+    };
+
+    useAladinStore.getState().addFitsLayer({
+      id: 'broken-fits',
+      url: 'https://example.com/fits',
+      name: 'Broken FITS',
+      enabled: true,
+      opacity: 1,
+      mode: 'overlay',
+    });
+
+    renderHook(() =>
+      useAladinFits({ aladinRef: aladinRef as never, engineReady: true })
+    );
+
+    await waitFor(() => {
+      expect(useAladinStore.getState().fitsLayers.find((layer) => layer.id === 'broken-fits')?.enabled).toBe(false);
+    });
   });
 });

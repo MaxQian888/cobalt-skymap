@@ -4,7 +4,7 @@
 
 ## 概览
 
-SkyMap 使用 Tauri 框架构建跨平台桌面应用，支持 Windows、macOS 和 Linux。
+SkyMap 使用 Tauri 2.9 框架构建跨平台桌面应用，支持 Windows、macOS 和 Linux。
 
 ## 支持平台
 
@@ -57,7 +57,14 @@ pnpm tauri dev
 ### 生产构建
 
 ```bash
+# 默认构建
 pnpm tauri build
+
+# 预配置桌面构建
+pnpm build:desktop
+
+# Windows 专属构建
+pnpm build:desktop:windows
 ```
 
 构建产物位于 `src-tauri/target/release/bundle/`。
@@ -67,4 +74,3 @@ pnpm tauri build
 - [部署概览](../index.md)
 - [Web 部署](../web/index.md)
 - [前置要求](../../developer-guide/development-environment/prerequisites.md)
-

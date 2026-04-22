@@ -5,11 +5,13 @@
 
 import type {
   FITSMetadata,
+  SolveResultConsumptionSummary,
   OnlineSolveDiagnostics,
   PlateSolveResult,
   SolveProgress,
 } from '@/lib/plate-solving';
 import type { SolverType } from '@/lib/tauri/plate-solver-api';
+import type { SelectedObjectData } from '@/lib/core/types';
 
 // ============================================================================
 // ImageCapture
@@ -58,6 +60,7 @@ export interface DownloadState {
 export interface PlateSolverUnifiedProps {
   onSolveComplete?: (result: PlateSolveResult) => void;
   onGoToCoordinates?: (ra: number, dec: number) => void;
+  onSelectObject?: (selection: SelectedObjectData) => void;
   trigger?: React.ReactNode;
   className?: string;
   autoOpenRequestId?: number;
@@ -80,6 +83,7 @@ export interface SolveHistoryEntry {
   solveMode: SolveMode;
   result: PlateSolveResult;
   diagnostics?: OnlineSolveDiagnostics;
+  consumption?: SolveResultConsumptionSummary;
 }
 
 // ============================================================================
@@ -89,6 +93,10 @@ export interface SolveHistoryEntry {
 export interface SolveResultCardProps {
   result: PlateSolveResult;
   onGoTo?: () => void;
+  consumption?: SolveResultConsumptionSummary;
+  onSelectObject?: (objectName: string) => void;
+  onNavigateAnnotation?: (coordinates: { ra: number; dec: number }) => void;
+  onCreateMarkerFromAnnotation?: (payload: { ra: number; dec: number; name: string }) => void;
 }
 
 // ============================================================================

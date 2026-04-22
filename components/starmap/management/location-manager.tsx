@@ -55,6 +55,7 @@ import { MapLocationPicker, MapProviderSettings } from '@/components/starmap/map
 import { cn } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/empty-state';
 import { findPotentialDuplicateLocation, validateLocationForm } from '@/lib/core/management-validators';
+import { buildContinuityActions, useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 import { useWebLocationStore } from '@/lib/stores/web-location-store';
 import { useShallow } from 'zustand/react/shallow';
 import { acquireCurrentLocation } from '@/lib/services/location-acquisition';
@@ -267,6 +268,8 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
   const lastDraftSelectionRef = useRef<ResolveLocationDraftMetadataInput | null>(null);
   const [draftMetadata, setDraftMetadata] = useState<LocationDraftMetadataState | null>(null);
   const [draftFieldMeta, setDraftFieldMeta] = useState<DraftFieldMetaState>(createEmptyDraftFieldMetaState());
+  const setSiteContext = useMapInteractionStore((state) => state.setSiteContext);
+  const clearSiteContext = useMapInteractionStore((state) => state.clearSiteContext);
 
   useEffect(() => {
     fieldTouchedRef.current = fieldTouched;
@@ -406,6 +409,22 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
           ? Math.round(effectiveAltitude).toString()
           : prev.altitude),
     }));
+
+    setSiteContext({
+      kind: 'draft',
+      sourceSurface: 'location-manager',
+      coordinates: result.coordinates,
+      summaryStatus: result.summaryStatus,
+      displayName: effectiveName ?? result.displayName ?? undefined,
+      issues: result.issues.map((issue) => issue.message),
+      actions: buildContinuityActions({
+        sourceSurface: 'location-manager',
+        hasDraftSite: true,
+        hasRecoverableMetadata: result.summaryStatus === 'partial' || result.summaryStatus === 'error',
+        hasTarget: false,
+        arStatus: 'idle',
+      }),
+    });
   };
 
   const resolveDraftSelection = async (
@@ -428,6 +447,20 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
       timezone: createLoadingDraftFieldMeta(prev.timezone, fieldTouchedRef.current.timezone),
       altitude: createLoadingDraftFieldMeta(prev.altitude, fieldTouchedRef.current.altitude),
     }));
+
+    setSiteContext({
+      kind: 'draft',
+      sourceSurface: 'location-manager',
+      coordinates: input.coordinates,
+      summaryStatus: 'loading',
+      actions: buildContinuityActions({
+        sourceSurface: 'location-manager',
+        hasDraftSite: true,
+        hasRecoverableMetadata: false,
+        hasTarget: false,
+        arStatus: 'idle',
+      }),
+    });
 
     const result = await draftMetadataResolverRef.current.resolve(input);
     if (result.stale) {
@@ -740,6 +773,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
     setInputMethod('manual');
     setEditingId(null);
     setDuplicateTarget(null);
+    clearSiteContext();
   };
 
   const getDraftMetaLabel = (meta: DraftFieldMeta): string => {

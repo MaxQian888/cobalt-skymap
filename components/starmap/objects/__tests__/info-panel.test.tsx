@@ -2,7 +2,12 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
+import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
+
+jest.mock('@/lib/services/object-info-service', () => ({
+  getCachedObjectInfo: jest.fn(),
+}));
 
 // Mock stores
 const mockUseMountStore = jest.fn((selector) => {
@@ -150,10 +155,10 @@ jest.mock('@/lib/astronomy/starmap-utils', () => ({
 
 // Mock UI components
 jest.mock('@/components/ui/card', () => ({
-  Card: ({ children, ...props }: { children: React.ReactNode }) => <div data-testid="card" {...props}>{children}</div>,
-  CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  CardTitle: ({ children }: { children: React.ReactNode }) => <h3>{children}</h3>,
+  Card: ({ children, ...props }: { children: React.ReactNode }) => <div data-testid="card" data-slot="card" {...props}>{children}</div>,
+  CardContent: ({ children }: { children: React.ReactNode }) => <div data-slot="card-content">{children}</div>,
+  CardHeader: ({ children }: { children: React.ReactNode }) => <div data-slot="card-header">{children}</div>,
+  CardTitle: ({ children }: { children: React.ReactNode }) => <h3 data-slot="card-title">{children}</h3>,
 }));
 
 jest.mock('@/components/ui/button', () => ({
@@ -194,6 +199,12 @@ jest.mock('@/components/ui/collapsible', () => ({
   CollapsibleTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+jest.mock('../altitude-chart-compact', () => ({
+  AltitudeChartCompact: ({ ra, dec }: { ra: number; dec: number }) => (
+    <div data-testid="altitude-chart-compact" data-ra={ra} data-dec={dec} />
+  ),
+}));
+
 // Mock recharts
 jest.mock('recharts', () => ({
   AreaChart: ({ children }: { children: React.ReactNode }) => <div data-testid="area-chart">{children}</div>,
@@ -207,8 +218,36 @@ jest.mock('recharts', () => ({
 
 import { useObjectActions } from '@/lib/hooks';
 import * as targetDisplayModel from '@/lib/astronomy/target-display-model';
+import type { SelectedObjectData } from '@/lib/core/types';
+import { getCachedObjectInfo } from '@/lib/services/object-info-service';
 
 const mockUseObjectActions = useObjectActions as jest.Mock;
+const mockGetCachedObjectInfo = getCachedObjectInfo as jest.Mock;
+const defaultCachedObjectInfo = {
+  names: ['M31', 'NGC 224'],
+  type: 'Galaxy',
+  typeCategory: 'galaxy',
+  ra: 10.6847,
+  dec: 41.2689,
+  raString: '00h 42m 44s',
+  decString: '+41° 16\' 09"',
+  images: [],
+  sources: ['Local', 'Wikipedia'],
+  provenance: {
+    description: {
+      acceptedSource: 'Wikipedia',
+      authorityLevel: 'reference',
+      contributors: ['Local', 'Wikipedia'],
+    },
+  },
+  diagnostics: [
+    {
+      providerId: 'sbdb',
+      status: 'unsupported',
+      fieldGroup: 'physical',
+    },
+  ],
+};
 
 import { InfoPanel } from '../info-panel';
 
@@ -218,7 +257,7 @@ describe('InfoPanel', () => {
     onSetFramingCoordinates: jest.fn(),
   };
 
-  const mockSelectedObject = {
+  const mockSelectedObject: SelectedObjectData = {
     names: ['M31', 'Andromeda Galaxy', 'NGC 224'],
     ra: '00h 42m 44s',
     dec: '+41° 16\' 09"',
@@ -228,10 +267,15 @@ describe('InfoPanel', () => {
     magnitude: 3.4,
     size: '3° x 1°',
     constellation: 'Andromeda',
+    selectionSource: 'enriched',
+    selectionFallback: 'resolved',
+    sourceCatalog: 'SIMBAD',
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    useMapInteractionStore.getState().reset();
+    mockGetCachedObjectInfo.mockImplementation(() => new Promise(() => undefined));
     // Reset useObjectActions to default (disconnected) state after each test
     mockUseObjectActions.mockReturnValue({
       handleSlew: jest.fn(),
@@ -239,6 +283,26 @@ describe('InfoPanel', () => {
       mountConnected: false,
     });
   });
+
+  async function renderSelectedInfoPanel(
+    overrideProps: Partial<React.ComponentProps<typeof InfoPanel>> = {}
+  ) {
+    mockGetCachedObjectInfo.mockResolvedValueOnce(defaultCachedObjectInfo);
+
+    const view = render(
+      <InfoPanel
+        {...defaultProps}
+        selectedObject={mockSelectedObject}
+        {...overrideProps}
+      />
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    return view;
+  }
 
   it('renders without crashing when no object selected', () => {
     render(<InfoPanel {...defaultProps} />);
@@ -251,40 +315,40 @@ describe('InfoPanel', () => {
   });
 
   describe('with selected object', () => {
-    it('displays object name', () => {
-      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+    it('displays object name', async () => {
+      await renderSelectedInfoPanel();
       expect(screen.getByText('M31')).toBeInTheDocument();
     });
 
-    it('displays object type badge', () => {
-      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+    it('displays object type badge', async () => {
+      await renderSelectedInfoPanel();
       expect(screen.getByText('Galaxy')).toBeInTheDocument();
     });
 
-    it('displays magnitude when available', () => {
-      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+    it('displays magnitude when available', async () => {
+      await renderSelectedInfoPanel();
       expect(screen.getByText('3.4')).toBeInTheDocument();
     });
 
-    it('displays size when available', () => {
-      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+    it('displays size when available', async () => {
+      await renderSelectedInfoPanel();
       expect(screen.getByText('3° x 1°')).toBeInTheDocument();
     });
 
-    it('displays constellation when available', () => {
-      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+    it('displays constellation when available', async () => {
+      await renderSelectedInfoPanel();
       expect(screen.getByText('Andromeda')).toBeInTheDocument();
     });
 
-    it('displays coordinates', () => {
-      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+    it('displays coordinates', async () => {
+      await renderSelectedInfoPanel();
       expect(screen.getByText('00h 42m 44s')).toBeInTheDocument();
       expect(screen.getByText('+41° 16\' 09"')).toBeInTheDocument();
     });
 
-    it('renders altitude chart', () => {
-      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
-      expect(screen.getByTestId('area-chart')).toBeInTheDocument();
+    it('renders altitude chart', async () => {
+      await renderSelectedInfoPanel();
+      expect(screen.getByTestId('altitude-chart-compact')).toBeInTheDocument();
     });
   });
 
@@ -433,9 +497,84 @@ describe('InfoPanel', () => {
 
     it('uses localized keys for advanced metadata labels', () => {
       render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+      const advanced = screen.getByTestId('info-panel-section-advanced-metadata');
+      expect(screen.getByText('objectDetail.systemMetadata')).toBeInTheDocument();
       expect(screen.getByText('objectDetail.frameTimeScale')).toBeInTheDocument();
       expect(screen.getByText('objectDetail.qualityEop')).toBeInTheDocument();
+      expect(screen.getByText('objectDetail.calculationSummary')).toBeInTheDocument();
       expect(screen.getByText('objectDetail.timestamp')).toBeInTheDocument();
+      expect(advanced).toHaveTextContent('objectDetail.calculationSource.calculation');
+      expect(advanced).toHaveTextContent('objectDetail.calculationState.normal');
+    });
+
+    it('renders selection source semantics for coordinate fallback objects', () => {
+      const coordinateSelection: SelectedObjectData = {
+        ...mockSelectedObject,
+        names: ['00h 42m 44s +41° 16\' 09"'],
+        selectionSource: 'coordinate',
+        selectionFallback: 'coordinate_fallback',
+        sourceCatalog: null,
+      };
+
+      render(<InfoPanel {...defaultProps} selectedObject={coordinateSelection} />);
+
+      expect(screen.getAllByText('objectDetail.selectionSource.coordinate').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('objectDetail.selectionFallback.coordinate_fallback').length).toBeGreaterThan(0);
+    });
+
+    it('does not expose raw advanced metadata literals', () => {
+      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+      expect(screen.queryByText('Calc')).not.toBeInTheDocument();
+      expect(screen.queryByText('degraded')).not.toBeInTheDocument();
+    });
+
+    it('renders shared source semantics from cached object info', async () => {
+      await renderSelectedInfoPanel();
+
+      expect(await screen.findByText('objectDetail.acceptedSource')).toBeInTheDocument();
+      expect(screen.getByText('Wikipedia')).toBeInTheDocument();
+      expect(screen.getByText('objectDetail.sourceAuthority.reference')).toBeInTheDocument();
+      expect(screen.getByText('objectDetail.unsupportedSourceState')).toBeInTheDocument();
+    });
+
+    it('renders target information blocks with shadcn card surfaces', () => {
+      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+
+      expect(screen.getByTestId('info-panel-section-identity')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('info-panel-section-live-status')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('info-panel-section-planning-metrics')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('info-panel-section-advanced-metadata')).toHaveAttribute('data-slot', 'card');
+    });
+  });
+
+  describe('continuity context', () => {
+    it('shows active observing-site context when continuity store has a site and target summary', () => {
+      useMapInteractionStore.getState().setSiteContext({
+        kind: 'committed',
+        sourceSurface: 'starmap',
+        coordinates: { latitude: 35.6762, longitude: 139.6503 },
+        summaryStatus: 'ready',
+        displayName: 'Tokyo',
+        actions: ['open-target-details'],
+      });
+      useMapInteractionStore.getState().setTargetContext({
+        objectName: 'M31',
+        primaryName: 'M31',
+        aliases: ['Andromeda Galaxy'],
+        ra: '00h 42m 44s',
+        dec: '+41° 16\' 09"',
+        raDeg: 10.6847,
+        decDeg: 41.2689,
+        type: 'Galaxy',
+        sourceQuality: 'normal',
+        siteName: 'Tokyo',
+        siteCoordinates: { latitude: 35.6762, longitude: 139.6503 },
+      });
+
+      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+
+      expect(screen.getByText(/starmap\.context\.activeSite/)).toBeInTheDocument();
+      expect(screen.getByText(/Tokyo/)).toBeInTheDocument();
     });
   });
 
@@ -531,7 +670,9 @@ describe('InfoPanel', () => {
       render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
 
       // Advance time by 30 seconds to trigger interval
-      jest.advanceTimersByTime(30000);
+      act(() => {
+        jest.advanceTimersByTime(30000);
+      });
 
       // Component should still be rendered without errors
       expect(screen.getByText('M31')).toBeInTheDocument();
@@ -546,7 +687,7 @@ describe('InfoPanel', () => {
 
     it('stops event propagation for mouse events on panel', () => {
       render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
-      const card = screen.getByTestId('card');
+      const card = screen.getAllByTestId('card')[0];
 
       // Ensure all panel-level handlers execute (pointer/mouse/double-click/wheel)
       fireEvent.pointerDown(card);
@@ -569,7 +710,7 @@ describe('InfoPanel', () => {
           containerBounds={{ width: 800, height: 600 }}
         />
       );
-      const card = screen.getByTestId('card');
+      const card = screen.getAllByTestId('card')[0];
       expect(card.className).toContain('fixed');
     });
 
@@ -577,7 +718,7 @@ describe('InfoPanel', () => {
       render(
         <InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />
       );
-      const card = screen.getByTestId('card');
+      const card = screen.getAllByTestId('card')[0];
       expect(card.className).not.toContain('fixed');
     });
   });

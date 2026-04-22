@@ -8,7 +8,7 @@ import type { DependencyInfo } from '@/types/about';
 export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   {
     name: 'next',
-    version: '^16.1.7',
+    version: '^16.2.3',
     type: 'framework',
     source: 'npm',
     runtime: 'shared',
@@ -16,7 +16,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'react',
-    version: '19.2.0',
+    version: '19.2.5',
     type: 'framework',
     source: 'npm',
     runtime: 'shared',
@@ -24,7 +24,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'react-dom',
-    version: '19.2.0',
+    version: '19.2.5',
     type: 'framework',
     source: 'npm',
     runtime: 'shared',
@@ -232,7 +232,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'lucide-react',
-    version: '^0.546.0',
+    version: '^1.8.0',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -240,7 +240,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'recharts',
-    version: '^3.8.0',
+    version: '^3.8.1',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -264,7 +264,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tailwindcss/postcss',
-    version: '^4.2.1',
+    version: '^4.2.2',
     type: 'style',
     source: 'npm',
     runtime: 'shared',
@@ -288,7 +288,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'tailwindcss',
-    version: '^4.2.1',
+    version: '^4.2.2',
     type: 'style',
     source: 'npm',
     runtime: 'shared',
@@ -312,7 +312,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'next-intl',
-    version: '^4.8.3',
+    version: '^4.9.1',
     type: 'i18n',
     source: 'npm',
     runtime: 'shared',
@@ -320,7 +320,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'aladin-lite',
-    version: '3.7.3-beta',
+    version: '3.8.2',
     type: 'astronomy',
     source: 'npm',
     runtime: 'shared',
@@ -344,7 +344,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'satellite.js',
-    version: '^6.0.2',
+    version: '^7.0.0',
     type: 'astronomy',
     source: 'npm',
     runtime: 'shared',
@@ -384,7 +384,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@playwright/test',
-    version: '^1.58.2',
+    version: '^1.59.1',
     type: 'testing',
     source: 'npm',
     runtime: 'shared',
@@ -431,14 +431,6 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
     manifestSection: 'devDependencies',
   },
   {
-    name: '@types/testing-library__jest-dom',
-    version: '^6.0.0',
-    type: 'testing',
-    source: 'npm',
-    runtime: 'shared',
-    manifestSection: 'devDependencies',
-  },
-  {
     name: 'jest',
     version: '^30.3.0',
     type: 'testing',
@@ -463,16 +455,16 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
     manifestSection: 'devDependencies',
   },
   {
-    name: 'ts-jest',
-    version: '^29.4.6',
-    type: 'testing',
+    name: '@eslint/compat',
+    version: '2.0.5',
+    type: 'tooling',
     source: 'npm',
     runtime: 'shared',
     manifestSection: 'devDependencies',
   },
   {
     name: '@types/node',
-    version: '^20.19.37',
+    version: '^25.6.0',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -504,7 +496,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'baseline-browser-mapping',
-    version: '^2.10.8',
+    version: '^2.10.19',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -520,7 +512,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'eslint',
-    version: '^9.39.4',
+    version: '^10.2.0',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -528,15 +520,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'eslint-config-next',
-    version: '16.0.0',
-    type: 'tooling',
-    source: 'npm',
-    runtime: 'shared',
-    manifestSection: 'devDependencies',
-  },
-  {
-    name: 'shadcn',
-    version: '^4.0.8',
+    version: '16.2.3',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -552,7 +536,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'typescript',
-    version: '^5.9.3',
+    version: '^6.0.2',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -576,7 +560,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'framer-motion',
-    version: '^12.37.0',
+    version: '^12.38.0',
     type: 'util',
     source: 'npm',
     runtime: 'shared',
@@ -584,7 +568,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@icons-pack/react-simple-icons',
-    version: '^13.12.0',
+    version: '^13.13.0',
     type: 'other',
     source: 'npm',
     runtime: 'shared',
@@ -672,7 +656,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-dialog',
-    version: '^2.6.0',
+    version: '^2.7.0',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -680,7 +664,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-fs',
-    version: '^2.4.5',
+    version: '^2.5.0',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -744,7 +728,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-updater',
-    version: '^2.10.0',
+    version: '^2.10.1',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',

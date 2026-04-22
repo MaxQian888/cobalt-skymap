@@ -347,6 +347,30 @@ describe('UnifiedOnboarding', () => {
     });
   });
 
+  it('does not auto-reenter setup from a stale checkpoint when onboarding auto-show is disabled', async () => {
+    act(() => {
+      useOnboardingStore.setState({
+        hasSeenWelcome: true,
+        hasCompletedOnboarding: false,
+        showOnNextVisit: false,
+        isSetupOpen: false,
+        resumeCheckpoint: {
+          phase: 'setup',
+          setupStep: 'equipment',
+          activeTourId: null,
+          currentStepIndex: -1,
+          updatedAt: '2026-04-05T00:00:00.000Z',
+        },
+      });
+    });
+
+    render(<UnifiedOnboarding />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('equipment-step')).not.toBeInTheDocument();
+    });
+  });
+
   it('restores tour hub visibility from persisted state', () => {
     act(() => {
       useOnboardingStore.getState().setTourHubOpen(true);
@@ -354,6 +378,28 @@ describe('UnifiedOnboarding', () => {
 
     render(<UnifiedOnboarding />);
     expect(screen.getByText('onboarding.hub.title')).toBeInTheDocument();
+  });
+
+  it('keeps tour hub visible after onboarding completion when the hub is explicitly open', () => {
+    act(() => {
+      useOnboardingStore.setState({
+        hasCompletedOnboarding: true,
+        hasSeenWelcome: true,
+        showOnNextVisit: false,
+        tourHubOpen: true,
+        resumeCheckpoint: {
+          phase: 'tour',
+          setupStep: null,
+          activeTourId: 'first-run-core',
+          currentStepIndex: 3,
+          updatedAt: '2026-04-05T00:00:00.000Z',
+        },
+      });
+    });
+
+    render(<UnifiedOnboarding />);
+    expect(screen.getByText('onboarding.hub.title')).toBeInTheDocument();
+    expect(screen.queryByTestId('onboarding-tour')).not.toBeInTheDocument();
   });
 
   it('shows messier marathon resume entry when an active guide session exists', () => {

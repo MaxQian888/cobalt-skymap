@@ -16,8 +16,8 @@
 | 软件 | 版本 | 用途 |
 |------|------|------|
 | Node.js | 20.x+ | 前端运行时 |
-| Rust | 1.70+ | 后端编译 |
-| pnpm | 8.x+ | 包管理器 |
+| Rust | 1.75+ | 后端编译 |
+| pnpm | 9.x+ | 包管理器 |
 | Git | 最新 | 版本控制 |
 
 ### 可选软件
@@ -70,6 +70,7 @@ pnpm tauri dev
 - 完整功能测试
 - Tauri API 可用
 - 桌面集成测试
+- 前后端热重载
 
 ## 工具链
 
@@ -162,11 +163,12 @@ NEXT_PUBLIC_APP_NAME=SkyMap
 - Chrome DevTools
 - React DevTools
 - Redux DevTools (Zustand)
+- 使用 `createLogger('module-name')` 输出结构化日志
 
 ### 后端调试
 
 - Rust Analyzer
-- println! 宏
+- `println!` 或 `log::info!` 宏
 - VS Code 调试器
 
 ## 版本管理
@@ -206,6 +208,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install
       - run: pnpm test
+      - run: cd src-tauri && cargo test security_tests
 ```
 
 ## 性能优化
@@ -226,7 +229,7 @@ jobs:
 
 1. [环境搭建详细步骤](setup.md)
 2. [项目结构](../project-structure/index.md)
-3. [组件开发](../frontend-development/index.md)
+3. [组件开发](../frontend-development/react-components.md)
 
 ## 相关文档
 
@@ -238,4 +241,3 @@ jobs:
 ---
 
 返回：[开发环境](index.md)
-

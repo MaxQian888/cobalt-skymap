@@ -63,6 +63,7 @@ export const MobileLayout = memo(function MobileLayout({
   onFovSliderChange,
   onLocationChange,
   onGoToCoordinates,
+  onSelectObject,
   onOpenSearch,
   onOpenDetails,
   onOpenSessionPlanner,
@@ -155,7 +156,7 @@ export const MobileLayout = memo(function MobileLayout({
       { id: 'shotlist', element: <ShotList currentSelection={currentSelection} /> },
       { id: 'observation-log', element: <ObservationLog currentSelection={observationSelection} /> },
       { id: 'mount', element: <StellariumMount compact /> },
-      { id: 'plate-solver', element: <PlateSolverUnified onGoToCoordinates={onGoToCoordinates} /> },
+      { id: 'plate-solver', element: <PlateSolverUnified onGoToCoordinates={onGoToCoordinates} onSelectObject={onSelectObject} /> },
       { id: 'ocular', element: <OcularSimulator onApplyFov={onFovSliderChange} currentFov={currentFov} /> },
       { id: 'sky-atlas', element: <SkyAtlasPanel /> },
       { id: 'equipment-manager', element: <EquipmentManager /> },
@@ -172,6 +173,7 @@ export const MobileLayout = memo(function MobileLayout({
     mosaic,
     observationSelection,
     onGoToCoordinates,
+    onSelectObject,
     onFovSliderChange,
     onLocationChange,
     prioritizedTools,
@@ -217,6 +219,7 @@ export const MobileLayout = memo(function MobileLayout({
   );
 
   const bottomBarTools = compactBottomBar ? compactVisibleTools : allTools;
+  const hasActiveOverlayPanel = activeMobilePanel !== null;
   const {
     actionRailBottomOffset,
     controlsBottomOffset,
@@ -327,93 +330,97 @@ export const MobileLayout = memo(function MobileLayout({
       </div>
 
       {/* Mobile Controls - Bottom Right Corner */}
-      <div
-        data-starmap-ui-control="true"
-        data-testid="mobile-zoom-cluster"
-        className="sm:hidden absolute flex flex-col items-center gap-1 pointer-events-auto animate-slide-in-right"
-        style={{ bottom: zoomBottomOffset, right: safeAreaRight }}
-      >
-        {/* Compact Zoom */}
-        <div className="bg-card/80 backdrop-blur-md rounded-lg border border-border/50" data-tour-id="zoom">
-          <ZoomControls
-            fov={currentFov}
-            onZoomIn={onZoomIn}
-            onZoomOut={onZoomOut}
-            onFovChange={onFovSliderChange}
-          />
+      {!hasActiveOverlayPanel && (
+        <div
+          data-starmap-ui-control="true"
+          data-testid="mobile-zoom-cluster"
+          className="sm:hidden absolute flex flex-col items-center gap-1 pointer-events-auto animate-slide-in-right"
+          style={{ bottom: zoomBottomOffset, right: safeAreaRight }}
+        >
+          {/* Compact Zoom */}
+          <div className="bg-card/80 backdrop-blur-md rounded-lg border border-border/50" data-tour-id="zoom">
+            <ZoomControls
+              fov={currentFov}
+              onZoomIn={onZoomIn}
+              onZoomOut={onZoomOut}
+              onFovChange={onFovSliderChange}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Mobile Bottom Tools Bar */}
-      <div
-        ref={toolsBarRef}
-        data-starmap-ui-control="true"
-        data-testid="mobile-bottom-tools-bar"
-        className={cn(
-          'mobile-bottom-bar sm:hidden absolute flex items-center gap-0.5 bg-card/90 backdrop-blur-md rounded-lg border border-border/50 p-1 pointer-events-auto overflow-x-auto scrollbar-hide animate-slide-in-left',
-          oneHandMode && 'one-hand-bottom-bar',
-        )}
-        style={{
-          bottom: controlsBottomOffset,
-          left: safeAreaLeft,
-          right: safeAreaRightWithControls,
-        }}
-      >
-        <div className="flex items-center gap-0.5 shrink-0">
-          {bottomBarTools.map((tool) => (
-            <div key={tool.id} data-tour-id={tool.id} data-starmap-ui-control="true">
-              {tool.element}
-            </div>
-          ))}
-        </div>
+      {!hasActiveOverlayPanel && (
+        <div
+          ref={toolsBarRef}
+          data-starmap-ui-control="true"
+          data-testid="mobile-bottom-tools-bar"
+          className={cn(
+            'mobile-bottom-bar sm:hidden absolute flex items-center gap-0.5 bg-card/90 backdrop-blur-md rounded-lg border border-border/50 p-1 pointer-events-auto overflow-x-auto scrollbar-hide animate-slide-in-left',
+            oneHandMode && 'one-hand-bottom-bar',
+          )}
+          style={{
+            bottom: controlsBottomOffset,
+            left: safeAreaLeft,
+            right: safeAreaRightWithControls,
+          }}
+        >
+          <div className="flex items-center gap-0.5 shrink-0">
+            {bottomBarTools.map((tool) => (
+              <div key={tool.id} data-tour-id={tool.id} data-starmap-ui-control="true">
+                {tool.element}
+              </div>
+            ))}
+          </div>
 
-        {compactBottomBar && compactOverflowTools.length > 0 && (
-          <>
-            <ToolbarSeparator />
-            <Drawer open={isMoreDrawerOpen} onOpenChange={setIsMoreDrawerOpen} repositionInputs={false}>
-              <DrawerTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  data-tour-id="mobile-more-tools"
-                  className="h-9 w-9 touch-target"
-                  aria-label={t('mobileToolbar.more')}
-                >
-                  <Ellipsis className="h-4 w-4" />
-                </Button>
-              </DrawerTrigger>
-              <DrawerContent className="sm:hidden max-h-[70vh] max-h-[70dvh] bg-card border-border">
-                <DrawerHeader>
-                  <DrawerTitle>{t('settingsNew.mobile.moreToolsTitle')}</DrawerTitle>
-                </DrawerHeader>
-                <ScrollArea
-                  data-starmap-ui-control="true"
-                  data-starmap-scroll-surface="true"
-                  className="pb-6 px-4 overscroll-contain"
-                >
-                  <div
-                    ref={drawerToolGridRef}
-                    data-mobile-more-tools="true"
-                    className="grid grid-cols-4 gap-2 pb-4"
+          {compactBottomBar && compactOverflowTools.length > 0 && (
+            <>
+              <ToolbarSeparator />
+              <Drawer open={isMoreDrawerOpen} onOpenChange={setIsMoreDrawerOpen} repositionInputs={false}>
+                <DrawerTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    data-tour-id="mobile-more-tools"
+                    className="h-9 w-9 touch-target"
+                    aria-label={t('mobileToolbar.more')}
                   >
-                    {compactOverflowTools.map((tool) => (
-                      <div
-                        key={tool.id}
-                        data-tour-id={tool.id}
-                        data-starmap-ui-control="true"
-                        className="flex items-center justify-center"
-                      >
-                        {tool.element}
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </DrawerContent>
-            </Drawer>
-          </>
-        )}
-      </div>
+                    <Ellipsis className="h-4 w-4" />
+                  </Button>
+                </DrawerTrigger>
+                <DrawerContent className="sm:hidden max-h-[70vh] max-h-[70dvh] bg-card border-border">
+                  <DrawerHeader>
+                    <DrawerTitle>{t('settingsNew.mobile.moreToolsTitle')}</DrawerTitle>
+                  </DrawerHeader>
+                  <ScrollArea
+                    data-starmap-ui-control="true"
+                    data-starmap-scroll-surface="true"
+                    className="pb-6 px-4 overscroll-contain"
+                  >
+                    <div
+                      ref={drawerToolGridRef}
+                      data-mobile-more-tools="true"
+                      className="grid grid-cols-4 gap-2 pb-4"
+                    >
+                      {compactOverflowTools.map((tool) => (
+                        <div
+                          key={tool.id}
+                          data-tour-id={tool.id}
+                          data-starmap-ui-control="true"
+                          className="flex items-center justify-center"
+                        >
+                          {tool.element}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </DrawerContent>
+              </Drawer>
+            </>
+          )}
+        </div>
+      )}
     </>
   );
 });

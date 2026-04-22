@@ -264,6 +264,20 @@ test.describe('Splash Screen', () => {
       await expect(canvas).toBeVisible({ timeout: TEST_TIMEOUTS.long });
     });
 
+    test('should not leave the blocking loading overlay stuck after a repeat open', async ({ page }) => {
+      const canvas = page.locator('canvas').first();
+      const loadingOverlay = page.locator('[data-testid="stellarium-loading-overlay"]');
+
+      await page.goto('/starmap');
+      await expect(canvas).toBeVisible({ timeout: TEST_TIMEOUTS.long });
+      await expect(loadingOverlay).toBeHidden({ timeout: TEST_TIMEOUTS.long }).catch(() => {});
+
+      await page.reload({ waitUntil: 'domcontentloaded' });
+
+      await expect(canvas).toBeVisible({ timeout: TEST_TIMEOUTS.long });
+      await expect(loadingOverlay).toBeHidden({ timeout: TEST_TIMEOUTS.long }).catch(() => {});
+    });
+
     test('should handle rapid navigation', async ({ page }) => {
       // Navigate to starmap
       await page.goto('/starmap');

@@ -116,4 +116,24 @@ describe('useAladinLoader', () => {
     expect(result.current.loadingState.phase).toBe('failed');
     expect(result.current.loadingState.errorCode).toBe('container_not_ready');
   });
+
+  it('should clear any previous Aladin instance before retrying', async () => {
+    const containerDiv = document.createElement('div');
+    const remove = jest.fn();
+    const aladinRef = { current: { remove } as unknown as never };
+
+    const { result } = renderHook(() =>
+      useAladinLoader({
+        containerRef: { current: containerDiv },
+        aladinRef,
+      })
+    );
+
+    await act(async () => {
+      result.current.handleRetry();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(remove).toHaveBeenCalled();
+  });
 });

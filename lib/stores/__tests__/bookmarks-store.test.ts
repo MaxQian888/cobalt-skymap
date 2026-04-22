@@ -135,16 +135,14 @@ describe('useBookmarksStore', () => {
 
       const originalUpdatedAt = result.current.bookmarks[0].updatedAt;
 
-      // Wait a bit to ensure timestamp difference
-      if (jest.advanceTimersByTime) {
-        jest.advanceTimersByTime(10);
-      }
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(originalUpdatedAt + 10);
 
       act(() => {
         result.current.updateBookmark(bookmarkId!, { name: 'Updated' });
       });
 
       expect(result.current.bookmarks[0].updatedAt).toBeGreaterThanOrEqual(originalUpdatedAt);
+      nowSpy.mockRestore();
     });
   });
 

@@ -28,7 +28,7 @@ export {
   type CalibrationReference,
 } from './use-device-orientation';
 
-export { useCacheInit } from './use-cache-init';
+export { useCacheInit, type CacheStartupStageEvent } from './use-cache-init';
 
 // Search and object hooks
 export { 

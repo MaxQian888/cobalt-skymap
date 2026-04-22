@@ -3,6 +3,7 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { deriveARAdaptationContext, type ARAdaptationContext } from '@/lib/core/ar-adaptation';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
+import { useIsClient } from '@/lib/hooks/use-is-client';
 import { isTauri } from '@/lib/tauri/app-control-api';
 
 const FALLBACK_VIEWPORT_WIDTH = 1024;
@@ -51,6 +52,7 @@ function parseViewportSnapshot(snapshot: string) {
 export function useARAdaptation(): ARAdaptationContext {
   const cameraRuntime = useARRuntimeStore((state) => state.camera);
   const sensorRuntime = useARRuntimeStore((state) => state.sensor);
+  const isClient = useIsClient();
 
   const viewportSnapshot = useSyncExternalStore(
     (onStoreChange) => {
@@ -88,7 +90,7 @@ export function useARAdaptation(): ARAdaptationContext {
       viewportWidth,
       viewportHeight,
       safeAreaInsets,
-      runtimeKind: isTauri() ? 'tauri' : 'browser',
+      runtimeKind: isClient && isTauri() ? 'tauri' : 'browser',
       cameraSupported: cameraRuntime.isSupported,
       capabilityMap: cameraRuntime.capabilityMap,
       sensorSupported: sensorRuntime.isSupported,
@@ -101,6 +103,7 @@ export function useARAdaptation(): ARAdaptationContext {
     sensorRuntime.isPermissionGranted,
     sensorRuntime.isSupported,
     sensorRuntime.status,
+    isClient,
     viewportSnapshot,
   ]);
 }

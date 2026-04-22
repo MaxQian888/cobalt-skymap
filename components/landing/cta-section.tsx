@@ -2,8 +2,9 @@
 
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { GitHubIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { Rocket, Download, Github } from 'lucide-react';
+import { Rocket, Download } from 'lucide-react';
 import { SectionHeader } from './section-header';
 import { EXTERNAL_LINKS } from '@/lib/constants/external-links';
 
@@ -52,7 +53,7 @@ export function CTASection() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <Github className="mr-2 h-5 w-5" />
+              <GitHubIcon className="mr-2 h-5 w-5" />
               {t('githubButton')}
             </a>
           </Button>

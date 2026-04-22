@@ -1,5 +1,6 @@
 import {
   getDefaultObjectInfoDataSourceConfigs,
+  getObjectInfoProviderDefinition,
   getDefaultSearchSourceConfigs,
   getEligibleSearchProviders,
   getRenderEligibleProviders,
@@ -48,5 +49,34 @@ describe('online-data-provider-registry', () => {
 
     expect(wikipedia?.renderTier).toBe('enrichment');
     expect(wikipedia?.fallbackRole).toBeTruthy();
+  });
+
+  it('exposes executable support boundaries for object-info providers', () => {
+    const simbad = getObjectInfoProviderDefinition('simbad');
+    const wikipedia = getObjectInfoProviderDefinition('wikipedia');
+    const local = getObjectInfoProviderDefinition('local');
+
+    expect(simbad.objectInfo?.targetClasses).toEqual(
+      expect.arrayContaining(['deep-sky', 'star', 'extragalactic'])
+    );
+    expect(simbad.objectInfo?.responseMode).toBe('json');
+    expect(simbad.objectInfo?.authorityLevel).toBe('authoritative');
+    expect(simbad.objectInfo?.healthCheck?.strategy).toBe('query');
+
+    expect(wikipedia.objectInfo?.responseMode).toBe('json');
+    expect(wikipedia.objectInfo?.authorityLevel).toBe('reference');
+
+    expect(local.objectInfo?.authorityLevel).toBe('fallback-local');
+    expect(local.objectInfo?.healthCheck?.strategy).toBe('none');
+  });
+
+  it('includes support-boundary metadata in object-info data source defaults', () => {
+    const defaults = getDefaultObjectInfoDataSourceConfigs();
+    const sbdb = defaults.find((source) => source.id === 'sbdb');
+
+    expect(sbdb?.targetClasses).toEqual(['small-body']);
+    expect(sbdb?.responseMode).toBe('json');
+    expect(sbdb?.authorityLevel).toBe('authoritative');
+    expect(sbdb?.healthCheck.strategy).toBe('query');
   });
 });

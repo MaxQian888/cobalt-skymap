@@ -17,10 +17,12 @@ import {
   summarizeCalculatorMeta,
   type CalculatorMetaSummary,
 } from './orchestrator';
+import type { AstroCalculatorObserverContext } from './types';
 
 interface AlmanacTabProps {
   latitude: number;
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
   sharedDate?: string;
   sharedTime?: string;
   onSharedDateChange?: (nextDate: string) => void;
@@ -37,6 +39,7 @@ function toDateInputString(date: Date): string {
 export function AlmanacTab({
   latitude,
   longitude,
+  observerContext,
   sharedDate,
   sharedTime,
   onSharedDateChange,
@@ -76,11 +79,13 @@ export function AlmanacTab({
           runCalculatorAlmanac({
             date,
             observer: { latitude, longitude },
+            contextKey: observerContext?.contextKey,
           }),
           runCalculatorRiseTransitSet({
             body: 'Sun',
             date,
             observer: { latitude, longitude },
+            contextKey: observerContext?.contextKey,
           }),
         ]);
 
@@ -107,7 +112,7 @@ export function AlmanacTab({
     return () => {
       cancelled = true;
     };
-  }, [date, latitude, longitude, t]);
+  }, [date, latitude, longitude, observerContext?.contextKey, t]);
 
   return (
     <div className="space-y-4">

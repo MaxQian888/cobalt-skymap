@@ -301,6 +301,26 @@ describe('useOnboardingStore', () => {
       
       expect(result.current.showOnNextVisit).toBe(false);
     });
+
+    it('should clear stale resume checkpoints when auto-show is disabled', () => {
+      const { result } = renderHook(() => useOnboardingStore());
+
+      act(() => {
+        result.current.openSetup();
+        result.current.goToSetupStep('equipment');
+        result.current.closeSetup();
+      });
+
+      expect(result.current.resumeCheckpoint?.phase).toBe('setup');
+
+      act(() => {
+        result.current.setShowOnNextVisit(false);
+      });
+
+      expect(result.current.showOnNextVisit).toBe(false);
+      expect(result.current.resumeCheckpoint).toBeNull();
+      expect(result.current.resolveEntrySurface()).toBe('idle');
+    });
   });
 
   describe('getCurrentStep', () => {
@@ -663,6 +683,25 @@ describe('useOnboardingStore', () => {
       expect(result.current.currentStepIndex).toBe(2);
     });
 
+    it('should ignore stale resume checkpoints after onboarding is completed', () => {
+      const { result } = renderHook(() => useOnboardingStore());
+
+      act(() => {
+        result.current.startTourById('module-discovery');
+        result.current.goToStep(2);
+        result.current.endTour();
+      });
+
+      expect(result.current.resolveEntrySurface()).toBe('resume-tour');
+
+      act(() => {
+        result.current.completeOnboarding();
+      });
+
+      expect(result.current.resumeCheckpoint).toBeNull();
+      expect(result.current.resolveEntrySurface()).toBe('idle');
+    });
+
     it('should restart all onboarding with full reset semantics', () => {
       const { result } = renderHook(() => useOnboardingStore());
 
@@ -705,6 +744,40 @@ describe('useOnboardingStore', () => {
       expect(after.currentStepIndex).toBe(0);
       expect(result.current.getTourProgress('module-discovery').currentStepIndex).toBeGreaterThan(0);
       expect(result.current.hasCompletedSetup).toBe(false);
+    });
+  });
+
+  describe('migration', () => {
+    it('should sanitize stale checkpoints that conflict with hidden onboarding state', () => {
+      const migrate = useOnboardingStore.persist?.getOptions().migrate;
+      expect(typeof migrate).toBe('function');
+      if (!migrate) return;
+
+      const migrated = migrate({
+        hasCompletedOnboarding: true,
+        hasSeenWelcome: true,
+        showOnNextVisit: false,
+        resumeCheckpoint: {
+          phase: 'tour',
+          setupStep: null,
+          activeTourId: 'first-run-core',
+          currentStepIndex: 3,
+          updatedAt: '2026-04-05T00:00:00.000Z',
+        },
+        tourHubOpen: false,
+      } as Record<string, unknown>, 5);
+
+      const migratedState = migrated as {
+        resumeCheckpoint?: unknown;
+        tourHubOpen?: boolean;
+        showOnNextVisit?: boolean;
+        hasCompletedOnboarding?: boolean;
+      };
+
+      expect(migratedState.hasCompletedOnboarding).toBe(true);
+      expect(migratedState.showOnNextVisit).toBe(false);
+      expect(migratedState.resumeCheckpoint).toBeNull();
+      expect(migratedState.tourHubOpen).toBe(false);
     });
   });
 });

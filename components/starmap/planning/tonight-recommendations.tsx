@@ -465,13 +465,19 @@ function TargetCard({
       {(target.reasons.length > 0 || target.warnings.length > 0) && (
         <div className="mt-2 space-y-1">
           {target.reasons.slice(0, 2).map((reason, i) => (
-            <div key={i} className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+            <div
+              key={i}
+              className="flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/8 px-2 py-1 text-xs text-emerald-700 dark:text-emerald-300"
+            >
               <CheckCircle2 className="h-3 w-3 shrink-0" />
               <span className="truncate">{t(reason.key, reason.params)}</span>
             </div>
           ))}
           {target.warnings.slice(0, 1).map((warning, i) => (
-            <div key={i} className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+            <div
+              key={i}
+              className="flex items-center gap-1 rounded-md border border-amber-500/25 bg-amber-500/8 px-2 py-1 text-xs text-amber-700 dark:text-amber-300"
+            >
               <AlertTriangle className="h-3 w-3 shrink-0" />
               <span className="truncate">{t(warning.key, warning.params)}</span>
             </div>
@@ -646,14 +652,23 @@ export function TonightRecommendations() {
         
         {/* Tonight's conditions with beautiful visualization */}
         {conditions && (
-          <div className="shrink-0 space-y-4 p-4 rounded-xl bg-linear-to-br from-slate-900/80 to-slate-800/80 border border-slate-700/50">
+          <div className="theme-surface-strong relative shrink-0 overflow-hidden rounded-xl border p-4">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-linear-to-br from-primary/12 via-transparent to-secondary/14 opacity-80"
+            />
+            <div className="relative z-10 space-y-4">
             {/* Header with date picker and refresh */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-200">{t('tonight.conditions')}</span>
+                <span className="text-sm font-medium text-foreground">{t('tonight.conditions')}</span>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-6 gap-1.5 text-xs font-normal border-slate-600 bg-transparent text-slate-300 hover:text-slate-100 hover:bg-slate-700">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-6 gap-1.5 border-border/70 bg-background/45 text-xs font-normal text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                    >
                       <CalendarDays className="h-3 w-3" />
                       {planDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                     </Button>
@@ -676,7 +691,7 @@ export function TonightRecommendations() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-slate-400 hover:text-slate-200"
+                className="h-6 w-6 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
                 onClick={refresh}
                 disabled={isLoading}
               >
@@ -700,14 +715,14 @@ export function TonightRecommendations() {
               
               {/* Quick Stats */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs text-slate-300">
-                  <Clock className="h-3.5 w-3.5 text-slate-400" />
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                   <span>{conditions.totalDarkHours.toFixed(1)}h {t('tonight.darkHours')}</span>
                 </div>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                      className="flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
                       onClick={handleRequestLocation}
                       disabled={geolocation.loading}
                     >
@@ -721,6 +736,7 @@ export function TonightRecommendations() {
                 </Tooltip>
               </div>
             </div>
+          </div>
           </div>
         )}
         
@@ -812,17 +828,17 @@ export function TonightRecommendations() {
         </div>
         
         {/* Score legend */}
-        <div className="shrink-0 flex items-center justify-center gap-4 pt-2 border-t text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-green-500" />
+        <div className="shrink-0 flex items-center justify-center gap-3 border-t pt-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-2 py-1 text-emerald-700 dark:text-emerald-300">
+            <div className="h-2 w-2 rounded-full bg-emerald-500" />
             <span>80+ {t('tonight.excellent')}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-yellow-500" />
+          <div className="flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/8 px-2 py-1 text-amber-700 dark:text-amber-300">
+            <div className="h-2 w-2 rounded-full bg-amber-500" />
             <span>60+ {t('tonight.good')}</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-orange-500" />
+          <div className="flex items-center gap-1.5 rounded-full border border-orange-500/20 bg-orange-500/8 px-2 py-1 text-orange-700 dark:text-orange-300">
+            <div className="h-2 w-2 rounded-full bg-orange-500" />
             <span>40+ {t('tonight.fair')}</span>
           </div>
         </div>

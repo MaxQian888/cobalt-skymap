@@ -10,7 +10,12 @@ import {
 } from '@/lib/core/starmap-data-tier';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { getDefaultObjectInfoDataSourceConfigs } from './online-data-provider-registry';
+import {
+  getDefaultObjectInfoDataSourceConfigs,
+  type ObjectInfoAuthorityLevel,
+  type ObjectInfoHealthCheckStrategy,
+  type ObjectInfoResponseMode,
+} from './online-data-provider-registry';
 
 // ============================================================================
 // Types
@@ -65,14 +70,27 @@ export interface DataSourceConfig {
   builtIn: boolean;
   renderTier: Extract<StarmapDataTier, 'enrichment'>;
   fallbackRole: StarmapSourceFallbackRole;
+  targetClasses: readonly string[];
+  responseMode: ObjectInfoResponseMode;
+  authorityLevel: ObjectInfoAuthorityLevel;
+  healthCheck: {
+    strategy: ObjectInfoHealthCheckStrategy;
+    probePath?: string;
+  };
 }
 
 type LegacyImageSourceConfig = Omit<ImageSourceConfig, 'renderTier' | 'fallbackRole'> & Partial<
   Pick<ImageSourceConfig, 'renderTier' | 'fallbackRole'>
 >;
 
-type LegacyDataSourceConfig = Omit<DataSourceConfig, 'renderTier' | 'fallbackRole'> & Partial<
-  Pick<DataSourceConfig, 'renderTier' | 'fallbackRole'>
+type LegacyDataSourceConfig = Omit<
+  DataSourceConfig,
+  'renderTier' | 'fallbackRole' | 'targetClasses' | 'responseMode' | 'authorityLevel' | 'healthCheck'
+> & Partial<
+  Pick<
+    DataSourceConfig,
+    'renderTier' | 'fallbackRole' | 'targetClasses' | 'responseMode' | 'authorityLevel' | 'healthCheck'
+  >
 >;
 
 export interface ObjectInfoConfig {
@@ -243,7 +261,35 @@ function normalizeDataSourceConfig(source: LegacyDataSourceConfig): DataSourceCo
     ...source,
     renderTier: source.renderTier ?? 'enrichment',
     fallbackRole: source.fallbackRole ?? (source.priority <= 1 ? 'primary' : 'fallback'),
+    targetClasses: source.targetClasses ?? ['generic'],
+    responseMode: source.responseMode ?? 'json',
+    authorityLevel: source.authorityLevel ?? 'reference',
+    healthCheck: source.healthCheck ?? { strategy: 'disabled' },
   };
+}
+
+function buildImageHealthProbeUrl(source: ImageSourceConfig): string {
+  const testRa = 10.68;
+  const testDec = 41.27;
+  const testSize = 0.5;
+
+  return source.baseUrl + source.urlTemplate
+    .replace('{ra}', testRa.toString())
+    .replace('{dec}', testDec.toString())
+    .replace('{size}', testSize.toString())
+    .replace('{format}', 'jpg');
+}
+
+function buildDataSourceHealthProbeUrl(source: DataSourceConfig): string | null {
+  if (source.healthCheck.strategy === 'none' || source.healthCheck.strategy === 'disabled') {
+    return null;
+  }
+
+  if (source.healthCheck.probePath) {
+    return `${source.baseUrl}${source.healthCheck.probePath}`;
+  }
+
+  return source.baseUrl + source.apiEndpoint;
 }
 
 export function getObjectInfoConfigMigratedState(
@@ -467,19 +513,9 @@ export async function checkImageSourceHealth(
   const startTime = performance.now();
   
   try {
-    // Generate a test URL for a known object (M31)
-    const testRa = 10.68;
-    const testDec = 41.27;
-    const testSize = 0.5;
-    
-    const url = source.baseUrl + source.urlTemplate
-      .replace('{ra}', testRa.toString())
-      .replace('{dec}', testDec.toString())
-      .replace('{size}', testSize.toString())
-      .replace('{format}', 'jpg');
-    
+    const url = buildImageHealthProbeUrl(source);
     const response = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
       signal: AbortSignal.timeout(5000),
     });
     
@@ -500,36 +536,29 @@ export async function checkDataSourceHealth(
   const startTime = performance.now();
   
   try {
-    let testUrl = source.baseUrl;
-    
-    // Use a simple ping-like request based on source type
-    switch (source.type) {
-      case 'simbad':
-        testUrl = `${source.baseUrl}/simbad/sim-tap/sync?request=doQuery&lang=adql&format=json&query=${encodeURIComponent('SELECT TOP 1 main_id FROM basic LIMIT 1')}`;
-        break;
-      case 'wikipedia':
-        testUrl = `${source.baseUrl}${source.apiEndpoint}/M31`;
-        break;
-      case 'sbdb':
-        testUrl = `${source.baseUrl}${source.apiEndpoint}?sstr=1P&phys-par=1`;
-        break;
-      case 'vizier':
-        testUrl = `${source.baseUrl}/viz-bin/votable?-source=I/239/hip_main&-c=M31&-c.rs=1`;
-        break;
-      case 'ned':
-        testUrl = `${source.baseUrl}/cgi-bin/nph-objsearch?objname=M31&of=xml_main`;
-        break;
-      default:
-        testUrl = source.baseUrl + source.apiEndpoint;
+    if (source.healthCheck.strategy === 'none') {
+      const responseTime = Math.round(performance.now() - startTime);
+      return { online: true, responseTime };
     }
-    
+
+    if (source.healthCheck.strategy === 'disabled') {
+      const responseTime = Math.round(performance.now() - startTime);
+      return { online: false, responseTime };
+    }
+
+    const testUrl = buildDataSourceHealthProbeUrl(source);
+    if (!testUrl) {
+      const responseTime = Math.round(performance.now() - startTime);
+      return { online: false, responseTime };
+    }
+
     const response = await fetch(testUrl, {
-      method: 'HEAD',
+      method: 'GET',
       signal: AbortSignal.timeout(source.timeout),
     });
     
     const responseTime = Math.round(performance.now() - startTime);
-    return { online: response.ok || response.status === 405, responseTime }; // 405 is ok for HEAD on some APIs
+    return { online: response.ok, responseTime };
   } catch {
     const responseTime = Math.round(performance.now() - startTime);
     return { online: false, responseTime };

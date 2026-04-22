@@ -33,7 +33,7 @@ describe('updater-hooks', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
-    mockGetCurrentVersion.mockResolvedValue('1.0.0');
+    mockGetCurrentVersion.mockImplementation(() => new Promise<string>(() => undefined));
     mockOnUpdateProgress.mockResolvedValue(jest.fn());
     // Reset the Zustand store between tests
     useUpdaterStore.getState().reset();
@@ -321,6 +321,7 @@ describe('updater-hooks', () => {
     });
 
     it('should return current version', async () => {
+      mockGetCurrentVersion.mockResolvedValue('1.0.0');
       const { result } = renderHook(() => useUpdater());
 
       await waitFor(() => {

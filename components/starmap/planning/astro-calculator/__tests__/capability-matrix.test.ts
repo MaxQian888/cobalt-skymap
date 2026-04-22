@@ -29,4 +29,13 @@ describe('astro calculator capability matrix', () => {
     const orderedKeys = [...ASTRO_CALCULATOR_TAB_ORDER].sort();
     expect(matrixKeys).toEqual(orderedKeys);
   });
+
+  it('keeps observer-context actions explicit across the nine-tab matrix', () => {
+    expect(ASTRO_CALCULATOR_CAPABILITY_MATRIX.wut.actions).toContain('reviewObserverContext');
+    expect(ASTRO_CALCULATOR_CAPABILITY_MATRIX.positions.actions).toContain('reviewObserverContext');
+
+    ['rts', 'ephemeris', 'almanac', 'phenomena', 'coordinate', 'time', 'solar-system'].forEach((tabId) => {
+      expect(ASTRO_CALCULATOR_CAPABILITY_MATRIX[tabId as keyof typeof ASTRO_CALCULATOR_CAPABILITY_MATRIX].actions).toContain('reuseObserverContext');
+    });
+  });
 });

@@ -2,7 +2,7 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 jest.mock('zustand/middleware', () => ({
   persist: (config: unknown) => config,
@@ -106,7 +106,9 @@ describe('SettingsExportImport', () => {
     render(<SettingsExportImport />);
 
     fireEvent.click(screen.getByLabelText('settingsNew.exportImport.domains.settings'));
-    fireEvent.click(screen.getByText('settingsNew.exportImport.export'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('settingsNew.exportImport.export'));
+    });
 
     await waitFor(() => {
       expect(mockBuildSettingsProfile).toHaveBeenCalledWith(expect.objectContaining({
@@ -126,14 +128,18 @@ describe('SettingsExportImport', () => {
     mockOpenSettingsProfileFile.mockResolvedValue('{"version":6}');
 
     render(<SettingsExportImport />);
-    fireEvent.click(screen.getByText('settingsNew.exportImport.import'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('settingsNew.exportImport.import'));
+    });
 
     expect(await screen.findByText('settingsNew.exportImport.previewTitle')).toBeInTheDocument();
     expect(screen.getByText('settingsNew.exportImport.skippedDomains')).toBeInTheDocument();
     expect(screen.getByText('settingsNew.exportImport.warnings')).toBeInTheDocument();
 
     fireEvent.click(within(screen.getByTestId('alert-dialog')).getByLabelText('settingsNew.exportImport.domains.theme'));
-    fireEvent.click(screen.getByText('settingsNew.exportImport.confirmImport'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('settingsNew.exportImport.confirmImport'));
+    });
 
     await waitFor(() => {
       expect(mockApplySettingsProfileImport).toHaveBeenCalledWith(
@@ -146,7 +152,7 @@ describe('SettingsExportImport', () => {
     });
   });
 
-  it('shows and triggers restore for the last import snapshot', () => {
+  it('shows and triggers restore for the last import snapshot', async () => {
     useSettingsImportRestoreStore.getState().setRestorePoint({
       createdAt: '2026-01-01T00:00:00.000Z',
       domains: ['theme'],
@@ -161,7 +167,9 @@ describe('SettingsExportImport', () => {
 
     render(<SettingsExportImport />);
 
-    fireEvent.click(screen.getByText('settingsNew.exportImport.restoreLastImport'));
+    await act(async () => {
+      fireEvent.click(screen.getByText('settingsNew.exportImport.restoreLastImport'));
+    });
     expect(mockRestoreLastSettingsImport).toHaveBeenCalledWith({ applyThemeMode: mockSetTheme });
   });
 });

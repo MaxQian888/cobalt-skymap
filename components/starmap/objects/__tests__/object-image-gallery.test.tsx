@@ -13,11 +13,13 @@ jest.mock('@/components/ui/button', () => ({
     variant,
     size,
     className,
+    asChild: _asChild,
     ...props
   }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
     children?: React.ReactNode;
     variant?: string;
     size?: string;
+    asChild?: boolean;
   }) => (
     <button
       onClick={onClick}
@@ -29,6 +31,27 @@ jest.mock('@/components/ui/button', () => ({
     >
       {children}
     </button>
+  ),
+}));
+
+jest.mock('@/components/ui/card', () => ({
+  Card: ({
+    children,
+    className,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="card" data-slot="card" className={className} {...props}>
+      {children}
+    </div>
+  ),
+  CardContent: ({
+    children,
+    className,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="card-content" data-slot="card-content" className={className} {...props}>
+      {children}
+    </div>
   ),
 }));
 
@@ -71,18 +94,21 @@ const mockImages: ObjectImage[] = [
     source: 'NASA',
     title: 'M31 Image 1',
     credit: 'NASA/ESA',
+    availability: 'degraded',
   },
   {
     url: 'https://example.com/image2.jpg',
     source: 'ESO',
     title: 'M31 Image 2',
     credit: 'ESO/VLT',
+    availability: 'available',
   },
   {
     url: 'https://example.com/image3.jpg',
     source: 'Hubble',
     title: 'M31 Image 3',
     credit: 'Hubble Space Telescope',
+    availability: 'unsupported',
   },
 ];
 
@@ -126,6 +152,17 @@ describe('ObjectImageGallery', () => {
     it('shows image credit when available', () => {
       render(<ObjectImageGallery images={[mockImages[0]]} objectName="M31" />);
       expect(screen.getByText('NASA/ESA')).toBeInTheDocument();
+    });
+
+    it('renders the gallery frame and metadata with shadcn card surfaces', () => {
+      render(<ObjectImageGallery images={[mockImages[0]]} objectName="M31" />);
+      expect(screen.getByTestId('object-image-gallery-frame')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-image-gallery-meta')).toHaveAttribute('data-slot', 'card');
+    });
+
+    it('shows image availability state when present', () => {
+      render(<ObjectImageGallery images={[mockImages[0]]} objectName="M31" />);
+      expect(screen.getByText('objectDetail.degradedSourceState')).toBeInTheDocument();
     });
 
     it('does not show navigation arrows for single image', () => {

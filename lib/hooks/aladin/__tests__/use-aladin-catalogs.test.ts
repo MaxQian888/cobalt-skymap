@@ -2,7 +2,8 @@
  * @jest-environment jsdom
  */
 
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
+import { useAladinStore } from '@/lib/stores/aladin-store';
 
 // Mock logger
 jest.mock('@/lib/logger', () => ({
@@ -31,6 +32,8 @@ describe('useAladinCatalogs', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSkyEngine = 'aladin';
+    window.localStorage.removeItem('aladin-layers-store');
+    useAladinStore.getState().resetAladinLayers();
   });
 
   it('exports the hook correctly', async () => {
@@ -69,5 +72,27 @@ describe('useAladinCatalogs', () => {
     const mod = await import('../use-aladin-catalogs');
     // Type exports are checked at compile time; runtime check for hook
     expect(mod.useAladinCatalogs).toBeDefined();
+  });
+
+  it('disables a catalog layer when addCatalog fails so the canvas can continue rendering', async () => {
+    const { useAladinCatalogs } = await import('../use-aladin-catalogs');
+    const aladinRef = {
+      current: {
+        addCatalog: jest.fn(() => {
+          throw new Error('catalog failed');
+        }),
+        getRaDec: jest.fn(() => [10, 20]),
+      },
+    };
+
+    useAladinStore.getState().updateCatalogLayer('simbad', { enabled: true });
+
+    renderHook(() =>
+      useAladinCatalogs({ aladinRef: aladinRef as never, engineReady: true })
+    );
+
+    await waitFor(() => {
+      expect(useAladinStore.getState().catalogLayers.find((layer) => layer.id === 'simbad')?.enabled).toBe(false);
+    });
   });
 });

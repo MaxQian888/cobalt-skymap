@@ -1,6 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const port = process.env.PLAYWRIGHT_PORT ?? '3001';
+const skipWebServer = process.env.PLAYWRIGHT_SKIP_WEBSERVER === '1';
+const configuredWorkers = process.env.PLAYWRIGHT_WORKERS
+  ? Number.parseInt(process.env.PLAYWRIGHT_WORKERS, 10)
+  : process.env.CI
+    ? 1
+    : process.platform === 'win32'
+      ? 1
+      : undefined;
 
 /**
  * Playwright configuration for SkyMap E2E tests
@@ -21,8 +29,8 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
   
-  /* Opt out of parallel tests on CI */
-  workers: process.env.CI ? 1 : undefined,
+  /* Keep local Windows runs serial because Next dev + WASM bootstrap is unstable under multi-worker pressure. */
+  workers: Number.isFinite(configuredWorkers) ? configuredWorkers : undefined,
   
   /* Reporter to use */
   reporter: [
@@ -81,13 +89,15 @@ export default defineConfig({
   ],
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'pnpm exec next dev --webpack',
-    url: `http://localhost:${port}/starmap`,
-    reuseExistingServer: !process.env.CI,
-    env: { ...process.env, PORT: port },
-    timeout: 120 * 1000,
-  },
+  ...(skipWebServer ? {} : {
+    webServer: {
+      command: 'pnpm exec next dev --webpack',
+      url: `http://localhost:${port}/starmap`,
+      reuseExistingServer: !process.env.CI,
+      env: { ...process.env, PORT: port },
+      timeout: 120 * 1000,
+    },
+  }),
   
   /* Global timeout for each test - extended for WASM initialization */
   timeout: 120 * 1000,

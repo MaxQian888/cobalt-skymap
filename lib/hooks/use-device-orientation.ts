@@ -111,7 +111,9 @@ const SOURCE_TRANSITION_STABILIZE_MS = 600;
 const STALE_SAMPLE_MS = 1400;
 const LOW_CONFIDENCE_ACCURACY_DEG = 18;
 const PERMISSION_REQUEST_TIMEOUT_MS = 4000;
+const DESKTOP_SENSOR_BOOTSTRAP_TIMEOUT_MS = 2000;
 const PERMISSION_CACHE_KEY = 'skymap:ar:device-orientation-permission';
+const DESKTOP_SENSOR_UNAVAILABLE_ERROR = 'No device orientation samples were detected.';
 type PermissionCacheState = 'unknown' | 'granted' | 'denied';
 let permissionCacheState: PermissionCacheState = 'unknown';
 
@@ -219,6 +221,19 @@ function usesPermissionRequestApi(): boolean {
     requestPermission?: (absolute?: boolean) => Promise<'granted' | 'denied' | string>;
   };
   return typeof deviceOrientationEventType.requestPermission === 'function';
+}
+
+function isLikelyDesktopOrientationRuntime(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const coarsePointer = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(pointer: coarse)').matches
+    : false;
+  const maxTouchPoints = typeof navigator !== 'undefined'
+    ? navigator.maxTouchPoints ?? 0
+    : 0;
+
+  return !usesPermissionRequestApi() && !coarsePointer && maxTouchPoints === 0;
 }
 
 function getScreenAngleDeg(): number {
@@ -368,10 +383,13 @@ export function useDeviceOrientation(
 
   const [orientation, setOrientation] = useState<DeviceOrientation | null>(null);
   const [skyDirection, setSkyDirection] = useState<SkyDirection | null>(null);
-  const [isSupported] = useState(supportsDeviceOrientation);
+  const [baseSupport] = useState(supportsDeviceOrientation);
+  const [desktopBootstrapTimedOut, setDesktopBootstrapTimedOut] = useState(false);
   const [cachedPermissionState] = useState<PermissionCacheState>(() => getCachedPermissionState());
+  const likelyDesktopRuntime = useMemo(() => isLikelyDesktopOrientationRuntime(), []);
+  const isSupported = baseSupport && !desktopBootstrapTimedOut;
   const [isPermissionGranted, setIsPermissionGranted] = useState(
-    () => isSupported && (!usesPermissionRequestApi() || cachedPermissionState === 'granted')
+    () => baseSupport && (!usesPermissionRequestApi() || cachedPermissionState === 'granted')
   );
   const [permissionDenied, setPermissionDenied] = useState(cachedPermissionState === 'denied');
   const [source, setSource] = useState<OrientationSource>('none');
@@ -428,7 +446,7 @@ export function useDeviceOrientation(
   }, []);
 
   const revalidatePermissionState = useCallback(async (): Promise<void> => {
-    if (!isSupported || !usesPermissionRequestApi()) return;
+    if (!baseSupport || !usesPermissionRequestApi()) return;
     if (typeof navigator === 'undefined' || !navigator.permissions || typeof navigator.permissions.query !== 'function') {
       return;
     }
@@ -469,10 +487,10 @@ export function useDeviceOrientation(
       setIsPermissionGranted(false);
       setPermissionDenied(false);
     }
-  }, [isSupported, setDegradedReasonState]);
+  }, [baseSupport, setDegradedReasonState]);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    if (!isSupported) {
+    if (!baseSupport) {
       setError('Device orientation not supported');
       return false;
     }
@@ -538,7 +556,7 @@ export function useDeviceOrientation(
       setIsPermissionGranted(false);
       return false;
     }
-  }, [isSupported, setDegradedReasonState]);
+  }, [baseSupport, setDegradedReasonState]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -606,7 +624,7 @@ export function useDeviceOrientation(
   }, [updateCalibrationState]);
 
   useEffect(() => {
-    if (!enabled || !isSupported || !isPermissionGranted) {
+    if (!enabled || !baseSupport || !isPermissionGranted) {
       return;
     }
 
@@ -624,6 +642,8 @@ export function useDeviceOrientation(
       }
       lastSourceRef.current = sample.source;
       latestSampleRef.current = sample;
+      setDesktopBootstrapTimedOut(false);
+      setError((current) => current === DESKTOP_SENSOR_UNAVAILABLE_ERROR ? null : current);
       setOrientation({
         alpha: sample.alpha,
         beta: sample.beta,
@@ -794,7 +814,7 @@ export function useDeviceOrientation(
     };
   }, [
     enabled,
-    isSupported,
+    baseSupport,
     isPermissionGranted,
     updateHz,
     deadbandDeg,
@@ -803,6 +823,52 @@ export function useDeviceOrientation(
     useCompassHeading,
     setDegradedReasonState,
     revalidatePermissionState,
+  ]);
+
+  useEffect(() => {
+    if (!enabled || !baseSupport || !isPermissionGranted || !likelyDesktopRuntime) {
+      if (!desktopBootstrapTimedOut) return;
+      const resetTimerId = window.setTimeout(() => {
+        setDesktopBootstrapTimedOut(false);
+      }, 0);
+      return () => {
+        window.clearTimeout(resetTimerId);
+      };
+    }
+
+    if (latestSampleRef.current) {
+      if (!desktopBootstrapTimedOut) return;
+      const resetTimerId = window.setTimeout(() => {
+        setDesktopBootstrapTimedOut(false);
+      }, 0);
+      return () => {
+        window.clearTimeout(resetTimerId);
+      };
+    }
+
+    const timerId = window.setTimeout(() => {
+      if (latestSampleRef.current || document.visibilityState !== 'visible') {
+        return;
+      }
+
+      setDesktopBootstrapTimedOut(true);
+      setHasActiveSample(false);
+      setSource('none');
+      setAccuracyDeg(null);
+      setDegradedReasonState(null);
+      setError((current) => current ?? DESKTOP_SENSOR_UNAVAILABLE_ERROR);
+    }, DESKTOP_SENSOR_BOOTSTRAP_TIMEOUT_MS);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [
+    enabled,
+    baseSupport,
+    desktopBootstrapTimedOut,
+    isPermissionGranted,
+    likelyDesktopRuntime,
+    setDegradedReasonState,
   ]);
 
   useEffect(() => {
@@ -817,12 +883,14 @@ export function useDeviceOrientation(
     if (typeof window === 'undefined') return;
 
     const resetTimer = window.setTimeout(() => {
+      setDesktopBootstrapTimedOut(false);
       setSkyDirection(null);
       setOrientation(null);
       setSource('none');
       setAccuracyDeg(null);
       setHasActiveSample(false);
       setDegradedReasonState(null);
+      setError((current) => current === DESKTOP_SENSOR_UNAVAILABLE_ERROR ? null : current);
     }, 0);
 
     return () => {

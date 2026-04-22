@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, MapPinned } from 'lucide-react';
+import { AlertTriangle, Download, MapPinned } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -22,16 +23,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { isExplicitMinorObjectQuery } from '@/lib/astronomy/object-resolver/parser/minor-parser';
 import { parseDecCoordinate, parseRACoordinate } from '@/lib/astronomy/coordinates/conversions';
 import { type EngineBody } from '@/lib/astronomy/engine';
 import { formatTimeShort } from '@/lib/astronomy/time/formats';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
 import { AltitudeChart } from '../altitude-chart';
 import { runCalculatorRiseTransitSetBatch, summarizeCalculatorMeta, type CalculatorMetaSummary } from './orchestrator';
+import {
+  fetchSmallBodyEphemeris,
+  toSmallBodyCalculationMeta,
+} from './small-body-adapter';
+import {
+  AstroCalculatorResultActionsBar,
+  ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME,
+} from './result-action-layout';
+import { useAstroCalculatorResultActions } from './result-actions';
+import type { AstroCalculatorObserverContext } from './types';
 
 interface RTSTabProps {
   latitude: number;
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
   selectedTarget?: { name: string; ra: number; dec: number };
   sharedDate?: string;
   onSharedDateChange?: (nextDate: string) => void;
@@ -60,6 +73,23 @@ function toLocalDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function getExplicitMinorObjectQuery(input: string): string | null {
+  const query = input.trim();
+  if (!query) {
+    return null;
+  }
+  if (isExplicitMinorObjectQuery(query)) {
+    return query;
+  }
+
+  const slashIndex = query.indexOf('/');
+  if (slashIndex > 0 && isExplicitMinorObjectQuery(query.slice(0, slashIndex))) {
+    return query;
+  }
+
+  return null;
+}
+
 interface RTSRow {
   date: Date;
   riseTime: Date | null;
@@ -71,7 +101,7 @@ interface RTSRow {
   darkImagingHours: number;
 }
 
-export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onSharedDateChange }: RTSTabProps) {
+export function RTSTab({ latitude, longitude, observerContext, selectedTarget, sharedDate, onSharedDateChange }: RTSTabProps) {
   const t = useTranslations();
   const [targetMode, setTargetMode] = useState<TargetMode>(selectedTarget ? 'Custom' : 'Moon');
   const [targetName, setTargetName] = useState(selectedTarget?.name ?? '');
@@ -83,6 +113,11 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
   const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sourceDiagnostics, setSourceDiagnostics] = useState<string[]>([]);
+  const {
+    copyResults,
+    exportResults,
+  } = useAstroCalculatorResultActions(observerContext);
 
   useEffect(() => {
     if (sharedDate && sharedDate !== startDate) {
@@ -92,7 +127,30 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
 
   const parsedRa = useMemo(() => parseRACoordinate(targetRA), [targetRA]);
   const parsedDec = useMemo(() => parseDecCoordinate(targetDec), [targetDec]);
+  const explicitMinorObjectQuery = useMemo(() => getExplicitMinorObjectQuery(targetName), [targetName]);
+  const exportLines = useMemo(() => {
+    return [
+      `Target mode: ${targetMode}`,
+      `Target name: ${targetName || targetMode}`,
+      `Start date: ${startDate}`,
+      `Days: ${dateRange}`,
+      '',
+      ...rows.map((row) => [
+        row.date.toISOString(),
+        `Rise=${formatTimeShort(row.riseTime)}`,
+        `Transit=${formatTimeShort(row.transitTime)}`,
+        `Set=${formatTimeShort(row.setTime)}`,
+        `TransitAlt=${row.transitAlt.toFixed(1)}`,
+        row.neverRises
+          ? 'Never rises'
+          : row.isCircumpolar
+            ? 'Circumpolar'
+            : `DarkHours=${row.darkImagingHours.toFixed(1)}`,
+      ].join(' | ')),
+    ];
+  }, [dateRange, rows, startDate, targetMode, targetName]);
   const coordinateError = useMemo(() => {
+    if (explicitMinorObjectQuery) return null;
     if (targetMode !== 'Custom') return null;
     if (targetRA.trim().length === 0 || targetDec.trim().length === 0) {
       return t('astroCalc.enterCoordinates');
@@ -101,7 +159,7 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
       return t('astroCalc.invalidCoordinates');
     }
     return null;
-  }, [parsedDec, parsedRa, targetDec, targetMode, targetRA, t]);
+  }, [explicitMinorObjectQuery, parsedDec, parsedRa, targetDec, targetMode, targetRA, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +167,7 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
     async function run() {
       if (coordinateError) {
         setRows([]);
+        setSourceDiagnostics([]);
         setError(null);
         return;
       }
@@ -117,6 +176,60 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
       setError(null);
       try {
         const start = new Date(`${startDate}T12:00:00`);
+
+        if (explicitMinorObjectQuery) {
+          const smallBodyResult = await fetchSmallBodyEphemeris({
+            query: explicitMinorObjectQuery,
+            observer: {
+              latitude,
+              longitude,
+              elevation: observerContext?.elevation,
+            },
+            startDate: start,
+            stepHours: 24,
+            steps: dateRange,
+          });
+
+          const batchResults = await runCalculatorRiseTransitSetBatch(
+            smallBodyResult.points.map((point) => ({
+              body: 'Custom',
+              observer: { latitude, longitude },
+              date: point.date,
+              contextKey: observerContext?.contextKey,
+              customCoordinate: {
+                ra: point.ra,
+                dec: point.dec,
+              },
+            })),
+            { concurrency: 3 },
+          );
+
+          const nextRows: RTSRow[] = batchResults.map((batchResult, index) => ({
+            date: smallBodyResult.points[index]?.date ?? new Date(start),
+            riseTime: batchResult.response.riseTime,
+            transitTime: batchResult.response.transitTime,
+            setTime: batchResult.response.setTime,
+            transitAlt: batchResult.response.transitAltitude,
+            isCircumpolar: batchResult.response.isCircumpolar,
+            neverRises: batchResult.response.neverRises,
+            darkImagingHours: batchResult.response.darkImagingHours,
+          }));
+
+          if (!cancelled) {
+            setRows(nextRows);
+            setSourceDiagnostics([
+              `Small-body source=${smallBodyResult.meta.source}`,
+              `Resolved target=${smallBodyResult.meta.resolvedName}`,
+              ...smallBodyResult.meta.warnings,
+            ]);
+            setMetaSummary(summarizeCalculatorMeta([
+              ...batchResults.map(result => result.meta),
+              toSmallBodyCalculationMeta(smallBodyResult.meta, start),
+            ]));
+          }
+          return;
+        }
+
         const jobs: Array<{ date: Date; request: Parameters<typeof runCalculatorRiseTransitSetBatch>[0][number] }> = [];
         for (let index = 0; index < dateRange; index += 1) {
           const date = new Date(start);
@@ -127,6 +240,7 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
               body: targetMode,
               observer: { latitude, longitude },
               date,
+              contextKey: observerContext?.contextKey,
               customCoordinate: targetMode === 'Custom' && parsedRa !== null && parsedDec !== null
                 ? { ra: parsedRa, dec: parsedDec }
                 : undefined,
@@ -151,11 +265,15 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
 
         if (!cancelled) {
           setRows(nextRows);
+          setSourceDiagnostics(batchResults.flatMap((result) =>
+            (result.meta.warnings ?? []).map((warning) => `Warning=${warning}`),
+          ));
           setMetaSummary(summarizeCalculatorMeta(batchResults.map(result => result.meta)));
         }
       } catch (runError) {
         if (!cancelled) {
           setRows([]);
+          setSourceDiagnostics([]);
           setMetaSummary(null);
           setError(runError instanceof Error ? runError.message : t('astroCalc.calculationFailed'));
         }
@@ -170,7 +288,7 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
     return () => {
       cancelled = true;
     };
-  }, [coordinateError, dateRange, latitude, longitude, parsedDec, parsedRa, startDate, t, targetMode]);
+  }, [coordinateError, dateRange, explicitMinorObjectQuery, latitude, longitude, observerContext?.contextKey, observerContext?.elevation, parsedDec, parsedRa, startDate, t, targetMode]);
 
   const formatDate = (date: Date): string => {
     return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -217,6 +335,7 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
           <Input
             value={targetName}
             onChange={(event) => setTargetName(event.target.value)}
+            aria-label={t('astroCalc.targetName')}
             className="h-8"
             placeholder={targetMode === 'Custom' ? 'M31, NGC 7000...' : targetMode}
           />
@@ -299,6 +418,48 @@ export function RTSTab({ latitude, longitude, selectedTarget, sharedDate, onShar
           </Badge>
         )}
       </div>
+
+      {rows.length > 0 && (
+        <AstroCalculatorResultActionsBar>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.copyResults')}
+            onClick={() => void copyResults({
+              title: t('astroCalc.rts'),
+              fileStem: 'astro-calculator-rts',
+              targetName: targetName || targetMode,
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            {t('astroCalc.copyResults')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.exportResults')}
+            onClick={() => exportResults({
+              title: t('astroCalc.rts'),
+              fileStem: 'astro-calculator-rts',
+              targetName: targetName || targetMode,
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {t('astroCalc.exportResults')}
+          </Button>
+        </AstroCalculatorResultActionsBar>
+      )}
 
       <ScrollArea className="h-[320px] border rounded-lg">
         {rows.length === 0 && !isLoading ? (

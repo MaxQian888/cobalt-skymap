@@ -80,6 +80,7 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
         sensorSupported: isSupported,
         sensorPermissionGranted: isPermissionGranted,
         sensorCalibrationRequired: stellarium.sensorCalibrationRequired,
+        runtimeClass: adaptation.runtimeClass,
       });
 
       setStellariumSetting('sensorControl', invocationSeed.sensorControlEnabled);
@@ -101,6 +102,7 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
       }
     }
   }, [
+    adaptation.runtimeClass,
     arMode,
     isPermissionGranted,
     isSupported,
@@ -119,6 +121,8 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
       ? t('settings.arModeDisable')
       : arSession.status === 'preflight'
         ? t('settings.arStatusPreflight')
+        : arSession.status === 'blocked' && adaptation.operatingMode === 'manual-first'
+          ? t('settings.arAdaptationManualOnly')
         : arSession.status === 'blocked' && adaptation.sensorPath === 'camera-primary'
           ? t('settings.arAdaptationCameraFirst')
         : arSession.status === 'degraded-camera-only'
@@ -137,6 +141,7 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
           data-testid="ar-mode-toggle"
           data-ar-session-status={arSession.status}
           data-ar-sensor-path={adaptation.sensorPath}
+          data-ar-operating-mode={adaptation.operatingMode}
           className={cn(
             'relative h-9 w-9 backdrop-blur-sm transition-colors',
             arMode && arSession.status === 'ready'

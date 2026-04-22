@@ -31,6 +31,7 @@
     "share": "Share",
     "undo": "Undo",
     "refresh": "Refresh",
+    "switchCamera": "Switch camera",
     "percent": "%",
     "pixels": "px",
     "unknown": "Unknown",
@@ -44,6 +45,7 @@
     "loading": "Loading star map...",
     "loadingStars": "Loading star catalogs...",
     "loadingEngine": "Initializing engine...",
+    "cacheWarmupDeferred": "Cache warmup will continue in the background",
     "poweredBy": "Powered by Stellarium Web Engine",
     "skipHint": "Press any key or click to skip"
   },
@@ -64,6 +66,7 @@
     "depPackage": "Package",
     "depVersion": "Version",
     "depTypeLabel": "Type",
+    "depSourceLabel": "Source",
     "totalDeps": "{count} packages",
     "appDescription": "A modern web-based astronomy application powered by Stellarium Web Engine",
     "licenseDesc": {
@@ -79,11 +82,26 @@
     "depType": {
       "core": "Core",
       "dev": "Dev",
+      "framework": "Framework",
+      "desktop": "Desktop",
       "style": "Style",
       "state": "State",
       "i18n": "i18n",
       "ui": "UI",
-      "util": "Util"
+      "util": "Util",
+      "astronomy": "Astronomy",
+      "mapping": "Mapping",
+      "testing": "Testing",
+      "tooling": "Tooling",
+      "other": "Other"
+    },
+    "depSource": {
+      "npm": "npm",
+      "cargo": "Cargo"
+    },
+    "depRuntime": {
+      "shared": "Shared Runtime",
+      "desktop": "Desktop Runtime"
     },
     "credit": {
       "hipsSurveys": "HiPS Surveys",
@@ -120,7 +138,12 @@
     "closeConfirmTitle": "Close Star Map?",
     "closeConfirmMessage": "Are you sure you want to close the star map and return to the home page?",
     "confirmClose": "Close",
-    "dontShowAgain": "Don't show this again"
+    "dontShowAgain": "Don't show this again",
+    "context": {
+      "activeSite": "Active site",
+      "activeTarget": "Active target",
+      "returnToTarget": "Return to target"
+    }
   },
   "compass": {
     "n": "N",
@@ -270,6 +293,17 @@
     "renameSetup": "Rename Setup",
     "deleteSetup": "Delete Setup",
     "targetFraming": "Target Framing",
+    "fitStatusTooLarge": "Too Large",
+    "fitStatusTight": "Tight Fit",
+    "fitStatusGood": "Good Fit",
+    "fitStatusRoomy": "Roomy",
+    "fitStatusUnknown": "Fit Unknown",
+    "fitRatioLabel": "Fit ratio: {ratio}",
+    "fitStatusNoSize": "Target size data is unavailable, so fit cannot be estimated.",
+    "centerTarget": "Center Target",
+    "autoAlign": "Auto Align",
+    "suggestedRotationLabel": "Suggested rotation: {angle}°",
+    "orientationUnavailable": "Target orientation data is unavailable.",
     "noTargetSelected": "No target selected",
     "cameraTab": "Camera",
     "opticsTab": "Optics",
@@ -611,6 +645,7 @@
     "arCameraDeviceSystemDefault": "System default",
     "arCameraLastFailureStage": "Last fallback stage",
     "arCameraRememberedPlan": "Retrying last known-good camera path",
+    "arCameraFallbackApplied": "Fallback profile active",
     "arRecoveryOpenCameraSettings": "Open camera settings",
     "arRecoveryRevertProfile": "Restore known-good profile",
     "arLaunchTitle": "AR launch assistant",
@@ -848,6 +883,12 @@
     "addObs": "Add Obs",
     "searchPlaceholder": "Search objects...",
     "searchHint": "Search your observation history",
+    "filterFromDate": "From Date",
+    "filterToDate": "To Date",
+    "filterObjectType": "Object Type",
+    "filterAny": "Any",
+    "filterMinRating": "Minimum Rating",
+    "clearFilters": "Clear Filters",
     "totalSessions": "Sessions",
     "totalObs": "Observations",
     "uniqueObjects": "Unique Objects",
@@ -877,6 +918,7 @@
     "plannerDraftCreated": "Session planner draft created",
     "noPlannerSession": "No saved planner session found",
     "createFailed": "Failed to create session",
+    "objectNameRequired": "Object name is required",
     "observationAdded": "Observation added",
     "addFailed": "Failed to add observation",
     "sessionEnded": "Session ended",
@@ -908,10 +950,13 @@
     "deleteConfirmDesc": "This action cannot be undone. Are you sure you want to delete this?",
     "editSession": "Edit Session",
     "editSessionDesc": "Update this observation session.",
+    "editObservation": "Edit Observation",
+    "editObsDesc": "Update the selected observation.",
     "observationDeleted": "Observation deleted",
     "monthlyTrend": "Monthly Trend",
     "exportSuccess": "Export completed",
     "exportFailed": "Export failed",
+    "openSession": "Open Session",
     "executionWorkspace": "Execution Workspace",
     "executionSummaryCompleted": "{count} completed",
     "executionSummarySkipped": "{count} skipped",
@@ -964,6 +1009,10 @@
     "catalogPresets": "Catalog Presets",
     "autoSearch": "Auto-search as you type",
     "foundResults": "{count} results found",
+    "localResultsReady": "Local results are ready. Merging online updates...",
+    "partialResults": "Partial results: showing available matches while some sources failed.",
+    "partialResultsBadge": "Partial",
+    "onlineLabel": "Online",
     "coordinateFormats": "Supported formats:",
     "decimal": "decimal degrees",
     "onlineSearch": "Online Search",
@@ -1001,7 +1050,8 @@
       "galaxies": "Galaxies",
       "nebulae": "Nebulae",
       "planets": "Planets",
-      "clusters": "Clusters"
+      "clusters": "Clusters",
+      "messier": "Messier"
     },
     "sortByDistance": "Distance",
     "sortByAltitude": "Altitude",
@@ -1980,10 +2030,10 @@
       "roundRobinDesc": "Rotate between providers"
     }
   },
-  "objectDetail": {
-    "overview": "Overview",
-    "images": "Images",
-    "observation": "Observation",
+    "objectDetail": {
+      "overview": "Overview",
+      "images": "Images",
+      "observation": "Observation",
     "viewDetails": "View Details",
     "properties": "Properties",
     "morphology": "Morphology",
@@ -2006,8 +2056,47 @@
     "fullscreen": "View fullscreen",
     "frameTimeScale": "Frame / Time Scale",
     "qualityEop": "Quality / EOP",
+    "systemMetadata": "System Metadata",
+    "calculationSummary": "Calculation",
+    "selectionSourceLabel": "Selection Source",
+    "selectionFallbackLabel": "Selection State",
+    "sourceCatalog": "Source Catalog",
+    "tonightSummary": "Tonight Summary",
     "timestamp": "Timestamp",
-    "riskHints": "Risk Hints",
+      "riskHints": "Risk Hints",
+      "acceptedSource": "Accepted source",
+      "fallbackSource": "Fallback source",
+      "localFallback": "Local fallback",
+      "remoteUnavailable": "Remote enrichment unavailable",
+      "degradedSourceState": "Some sources are unavailable for this target",
+      "unsupportedSourceState": "This source does not support the current target",
+      "emptySourceState": "The source responded but returned no matching data",
+      "calculationState": {
+        "normal": "Normal",
+        "degraded": "Degraded"
+      },
+      "sourceAuthority": {
+        "authoritative": "Authoritative remote source",
+        "reference": "Reference source",
+        "fallback-local": "Local fallback source"
+      },
+    "calculationSource": {
+      "tauri": "Tauri",
+      "fallback": "Fallback",
+      "calculation": "Calculation",
+      "engine": "Engine"
+    },
+    "selectionSource": {
+      "engine": "Engine selection",
+      "catalog": "Catalog selection",
+      "coordinate": "Coordinate selection",
+      "enriched": "Enriched selection"
+    },
+    "selectionFallback": {
+      "resolved": "Resolved object",
+      "catalog_partial": "Catalog partial metadata",
+      "coordinate_fallback": "Coordinate fallback"
+    },
     "altitudeState": {
       "optimal": "Optimal altitude",
       "observable": "Above horizon",
@@ -2024,9 +2113,9 @@
       "low-feasibility": "Low feasibility"
     }
   },
-  "sourceConfig": {
-    "title": "Information Sources",
-    "configDescription": "Configure image and data sources for celestial objects",
+    "sourceConfig": {
+      "title": "Information Sources",
+      "configDescription": "Configure image and data sources for celestial objects",
     "imageSources": "Image Sources",
     "dataSourcesLabel": "Data Sources",
     "globalSettings": "Global Settings",
@@ -2052,13 +2141,29 @@
     "sourceDescription": "Description",
     "descriptionPlaceholder": "Brief description of this source",
     "statusUnknown": "Status unknown",
-    "statusChecking": "Checking...",
-    "statusOnline": "Online",
-    "statusOffline": "Offline",
-    "statusError": "Error",
-    "responseTime": "Response time",
-    "autoSkipOffline": "Auto-skip Offline Sources",
-    "autoSkipOfflineDescription": "Automatically skip sources that are detected as offline",
+      "statusChecking": "Checking...",
+      "statusOnline": "Online",
+      "statusOffline": "Offline",
+      "statusError": "Error",
+      "statusUnsupported": "Unsupported",
+      "statusDegraded": "Degraded",
+      "statusEmpty": "No matching data",
+      "responseTime": "Response time",
+      "authorityLevel": "Authority level",
+      "healthStrategy": "Health strategy",
+      "targetSupport": "Target support",
+      "diagnostic": {
+        "authoritative": "Authoritative remote metadata",
+        "reference": "Reference or supplemental remote content",
+        "fallback-local": "Local curated fallback content",
+        "query": "Query-backed probe",
+        "lookup": "Lookup probe",
+        "cutout": "Generated cutout probe",
+        "none": "Passive health state",
+        "disabled": "Health probe disabled"
+      },
+      "autoSkipOffline": "Auto-skip Offline Sources",
+      "autoSkipOfflineDescription": "Automatically skip sources that are detected as offline",
     "imageTimeout": "Image Load Timeout",
     "apiTimeout": "API Request Timeout",
     "defaultImageSize": "Default Image Size (arcmin)",
@@ -2084,6 +2189,7 @@
     "skip": "Skip",
     "finish": "Finish",
     "restartTour": "Restart Guide",
+    "restartAll": "Restart onboarding",
     "restartAllDescription": "Restart the full onboarding setup and guided tour from the beginning.",
     "moduleRestartDescription": "Reopen module guides anytime to revisit a specific workflow.",
     "transition": {
@@ -2671,6 +2777,18 @@
     "solveComplete": "Solve complete!",
     "objectsInField": "Objects in Field",
     "annotations": "Annotations",
+    "detectedObjects": "Detected Objects",
+    "annotationCount": "Annotation Count",
+    "analysisSummary": "Analysis Summary",
+    "analysisStars": "Stars",
+    "analysisMedianHfd": "Median HFD",
+    "wcsMissing": "WCS missing",
+    "goToAnnotation": "Go to Annotation",
+    "addAnnotationMarker": "Add Marker",
+    "annotationActionDisabled": {
+      "missing_wcs": "Annotation actions need WCS metadata",
+      "missing_frame_size": "Annotation actions need frame size metadata"
+    },
     "orientation": "Orientation",
     "parity": "Parity",
     "jobId": "Job ID",
@@ -2846,6 +2964,7 @@
       "screenReaderOptimizedDesc": "Optimize interface for screen readers"
     },
     "notifications": {
+      "title": "Notifications",
       "general": "Notifications",
       "enableToasts": "Show Notifications",
       "enableToastsDesc": "Display toast notifications for events and status changes",
@@ -2861,6 +2980,7 @@
       "satelliteAlertsDesc": "Notify for satellite visibility and tracking events"
     },
     "search": {
+      "title": "Search",
       "behavior": "Search Behavior",
       "fuzzySearch": "Fuzzy Search",
       "fuzzySearchDesc": "Allow approximate matches for object names (e.g. 'andrmeda' → Andromeda)",
@@ -3568,6 +3688,14 @@
     "night": "Night",
     "daylight": "Daylight",
     "targetName": "Target Name",
+    "minorObjectQuery": "Minor Object Query",
+    "minorObjectPlaceholder": "1P/Halley, (433), C/2023 A3...",
+    "copyResults": "Copy Results",
+    "exportResults": "Export Results",
+    "openPlanner": "Open Planner",
+    "actions": "Actions",
+    "copySuccess": "Copied to clipboard.",
+    "copyFailed": "Copy failed.",
     "daysAhead": "Days Ahead",
     "circumpolar": "Circumpolar",
     "date": "Date",
@@ -4046,6 +4174,17 @@
     "title": "Daily Knowledge",
     "subtitle": "A curated daily astronomy insight inspired by KStars and Stellarium workflows.",
     "open": "Daily Knowledge",
+    "practicalInsights": "Practical insights",
+    "observationTips": "Observation tips",
+    "noObservationTips": "No observation tips are available for this entry yet.",
+    "bestViewingMonthsLabel": "Best viewing months",
+    "allYear": "All year",
+    "difficultyBadge": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced",
+      "expert": "Expert"
+    },
     "searchPlaceholder": "Search title, summary, or tags...",
     "categoryAll": "All categories",
     "categoryObject": "Object",
@@ -4072,6 +4211,12 @@
     "next": "Next",
     "random": "Random",
     "history": "History",
+    "activeDateLabel": "Viewing {date}",
+    "browsingDate": "Browsing another date",
+    "previousDate": "Previous date",
+    "nextDate": "Next date",
+    "goToToday": "Today",
+    "sourceStatusForDate": "Source status for {date}",
     "refreshCurrentDate": "Refresh current date",
     "resultCount": "{count} results",
     "freshness": {

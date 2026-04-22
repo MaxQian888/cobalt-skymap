@@ -12,6 +12,7 @@ import {
   X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -263,96 +264,115 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
   const imageState = imageStates[currentIndex];
   const isLoading = !imageState?.loaded;
   const hasError = imageState?.error;
+  const availabilityLabel =
+    currentImage.availability === 'unsupported'
+      ? t('objectDetail.unsupportedSourceState')
+      : currentImage.availability === 'degraded'
+        ? t('objectDetail.degradedSourceState')
+        : currentImage.availability === 'unavailable'
+          ? t('objectDetail.remoteUnavailable')
+          : null;
 
   return (
     <>
-      <div className={cn('relative group', className)}>
+      <div className={cn('space-y-2', className)}>
         {/* Main Image Container */}
-        <div 
-          ref={containerRef}
-          className="relative h-48 sm:h-56 md:h-64 bg-black/50 rounded-lg overflow-hidden cursor-grab active:cursor-grabbing select-none touch-pan-x"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseLeave}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          {/* Image */}
-          <div 
-            className="absolute inset-0 flex items-center justify-center transition-transform duration-100"
-            style={{ 
-              transform: isDragging ? `translateX(${translateX}px)` : 'translateX(0)',
-            }}
-          >
-            {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            )}
-            
-            {hasError ? (
-              <div className="flex flex-col items-center text-muted-foreground">
-                <ImageOff className="h-12 w-12 mb-2 opacity-50" />
-                <p className="text-xs">{t('objectDetail.imageLoadError')}</p>
-              </div>
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={currentImage.url}
-                alt={currentImage.title || objectName}
-                className={cn(
-                  'max-w-full max-h-full object-contain transition-opacity duration-300',
-                  isLoading ? 'opacity-0' : 'opacity-100'
-                )}
-                onLoad={() => handleImageLoad(currentIndex)}
-                onError={() => handleImageError(currentIndex)}
-                draggable={false}
-              />
-            )}
-          </div>
-
-          {/* Navigation Arrows - Always visible on mobile, hover on desktop */}
-          {images.length > 1 && (
-            <NavigationArrows onPrev={goToPrev} onNext={goToNext} variant="default" />
-          )}
-
-          {/* Fullscreen Button - Always visible on mobile */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 h-9 w-9 sm:h-7 sm:w-7 bg-black/50 hover:bg-black/70 text-white sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-target"
-                onClick={() => setFullscreenOpen(true)}
+        <Card data-testid="object-image-gallery-frame" className="relative group gap-0 overflow-hidden border-border/70 bg-black/50 py-0 shadow-none">
+          <CardContent className="p-0">
+            <div 
+              ref={containerRef}
+              className="relative h-48 cursor-grab select-none overflow-hidden rounded-lg active:cursor-grabbing touch-pan-x sm:h-56 md:h-64"
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
+              {/* Image */}
+              <div 
+                className="absolute inset-0 flex items-center justify-center transition-transform duration-100"
+                style={{ 
+                  transform: isDragging ? `translateX(${translateX}px)` : 'translateX(0)',
+                }}
               >
-                <Maximize2 className="h-5 w-5 sm:h-4 sm:w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t('objectDetail.fullscreen')}</TooltipContent>
-          </Tooltip>
+                {isLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                
+                {hasError ? (
+                  <div className="flex flex-col items-center text-muted-foreground">
+                    <ImageOff className="mb-2 h-12 w-12 opacity-50" />
+                    <p className="text-xs">{t('objectDetail.imageLoadError')}</p>
+                  </div>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={currentImage.url}
+                    alt={currentImage.title || objectName}
+                    className={cn(
+                      'max-h-full max-w-full object-contain transition-opacity duration-300',
+                      isLoading ? 'opacity-0' : 'opacity-100'
+                    )}
+                    onLoad={() => handleImageLoad(currentIndex)}
+                    onError={() => handleImageError(currentIndex)}
+                    draggable={false}
+                  />
+                )}
+              </div>
 
-          {/* Dots Indicator - Larger on mobile */}
-          <DotsPagination count={images.length} currentIndex={currentIndex} onSelect={setCurrentIndex} variant="default" className="bottom-2" />
-        </div>
+              {/* Navigation Arrows - Always visible on mobile, hover on desktop */}
+              {images.length > 1 && (
+                <NavigationArrows onPrev={goToPrev} onNext={goToNext} variant="default" />
+              )}
+
+              {/* Fullscreen Button - Always visible on mobile */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 h-9 w-9 bg-black/50 text-white transition-opacity hover:bg-black/70 touch-target sm:h-7 sm:w-7 sm:opacity-0 sm:group-hover:opacity-100"
+                    onClick={() => setFullscreenOpen(true)}
+                  >
+                    <Maximize2 className="h-5 w-5 sm:h-4 sm:w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t('objectDetail.fullscreen')}</TooltipContent>
+              </Tooltip>
+
+              {/* Dots Indicator - Larger on mobile */}
+              <DotsPagination count={images.length} currentIndex={currentIndex} onSelect={setCurrentIndex} variant="default" className="bottom-2" />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Image Info */}
-        <div className="mt-2 px-1">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground truncate flex-1 mr-2">
-              {currentImage.source}
-            </span>
-            <span className="text-muted-foreground shrink-0">
-              {currentIndex + 1} / {images.length}
-            </span>
-          </div>
-          {currentImage.credit && (
-            <p className="text-[10px] text-muted-foreground/70 truncate mt-0.5">
-              {currentImage.credit}
-            </p>
-          )}
-        </div>
+        <Card data-testid="object-image-gallery-meta" className="gap-0 border-border/70 bg-muted/20 py-0 shadow-none">
+          <CardContent className="space-y-1 px-3 py-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="mr-2 flex-1 truncate text-muted-foreground">
+                {currentImage.source}
+              </span>
+              <span className="shrink-0 text-muted-foreground">
+                {currentIndex + 1} / {images.length}
+              </span>
+            </div>
+            {currentImage.credit && (
+              <p className="mt-0.5 truncate text-[10px] text-muted-foreground/70">
+                {currentImage.credit}
+              </p>
+            )}
+            {availabilityLabel && (
+              <p className="mt-0.5 truncate text-[10px] text-amber-400/90" data-testid="object-image-availability">
+                {availabilityLabel}
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Fullscreen Dialog */}

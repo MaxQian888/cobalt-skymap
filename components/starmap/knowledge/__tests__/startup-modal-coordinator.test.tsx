@@ -202,6 +202,20 @@ describe('StartupModalCoordinator', () => {
     expect(mockOpenDialog).not.toHaveBeenCalledWith('auto');
   });
 
+  it('auto-opens when onboarding is completed even if stale checkpoint-like state was previously persisted', () => {
+    mockSettingsState.preferences.dailyKnowledgeEnabled = true;
+    mockShouldAutoShowToday.mockReturnValue(true);
+    mockOnboardingState.hasCompletedOnboarding = true;
+    mockOnboardingState.showOnNextVisit = false;
+    mockOnboardingState.phase = 'idle';
+    mockOnboardingState.isSetupOpen = false;
+    mockOnboardingState.isTourActive = false;
+
+    render(<StartupModalCoordinator showSplash={false} />);
+
+    expect(mockOpenDialog).toHaveBeenCalledWith('auto');
+  });
+
   it('waits for daily knowledge hydration before auto-opening', async () => {
     mockSettingsState.preferences.dailyKnowledgeEnabled = true;
     mockShouldAutoShowToday.mockReturnValue(true);

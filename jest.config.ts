@@ -102,7 +102,10 @@ const config: Config = {
   // globals: {},
 
   // The maximum amount of workers used to run your tests. Can be specified as % or a number. E.g. maxWorkers: 10% will use 10% of your CPU amount + 1 as the maximum worker number. maxWorkers: 2 will use a maximum of 2 workers.
-  // maxWorkers: "50%",
+  maxWorkers: "50%",
+
+  // Recycle workers that grow too large during long jsdom runs.
+  workerIdleMemoryLimit: "512MB",
 
   // An array of directory names to be searched recursively up from the requiring module's location
   // moduleDirectories: [
@@ -125,6 +128,8 @@ const config: Config = {
 
   // A map from regular expressions to module names or to arrays of module names that allow to stub out resources with a single module
   moduleNameMapper: {
+    "^@/lib/vendor/satellite-js-v7$": "<rootDir>/__mocks__/satellite-js-v7.js",
+
     // Handle module aliases (this will be automatically configured for you by Next.js)
     "^@/(.*)$": "<rootDir>/$1",
 

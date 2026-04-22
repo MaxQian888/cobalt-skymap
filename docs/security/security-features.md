@@ -1,10 +1,10 @@
-# 安全特性 (Security Features)
+# 安全特性
 
-SkyMap 包含多层安全防护机制，旨在保护用户数据并防止恶意滥用。
+SkyMap 采用纵深防御策略，包含多层安全防护机制，旨在保护用户数据并防止恶意滥用。
 
-## 1. 速率限制 (Rate Limiting)
+## 1. 速率限制
 
-后端实现了一个基于滑动窗口算法的速率限制器，防止命令滥用和拒绝服务 (DoS) 攻击。
+后端实现了一个基于滑动窗口算法的速率限制器，防止命令滥用和拒绝服务（DoS）攻击。
 
 ### 限制级别
 
@@ -12,7 +12,7 @@ SkyMap 包含多层安全防护机制，旨在保护用户数据并防止恶意�
 
 | 级别 | 请求/分钟 | 适用场景 | 超限封禁 |
 |------|-----------|----------|----------|
-| **保守级别** | 10 | 敏感操作（文件访问、数据导入导出） | 是 (5分钟) |
+| **保守级别** | 10 | 敏感操作（文件访问、数据导入导出） | 是（5 分钟） |
 | **中等级别** | 100 | 常规操作（CRUD、缓存操作） | 否 |
 | **宽松级别** | 1000 | 缓存预取、瓦片加载 | 否 |
 | **只读级别** | 10000 | 读取查询（获取、列表、统计） | 否 |
@@ -26,11 +26,11 @@ SkyMap 包含多层安全防护机制，旨在保护用户数据并防止恶意�
 
 ### 自动惩罚机制
 
-对于"保守级别"的命令，如果用户持续触发限制，系统会自动实施临时封禁（5分钟）。
+对于「保守级别」的命令，如果用户持续触发限制，系统会自动实施临时封禁（5 分钟）。
 
 ---
 
-## 2. 输入验证 (Input Validation)
+## 2. 输入验证
 
 后端在处理数据前会执行严格的验证，防止各类攻击。
 
@@ -45,9 +45,9 @@ SkyMap 包含多层安全防护机制，旨在保护用户数据并防止恶意�
 | CSV 导入 | 50 MB + 100,000 行 | `data/target_io.rs` |
 | URL 长度 | 2048 字符 | `network/security.rs` |
 
-### URL 验证 (SSRF 防护)
+### URL 验证（SSRF 防护）
 
-防止服务端请求伪造 (SSRF) 攻击：
+防止服务端请求伪造（SSRF）攻击：
 
 | 规则 | 说明 |
 |------|------|
@@ -73,7 +73,59 @@ SkyMap 包含多层安全防护机制，旨在保护用户数据并防止恶意�
 
 ---
 
-## 4. 安全模块架构
+## 4. 密钥保险箱（Secret Vault）
+
+SkyMap 提供通过系统钥匙串安全存储敏感凭证的能力，防止 API 密钥等敏感信息以明文形式保存在配置文件或本地存储中。
+
+### 功能
+
+- **安全存储** — API 密钥、地图服务 token、私有服务凭证等通过 OS 钥匙串加密保存
+- **前端隔离** — 前端仅通过 Tauri IPC 调用 vault 接口，无法直接访问密钥明文
+- **按服务隔离** — 不同服务的凭证独立存储，降低单点泄露风险
+
+### 使用方式
+
+```rust
+// Rust 后端（src-tauri/src/platform/secret_vault.rs）
+use tauri_plugin_keyring::Keyring;
+
+// 存储密钥
+keyring.set_password("service_name", "account_name", "secret_value")?;
+
+// 读取密钥
+let secret = keyring.get_password("service_name", "account_name")?;
+
+// 删除密钥
+keyring.delete_password("service_name", "account_name")?;
+```
+
+```typescript
+// 前端封装（lib/tauri/secret-vault-api.ts）
+import { invoke } from '@tauri-apps/api/core';
+
+export async function setSecret(service: string, account: string, secret: string) {
+  await invoke('set_secret', { service, account, secret });
+}
+
+export async function getSecret(service: string, account: string) {
+  return await invoke<string | null>('get_secret', { service, account });
+}
+
+export async function deleteSecret(service: string, account: string) {
+  await invoke('delete_secret', { service, account });
+}
+```
+
+### 适用场景
+
+- 地图瓦片服务 API key
+- 天文数据服务 token
+- 私有星表访问凭证
+- 云同步服务密钥
+
+---
+
+## 5. 安全模块架构
 
 ### 后端安全模块
 
@@ -81,6 +133,9 @@ SkyMap 包含多层安全防护机制，旨在保护用户数据并防止恶意�
 src-tauri/src/network/
 ├── security.rs         # 核心安全工具（URL 验证、大小验证）
 └── rate_limiter.rs     # 速率限制器实现（含测试套件）
+
+src-tauri/src/platform/
+└── secret_vault.rs     # 密钥保险箱（系统钥匙串封装）
 ```
 
 ### 前端安全模块
@@ -92,16 +147,17 @@ lib/security/
 
 ---
 
-## 5. 安全防护效果
+## 6. 安全防护效果
 
 ### 已缓解的攻击场景
 
 | 攻击场景 | 防护状态 | 残余风险 |
 |----------|----------|----------|
 | **SSRF 攻击** | 已阻止 | 无 |
-| **资源耗尽 (DoS)** | 已缓解 | 低 |
+| **资源耗尽（DoS）** | 已缓解 | 低 |
 | **API 滥用** | 已缓解 | 中 |
 | **大型文件攻击** | 已阻止 | 无 |
+| **密钥泄露** | 已缓解 | 低（依赖 OS 钥匙串安全） |
 
 ### 攻击难度变化
 
@@ -112,10 +168,11 @@ lib/security/
 | 缓存泛洪 | 简单 | 中等 |
 | 大量 CSV 导入 | 简单 | 已阻止 |
 | API 滥用 | 简单 | 中等 |
+| 本地密钥窃取 | 简单 | 困难（需攻破 OS 钥匙串） |
 
 ---
 
-## 6. 运行安全测试
+## 7. 运行安全测试
 
 项目配置了完整的安全测试套件，验证各安全机制的正确性：
 
@@ -124,11 +181,13 @@ lib/security/
 cd src-tauri
 cargo test network::security::tests
 cargo test network::rate_limiter::tests
+cargo test platform::secret_vault::tests
 
 # 运行特定测试
 cargo test test_validate_url_blocks_localhost
 cargo test test_validate_size
 cargo test test_rate_limit_within_window
+cargo test test_secret_vault_roundtrip
 
 # 查看测试输出
 cargo test network:: -- --nocapture
@@ -139,11 +198,12 @@ cargo test network:: -- --nocapture
 - URL 验证（localhost、私有 IP、危险协议、白名单）
 - 大小限制（JSON、CSV、瓦片）
 - 速率限制（窗口过期、封禁行为、命令级限制）
+- 密钥保险箱（存储、读取、删除、隔离）
 - 集成测试（纵深防御）
 
 ---
 
-## 7. 安全配置指南
+## 8. 安全配置指南
 
 ### 调整大小限制
 
@@ -154,7 +214,7 @@ pub mod limits {
     pub const MAX_JSON_SIZE: usize = 10 * 1024 * 1024; // 10 MB
     pub const MAX_CSV_SIZE: usize = 50 * 1024 * 1024;  // 50 MB
     pub const MAX_TILE_SIZE: usize = 5 * 1024 * 1024;  // 5 MB
-    pub const MAX_CSV_ROWS: usize = 100_000;           // 10万行
+    pub const MAX_CSV_ROWS: usize = 100_000;           // 10 万行
 }
 ```
 
@@ -178,21 +238,22 @@ validateUrl(url, {
 
 ---
 
-## 8. 性能影响
+## 9. 性能影响
 
 安全措施的性能开销极低：
 
 | 检查类型 | 开销 | 影响评估 |
 |----------|------|----------|
-| URL 验证 | ~0.1ms | 可忽略（相比网络延迟） |
-| 大小验证 | ~0.001ms | O(1) 操作 |
-| 速率限制检查 | ~0.05ms | 可忽略 |
+| URL 验证 | ~0.1 ms | 可忽略（相比网络延迟） |
+| 大小验证 | ~0.001 ms | O(1) 操作 |
+| 速率限制检查 | ~0.05 ms | 可忽略 |
+| 密钥保险箱 | ~5-20 ms | 低频操作，可忽略 |
 
-**总开销：** 每个受保护操作 <1ms
+**总开销：** 每个受保护操作 < 1 ms（不含密钥保险箱）
 
 ---
 
-## 9. 未来改进计划
+## 10. 未来改进计划
 
 ### 计划中的安全增强
 
@@ -203,8 +264,7 @@ validateUrl(url, {
 
 2. **数据加密**
    - 加密静态敏感数据
-   - 使用系统凭证存储
-   - 实现密钥管理
+   - 完善密钥管理
 
 3. **审计日志**
    - 记录所有安全相关操作
@@ -217,7 +277,7 @@ validateUrl(url, {
 
 ---
 
-## 10. 参考资源
+## 参考资源
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
 - [Tauri 安全指南](https://tauri.app/v1/guides/security/)

@@ -12,6 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
@@ -133,46 +140,50 @@ export function WelcomeDialog({ onStartTour, onSkip }: WelcomeDialogProps) {
         {/* App features grid */}
         <div className="relative z-10 grid grid-cols-2 gap-3 py-3">
           {WELCOME_FEATURES.map(({ icon: Icon, key }, index) => (
-            <div
+            <Card
               key={key}
               className={cn(
-                'flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50 tour-feature-card',
+                'tour-feature-card gap-0 bg-muted/50 py-0 transition-colors',
                 'hover:bg-muted hover:border-primary/30'
               )}
               style={{
                 animationDelay: `${index * 100}ms`,
               }}
             >
-              <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Icon className="w-5 h-5 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {t(`onboarding.welcome.features.${key}.title`)}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {t(`onboarding.welcome.features.${key}.description`)}
-                </p>
-              </div>
-            </div>
+              <CardContent className="flex items-center gap-3 px-3 py-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <Icon className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <CardTitle className="truncate text-sm">
+                    {t(`onboarding.welcome.features.${key}.title`)}
+                  </CardTitle>
+                  <CardDescription className="truncate text-xs">
+                    {t(`onboarding.welcome.features.${key}.description`)}
+                  </CardDescription>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
 
         {/* Setup configuration preview */}
         {!hasCompletedSetup && (
-          <div className="relative z-10 py-2">
-            <p className="text-xs text-muted-foreground mb-2">
-              {t('setupWizard.steps.welcome.whatWellConfigure')}
-            </p>
-            <div className="flex items-center gap-4">
+          <Card className="relative z-10 gap-0 border-dashed bg-muted/30 py-0 shadow-none">
+            <CardHeader className="px-4 py-3">
+              <CardDescription className="text-xs">
+                {t('setupWizard.steps.welcome.whatWellConfigure')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-4 px-4 pb-3">
               {SETUP_FEATURES.map(({ icon: Icon, key }) => (
                 <div key={key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Icon className="w-3.5 h-3.5 text-primary/70" />
+                  <Icon className="h-3.5 w-3.5 text-primary/70" />
                   <span>{t(`setupWizard.steps.welcome.features.${key}.title`)}</span>
                 </div>
               ))}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Don't show again checkbox */}

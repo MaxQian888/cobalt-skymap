@@ -84,7 +84,7 @@ jest.mock('@/components/ui/scroll-area', () => ({
 
 jest.mock('@/components/ui/tabs', () => ({
   Tabs: ({ children, value, onValueChange }: { children: React.ReactNode; value: string; onValueChange?: (v: string) => void }) => (
-    <div data-testid="tabs" data-value={value} onClick={() => onValueChange?.('online')}>{children}</div>
+    <div data-testid="tabs" data-value={value} data-on-value-change={typeof onValueChange === 'function'}>{children}</div>
   ),
   TabsContent: ({ children, value }: { children: React.ReactNode; value: string }) => (
     <div data-testid={`tab-content-${value}`}>{children}</div>

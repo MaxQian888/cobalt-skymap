@@ -5,6 +5,7 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SourceItem } from '../source-item';
+import type { DataSourceConfig } from '@/lib/services/object-info-config';
 
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
@@ -39,7 +40,7 @@ jest.mock('../status-badge', () => ({
 }));
 
 describe('SourceItem', () => {
-  const mockSource = {
+  const mockSource: DataSourceConfig = {
     id: 'src-1',
     name: 'SIMBAD',
     type: 'simbad' as const,
@@ -54,6 +55,10 @@ describe('SourceItem', () => {
     timeout: 5000,
     renderTier: 'enrichment' as const,
     fallbackRole: 'primary' as const,
+    targetClasses: ['generic'],
+    responseMode: 'json' as const,
+    authorityLevel: 'reference' as const,
+    healthCheck: { strategy: 'disabled' as const },
   };
 
   const defaultProps = {

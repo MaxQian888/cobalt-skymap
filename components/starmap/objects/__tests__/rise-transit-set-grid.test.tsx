@@ -6,6 +6,27 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { RiseTransitSetGrid } from '../rise-transit-set-grid';
 
+jest.mock('@/components/ui/card', () => ({
+  Card: ({
+    children,
+    className,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="card" data-slot="card" className={className} {...props}>
+      {children}
+    </div>
+  ),
+  CardContent: ({
+    children,
+    className,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="card-content" data-slot="card-content" className={className} {...props}>
+      {children}
+    </div>
+  ),
+}));
+
 jest.mock('next-intl', () => ({
   useTranslations: () => (key: string) => key,
 }));
@@ -87,5 +108,10 @@ describe('RiseTransitSetGrid', () => {
   it('renders grid with 3 columns', () => {
     const { container } = render(<RiseTransitSetGrid visibility={baseVisibility} />);
     expect(container.firstChild).toHaveClass('grid-cols-3');
+  });
+
+  it('renders each metric cell with shadcn card surfaces', () => {
+    render(<RiseTransitSetGrid visibility={baseVisibility} />);
+    expect(screen.getAllByTestId('card')).toHaveLength(3);
   });
 });

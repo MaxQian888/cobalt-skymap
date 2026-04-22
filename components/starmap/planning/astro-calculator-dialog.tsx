@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   ResponsiveDialog,
@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useMountStore, useStellariumStore } from '@/lib/stores';
 import { useTargetListStore } from '@/lib/stores/target-list-store';
+import { useCanonicalObservationLocationState } from '@/lib/hooks/use-canonical-observation-location';
 import { degreesToHMS, degreesToDMS } from '@/lib/astronomy/starmap-utils';
 import {
   PositionsTab,
@@ -41,6 +42,8 @@ import {
   SolarSystemTab,
   ASTRO_CALCULATOR_CAPABILITY_MATRIX,
   ASTRO_CALCULATOR_TAB_ORDER,
+  buildAstroCalculatorObserverContext,
+  DEFAULT_ASTRO_CALCULATOR_OBSERVER_CONSTRAINTS,
 } from './astro-calculator';
 
 // ============================================================================
@@ -64,13 +67,23 @@ export function AstroCalculatorDialog() {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
   });
+  const [sharedConstraints] = useState(DEFAULT_ASTRO_CALCULATOR_OBSERVER_CONSTRAINTS);
 
   const profileInfo = useMountStore((state) => state.profileInfo);
   const setViewDirection = useStellariumStore((state) => state.setViewDirection);
   const addTarget = useTargetListStore((state) => state.addTarget);
+  const { currentLocation } = useCanonicalObservationLocationState();
 
-  const latitude = profileInfo.AstrometrySettings.Latitude || 0;
-  const longitude = profileInfo.AstrometrySettings.Longitude || 0;
+  const observerContext = useMemo(() => buildAstroCalculatorObserverContext({
+    currentLocation,
+    profileInfo,
+    sharedDate,
+    sharedTime,
+    constraints: sharedConstraints,
+  }), [currentLocation, profileInfo, sharedDate, sharedTime, sharedConstraints]);
+
+  const latitude = observerContext.latitude;
+  const longitude = observerContext.longitude;
 
   const handleSelectObject = useCallback((ra: number, dec: number) => {
     if (setViewDirection) {
@@ -111,10 +124,18 @@ export function AstroCalculatorDialog() {
               <Calculator className="h-5 w-5 text-primary" />
               {t('astroCalc.title')}
             </div>
-            <Badge variant="outline" className="font-normal text-xs gap-1.5">
-              <MapPin className="h-3 w-3" />
-              {latitude.toFixed(2)}°, {longitude.toFixed(2)}°
-            </Badge>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Badge variant="secondary" className="font-normal text-xs">
+                {observerContext.locationName}
+              </Badge>
+              <Badge variant="secondary" className="font-normal text-xs">
+                {observerContext.timezone}
+              </Badge>
+              <Badge variant="outline" className="font-normal text-xs gap-1.5">
+                <MapPin className="h-3 w-3" />
+                {latitude.toFixed(2)}°, {longitude.toFixed(2)}°
+              </Badge>
+            </div>
           </ResponsiveDialogTitle>
         </ResponsiveDialogHeader>
 
@@ -139,6 +160,7 @@ export function AstroCalculatorDialog() {
               <WUTTab
                 latitude={latitude}
                 longitude={longitude}
+                observerContext={observerContext}
                 onSelectObject={handleSelectObject}
                 onAddToList={handleAddToList}
               />
@@ -148,6 +170,7 @@ export function AstroCalculatorDialog() {
               <PositionsTab
                 latitude={latitude}
                 longitude={longitude}
+                observerContext={observerContext}
                 onSelectObject={handleSelectObject}
                 onAddToList={handleAddToList}
               />
@@ -157,6 +180,7 @@ export function AstroCalculatorDialog() {
               <RTSTab
                 latitude={latitude}
                 longitude={longitude}
+                observerContext={observerContext}
                 sharedDate={sharedDate}
                 onSharedDateChange={setSharedDate}
               />
@@ -166,6 +190,7 @@ export function AstroCalculatorDialog() {
               <EphemerisTab
                 latitude={latitude}
                 longitude={longitude}
+                observerContext={observerContext}
                 sharedDate={sharedDate}
                 onSharedDateChange={setSharedDate}
               />
@@ -175,6 +200,7 @@ export function AstroCalculatorDialog() {
               <AlmanacTab
                 latitude={latitude}
                 longitude={longitude}
+                observerContext={observerContext}
                 sharedDate={sharedDate}
                 sharedTime={sharedTime}
                 onSharedDateChange={setSharedDate}
@@ -183,13 +209,14 @@ export function AstroCalculatorDialog() {
             </TabsContent>
 
             <TabsContent value="phenomena" className="mt-0 h-full overflow-hidden">
-              <PhenomenaTab latitude={latitude} longitude={longitude} />
+              <PhenomenaTab latitude={latitude} longitude={longitude} observerContext={observerContext} />
             </TabsContent>
 
             <TabsContent value="coordinate" className="mt-0 h-full overflow-hidden">
               <CoordinateTab
                 latitude={latitude}
                 longitude={longitude}
+                observerContext={observerContext}
                 sharedDate={sharedDate}
                 sharedTime={sharedTime}
                 onSharedDateChange={setSharedDate}
@@ -200,6 +227,7 @@ export function AstroCalculatorDialog() {
             <TabsContent value="time" className="mt-0 h-full overflow-hidden">
               <TimeTab
                 longitude={longitude}
+                observerContext={observerContext}
                 sharedDate={sharedDate}
                 sharedTime={sharedTime}
                 onSharedDateChange={setSharedDate}
@@ -211,6 +239,7 @@ export function AstroCalculatorDialog() {
               <SolarSystemTab
                 latitude={latitude}
                 longitude={longitude}
+                observerContext={observerContext}
                 sharedDate={sharedDate}
                 sharedTime={sharedTime}
                 onSharedDateChange={setSharedDate}

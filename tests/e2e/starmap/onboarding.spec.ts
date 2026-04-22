@@ -4,22 +4,45 @@ import { test, expect, Page } from '@playwright/test';
 async function clearOnboardingState(page: Page) {
   await page.evaluate(() => {
     localStorage.removeItem('onboarding-storage');
+    localStorage.removeItem('starmap-onboarding');
   });
 }
 
 // Helper to set onboarding as completed
 async function setOnboardingCompleted(page: Page) {
   await page.evaluate(() => {
-    localStorage.setItem('onboarding-storage', JSON.stringify({
+    localStorage.setItem('starmap-onboarding', JSON.stringify({
       state: {
         hasCompletedOnboarding: true,
         hasSeenWelcome: true,
+        hasCompletedSetup: true,
         currentStepIndex: -1,
         isTourActive: false,
         completedSteps: ['welcome', 'search', 'navigation', 'zoom', 'settings', 'fov', 'shotlist', 'tonight', 'contextmenu', 'complete'],
+        setupCompletedSteps: ['welcome', 'location', 'equipment', 'preferences', 'complete'],
         showOnNextVisit: false,
+        phase: 'idle',
+        resumeCheckpoint: null,
+        tourHubOpen: false,
+        activeTourId: null,
+        tourProgressById: {},
+        completedTours: ['first-run-core'],
+        skippedCapabilities: {},
+        lastCompletedAt: '2026-04-05T00:00:00.000Z',
+        setupData: {
+          locationConfigured: true,
+          equipmentConfigured: true,
+          preferencesConfigured: true,
+        },
+        setupMetadata: {
+          location: 'configured',
+          equipment: 'configured',
+          preferences: 'configured',
+          skipReasons: {},
+          completedAt: '2026-04-05T00:00:00.000Z',
+        },
       },
-      version: 0,
+      version: 6,
     }));
   });
 }
@@ -193,6 +216,59 @@ test.describe('Onboarding Tour', () => {
     // Welcome dialog should not appear
     const welcomeDialog = page.locator('text=Welcome to SkyMap').or(page.locator('text=欢迎使用 SkyMap'));
     await expect(welcomeDialog).not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('should ignore stale tour checkpoints after onboarding was already completed', async ({ page }) => {
+    await page.evaluate(() => {
+      localStorage.setItem('starmap-onboarding', JSON.stringify({
+        state: {
+          hasCompletedOnboarding: true,
+          hasSeenWelcome: true,
+          hasCompletedSetup: true,
+          showOnNextVisit: false,
+          phase: 'idle',
+          resumeCheckpoint: {
+            phase: 'tour',
+            setupStep: null,
+            activeTourId: 'first-run-core',
+            currentStepIndex: 2,
+            updatedAt: '2026-04-05T00:00:00.000Z',
+          },
+          tourHubOpen: false,
+          currentStepIndex: -1,
+          isTourActive: false,
+          completedSteps: ['welcome', 'search', 'navigation'],
+          setupCompletedSteps: ['welcome', 'location', 'equipment', 'preferences', 'complete'],
+          activeTourId: 'first-run-core',
+          tourProgressById: {},
+          completedTours: ['first-run-core'],
+          skippedCapabilities: {},
+          lastCompletedAt: '2026-04-05T00:00:00.000Z',
+          setupData: {
+            locationConfigured: true,
+            equipmentConfigured: true,
+            preferencesConfigured: true,
+          },
+          setupMetadata: {
+            location: 'configured',
+            equipment: 'configured',
+            preferences: 'configured',
+            skipReasons: {},
+            completedAt: '2026-04-05T00:00:00.000Z',
+          },
+        },
+        version: 6,
+      }));
+    });
+
+    await page.reload();
+    await page.waitForTimeout(3000);
+
+    const welcomeDialog = page.locator('text=Welcome to SkyMap').or(page.locator('text=欢迎使用 SkyMap'));
+    const tooltip = page.locator('.fixed.z-\\[9999\\]');
+
+    await expect(welcomeDialog).not.toBeVisible({ timeout: 3000 });
+    await expect(tooltip).not.toBeVisible({ timeout: 3000 });
   });
 
   test('should skip tour with Skip button during tour', async ({ page }) => {

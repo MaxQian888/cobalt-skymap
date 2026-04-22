@@ -29,6 +29,10 @@ import {
 } from '@/lib/stores/settings-store';
 import { useSettingsSessionStore } from '@/lib/stores/settings-session-store';
 
+jest.mock('@/lib/services/observation-location-controller', () => ({
+  applyCanonicalObservationLocation: jest.fn(() => new Promise(() => undefined)),
+}));
+
 function resetStores() {
   useSettingsSessionStore.getState().clearSession();
   useSettingsStore.setState({

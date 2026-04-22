@@ -65,16 +65,16 @@ jest.mock('@/lib/astronomy/astro-utils', () => ({
 let capturedTooltipContent: any = null;
 
 jest.mock('recharts', () => ({
-  AreaChart: ({ children }: React.PropsWithChildren) => <div data-testid="area-chart">{children}</div>,
-  Area: () => <div data-testid="area" />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  ReferenceLine: () => <div data-testid="reference-line" />,
+  AreaChart: ({ children }: React.PropsWithChildren) => <svg data-testid="area-chart">{children}</svg>,
+  Area: () => <g data-testid="area" />,
+  XAxis: () => <g />,
+  YAxis: () => <g />,
+  ReferenceLine: () => <g data-testid="reference-line" />,
   ResponsiveContainer: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Tooltip: ({ content }: { content?: any }) => {
     capturedTooltipContent = content;
-    return <div data-testid="recharts-tooltip" />;
+    return <g data-testid="recharts-tooltip" />;
   },
 }));
 

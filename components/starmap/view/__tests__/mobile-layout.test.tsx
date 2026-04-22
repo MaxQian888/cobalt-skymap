@@ -275,4 +275,17 @@ describe('MobileLayout', () => {
     expect(onOpenSessionPlanner).toHaveBeenCalledTimes(1);
     expect(onOpenSettings).toHaveBeenCalledTimes(1);
   });
+
+  it('hides floating bottom controls when a mobile panel is active', () => {
+    render(
+      <MobileLayout
+        {...defaultProps}
+        activeMobilePanel="search"
+      />
+    );
+
+    expect(screen.getByTestId('mobile-action-rail')).toBeInTheDocument();
+    expect(screen.queryByTestId('mobile-bottom-tools-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mobile-zoom-cluster')).not.toBeInTheDocument();
+  });
 });

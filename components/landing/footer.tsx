@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import type { ComponentType } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { EXTERNAL_LINKS } from '@/lib/constants/external-links';
@@ -11,13 +12,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Star, Github, Heart, ExternalLink, Map, BookOpen, ArrowUp, Mail } from 'lucide-react';
-import { SkyMapLogo, StellariumIcon } from '@/components/icons';
-import type { LucideIcon } from 'lucide-react';
+import { Star, Heart, ExternalLink, Map, BookOpen, ArrowUp, Mail } from 'lucide-react';
+import { GitHubIcon, SkyMapLogo, StellariumIcon } from '@/components/icons';
 
 interface FooterLinkProps {
   href: string;
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   tooltip: string;
   external?: boolean;
@@ -88,7 +88,7 @@ export function Footer() {
             <TooltipProvider>
               <ul className="space-y-2">
                 <FooterLink href="/starmap" icon={Map} label={t('starmap')} tooltip={t('starmapTooltip')} />
-                <FooterLink href={EXTERNAL_LINKS.repository} icon={Github} label={t('github')} tooltip={t('githubTooltip')} external />
+                <FooterLink href={EXTERNAL_LINKS.repository} icon={GitHubIcon} label={t('github')} tooltip={t('githubTooltip')} external />
                 <FooterLink href="https://stellarium.org" icon={BookOpen} label={t('stellarium')} tooltip={t('stellariumTooltip')} external />
               </ul>
             </TooltipProvider>
@@ -99,7 +99,7 @@ export function Footer() {
             <h4 className="font-semibold text-foreground mb-4">{t('community')}</h4>
             <TooltipProvider>
               <ul className="space-y-2">
-                <FooterLink href={EXTERNAL_LINKS.discussions} icon={Github} label={t('discussions')} tooltip={t('discussionsTooltip')} external />
+                <FooterLink href={EXTERNAL_LINKS.discussions} icon={GitHubIcon} label={t('discussions')} tooltip={t('discussionsTooltip')} external />
                 <FooterLink href={EXTERNAL_LINKS.newIssueUrl()} icon={Mail} label={t('reportIssue')} tooltip={t('reportIssueTooltip')} external />
               </ul>
             </TooltipProvider>

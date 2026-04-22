@@ -2,15 +2,20 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import type { ARRecoveryAction } from '@/lib/core/ar-session';
 import { ARLaunchAssistant } from '../ar-launch-assistant';
+
+const originalConsoleError = console.error;
 
 const mockSetStellariumSetting = jest.fn();
 const mockOpenSettingsDrawer = jest.fn();
 let mockAssistantMode: 'floating-card' | 'edge-sheet' | 'compact-strip' = 'edge-sheet';
 let mockSensorPath: 'sensor-primary' | 'camera-primary' | 'manual-only' = 'sensor-primary';
+let mockRuntimeClass: 'browser-mobile' | 'browser-desktop' | 'tauri-desktop' = 'browser-mobile';
+let mockOperatingMode: 'sensor-first' | 'camera-first' | 'manual-first' = 'sensor-first';
 
 jest.mock('@/lib/stores/settings-store', () => ({
   useSettingsStore: (selector: (state: { setStellariumSetting: (key: string, value: unknown) => void }) => unknown) =>
@@ -32,7 +37,8 @@ jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
     recoveryMode: 'compact-strip',
     cameraControlMode: 'compact-strip',
     sensorPath: mockSensorPath,
-    runtimeClass: 'browser-mobile',
+    runtimeClass: mockRuntimeClass,
+    operatingMode: mockOperatingMode,
     layoutTier: 'phone-compact',
     controlDensity: 'compact',
     capabilityTier: 'limited',
@@ -47,8 +53,17 @@ jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
 describe('ARLaunchAssistant', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const [firstArg] = args;
+      if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) {
+        return;
+      }
+      originalConsoleError(...args as Parameters<typeof console.error>);
+    });
     mockAssistantMode = 'edge-sheet';
     mockSensorPath = 'sensor-primary';
+    mockRuntimeClass = 'browser-mobile';
+    mockOperatingMode = 'sensor-first';
     useARRuntimeStore.getState().resetRecoveryState();
     useARRuntimeStore.getState().openLaunchAssistant('enter-ar');
     useARRuntimeStore.setState((state) => ({
@@ -80,6 +95,10 @@ describe('ARLaunchAssistant', () => {
     }));
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('renders launch assistant checklist and diagnostics when visible', () => {
     render(<ARLaunchAssistant />);
 
@@ -98,9 +117,12 @@ describe('ARLaunchAssistant', () => {
   });
 
   it('dispatches shared recovery actions from launch assistant', async () => {
+    const user = userEvent.setup();
     render(<ARLaunchAssistant />);
 
-    fireEvent.click(screen.getByTestId('ar-launch-action-request-sensor-permission'));
+    await act(async () => {
+      await user.click(screen.getByTestId('ar-launch-action-request-sensor-permission'));
+    });
 
     await waitFor(() => {
       expect(useARRuntimeStore.getState().recoveryRequestVersion['request-sensor-permission']).toBe(1);
@@ -125,13 +147,28 @@ describe('ARLaunchAssistant', () => {
   it('exposes adaptation metadata for compact launch presentation', () => {
     mockAssistantMode = 'edge-sheet';
     mockSensorPath = 'camera-primary';
+    mockRuntimeClass = 'tauri-desktop';
+    mockOperatingMode = 'camera-first';
 
     render(<ARLaunchAssistant />);
 
     expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-assistant-mode', 'edge-sheet');
     expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-sensor-path', 'camera-primary');
     expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-sticky-actions', 'true');
-    expect(screen.getByText('settings.arAdaptationCameraFirst')).toBeInTheDocument();
+    expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-operating-mode', 'camera-first');
+    expect(screen.getAllByText('settings.arAdaptationCameraFirst').length).toBeGreaterThan(0);
+  });
+
+  it('surfaces manual-first desktop guidance when no viable AR sensor or camera path exists', () => {
+    mockAssistantMode = 'floating-card';
+    mockSensorPath = 'manual-only';
+    mockRuntimeClass = 'browser-desktop';
+    mockOperatingMode = 'manual-first';
+
+    render(<ARLaunchAssistant />);
+
+    expect(screen.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-operating-mode', 'manual-first');
+    expect(screen.getAllByText('settings.arAdaptationManualOnly').length).toBeGreaterThan(0);
   });
 
   it('shows remembered-plan diagnostics using the shared summary contract', () => {
@@ -168,7 +205,9 @@ describe('ARLaunchAssistant', () => {
       configurable: true,
       value: 'visible',
     });
-    document.dispatchEvent(new Event('visibilitychange'));
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
 
     expect(useARRuntimeStore.getState().launchAssistant.resumeCount).toBe(before + 1);
   });

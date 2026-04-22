@@ -30,6 +30,29 @@ export interface ObjectImage {
   title?: string;
   width?: number;
   height?: number;
+  availability?: 'available' | 'unavailable' | 'unsupported' | 'degraded';
+  authorityLevel?: 'authoritative' | 'reference' | 'fallback-local';
+}
+
+export interface ObjectInfoSourceProvenance {
+  acceptedSource: string;
+  authorityLevel: 'authoritative' | 'reference' | 'fallback-local';
+  contributors: string[];
+}
+
+export interface ObjectInfoDiagnostic {
+  providerId: string;
+  status: 'success' | 'unsupported' | 'empty' | 'error';
+  fieldGroup: 'identity' | 'classification' | 'physical' | 'description' | 'images';
+  message?: string;
+}
+
+export interface ObjectInfoProvenance {
+  identity?: ObjectInfoSourceProvenance;
+  classification?: ObjectInfoSourceProvenance;
+  physical?: ObjectInfoSourceProvenance;
+  description?: ObjectInfoSourceProvenance;
+  images?: ObjectInfoSourceProvenance;
 }
 
 export interface ObjectDetailedInfo {
@@ -78,9 +101,12 @@ export interface ObjectDetailedInfo {
   // Loading/error state
   isLoading?: boolean;
   error?: string;
+  provenance: ObjectInfoProvenance;
+  diagnostics: ObjectInfoDiagnostic[];
 }
 
 type ExternalDataSourceType = 'simbad' | 'wikipedia' | 'sbdb' | 'vizier' | 'ned';
+type ObjectInfoFieldGroup = keyof ObjectInfoProvenance;
 
 // Common DSO types mapping
 const DSO_TYPE_MAP: Record<string, { type: string; category: ObjectDetailedInfo['typeCategory'] }> = {
@@ -105,6 +131,8 @@ const DSO_TYPE_MAP: Record<string, { type: string; category: ObjectDetailedInfo[
   'SNR': { type: 'Supernova Remnant', category: 'nebula' },
   'Nb': { type: 'Nebula', category: 'nebula' },
   'Neb': { type: 'Nebula', category: 'nebula' },
+  'Com': { type: 'Comet', category: 'comet' },
+  'COM': { type: 'Comet', category: 'comet' },
   '*': { type: 'Star', category: 'star' },
   '**': { type: 'Double Star', category: 'star' },
   'V*': { type: 'Variable Star', category: 'star' },
@@ -245,6 +273,104 @@ function findFamousObjectEntry(names: string[]): FamousObjectEntry | undefined {
     if (match) return match;
   }
   return undefined;
+}
+
+function addContributor(
+  provenance: ObjectInfoSourceProvenance | undefined,
+  source: string
+): ObjectInfoSourceProvenance | undefined {
+  if (!provenance) return provenance;
+
+  return {
+    ...provenance,
+    contributors: provenance.contributors.includes(source)
+      ? provenance.contributors
+      : [...provenance.contributors, source],
+  };
+}
+
+function updateFieldProvenance(
+  base: ObjectDetailedInfo,
+  group: ObjectInfoFieldGroup,
+  source: string,
+  authorityLevel: 'authoritative' | 'reference' | 'fallback-local',
+  accepted: boolean
+): ObjectInfoProvenance {
+  const current = base.provenance[group];
+  if (!current) {
+    return {
+      ...base.provenance,
+      [group]: {
+        acceptedSource: source,
+        authorityLevel,
+        contributors: [source],
+      },
+    };
+  }
+
+  return {
+    ...base.provenance,
+    [group]: accepted
+      ? {
+          acceptedSource: source,
+          authorityLevel,
+          contributors: current.contributors.includes(source)
+            ? current.contributors
+            : [...current.contributors, source],
+        }
+      : addContributor(current, source),
+  };
+}
+
+function resolveTargetClasses(category: ObjectDetailedInfo['typeCategory']): string[] {
+  switch (category) {
+    case 'galaxy':
+      return ['deep-sky', 'extragalactic', 'generic'];
+    case 'nebula':
+    case 'cluster':
+      return ['deep-sky', 'generic'];
+    case 'star':
+      return ['star', 'generic'];
+    case 'planet':
+    case 'moon':
+      return ['planetary', 'generic'];
+    case 'comet':
+    case 'asteroid':
+      return ['small-body', 'generic'];
+    default:
+      return ['generic'];
+  }
+}
+
+function isSourceEligibleForObject(
+  info: ObjectDetailedInfo,
+  source: ReturnType<typeof getActiveDataSources>[number]
+): boolean {
+  const supportedClasses = source.targetClasses ?? ['generic'];
+  return resolveTargetClasses(info.typeCategory).some((targetClass) => supportedClasses.includes(targetClass as never));
+}
+
+function createDiagnostic(
+  providerId: string,
+  status: ObjectInfoDiagnostic['status'],
+  fieldGroup: ObjectInfoDiagnostic['fieldGroup'],
+  message?: string
+): ObjectInfoDiagnostic {
+  return { providerId, status, fieldGroup, message };
+}
+
+function appendDiagnostic(
+  diagnostics: ObjectInfoDiagnostic[],
+  diagnostic: ObjectInfoDiagnostic
+): ObjectInfoDiagnostic[] {
+  return diagnostics.some(
+    (item) =>
+      item.providerId === diagnostic.providerId &&
+      item.status === diagnostic.status &&
+      item.fieldGroup === diagnostic.fieldGroup
+  )
+    ? diagnostics
+    : [...diagnostics, diagnostic];
 }
 
 // ============================================================================
@@ -593,7 +719,9 @@ async function fetchSbdbInfo(
 
 function mergeEnhancedInfo(
   base: ObjectDetailedInfo,
-  patch: Partial<ObjectDetailedInfo>
+  patch: Partial<ObjectDetailedInfo>,
+  sourceName: string,
+  authorityLevel: 'authoritative' | 'reference' | 'fallback-local'
 ): ObjectDetailedInfo {
   const mergedImages = patch.images && patch.images.length > 0
     ? [...base.images, ...patch.images.filter((image) => !base.images.some((existing) => existing.url === image.url))]
@@ -603,6 +731,39 @@ function mergeEnhancedInfo(
   const patchAngularSize = patch.angularSizeArcmin
     ? formatAngularSize(patch.angularSizeArcmin.width, patch.angularSizeArcmin.height)
     : patch.angularSize;
+  const acceptedIdentity = Boolean(patch.names?.length && patch.names[0] && patch.names[0] !== base.names[0]);
+  const acceptedClassification = Boolean((patch.type && patch.type !== base.type) || (patch.typeCategory && patch.typeCategory !== base.typeCategory));
+  const acceptedPhysical = Boolean(
+    patch.magnitude != null ||
+    patch.surfaceBrightness != null ||
+    patch.angularSizeArcmin != null ||
+    patch.angularSize != null ||
+    patch.distance != null ||
+    patch.distanceLy != null ||
+    patch.redshift != null ||
+    patch.radialVelocity != null ||
+    patch.morphologicalType != null ||
+    patch.spectralType != null
+  );
+  const acceptedDescription = Boolean(!base.description && patch.description);
+  const acceptedImages = Boolean(patch.images && patch.images.length > 0);
+
+  let provenance = base.provenance;
+  if (patch.names?.length) {
+    provenance = updateFieldProvenance({ ...base, provenance }, 'identity', sourceName, authorityLevel, acceptedIdentity);
+  }
+  if (patch.type || patch.typeCategory) {
+    provenance = updateFieldProvenance({ ...base, provenance }, 'classification', sourceName, authorityLevel, acceptedClassification);
+  }
+  if (acceptedPhysical) {
+    provenance = updateFieldProvenance({ ...base, provenance }, 'physical', sourceName, authorityLevel, true);
+  }
+  if (patch.description) {
+    provenance = updateFieldProvenance({ ...base, provenance }, 'description', sourceName, authorityLevel, acceptedDescription);
+  }
+  if (patch.images?.length) {
+    provenance = updateFieldProvenance({ ...base, provenance }, 'images', sourceName, authorityLevel, acceptedImages);
+  }
 
   return {
     ...base,
@@ -627,6 +788,11 @@ function mergeEnhancedInfo(
     wikipediaUrl: patch.wikipediaUrl || base.wikipediaUrl,
     images: mergedImages,
     sources: mergedSources,
+    provenance,
+    diagnostics: appendDiagnostic(
+      base.diagnostics,
+      createDiagnostic(sourceName.toLowerCase(), 'success', patch.images?.length ? 'images' : patch.description ? 'description' : 'physical')
+    ),
   };
 }
 
@@ -921,6 +1087,8 @@ export async function getObjectDetailedInfo(
         source: 'Wikipedia',
         credit: 'Wikimedia Commons',
         title: `${primaryName} - Featured Image`,
+        availability: 'degraded',
+        authorityLevel: 'fallback-local',
       });
     }
   }
@@ -946,6 +1114,29 @@ export async function getObjectDetailedInfo(
     simbadUrl: getSimbadUrl(primaryName),
     wikipediaUrl: getWikipediaUrl(primaryName),
     sources: ['Local'],
+    provenance: {
+      identity: {
+        acceptedSource: 'Local',
+        authorityLevel: 'fallback-local',
+        contributors: ['Local'],
+      },
+      classification: {
+        acceptedSource: 'Local',
+        authorityLevel: 'fallback-local',
+        contributors: ['Local'],
+      },
+      physical: {
+        acceptedSource: 'Local',
+        authorityLevel: 'fallback-local',
+        contributors: ['Local'],
+      },
+      images: {
+        acceptedSource: 'Local',
+        authorityLevel: 'fallback-local',
+        contributors: ['Local'],
+      },
+    },
+    diagnostics: [],
   };
 
   // Use famous description when available, otherwise generate
@@ -961,6 +1152,11 @@ export async function getObjectDetailedInfo(
       discoveryYear: info.discoveryYear,
     },
   );
+  info.provenance.description = {
+    acceptedSource: 'Local',
+    authorityLevel: 'fallback-local',
+    contributors: ['Local'],
+  };
   
   return info;
 }
@@ -979,6 +1175,17 @@ export async function enhanceObjectInfo(
 
     for (const source of dataSources) {
       if (signal?.aborted) break;
+
+      if (!isSourceEligibleForObject(enhanced, source)) {
+        enhanced = {
+          ...enhanced,
+          diagnostics: appendDiagnostic(
+            enhanced.diagnostics,
+            createDiagnostic(source.id, 'unsupported', source.type === 'wikipedia' ? 'description' : 'physical')
+          ),
+        };
+        continue;
+      }
 
       let patch: Partial<ObjectDetailedInfo> | null = null;
 
@@ -1007,7 +1214,24 @@ export async function enhanceObjectInfo(
       }
 
       if (patch) {
-        enhanced = mergeEnhancedInfo(enhanced, patch);
+        enhanced = mergeEnhancedInfo(
+          enhanced,
+          patch,
+          source.name,
+          source.authorityLevel
+        );
+      } else {
+        enhanced = {
+          ...enhanced,
+          diagnostics: appendDiagnostic(
+            enhanced.diagnostics,
+            createDiagnostic(
+              source.id,
+              'empty',
+              source.type === 'wikipedia' ? 'description' : source.type === 'sbdb' ? 'physical' : 'physical'
+            )
+          ),
+        };
       }
     }
 

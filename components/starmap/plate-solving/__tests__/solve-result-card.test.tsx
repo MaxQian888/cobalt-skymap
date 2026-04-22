@@ -5,6 +5,7 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SolveResultCard } from '../solve-result-card';
+import type { SolveResultConsumptionSummary } from '@/lib/plate-solving';
 
 // Mock next-intl
 const mockTranslate = jest.fn((key: string) => key);
@@ -20,6 +21,45 @@ Object.assign(navigator, {
 });
 
 describe('SolveResultCard', () => {
+  const richConsumption: SolveResultConsumptionSummary = {
+    success: true,
+    objects: {
+      count: 2,
+      previewNames: ['M31', 'NGC 224'],
+    },
+    artifacts: {
+      annotationCount: 1,
+      annotationsState: 'complete',
+      wcsState: 'missing',
+      issueMessages: ['WCS unavailable'],
+    },
+    annotations: [
+      {
+        names: ['M31'],
+        annotationType: 'galaxy',
+        radius: 30,
+        derivedCoordinates: {
+          ra: 10.6847083,
+          dec: 41.26875,
+        },
+        actionability: {
+          canNavigate: true,
+          canCreateMarker: true,
+          disabledReason: null,
+        },
+      },
+    ],
+    analysis: {
+      available: true,
+      success: true,
+      starCount: 124,
+      medianHfd: 2.3,
+      background: 1200,
+      noise: 45,
+      errorMessage: null,
+    },
+  };
+
   const successResult = {
     success: true,
     coordinates: {
@@ -118,6 +158,72 @@ describe('SolveResultCard', () => {
       expect(screen.getByText('plateSolving.solveSuccess')).toBeInTheDocument();
       expect(screen.getByText(/Astrometry\.net \(Online\)/i)).toBeInTheDocument();
       expect(screen.getByText(/12h02m00s/)).toBeInTheDocument();
+    });
+
+    it('renders consolidated artifact and analysis details when result-consumption summary is provided', () => {
+      render(
+        <SolveResultCard
+          result={successResult}
+          consumption={richConsumption}
+        />
+      );
+
+      expect(screen.getAllByText('plateSolving.detectedObjects').length).toBeGreaterThan(0);
+      expect(screen.getByText('M31')).toBeInTheDocument();
+      expect(screen.getByText('NGC 224')).toBeInTheDocument();
+      expect(screen.getByText('plateSolving.annotationCount')).toBeInTheDocument();
+      expect(screen.getByText('plateSolving.analysisSummary')).toBeInTheDocument();
+      expect(screen.getByText(/124/)).toBeInTheDocument();
+      expect(screen.getByText(/2\.3/)).toBeInTheDocument();
+      expect(screen.getByText('plateSolving.wcsMissing')).toBeInTheDocument();
+    });
+
+    it('shows disabled reason for non-actionable annotations', () => {
+      render(
+        <SolveResultCard
+          result={successResult}
+          consumption={{
+            ...richConsumption,
+            annotations: [
+              {
+                ...richConsumption.annotations[0],
+                derivedCoordinates: null,
+                actionability: {
+                  canNavigate: false,
+                  canCreateMarker: false,
+                  disabledReason: 'missing_wcs',
+                },
+              },
+            ],
+          }}
+        />
+      );
+
+      expect(screen.getByText('plateSolving.annotationActionDisabled.missing_wcs')).toBeInTheDocument();
+    });
+
+    it('triggers object and annotation follow-up callbacks when provided', () => {
+      const onSelectObject = jest.fn();
+      const onNavigateAnnotation = jest.fn();
+      const onCreateMarkerFromAnnotation = jest.fn();
+
+      render(
+        <SolveResultCard
+          result={successResult}
+          consumption={richConsumption}
+          onSelectObject={onSelectObject}
+          onNavigateAnnotation={onNavigateAnnotation}
+          onCreateMarkerFromAnnotation={onCreateMarkerFromAnnotation}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'M31' }));
+      fireEvent.click(screen.getByRole('button', { name: 'plateSolving.goToAnnotation' }));
+      fireEvent.click(screen.getByRole('button', { name: 'plateSolving.addAnnotationMarker' }));
+
+      expect(onSelectObject).toHaveBeenCalledWith('M31');
+      expect(onNavigateAnnotation).toHaveBeenCalledWith({ ra: 10.6847083, dec: 41.26875 });
+      expect(onCreateMarkerFromAnnotation).toHaveBeenCalledWith({ ra: 10.6847083, dec: 41.26875, name: 'M31' });
     });
   });
 

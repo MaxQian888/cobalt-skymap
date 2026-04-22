@@ -16,10 +16,12 @@ import {
 } from '@/lib/astronomy/coordinates/transforms';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
 import { runCalculatorCoordinates, type CalculatorMetaSummary } from './orchestrator';
+import type { AstroCalculatorObserverContext } from './types';
 
 interface CoordinateTabProps {
   latitude: number;
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
   sharedDate?: string;
   sharedTime?: string;
   onSharedDateChange?: (nextDate: string) => void;
@@ -43,6 +45,7 @@ function normalizeDifference(a: number, b: number): number {
 export function CoordinateTab({
   latitude,
   longitude,
+  observerContext,
   sharedDate,
   sharedTime,
   onSharedDateChange,
@@ -120,6 +123,7 @@ export function CoordinateTab({
           observer: { latitude: lat, longitude: lon },
           date: dateTime,
           refraction: useRefraction ? 'normal' : 'none',
+          contextKey: observerContext?.contextKey,
         });
 
         if (!cancelled) {
@@ -182,7 +186,7 @@ export function CoordinateTab({
     return () => {
       cancelled = true;
     };
-  }, [coord1, coord2, dateTime, observerLat, observerLon, source, t, useRefraction]);
+  }, [coord1, coord2, dateTime, observerContext?.contextKey, observerLat, observerLon, source, t, useRefraction]);
 
   const field1Label = source === 'horizontal'
     ? t('astroCalc.azimuth')

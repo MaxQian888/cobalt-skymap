@@ -41,17 +41,18 @@ import {
   CONSTELLATION_NAMES,
 } from '@/lib/catalogs';
 import { SortableHeader } from './sortable-header';
-import type { CelestialPosition } from './types';
+import type { AstroCalculatorObserverContext, CelestialPosition } from './types';
 import { runCalculatorEphemerisBatch, summarizeCalculatorMeta, type CalculatorMetaSummary } from './orchestrator';
 
 interface PositionsTabProps {
   latitude: number;
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
   onSelectObject: (ra: number, dec: number) => void;
   onAddToList: (name: string, ra: number, dec: number) => void;
 }
 
-export function PositionsTab({ latitude, longitude, onSelectObject, onAddToList }: PositionsTabProps) {
+export function PositionsTab({ latitude, longitude, observerContext, onSelectObject, onAddToList }: PositionsTabProps) {
   const t = useTranslations();
   const [catalog, setCatalog] = useState<'messier' | 'ngc' | 'caldwell' | 'planets' | 'all'>('messier');
   const [magnitudeLimit, setMagnitudeLimit] = useState(12);
@@ -93,6 +94,7 @@ export function PositionsTab({ latitude, longitude, onSelectObject, onAddToList 
             startDate: new Date(),
             stepHours: 24,
             steps: 1,
+            contextKey: observerContext?.contextKey,
           },
           {
             body: 'Moon',
@@ -100,6 +102,7 @@ export function PositionsTab({ latitude, longitude, onSelectObject, onAddToList 
             startDate: new Date(),
             stepHours: 24,
             steps: 1,
+            contextKey: observerContext?.contextKey,
           },
         ], { concurrency: 2 });
 
@@ -122,7 +125,7 @@ export function PositionsTab({ latitude, longitude, onSelectObject, onAddToList 
     return () => {
       cancelled = true;
     };
-  }, [latitude, longitude]);
+  }, [latitude, longitude, observerContext?.contextKey]);
   
   // Calculate positions for all objects
   const positions = useMemo(() => {

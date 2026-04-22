@@ -40,6 +40,8 @@ jest.mock('@/lib/offline', () => ({
   },
 }));
 
+const mockGetStorageInfo = jest.requireMock('@/lib/offline').offlineCacheManager.getStorageInfo as jest.Mock;
+
 jest.mock('@/lib/tauri/hooks', () => ({
   useCache: jest.fn(() => ({
     stats: null,
@@ -174,6 +176,7 @@ import { OfflineCacheManager } from '../offline-cache-manager';
 describe('OfflineCacheManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetStorageInfo.mockImplementation(() => new Promise(() => undefined));
     mockOfflineState = {
       isOnline: true,
       isInitialized: true,

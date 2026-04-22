@@ -457,6 +457,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
           decHint={cliPlateSolverLaunch?.decHint}
           fovHint={cliPlateSolverLaunch?.fovHint}
           onGoToCoordinates={handleGoToCoordinates}
+          onSelectObject={handleSelectionChange}
         />
 
         {arMode && arLaunchAssistantVisible && <ARLaunchAssistant />}
@@ -502,6 +503,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
           onSetFov={handleSetFov}
           onNavigate={handleNavigate}
           onGoToCoordinates={handleGoToCoordinates}
+          onSelectObject={handleSelectionChange}
         />
 
         {/* Search Panel */}
@@ -539,6 +541,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
             onFovSliderChange={handleSetFov}
             onLocationChange={handleLocationChange}
             onGoToCoordinates={handleGoToCoordinates}
+            onSelectObject={handleSelectionChange}
             onOpenSearch={handleSearchToggle}
             onOpenDetails={handleOpenDetails}
             onOpenSessionPlanner={handleOpenSessionPlanner}
@@ -604,6 +607,5 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
     </TooltipProvider>
   );
 }
-
 
 

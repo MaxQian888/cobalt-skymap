@@ -73,6 +73,7 @@ export function DailyKnowledgeDialog() {
   const WHEEL_THROTTLE_MS = 300;
   const t = useTranslations();
   const open = useDailyKnowledgeStore((state) => state.open);
+  const activeDateKey = useDailyKnowledgeStore((state) => state.activeDateKey);
   const loading = useDailyKnowledgeStore((state) => state.loading);
   const error = useDailyKnowledgeStore((state) => state.error);
   const items = useDailyKnowledgeStore((state) => state.items);
@@ -86,6 +87,9 @@ export function DailyKnowledgeDialog() {
   const closeDialog = useDailyKnowledgeStore((state) => state.closeDialog);
   const loadDaily = useDailyKnowledgeStore((state) => state.loadDaily);
   const refreshCurrentDate = useDailyKnowledgeStore((state) => state.refreshCurrentDate);
+  const browsePreviousDate = useDailyKnowledgeStore((state) => state.browsePreviousDate);
+  const browseNextDate = useDailyKnowledgeStore((state) => state.browseNextDate);
+  const goToToday = useDailyKnowledgeStore((state) => state.goToToday);
   const next = useDailyKnowledgeStore((state) => state.next);
   const prev = useDailyKnowledgeStore((state) => state.prev);
   const random = useDailyKnowledgeStore((state) => state.random);
@@ -104,6 +108,16 @@ export function DailyKnowledgeDialog() {
     () =>
       new Intl.DateTimeFormat(undefined, {
         month: 'short',
+      }),
+    []
+  );
+  const activeDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       }),
     []
   );
@@ -131,6 +145,19 @@ export function DailyKnowledgeDialog() {
 
   function formatDifficultyLabel(difficulty: DailyKnowledgeDifficulty | undefined): string {
     return t(`dailyKnowledge.difficultyBadge.${difficulty ?? 'intermediate'}`);
+  }
+
+  function getTodayDateKey(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = `${now.getMonth() + 1}`.padStart(2, '0');
+    const day = `${now.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function formatActiveDate(dateKey: string): string {
+    const [year, month, day] = dateKey.split('-').map((segment) => Number.parseInt(segment, 10));
+    return activeDateFormatter.format(new Date(year, (month || 1) - 1, day || 1));
   }
 
   useEffect(() => {
@@ -278,6 +305,8 @@ export function DailyKnowledgeDialog() {
   }
 
   const isFavorite = effectiveItem ? favoriteIds.has(effectiveItem.id) : false;
+  const formattedActiveDate = formatActiveDate(activeDateKey);
+  const isViewingToday = activeDateKey === getTodayDateKey();
 
   return (
     <ResponsiveDialog
@@ -289,6 +318,12 @@ export function DailyKnowledgeDialog() {
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>{t('dailyKnowledge.title')}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>{t('dailyKnowledge.subtitle')}</ResponsiveDialogDescription>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <Badge variant="outline">{t('dailyKnowledge.activeDateLabel', { date: formattedActiveDate })}</Badge>
+            {!isViewingToday && (
+              <Badge variant="secondary">{t('dailyKnowledge.browsingDate')}</Badge>
+            )}
+          </div>
         </ResponsiveDialogHeader>
 
         <div className="grid gap-3 md:grid-cols-[1fr_auto_auto_auto_auto_auto]">
@@ -297,6 +332,35 @@ export function DailyKnowledgeDialog() {
             onChange={(value) => setFilters({ query: value })}
             placeholder={t('dailyKnowledge.searchPlaceholder')}
           />
+          <div className="flex items-center gap-1 md:col-span-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => void browsePreviousDate('manual')}
+              aria-label={t('dailyKnowledge.previousDate')}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void goToToday('manual')}
+              disabled={loading || isViewingToday}
+              aria-label={t('dailyKnowledge.goToToday')}
+            >
+              {t('dailyKnowledge.goToToday')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => void browseNextDate('manual')}
+              aria-label={t('dailyKnowledge.nextDate')}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
           <Select
             value={filters.category}
             onValueChange={(value) => setFilters({ category: value as DailyKnowledgeCategory | 'all' })}
@@ -371,7 +435,13 @@ export function DailyKnowledgeDialog() {
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="icon" onClick={prev} disabled={loading || !effectiveItem}>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={prev}
+                disabled={loading || !effectiveItem}
+                aria-label={t('dailyKnowledge.prev')}
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -379,7 +449,13 @@ export function DailyKnowledgeDialog() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="icon" onClick={next} disabled={loading || !effectiveItem}>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={next}
+                disabled={loading || !effectiveItem}
+                aria-label={t('dailyKnowledge.next')}
+              >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -387,7 +463,13 @@ export function DailyKnowledgeDialog() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="outline" size="icon" onClick={random} disabled={loading || filteredItems.length === 0}>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={random}
+                disabled={loading || filteredItems.length === 0}
+                aria-label={t('dailyKnowledge.random')}
+              >
                 <Shuffle className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -448,6 +530,7 @@ export function DailyKnowledgeDialog() {
           <Alert className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="space-y-1 text-xs">
+              <p>{t('dailyKnowledge.sourceStatusForDate', { date: formattedActiveDate })}</p>
               {usedCuratedFallback && <p>{t('dailyKnowledge.curatedFallbackNotice')}</p>}
               {degradedSourceStatuses.map((status) => (
                 <p key={`${status.source}-${status.reason}`}>

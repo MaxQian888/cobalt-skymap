@@ -69,6 +69,7 @@ const mockCacheManager = offlineCacheManager as jest.Mocked<typeof offlineCacheM
 describe('CacheSurveysTab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCacheManager.getHiPSCacheStatus.mockImplementation(() => new Promise(() => undefined));
   });
 
   it('renders survey list', () => {

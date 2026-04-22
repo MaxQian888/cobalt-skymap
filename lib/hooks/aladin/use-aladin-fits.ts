@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, type RefObject } from 'react';
+import { useEffect, useRef, useCallback, useState, type RefObject } from 'react';
 import type A from 'aladin-lite';
 import { removeImageLayerCompat } from '@/lib/aladin/aladin-compat';
 import { getSurveyById } from '@/lib/core/constants/sky-surveys';
@@ -48,6 +48,7 @@ export function useAladinFits({
 
   const aladinStaticRef = useRef<typeof A | null>(null);
   const fitsInstancesRef = useRef<Map<string, FitsHandle>>(new Map());
+  const [staticApiReady, setStaticApiReady] = useState(false);
 
   const restoreBaseSurvey = useCallback((aladin: AladinInstance) => {
     if (!surveyEnabled) return;
@@ -68,6 +69,7 @@ export function useAladinFits({
     if (!engineReady || skyEngine !== 'aladin') return;
     import('aladin-lite').then((m) => {
       aladinStaticRef.current = m.default;
+      setStaticApiReady(true);
     }).catch((err) => {
       logger.warn('Failed to load aladin-lite static API for FITS layers', err);
     });
@@ -76,7 +78,7 @@ export function useAladinFits({
   useEffect(() => {
     const aladin = aladinRef.current;
     const AStatic = aladinStaticRef.current;
-    if (!aladin || !AStatic || !engineReady || skyEngine !== 'aladin') return;
+    if (!aladin || !AStatic || !engineReady || skyEngine !== 'aladin' || !staticApiReady) return;
 
     const active = fitsInstancesRef.current;
 
@@ -119,6 +121,7 @@ export function useAladinFits({
           active.set(layer.id, { survey, mode: layer.mode });
         } catch (error) {
           logger.warn(`Failed to add FITS layer: ${layer.name}`, error);
+          updateFitsLayer(layer.id, { enabled: false });
           continue;
         }
       }
@@ -137,7 +140,7 @@ export function useAladinFits({
       }
       active.delete(id);
     }
-  }, [aladinRef, engineReady, fitsLayers, restoreBaseSurvey, skyEngine]);
+  }, [aladinRef, engineReady, fitsLayers, restoreBaseSurvey, skyEngine, staticApiReady, updateFitsLayer]);
 
   useEffect(() => {
     const fitsInstances = fitsInstancesRef.current;

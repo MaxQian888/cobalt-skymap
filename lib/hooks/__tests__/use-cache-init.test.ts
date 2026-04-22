@@ -81,12 +81,14 @@ describe('useCacheInit', () => {
   let consoleLogSpy: jest.SpyInstance;
   let addEventListenerSpy: jest.SpyInstance;
   let removeEventListenerSpy: jest.SpyInstance;
+  let mockOnCacheStage: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation();
     addEventListenerSpy = jest.spyOn(window, 'addEventListener');
     removeEventListenerSpy = jest.spyOn(window, 'removeEventListener');
+    mockOnCacheStage = jest.fn();
   });
 
   afterEach(() => {
@@ -174,23 +176,50 @@ describe('useCacheInit', () => {
   });
 
   it('notifies cache-index lifecycle callbacks', async () => {
-    const onCacheIndexStart = jest.fn();
-    const onCacheIndexReady = jest.fn();
-    const onCacheIndexError = jest.fn();
-
     renderHook(() => useCacheInit({
-      onCacheIndexStart,
-      onCacheIndexReady,
-      onCacheIndexError,
+      onCacheStage: mockOnCacheStage,
     }));
 
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 0));
     });
 
-    expect(onCacheIndexStart).toHaveBeenCalledTimes(1);
-    expect(onCacheIndexReady).toHaveBeenCalledTimes(1);
-    expect(onCacheIndexError).not.toHaveBeenCalled();
+    expect(mockOnCacheStage).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: 'cache_index', state: 'loading', blocking: false })
+    );
+    expect(mockOnCacheStage).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: 'cache_index', state: 'ready', blocking: false })
+    );
+  });
+
+  it('reports unsupported cache-index state when persistent cache is unavailable', async () => {
+    const { getUnifiedCacheProviderDiagnostics } = jest.requireMock('@/lib/offline') as {
+      getUnifiedCacheProviderDiagnostics: jest.Mock;
+    };
+    getUnifiedCacheProviderDiagnostics.mockReturnValue({
+      providerId: 'memory-only',
+      available: true,
+      supportsPersistent: false,
+      supportsClear: true,
+      supportsCleanup: false,
+      supportsFlush: false,
+      supportsInterception: true,
+    });
+
+    renderHook(() => useCacheInit({ onCacheStage: mockOnCacheStage }));
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    expect(mockInitializeCacheSystem).not.toHaveBeenCalled();
+    expect(mockOnCacheStage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'cache_index',
+        state: 'unsupported',
+        blocking: false,
+      })
+    );
   });
 
   it('sets up periodic cleanup interval', () => {

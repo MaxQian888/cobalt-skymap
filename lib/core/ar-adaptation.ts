@@ -8,6 +8,7 @@ export type ARAdaptationControlDensity = 'compact' | 'comfortable';
 export type ARSurfacePresentationMode = 'floating-card' | 'edge-sheet' | 'compact-strip';
 export type ARCapabilityTier = 'full' | 'limited' | 'minimal';
 export type ARSensorPath = 'sensor-primary' | 'camera-primary' | 'manual-only';
+export type AROperatingMode = 'sensor-first' | 'camera-first' | 'manual-first';
 
 export interface ARSafeAreaInsets {
   top: number;
@@ -40,6 +41,7 @@ export interface ARAdaptationContext {
   cameraControlMode: ARSurfacePresentationMode;
   capabilityTier: ARCapabilityTier;
   sensorPath: ARSensorPath;
+  operatingMode: AROperatingMode;
   isLandscape: boolean;
   isViewportReduced: boolean;
 }
@@ -120,6 +122,26 @@ function deriveSensorPath(input: ARAdaptationInput, runtimeClass: ARAdaptationRu
   return 'camera-primary';
 }
 
+function deriveOperatingMode(
+  input: ARAdaptationInput,
+  runtimeClass: ARAdaptationRuntimeClass,
+  sensorPath: ARSensorPath,
+): AROperatingMode {
+  if (runtimeClass === 'browser-mobile' && sensorPath === 'sensor-primary') {
+    return 'sensor-first';
+  }
+
+  if (!input.cameraSupported) {
+    return 'manual-first';
+  }
+
+  if (sensorPath === 'manual-only') {
+    return 'manual-first';
+  }
+
+  return 'camera-first';
+}
+
 export function deriveARAdaptationContext(input: ARAdaptationInput): ARAdaptationContext {
   const isLandscape = input.viewportWidth > input.viewportHeight;
   const isMobileLike = isMobileLikeViewport(input.viewportWidth, input.viewportHeight);
@@ -158,6 +180,7 @@ export function deriveARAdaptationContext(input: ARAdaptationInput): ARAdaptatio
     : 'comfortable';
   const capabilityTier = deriveCapabilityTier(input.cameraSupported, input.capabilityMap);
   const sensorPath = deriveSensorPath(input, runtimeClass);
+  const operatingMode = deriveOperatingMode(input, runtimeClass, sensorPath);
 
   return {
     viewportWidth: input.viewportWidth,
@@ -177,13 +200,14 @@ export function deriveARAdaptationContext(input: ARAdaptationInput): ARAdaptatio
       : 'floating-card',
     capabilityTier,
     sensorPath,
+    operatingMode,
     isLandscape,
     isViewportReduced,
   };
 }
 
 export function deriveARSessionCameraDefaults(
-  context: Pick<ARAdaptationContext, 'capabilityTier' | 'sensorPath'>,
+  context: Pick<ARAdaptationContext, 'capabilityTier' | 'sensorPath' | 'operatingMode'>,
 ): Partial<ARCameraProfile> {
   const defaults: Partial<ARCameraProfile> = {
     facingMode: 'environment',
@@ -213,6 +237,12 @@ export function deriveARSessionCameraDefaults(
   } else if (context.sensorPath === 'manual-only') {
     defaults.overlayOpacity = Math.max(defaults.overlayOpacity ?? 0.7, 0.8);
     defaults.sensorSmoothingFactor = Math.max(defaults.sensorSmoothingFactor ?? 0.2, 0.3);
+  }
+
+  if (context.operatingMode === 'manual-first') {
+    defaults.overlayOpacity = Math.max(defaults.overlayOpacity ?? 0.75, 0.82);
+    defaults.targetFps = Math.min(defaults.targetFps ?? 24, 24);
+    defaults.torchPreferred = false;
   }
 
   return defaults;

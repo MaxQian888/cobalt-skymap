@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { ChevronUp, Clock } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { formatTimeShort } from '@/lib/astronomy/astro-utils';
 import type { RiseTransitSetGridProps } from '@/types/starmap/objects';
@@ -16,9 +17,9 @@ export const RiseTransitSetGrid = memo(function RiseTransitSetGrid({
 
   const isCompact = variant === 'compact';
 
-  const cellClass = isCompact
-    ? 'text-center p-1 rounded bg-muted/30'
-    : 'text-center p-3 rounded-lg bg-muted/30';
+  const cardClass = isCompact
+    ? 'gap-0 rounded-md border-border/50 bg-muted/30 py-0 shadow-none'
+    : 'gap-0 rounded-lg border-border/70 bg-muted/30 py-0 shadow-none';
 
   const labelClass = isCompact
     ? 'text-[10px] text-muted-foreground'
@@ -34,33 +35,39 @@ export const RiseTransitSetGrid = memo(function RiseTransitSetGrid({
       isCompact ? 'gap-0.5 sm:gap-1 text-xs' : 'gap-2',
       className,
     )}>
-      <div className={cellClass}>
-        <div className={labelClass}>
-          {!isCompact && <ChevronUp className="h-3 w-3" />}
-          {t('time.rise')}
-        </div>
-        <p className={valueClass}>
-          {visibility.isCircumpolar ? '∞' : formatTimeShort(visibility.riseTime)}
-        </p>
-      </div>
-      <div className={cellClass}>
-        <div className={labelClass}>
-          {!isCompact && <Clock className="h-3 w-3" />}
-          {t('time.transit')}
-        </div>
-        <p className={valueClass}>
-          {formatTimeShort(visibility.transitTime)}
-        </p>
-      </div>
-      <div className={cellClass}>
-        <div className={labelClass}>
-          {!isCompact && <ChevronUp className="h-3 w-3 rotate-180" />}
-          {t('time.set')}
-        </div>
-        <p className={valueClass}>
-          {visibility.isCircumpolar ? '∞' : formatTimeShort(visibility.setTime)}
-        </p>
-      </div>
+      <Card className={cardClass}>
+        <CardContent className={cn(isCompact ? 'space-y-1 p-1' : 'space-y-1 p-3')}>
+          <div className={labelClass}>
+            {!isCompact && <ChevronUp className="h-3 w-3" />}
+            {t('time.rise')}
+          </div>
+          <p className={valueClass}>
+            {visibility.isCircumpolar ? '∞' : formatTimeShort(visibility.riseTime)}
+          </p>
+        </CardContent>
+      </Card>
+      <Card className={cardClass}>
+        <CardContent className={cn(isCompact ? 'space-y-1 p-1' : 'space-y-1 p-3')}>
+          <div className={labelClass}>
+            {!isCompact && <Clock className="h-3 w-3" />}
+            {t('time.transit')}
+          </div>
+          <p className={valueClass}>
+            {formatTimeShort(visibility.transitTime)}
+          </p>
+        </CardContent>
+      </Card>
+      <Card className={cardClass}>
+        <CardContent className={cn(isCompact ? 'space-y-1 p-1' : 'space-y-1 p-3')}>
+          <div className={labelClass}>
+            {!isCompact && <ChevronUp className="h-3 w-3 rotate-180" />}
+            {t('time.set')}
+          </div>
+          <p className={valueClass}>
+            {visibility.isCircumpolar ? '∞' : formatTimeShort(visibility.setTime)}
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 });

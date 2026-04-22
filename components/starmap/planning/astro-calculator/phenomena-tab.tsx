@@ -17,10 +17,12 @@ import {
 import { cn } from '@/lib/utils';
 import { type PhenomenaEvent } from '@/lib/astronomy/engine';
 import { runCalculatorPhenomena, type CalculatorMetaSummary } from './orchestrator';
+import type { AstroCalculatorObserverContext } from './types';
 
 interface PhenomenaTabProps {
   latitude: number;
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
 }
 
 function getEventIcon(type: PhenomenaEvent['type']): string {
@@ -51,7 +53,7 @@ function getImportanceColor(importance: PhenomenaEvent['importance']): string {
   }
 }
 
-export function PhenomenaTab({ latitude, longitude }: PhenomenaTabProps) {
+export function PhenomenaTab({ latitude, longitude, observerContext }: PhenomenaTabProps) {
   const t = useTranslations();
   const [daysAhead, setDaysAhead] = useState(30);
   const [showMinor, setShowMinor] = useState(false);
@@ -79,6 +81,7 @@ export function PhenomenaTab({ latitude, longitude }: PhenomenaTabProps) {
           endDate: dateRange.endDate,
           observer: { latitude, longitude },
           includeMinor: showMinor,
+          contextKey: observerContext?.contextKey,
         });
 
         if (!cancelled) {
@@ -113,7 +116,7 @@ export function PhenomenaTab({ latitude, longitude }: PhenomenaTabProps) {
     return () => {
       cancelled = true;
     };
-  }, [dateRange.endDate, dateRange.startDate, latitude, longitude, showMinor, t]);
+  }, [dateRange.endDate, dateRange.startDate, latitude, longitude, observerContext?.contextKey, showMinor, t]);
 
   return (
     <div className="space-y-4">

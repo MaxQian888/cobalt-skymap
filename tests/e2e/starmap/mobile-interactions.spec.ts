@@ -153,6 +153,18 @@ test.describe('Mobile Interactions', () => {
     await expectMinimumTouchTarget(moreButton, 'mobile more tools button', 44);
   });
 
+  test('opening a mobile panel hides floating bottom controls', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await waitForStarmapReady(page, { skipWasmWait: true });
+
+    await page.getByTestId('mobile-rail-search').click();
+
+    await expect(page.getByTestId('search-panel')).toBeVisible();
+    await expect(page.getByTestId('mobile-action-rail')).toBeVisible();
+    await expect(page.getByTestId('mobile-bottom-tools-bar')).toHaveCount(0);
+    await expect(page.getByTestId('mobile-zoom-cluster')).toHaveCount(0);
+  });
+
   test('desktop viewport hides mobile bottom bar', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await waitForStarmapReady(page, { skipWasmWait: true });

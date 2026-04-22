@@ -22,10 +22,12 @@ let mockArMode = false;
 let mockIsSupported = true;
 let mockIsPermissionGranted = false;
 let mockStatus = 'idle';
+let mockSource: 'deviceorientationabsolute' | 'deviceorientation' | 'webkitCompassHeading' | 'none' = 'deviceorientation';
 let mockSensorCalibrationRequired = true;
 let mockDegradedReason: 'relative-source' | 'low-confidence' | 'stale-sample' | null = null;
 let mockError: string | null = null;
 let mockArSessionStatus: ARSessionStatus = 'ready';
+let mockIsTauriDesktop = false;
 let mockViewDirection: { ra: number; dec: number; alt: number; az: number } | null = {
   ra: 1.0,
   dec: 0.5,
@@ -116,7 +118,7 @@ jest.mock('@/lib/hooks/use-device-orientation', () => ({
       isSupported: mockIsSupported,
       isPermissionGranted: mockIsPermissionGranted,
       status: mockStatus,
-      source: 'deviceorientation',
+      source: mockSource,
       accuracyDeg: null,
       degradedReason: mockDegradedReason,
       calibration: {
@@ -142,6 +144,10 @@ jest.mock('@/lib/hooks/use-ar-session-status', () => ({
     needsUserAction: mockArSessionStatus !== 'ready',
     recoveryActions: [],
   }),
+}));
+
+jest.mock('@/lib/tauri/app-control-api', () => ({
+  isTauri: () => mockIsTauriDesktop,
 }));
 
 const messages = {
@@ -188,10 +194,12 @@ describe('SensorControlToggle', () => {
     mockIsSupported = true;
     mockIsPermissionGranted = false;
     mockStatus = 'idle';
+    mockSource = 'deviceorientation';
     mockSensorCalibrationRequired = true;
     mockDegradedReason = null;
     mockError = null;
     mockArSessionStatus = 'ready';
+    mockIsTauriDesktop = false;
     mockViewDirection = {
       ra: 1.0,
       dec: 0.5,
@@ -329,6 +337,27 @@ describe('SensorControlToggle', () => {
     await waitFor(() => {
       expect(mockRequestPermission).toHaveBeenCalled();
       expect(mockToggleStellariumSetting).toHaveBeenCalledWith('sensorControl');
+    });
+  });
+
+  it('projects desktop AR idle sensors to camera-first runtime when sensor control is off', async () => {
+    mockArMode = true;
+    mockSensorControl = false;
+    mockIsSupported = true;
+    mockIsPermissionGranted = true;
+    mockStatus = 'idle';
+    mockSource = 'none';
+    mockIsTauriDesktop = true;
+
+    renderWithProviders(<SensorControlToggle />);
+
+    await waitFor(() => {
+      expect(useARRuntimeStore.getState().sensor).toMatchObject({
+        isSupported: false,
+        isPermissionGranted: false,
+        status: 'unsupported',
+        error: 'Desktop AR defaults to camera-first mode until sensor data is confirmed.',
+      });
     });
   });
 

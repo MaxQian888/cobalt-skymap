@@ -4,7 +4,7 @@ import { TEST_TIMEOUTS } from './test-data';
 /**
  * Selector for the Stellarium loading overlay
  */
-const LOADING_OVERLAY_SELECTOR = 'div.absolute.inset-0.flex.flex-col.items-center.justify-center.bg-black\\/90.z-10';
+const LOADING_OVERLAY_SELECTOR = '[data-testid="stellarium-loading-overlay"]';
 const SPLASH_SELECTOR = '[data-testid="splash-screen"]';
 const SEARCH_TOGGLE_SELECTOR = '[data-testid="search-toggle-button"]';
 const SEARCH_INPUT_SELECTOR = '[data-testid="starmap-search-input"]';
@@ -14,6 +14,19 @@ const SESSION_PLANNER_BUTTON_SELECTOR = '[data-testid="session-planner-button"]'
 const SESSION_PLANNER_DIALOG_SELECTOR = '[data-testid="session-planner-dialog"]';
 const ABOUT_BUTTON_SELECTOR = '[data-testid="about-button"]';
 const ABOUT_DIALOG_SELECTOR = '[data-testid="about-dialog"]';
+
+async function neutralizeSplash(page: Page) {
+  await page.evaluate((selector) => {
+    document.querySelectorAll(selector).forEach((node) => {
+      if (node instanceof HTMLElement) {
+        node.style.pointerEvents = 'none';
+        node.style.display = 'none';
+        node.style.visibility = 'hidden';
+        node.setAttribute('aria-hidden', 'true');
+      }
+    });
+  }, SPLASH_SELECTOR).catch(() => {});
+}
 
 async function dismissSplashIfVisible(page: Page) {
   const splash = page.locator(SPLASH_SELECTOR).first();
@@ -43,6 +56,8 @@ async function dismissSplashIfVisible(page: Page) {
   }
 
   await splash.waitFor({ state: 'hidden', timeout: TEST_TIMEOUTS.splash }).catch(() => {});
+
+  await neutralizeSplash(page);
 }
 
 /**
@@ -50,6 +65,9 @@ async function dismissSplashIfVisible(page: Page) {
  */
 export async function skipOnboardingAndSetup(page: Page) {
   await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+
     localStorage.setItem('starmap-onboarding', JSON.stringify({
       state: {
         hasCompletedOnboarding: true,
@@ -106,12 +124,75 @@ export async function skipOnboardingAndSetup(page: Page) {
   });
 }
 
+async function seedOnboardingAndSetupOnInit(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+
+    localStorage.setItem('starmap-onboarding', JSON.stringify({
+      state: {
+        hasCompletedOnboarding: true,
+        hasCompletedSetup: true,
+        completedSteps: ['welcome', 'search', 'navigation', 'zoom', 'settings', 'fov', 'shotlist', 'tonight', 'contextmenu', 'complete'],
+        setupCompletedSteps: ['welcome', 'location', 'equipment', 'preferences', 'complete'],
+        showOnNextVisit: false,
+        hasSeenWelcome: true,
+        isTourActive: false,
+        isSetupOpen: false,
+        phase: 'idle',
+        resumeCheckpoint: null,
+        tourHubOpen: false,
+        activeTourId: null,
+        tourProgressById: {},
+        completedTours: ['first-run-core'],
+        skippedCapabilities: {},
+        lastCompletedAt: '2026-04-05T00:00:00.000Z',
+      },
+      version: 6,
+    }));
+
+    localStorage.setItem('onboarding-storage', JSON.stringify({
+      state: {
+        hasCompletedOnboarding: true,
+        hasSeenWelcome: true,
+        currentStepIndex: -1,
+        isTourActive: false,
+        completedSteps: ['welcome', 'search', 'navigation', 'zoom', 'settings', 'fov', 'shotlist', 'tonight', 'contextmenu', 'complete'],
+        showOnNextVisit: false,
+      },
+      version: 0,
+    }));
+
+    localStorage.setItem('starmap-setup-wizard', JSON.stringify({
+      state: {
+        hasCompletedSetup: true,
+        showOnNextVisit: false,
+        completedSteps: ['welcome', 'location', 'equipment', 'preferences', 'complete'],
+      },
+      version: 1,
+    }));
+
+    localStorage.setItem('starmap-settings', JSON.stringify({
+      state: {
+        preferences: {
+          locale: 'en',
+          showSplash: false,
+          dailyKnowledgeAutoShow: false,
+        },
+      },
+      version: 19,
+    }));
+  });
+}
+
 /**
  * Helper to wait for starmap ready and dismiss onboarding.
  * This bypasses the WASM loading wait and skips onboarding dialogs
  * for faster and more reliable tests.
  */
 export async function waitForStarmapReady(page: Page, options?: { skipWasmWait?: boolean }) {
+  await seedOnboardingAndSetupOnInit(page);
+
   const openStarmap = async () => {
     await page.goto('/starmap', {
       waitUntil: 'domcontentloaded',
@@ -126,14 +207,7 @@ export async function waitForStarmapReady(page: Page, options?: { skipWasmWait?:
     await page.waitForTimeout(1500);
     await openStarmap();
   }
-  
-  // Skip onboarding and setup wizard by setting localStorage
-  await skipOnboardingAndSetup(page);
-  
-  await page.reload({
-    waitUntil: 'domcontentloaded',
-    timeout: TEST_TIMEOUTS.wasmInit,
-  });
+
   await dismissSplashIfVisible(page);
   
   // Wait for canvas to be visible
@@ -157,6 +231,10 @@ export async function waitForStarmapReady(page: Page, options?: { skipWasmWait?:
   
   // Wait a bit for UI to stabilize
   await page.waitForTimeout(1000);
+  await neutralizeSplash(page);
+
+  const compileIndicator = page.getByText(/Compiling/i).first();
+  await compileIndicator.waitFor({ state: 'hidden', timeout: TEST_TIMEOUTS.wasmInit }).catch(() => {});
 }
 
 export async function ensureSearchPanelOpen(page: Page): Promise<Locator> {
@@ -165,6 +243,8 @@ export async function ensureSearchPanelOpen(page: Page): Promise<Locator> {
   if (isInputVisible) {
     return searchInput;
   }
+
+  await neutralizeSplash(page);
 
   const searchToggleByTestId = page.locator(SEARCH_TOGGLE_SELECTOR).first();
   const hasTestIdToggle = await searchToggleByTestId.count();
@@ -211,6 +291,7 @@ export async function openSettingsPanel(page: Page): Promise<Locator> {
 
   const settingsButton = page.locator(SETTINGS_BUTTON_SELECTOR).first()
     .or(page.getByRole('button', { name: /settings|设置/i }).first());
+  await neutralizeSplash(page);
   await expect(settingsButton).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
   await settingsButton.click();
   await expect(panel).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
@@ -226,6 +307,7 @@ export async function openSessionPlannerDialog(page: Page): Promise<Locator> {
 
   const plannerButton = page.locator(SESSION_PLANNER_BUTTON_SELECTOR).first()
     .or(page.getByRole('button', { name: /session.*plan|观测.*计划/i }).first());
+  await neutralizeSplash(page);
   await expect(plannerButton).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
   await plannerButton.click();
   await expect(dialog).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
@@ -241,6 +323,7 @@ export async function openAboutDialog(page: Page): Promise<Locator> {
 
   const aboutButton = page.locator(ABOUT_BUTTON_SELECTOR).first()
     .or(page.getByRole('button', { name: /about|关于/i }).first());
+  await neutralizeSplash(page);
   await expect(aboutButton).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
   await aboutButton.click();
   await expect(dialog).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
@@ -266,6 +349,7 @@ export function getCanvas(page: Page) {
  * Helper to search for an object and select the first result
  */
 export async function searchAndSelectObject(page: Page, objectName: string) {
+  await neutralizeSplash(page);
   const searchButton = page.getByRole('button', { name: /search|搜索/i }).first();
   if (await searchButton.isVisible().catch(() => false)) {
     await searchButton.click();

@@ -20,20 +20,30 @@ interface UseCacheInitOptions {
   enablePrefetch?: boolean;
   /** Custom resources to prefetch (in addition to defaults) */
   additionalPrefetchUrls?: string[];
-  /** Called when cache-index bootstrap starts */
-  onCacheIndexStart?: () => void;
-  /** Called when cache-index bootstrap succeeds */
-  onCacheIndexReady?: () => void;
-  /** Called when cache-index bootstrap fails */
-  onCacheIndexError?: (error: unknown) => void;
+  /** Called when deferred cache startup stages change state */
+  onCacheStage?: (event: CacheStartupStageEvent) => void;
+}
+
+type CacheStartupStage = 'cache_index' | 'cache_prefetch' | 'cache_cleanup';
+type CacheStartupStageState = 'loading' | 'ready' | 'degraded' | 'unsupported';
+
+export interface CacheStartupStageEvent {
+  stage: CacheStartupStage;
+  state: CacheStartupStageState;
+  blocking: false;
+  reason?: string;
 }
 
 /**
  * Prefetch critical resources for better cold-start performance
  */
-async function prefetchCriticalResources(additionalUrls: string[] = []): Promise<void> {
+async function prefetchCriticalResources(
+  additionalUrls: string[] = []
+): Promise<{ state: CacheStartupStageState; reason?: string }> {
   const urlsToPrefetch = Array.from(new Set([...PREFETCH_RESOURCES, ...additionalUrls]));
-  if (urlsToPrefetch.length === 0) return;
+  if (urlsToPrefetch.length === 0) {
+    return { state: 'ready' };
+  }
   
   logger.info('Starting prefetch of critical resources');
   
@@ -65,10 +75,11 @@ async function prefetchCriticalResources(additionalUrls: string[] = []): Promise
 
   if (skippedOrFailed > 0) {
     logger.warn(`Prefetched ${successCount}/${urlsToPrefetch.length} resources`, { skippedOrFailed });
-    return;
+    return { state: 'degraded', reason: `prefetch_partial:${successCount}/${urlsToPrefetch.length}` };
   }
 
   logger.info(`Prefetched ${successCount}/${urlsToPrefetch.length} resources`);
+  return { state: 'ready' };
 }
 
 /**
@@ -81,9 +92,7 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
     enableInterception = true,
     enablePrefetch = true,
     additionalPrefetchUrls = [],
-    onCacheIndexStart,
-    onCacheIndexReady,
-    onCacheIndexError,
+    onCacheStage,
   } = options;
   const initialized = useRef(false);
   const providerDiagnostics: UnifiedCacheProviderDiagnostics | null = getUnifiedCacheProviderDiagnostics();
@@ -92,17 +101,35 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
     if (initialized.current) return;
     initialized.current = true;
 
+    const emitStage = (event: CacheStartupStageEvent) => {
+      onCacheStage?.(event);
+    };
+
     // Run cache migrations on startup
-    onCacheIndexStart?.();
-    initializeCacheSystem().then((result) => {
-      if (result.migratedItems > 0 || result.deletedItems > 0) {
-        logger.info('Cache migration completed', result);
-      }
-      onCacheIndexReady?.();
-    }).catch((error) => {
-      logger.warn('Cache migration failed', error);
-      onCacheIndexError?.(error);
-    });
+    emitStage({ stage: 'cache_index', state: 'loading', blocking: false });
+    if (!providerDiagnostics?.supportsPersistent) {
+      emitStage({
+        stage: 'cache_index',
+        state: 'unsupported',
+        blocking: false,
+        reason: 'persistent_cache_unavailable',
+      });
+    } else {
+      initializeCacheSystem().then((result) => {
+        if (result.migratedItems > 0 || result.deletedItems > 0) {
+          logger.info('Cache migration completed', result);
+        }
+        emitStage({ stage: 'cache_index', state: 'ready', blocking: false });
+      }).catch((error) => {
+        logger.warn('Cache migration failed', error);
+        emitStage({
+          stage: 'cache_index',
+          state: 'degraded',
+          blocking: false,
+          reason: error instanceof Error ? error.message : 'cache_index_failed',
+        });
+      });
+    }
 
     // Install fetch interceptor for automatic caching
     if (enableInterception && getUnifiedCacheProviderDiagnostics().supportsInterception) {
@@ -133,7 +160,21 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
 
     // Prefetch critical resources (non-blocking, uses idle time)
     if (enablePrefetch) {
-      const startPrefetch = () => prefetchCriticalResources(additionalPrefetchUrls);
+      const startPrefetch = () => {
+        emitStage({ stage: 'cache_prefetch', state: 'loading', blocking: false });
+        void prefetchCriticalResources(additionalPrefetchUrls)
+          .then((result) => {
+            emitStage({ stage: 'cache_prefetch', blocking: false, ...result });
+          })
+          .catch((error: unknown) => {
+            emitStage({
+              stage: 'cache_prefetch',
+              state: 'degraded',
+              blocking: false,
+              reason: error instanceof Error ? error.message : 'cache_prefetch_failed',
+            });
+          });
+      };
       if ('requestIdleCallback' in window) {
         (window as Window & { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(startPrefetch);
       } else {
@@ -152,6 +193,15 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
     }
 
     // Periodic cleanup of expired cache entries (every 30 minutes)
+    if (!providerDiagnostics?.supportsCleanup) {
+      emitStage({
+        stage: 'cache_cleanup',
+        state: 'unsupported',
+        blocking: false,
+        reason: 'cleanup_unsupported',
+      });
+    }
+
     const cleanupInterval = setInterval(async () => {
       try {
         const deleted = await unifiedCache.cleanupExpired();
@@ -161,8 +211,15 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
           const keys = await unifiedCache.keys();
           logger.debug(`Periodic cleanup check: ${keys.length} cached entries`);
         }
+        emitStage({ stage: 'cache_cleanup', state: 'ready', blocking: false });
       } catch (error) {
         logger.warn('Periodic cache cleanup failed', error);
+        emitStage({
+          stage: 'cache_cleanup',
+          state: 'degraded',
+          blocking: false,
+          reason: error instanceof Error ? error.message : 'cache_cleanup_failed',
+        });
       }
     }, 30 * 60 * 1000);
 
@@ -177,9 +234,8 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
     enableInterception,
     enablePrefetch,
     additionalPrefetchUrls,
-    onCacheIndexStart,
-    onCacheIndexReady,
-    onCacheIndexError,
+    onCacheStage,
+    providerDiagnostics,
   ]);
 
   return {

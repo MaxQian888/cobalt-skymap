@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 
 // Mock services
 jest.mock('@/lib/services/object-info-service', () => ({
@@ -15,14 +16,48 @@ jest.mock('@/lib/tauri/app-control-api', () => ({
   openExternalUrl: jest.fn(),
 }));
 
+jest.mock('@/lib/logger', () => ({
+  __mockLogger: {
+    warn: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+  },
+  createLogger: jest.fn(() => {
+    const loggerModule = jest.requireMock('@/lib/logger') as {
+      __mockLogger: {
+        warn: jest.Mock;
+        error: jest.Mock;
+        info: jest.Mock;
+        debug: jest.Mock;
+      };
+    };
+    return loggerModule.__mockLogger;
+  }),
+}));
+
 import { getCachedObjectInfo, enhanceObjectInfo, updateCachedObjectInfo } from '@/lib/services/object-info-service';
 import { openExternalUrl } from '@/lib/tauri/app-control-api';
 import { clipboardService } from '@/lib/services/clipboard-service';
+import { createLogger } from '@/lib/logger';
 
 const mockGetCachedObjectInfo = getCachedObjectInfo as jest.Mock;
 const mockEnhanceObjectInfo = enhanceObjectInfo as jest.Mock;
 const mockUpdateCachedObjectInfo = updateCachedObjectInfo as jest.Mock;
 const mockOpenExternalUrl = openExternalUrl as jest.Mock;
+const _mockCreateLogger = createLogger as jest.Mock;
+const mockLoggerModule = jest.requireMock('@/lib/logger') as {
+  __mockLogger: {
+    warn: jest.Mock;
+    error: jest.Mock;
+    info: jest.Mock;
+    debug: jest.Mock;
+  };
+};
+
+function getDrawerLogger() {
+  return mockLoggerModule.__mockLogger;
+}
 
 // Mock astronomy utils
 jest.mock('@/lib/astronomy/starmap-utils', () => ({
@@ -174,8 +209,14 @@ jest.mock('@/components/ui/drawer', () => ({
   DrawerHeader: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="drawer-header" className={className}>{children}</div>
   ),
+  DrawerFooter: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="drawer-footer" data-slot="drawer-footer" className={className}>{children}</div>
+  ),
   DrawerTitle: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <h2 data-testid="drawer-title" className={className}>{children}</h2>
+  ),
+  DrawerDescription: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <p data-testid="drawer-description" className={className}>{children}</p>
   ),
   DrawerClose: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) => (
     asChild ? <>{children}</> : <div data-testid="drawer-close">{children}</div>
@@ -208,6 +249,45 @@ jest.mock('@/components/ui/badge', () => ({
   ),
 }));
 
+jest.mock('@/components/ui/card', () => ({
+  Card: ({
+    children,
+    className,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="card" data-slot="card" className={className} {...props}>
+      {children}
+    </div>
+  ),
+  CardHeader: ({
+    children,
+    className,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="card-header" data-slot="card-header" className={className} {...props}>
+      {children}
+    </div>
+  ),
+  CardTitle: ({
+    children,
+    className,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="card-title" data-slot="card-title" className={className} {...props}>
+      {children}
+    </div>
+  ),
+  CardContent: ({
+    children,
+    className,
+    ...props
+  }: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode }) => (
+    <div data-testid="card-content" data-slot="card-content" className={className} {...props}>
+      {children}
+    </div>
+  ),
+}));
+
 jest.mock('@/components/ui/tabs', () => ({
   Tabs: ({
     children,
@@ -219,10 +299,11 @@ jest.mock('@/components/ui/tabs', () => ({
   TabsContent: ({
     children,
     value,
+    ...props
   }: {
     children: React.ReactNode;
     value: string;
-  }) => <div data-testid={`tabs-content-${value}`}>{children}</div>,
+  } & React.HTMLAttributes<HTMLDivElement>) => <div data-testid={`tabs-content-${value}`} {...props}>{children}</div>,
   TabsList: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="tabs-list" className={className}>{children}</div>
   ),
@@ -261,6 +342,12 @@ jest.mock('../object-image-gallery', () => ({
   ),
 }));
 
+jest.mock('../altitude-chart-compact', () => ({
+  AltitudeChartCompact: ({ ra, dec }: { ra: number; dec: number }) => (
+    <div data-testid="altitude-chart-compact" data-ra={ra} data-dec={dec} />
+  ),
+}));
+
 import { ObjectDetailDrawer } from '../object-detail-drawer';
 import type { SelectedObjectData } from '@/lib/core/types';
 
@@ -272,6 +359,9 @@ const mockSelectedObject: SelectedObjectData = {
   decDeg: 41.269,
   type: 'galaxy',
   magnitude: 3.4,
+  selectionSource: 'enriched',
+  selectionFallback: 'resolved',
+  sourceCatalog: 'SIMBAD',
 };
 
 const mockObjectInfo = {
@@ -286,8 +376,37 @@ const mockObjectInfo = {
   spectralType: null,
   simbadUrl: 'https://simbad.u-strasbg.fr/simbad/sim-id?Ident=M31',
   wikipediaUrl: 'https://en.wikipedia.org/wiki/Andromeda_Galaxy',
-  images: [{ url: 'https://example.com/m31.jpg', source: 'NASA' }],
+  images: [{ url: 'https://example.com/m31.jpg', source: 'NASA', availability: 'degraded', authorityLevel: 'reference' }],
   sources: ['SIMBAD', 'Wikipedia'],
+  provenance: {
+    description: {
+      acceptedSource: 'Wikipedia',
+      authorityLevel: 'reference',
+      contributors: ['Local', 'Wikipedia'],
+    },
+    physical: {
+      acceptedSource: 'SIMBAD',
+      authorityLevel: 'authoritative',
+      contributors: ['SIMBAD'],
+    },
+    images: {
+      acceptedSource: 'NASA',
+      authorityLevel: 'reference',
+      contributors: ['NASA', 'Local'],
+    },
+  },
+  diagnostics: [
+    {
+      providerId: 'sbdb',
+      status: 'unsupported',
+      fieldGroup: 'physical',
+    },
+    {
+      providerId: 'dss',
+      status: 'error',
+      fieldGroup: 'images',
+    },
+  ],
 };
 
 describe('ObjectDetailDrawer', () => {
@@ -296,7 +415,12 @@ describe('ObjectDetailDrawer', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+    useMapInteractionStore.getState().reset();
+    getDrawerLogger().warn.mockClear();
+    getDrawerLogger().error.mockClear();
+    getDrawerLogger().info.mockClear();
+    getDrawerLogger().debug.mockClear();
+
     mockGetCachedObjectInfo.mockResolvedValue(mockObjectInfo);
     mockEnhanceObjectInfo.mockResolvedValue(mockObjectInfo);
     mockUpdateCachedObjectInfo.mockImplementation(() => {});
@@ -434,6 +558,27 @@ describe('ObjectDetailDrawer', () => {
       expect(screen.getByTestId('tab-images')).toBeInTheDocument();
       expect(screen.getByTestId('tab-observation')).toBeInTheDocument();
     });
+
+    it('uses a mobile-safe drawer content shell', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByTestId('drawer-content')).toHaveClass(
+        'min-h-0',
+        'w-full',
+        'max-h-[calc(100dvh-var(--safe-area-top)-0.5rem)]'
+      );
+      expect(screen.getByTestId('scroll-area')).toHaveClass('min-h-0', 'overscroll-contain');
+    });
   });
 
   describe('Object Info Loading', () => {
@@ -503,7 +648,6 @@ describe('ObjectDetailDrawer', () => {
     });
 
     it('handles load error gracefully', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       mockGetCachedObjectInfo.mockRejectedValue(new Error('Load failed'));
 
       render(
@@ -519,10 +663,8 @@ describe('ObjectDetailDrawer', () => {
       });
 
       await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalled();
+        expect(getDrawerLogger().error).toHaveBeenCalledWith('Failed to load object info', expect.any(Error));
       });
-
-      consoleSpy.mockRestore();
     });
   });
 
@@ -630,8 +772,8 @@ describe('ObjectDetailDrawer', () => {
       });
 
       await waitFor(() => {
-        expect(screen.getByText('SIMBAD')).toBeInTheDocument();
-        expect(screen.getByText('Wikipedia')).toBeInTheDocument();
+        expect(screen.getAllByText('SIMBAD').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText('Wikipedia').length).toBeGreaterThanOrEqual(1);
       });
     });
 
@@ -645,13 +787,16 @@ describe('ObjectDetailDrawer', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('SIMBAD')).toBeInTheDocument();
-        expect(screen.getByText('Wikipedia')).toBeInTheDocument();
+        expect(screen.getAllByText('SIMBAD').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText('Wikipedia').length).toBeGreaterThanOrEqual(1);
       });
 
+      const simbadButton = screen.getAllByRole('button').find((button) => button.textContent?.includes('SIMBAD'));
+      const wikipediaButton = screen.getAllByRole('button').find((button) => button.textContent?.includes('Wikipedia'));
+
       await act(async () => {
-        fireEvent.click(screen.getByText('SIMBAD'));
-        fireEvent.click(screen.getByText('Wikipedia'));
+        fireEvent.click(simbadButton!);
+        fireEvent.click(wikipediaButton!);
       });
 
       expect(mockOpenExternalUrl).toHaveBeenCalledWith(mockObjectInfo.simbadUrl);
@@ -674,6 +819,41 @@ describe('ObjectDetailDrawer', () => {
       await waitFor(() => {
         expect(screen.getByText(/SIMBAD, Wikipedia/)).toBeInTheDocument();
       });
+    });
+
+    it('displays accepted source provenance for object information', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByText('objectDetail.acceptedSource')).toBeInTheDocument();
+      expect(screen.getAllByText('Wikipedia').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getByText('objectDetail.sourceAuthority.reference')).toBeInTheDocument();
+    });
+
+    it('displays degraded and unsupported source diagnostics', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByText('objectDetail.unsupportedSourceState')).toBeInTheDocument();
+      expect(screen.getByText('objectDetail.degradedSourceState')).toBeInTheDocument();
     });
   });
 
@@ -744,7 +924,7 @@ describe('ObjectDetailDrawer', () => {
 
       const identity = screen.getByTestId('object-drawer-section-identity');
       const live = screen.getByTestId('object-drawer-section-live-status');
-      const planning = screen.getByTestId('object-drawer-section-planning-metrics');
+      const planning = screen.getByTestId('object-drawer-section-planning');
       const advanced = screen.getByTestId('object-drawer-section-advanced-metadata');
 
       expect(identity.compareDocumentPosition(live) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -765,9 +945,37 @@ describe('ObjectDetailDrawer', () => {
         expect(mockGetCachedObjectInfo).toHaveBeenCalled();
       });
 
+      const advanced = screen.getByTestId('object-drawer-section-advanced-metadata');
+      expect(screen.getByText('objectDetail.systemMetadata')).toBeInTheDocument();
       expect(screen.getByText('objectDetail.frameTimeScale')).toBeInTheDocument();
       expect(screen.getByText('objectDetail.qualityEop')).toBeInTheDocument();
+      expect(screen.getByText('objectDetail.calculationSummary')).toBeInTheDocument();
       expect(screen.getByText('objectDetail.timestamp')).toBeInTheDocument();
+      expect(advanced).toHaveTextContent('objectDetail.calculationSource.calculation');
+      expect(advanced).toHaveTextContent('objectDetail.calculationState.normal');
+    });
+
+    it('renders selection source semantics for coordinate fallback objects', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={{
+            ...mockSelectedObject,
+            names: ['00h 42m 44.3s +41° 16\' 09"'],
+            selectionSource: 'coordinate',
+            selectionFallback: 'coordinate_fallback',
+            sourceCatalog: null,
+          }}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getAllByText('objectDetail.selectionSource.coordinate').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('objectDetail.selectionFallback.coordinate_fallback').length).toBeGreaterThan(0);
     });
 
     it('keeps shared core metrics formatted consistently across sections', async () => {
@@ -786,6 +994,104 @@ describe('ObjectDetailDrawer', () => {
       expect(screen.getAllByText('45.0°').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('180.0°').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('60°').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('separates overview summary from observation planning detail', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getAllByText('objectDetail.tonightSummary').length).toBeGreaterThan(0);
+      expect(screen.getByTestId('object-drawer-observation-tab')).toHaveTextContent('session.moonDistance');
+      expect(screen.getByTestId('object-drawer-observation-tab')).toHaveTextContent('session.maxAltitude');
+    });
+
+    it('renders overview information blocks with shadcn card surfaces', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByTestId('object-drawer-summary-card')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-section-identity')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-section-live-status')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-section-planning')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-section-advanced-metadata')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-section-properties')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-section-links')).toHaveAttribute('data-slot', 'card');
+    });
+
+    it('does not expose raw advanced metadata literals', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.queryByText('Calc')).not.toBeInTheDocument();
+      expect(screen.queryByText('degraded')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('continuity context', () => {
+    it('shows the active observing-site context in the detail drawer when continuity data exists', async () => {
+      useMapInteractionStore.getState().setSiteContext({
+        kind: 'committed',
+        sourceSurface: 'starmap',
+        coordinates: { latitude: 35.6762, longitude: 139.6503 },
+        summaryStatus: 'ready',
+        displayName: 'Tokyo',
+        actions: ['open-target-details'],
+      });
+      useMapInteractionStore.getState().setTargetContext({
+        objectName: 'M31',
+        primaryName: 'M31',
+        aliases: ['Andromeda Galaxy'],
+        ra: '00h 42m 44.3s',
+        dec: '+41° 16\' 09"',
+        raDeg: 10.685,
+        decDeg: 41.269,
+        type: 'galaxy',
+        sourceQuality: 'normal',
+        siteName: 'Tokyo',
+        siteCoordinates: { latitude: 35.6762, longitude: 139.6503 },
+      });
+
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByText(/starmap\.context\.activeSite/)).toBeInTheDocument();
+      expect(screen.getByText(/Tokyo/)).toBeInTheDocument();
     });
   });
 
@@ -829,6 +1135,45 @@ describe('ObjectDetailDrawer', () => {
   });
 
   describe('Action Buttons', () => {
+    it('renders action area inside drawer footer surface', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByTestId('drawer-footer')).toHaveAttribute('data-slot', 'drawer-footer');
+    });
+
+    it('uses a stacked mobile footer layout with safe-area padding', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByTestId('drawer-footer')).toHaveClass(
+        'sticky',
+        'bottom-0',
+        'pb-[calc(var(--safe-area-bottom)+0.75rem)]'
+      );
+
+      const addButton = screen.getByText(/actions\.addToTargetList/);
+      expect(addButton).toHaveClass('w-full', 'sm:flex-1');
+    });
+
     it('renders add to target list button', async () => {
       render(
         <ObjectDetailDrawer
@@ -1056,6 +1401,7 @@ describe('ObjectDetailDrawer', () => {
       });
 
       expect(writeTextSpy).toHaveBeenCalled();
+      expect(getDrawerLogger().warn).toHaveBeenCalledWith('Failed to copy coordinates', expect.any(Error));
       expect(screen.getByText('common.copy')).toBeInTheDocument();
       writeTextSpy.mockRestore();
     });
@@ -1169,6 +1515,25 @@ describe('ObjectDetailDrawer', () => {
       });
 
       expect(screen.getAllByText('60°').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders observation tab metrics on shadcn card surfaces', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByTestId('object-drawer-observation-visibility-card')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-observation-summary-card')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-observation-feasibility-card')).toHaveAttribute('data-slot', 'card');
+      expect(screen.getByTestId('object-drawer-observation-chart-card')).toHaveAttribute('data-slot', 'card');
     });
   });
 

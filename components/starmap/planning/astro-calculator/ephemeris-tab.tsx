@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, MapPinned } from 'lucide-react';
+import { AlertTriangle, Download, ListPlus, MapPinned, NotebookPen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -23,14 +24,27 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { isExplicitMinorObjectQuery } from '@/lib/astronomy/object-resolver/parser/minor-parser';
+import { raDecToEcliptic, raDecToGalactic } from '@/lib/astronomy/coordinates/transforms';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
 import { parseDecCoordinate, parseRACoordinate } from '@/lib/astronomy/coordinates/conversions';
 import { type EngineBody, type EphemerisPoint } from '@/lib/astronomy/engine';
 import { runCalculatorEphemeris, type CalculatorMetaSummary } from './orchestrator';
+import {
+  fetchSmallBodyEphemeris,
+  toSmallBodyCalculationMeta,
+} from './small-body-adapter';
+import {
+  AstroCalculatorResultActionsBar,
+  ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME,
+} from './result-action-layout';
+import { useAstroCalculatorResultActions } from './result-actions';
+import type { AstroCalculatorObserverContext } from './types';
 
 interface EphemerisTabProps {
   latitude: number;
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
   selectedTarget?: { name: string; ra: number; dec: number };
   sharedDate?: string;
   onSharedDateChange?: (nextDate: string) => void;
@@ -59,9 +73,27 @@ function toDateInputString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function getExplicitMinorObjectQuery(input: string): string | null {
+  const query = input.trim();
+  if (!query) {
+    return null;
+  }
+  if (isExplicitMinorObjectQuery(query)) {
+    return query;
+  }
+
+  const slashIndex = query.indexOf('/');
+  if (slashIndex > 0 && isExplicitMinorObjectQuery(query.slice(0, slashIndex))) {
+    return query;
+  }
+
+  return null;
+}
+
 export function EphemerisTab({
   latitude,
   longitude,
+  observerContext,
   selectedTarget,
   sharedDate,
   onSharedDateChange,
@@ -70,6 +102,7 @@ export function EphemerisTab({
   const [targetMode, setTargetMode] = useState<EngineBody>(selectedTarget ? 'Custom' : 'Moon');
   const [targetRA, setTargetRA] = useState(selectedTarget?.ra ? degreesToHMS(selectedTarget.ra) : '');
   const [targetDec, setTargetDec] = useState(selectedTarget?.dec ? degreesToDMS(selectedTarget.dec) : '');
+  const [minorObjectQuery, setMinorObjectQuery] = useState('');
   const [startDate, setStartDate] = useState(sharedDate ?? toDateInputString(new Date()));
   const [stepHours, setStepHours] = useState(1);
   const [numSteps, setNumSteps] = useState(24);
@@ -78,11 +111,69 @@ export function EphemerisTab({
   const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [sourceDiagnostics, setSourceDiagnostics] = useState<string[]>([]);
+  const {
+    copyResults,
+    exportResults,
+    addTargetToList,
+    openPlannerForTarget,
+  } = useAstroCalculatorResultActions(observerContext);
 
   const parsedRa = useMemo(() => parseRACoordinate(targetRA), [targetRA]);
   const parsedDec = useMemo(() => parseDecCoordinate(targetDec), [targetDec]);
+  const explicitMinorObjectQuery = useMemo(() => getExplicitMinorObjectQuery(minorObjectQuery), [minorObjectQuery]);
+  const resolvedTargetName = useMemo(() => {
+    if (explicitMinorObjectQuery) {
+      return explicitMinorObjectQuery;
+    }
+    if (targetMode === 'Custom') {
+      return selectedTarget?.name ?? 'Custom';
+    }
+    return targetMode;
+  }, [explicitMinorObjectQuery, selectedTarget?.name, targetMode]);
+  const handoffTarget = useMemo(() => {
+    const firstEntry = ephemeris[0];
+    if (!firstEntry) {
+      return null;
+    }
+    return {
+      name: resolvedTargetName,
+      ra: firstEntry.ra,
+      dec: firstEntry.dec,
+    };
+  }, [ephemeris, resolvedTargetName]);
+  const exportLines = useMemo(() => {
+    return [
+      `Target mode: ${targetMode}`,
+      `Coordinate output: ${coordinateMode}`,
+      `Start date: ${startDate}`,
+      `Step hours: ${stepHours}`,
+      `Steps: ${numSteps}`,
+      '',
+      ...ephemeris.map((entry) => {
+        const coordinateValues =
+          coordinateMode === 'equatorial'
+            ? `RA=${degreesToHMS(entry.ra)} Dec=${degreesToDMS(entry.dec)}`
+            : coordinateMode === 'horizontal'
+              ? `Alt=${entry.altitude.toFixed(2)} Az=${entry.azimuth.toFixed(2)}`
+              : coordinateMode === 'galactic'
+                ? `L=${entry.galacticL.toFixed(4)} B=${entry.galacticB.toFixed(4)}`
+                : `Lon=${entry.eclipticLon.toFixed(4)} Lat=${entry.eclipticLat.toFixed(4)}`;
+
+        return [
+          entry.date.toISOString(),
+          coordinateValues,
+          `Mag=${entry.magnitude !== undefined ? entry.magnitude.toFixed(2) : '--'}`,
+          `Phase=${entry.phaseFraction !== undefined ? `${(entry.phaseFraction * 100).toFixed(1)}%` : '--'}`,
+        ].join(' | ');
+      }),
+    ];
+  }, [coordinateMode, ephemeris, numSteps, startDate, stepHours, targetMode]);
 
   const customCoordinateError = useMemo(() => {
+    if (explicitMinorObjectQuery) {
+      return null;
+    }
     if (targetMode !== 'Custom') {
       return null;
     }
@@ -93,7 +184,7 @@ export function EphemerisTab({
       return t('astroCalc.invalidCoordinates');
     }
     return null;
-  }, [parsedDec, parsedRa, targetDec, targetMode, targetRA, t]);
+  }, [explicitMinorObjectQuery, parsedDec, parsedRa, targetDec, targetMode, targetRA, t]);
 
   useEffect(() => {
     if (sharedDate && sharedDate !== startDate) {
@@ -107,6 +198,7 @@ export function EphemerisTab({
     async function run() {
       if (customCoordinateError) {
         setEphemeris([]);
+        setSourceDiagnostics([]);
         setError(null);
         return;
       }
@@ -114,12 +206,59 @@ export function EphemerisTab({
       setIsLoading(true);
       setError(null);
       try {
+        if (explicitMinorObjectQuery) {
+          const computedAt = new Date(`${startDate}T00:00:00`);
+          const result = await fetchSmallBodyEphemeris({
+            query: explicitMinorObjectQuery,
+            observer: {
+              latitude,
+              longitude,
+              elevation: observerContext?.elevation,
+            },
+            startDate: computedAt,
+            stepHours,
+            steps: numSteps,
+          });
+          const points: EphemerisPoint[] = result.points.map((point) => {
+            const galactic = raDecToGalactic(point.ra, point.dec, point.date);
+            const ecliptic = raDecToEcliptic(point.ra, point.dec, point.date);
+            return {
+              ...point,
+              galacticL: galactic.l,
+              galacticB: galactic.b,
+              eclipticLon: ecliptic.longitude,
+              eclipticLat: ecliptic.latitude,
+            };
+          });
+
+          if (!cancelled) {
+            const meta = toSmallBodyCalculationMeta(result.meta, computedAt);
+            setEphemeris(points);
+            setSourceDiagnostics([
+              `Small-body source=${result.meta.source}`,
+              `Resolved target=${result.meta.resolvedName}`,
+              ...result.meta.warnings,
+            ]);
+            setMetaSummary({
+              total: 1,
+              sourceCounts: { tauri: 0, fallback: 1 },
+              cacheHits: 0,
+              cacheMisses: 1,
+              degradedCount: meta.degraded ? 1 : 0,
+              warningsCount: meta.warnings?.length ?? 0,
+              latestComputedAt: meta.computedAt,
+            });
+          }
+          return;
+        }
+
         const result = await runCalculatorEphemeris({
           body: targetMode,
           observer: { latitude, longitude },
           startDate: new Date(`${startDate}T00:00:00`),
           stepHours,
           steps: numSteps,
+          contextKey: observerContext?.contextKey,
           customCoordinate: targetMode === 'Custom' && parsedRa !== null && parsedDec !== null
             ? { ra: parsedRa, dec: parsedDec }
             : undefined,
@@ -127,6 +266,10 @@ export function EphemerisTab({
 
         if (!cancelled) {
           setEphemeris(result.response.points);
+          setSourceDiagnostics([
+            `Backend source=${result.meta.source}`,
+            ...((result.meta.warnings ?? []).map((warning) => `Warning=${warning}`)),
+          ]);
           setMetaSummary({
             total: 1,
             sourceCounts: {
@@ -143,6 +286,7 @@ export function EphemerisTab({
       } catch (runError) {
         if (!cancelled) {
           setEphemeris([]);
+          setSourceDiagnostics([]);
           setMetaSummary(null);
           setError(runError instanceof Error ? runError.message : t('astroCalc.calculationFailed'));
         }
@@ -157,7 +301,7 @@ export function EphemerisTab({
     return () => {
       cancelled = true;
     };
-  }, [customCoordinateError, latitude, longitude, numSteps, parsedDec, parsedRa, startDate, stepHours, t, targetMode]);
+  }, [customCoordinateError, explicitMinorObjectQuery, latitude, longitude, numSteps, observerContext?.contextKey, observerContext?.elevation, parsedDec, parsedRa, startDate, stepHours, t, targetMode]);
 
   return (
     <div className="space-y-4">
@@ -222,6 +366,17 @@ export function EphemerisTab({
         </div>
       </div>
 
+      <div className="space-y-1.5">
+        <Label className="text-xs">{t('astroCalc.minorObjectQuery')}</Label>
+        <Input
+          value={minorObjectQuery}
+          onChange={(event) => setMinorObjectQuery(event.target.value)}
+          aria-label={t('astroCalc.minorObjectQuery')}
+          placeholder={t('astroCalc.minorObjectPlaceholder')}
+          className="h-8"
+        />
+      </div>
+
       {targetMode === 'Custom' && (
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
@@ -272,6 +427,74 @@ export function EphemerisTab({
           )}
         </div>
       </div>
+
+      {ephemeris.length > 0 && (
+        <AstroCalculatorResultActionsBar>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.copyResults')}
+            onClick={() => void copyResults({
+              title: t('astroCalc.ephemeris'),
+              fileStem: 'astro-calculator-ephemeris',
+              targetName: resolvedTargetName,
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            {t('astroCalc.copyResults')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.exportResults')}
+            onClick={() => exportResults({
+              title: t('astroCalc.ephemeris'),
+              fileStem: 'astro-calculator-ephemeris',
+              targetName: resolvedTargetName,
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {t('astroCalc.exportResults')}
+          </Button>
+          {handoffTarget && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+                aria-label={t('astroCalc.addToList')}
+                onClick={() => addTargetToList(handoffTarget)}
+              >
+                <ListPlus className="h-3.5 w-3.5" />
+                {t('astroCalc.addToList')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+                aria-label={t('astroCalc.openPlanner')}
+                onClick={() => openPlannerForTarget(handoffTarget)}
+              >
+                <NotebookPen className="h-3.5 w-3.5" />
+                {t('astroCalc.openPlanner')}
+              </Button>
+            </>
+          )}
+        </AstroCalculatorResultActionsBar>
+      )}
 
       {customCoordinateError && (
         <div className="flex items-center gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-2 text-xs text-yellow-600">

@@ -174,6 +174,20 @@ function getPersistedLegacyState(storageKey: string): Record<string, unknown> | 
   }
 }
 
+function sanitizePersistedOnboardingState(
+  state: Record<string, unknown>,
+): Record<string, unknown> {
+  const hasCompletedOnboarding = state.hasCompletedOnboarding === true;
+  const showOnNextVisit = state.showOnNextVisit !== false;
+
+  if (hasCompletedOnboarding || !showOnNextVisit) {
+    state.resumeCheckpoint = null;
+    state.activeTourId = null;
+  }
+
+  return state;
+}
+
 export const useOnboardingStore = create<OnboardingState>()(
   persist(
     (set, get) => ({
@@ -207,7 +221,11 @@ export const useOnboardingStore = create<OnboardingState>()(
       // Shared actions
       setHasSeenWelcome: (seen) => set({ hasSeenWelcome: seen }),
 
-      setShowOnNextVisit: (show) => set({ showOnNextVisit: show }),
+      setShowOnNextVisit: (show) =>
+        set((state) => ({
+          showOnNextVisit: show,
+          resumeCheckpoint: show ? state.resumeCheckpoint : null,
+        })),
 
       setTourHubOpen: (open) => set({ tourHubOpen: open }),
 
@@ -910,7 +928,7 @@ export const useOnboardingStore = create<OnboardingState>()(
     {
       name: 'starmap-onboarding',
       storage: getZustandStorage(),
-      version: 5,
+      version: 6,
       migrate: (persistedState, version) => {
         const state =
           persistedState && typeof persistedState === 'object'
@@ -968,6 +986,10 @@ export const useOnboardingStore = create<OnboardingState>()(
         if (version < 5) {
           if (!('resumeCheckpoint' in state)) state.resumeCheckpoint = null;
           if (!('tourHubOpen' in state)) state.tourHubOpen = false;
+        }
+
+        if (version < 6) {
+          sanitizePersistedOnboardingState(state);
         }
 
         return state;

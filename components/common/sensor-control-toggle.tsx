@@ -22,8 +22,11 @@ import {
 } from '@/lib/hooks/use-device-orientation';
 import { useIsClient } from '@/lib/hooks/use-is-client';
 import { useARSessionStatus } from '@/lib/hooks/use-ar-session-status';
+import { isTauri } from '@/lib/tauri/app-control-api';
 import { cn } from '@/lib/utils';
 import { SensorCalibrationDialog } from './sensor-calibration-dialog';
+
+const DESKTOP_CAMERA_FIRST_NOTICE = 'Desktop AR defaults to camera-first mode until sensor data is confirmed.';
 
 interface SensorControlToggleProps {
   className?: string;
@@ -138,9 +141,44 @@ export function SensorControlToggle({ className, showStatusLabel = false }: Sens
     onOrientationChange: handleOrientationChange,
   });
   const arSession = useARSessionStatus({ enabled: stellarium.arMode });
+  const shouldPreferDesktopCameraFirst =
+    stellarium.arMode &&
+    !sensorControl &&
+    isTauri() &&
+    isSupported &&
+    isPermissionGranted &&
+    status === 'idle' &&
+    source === 'none' &&
+    !error;
 
-  useEffect(() => {
-    setSensorRuntime({
+  const projectedSensorRuntime = useMemo(() => {
+    if (shouldPreferDesktopCameraFirst) {
+      return {
+        isSupported: false,
+        isPermissionGranted: false,
+        status: 'unsupported' as const,
+        calibrationRequired: calibration.required,
+        degradedReason: null,
+        source: 'none' as const,
+        accuracyDeg: null,
+        error: DESKTOP_CAMERA_FIRST_NOTICE,
+      };
+    }
+
+    if (stellarium.arMode && !sensorControl && !isPermissionGranted && status === 'idle') {
+      return {
+        isSupported,
+        isPermissionGranted,
+        status: 'permission-required' as const,
+        calibrationRequired: calibration.required,
+        degradedReason,
+        source,
+        accuracyDeg,
+        error,
+      };
+    }
+
+    return {
       isSupported,
       isPermissionGranted,
       status,
@@ -149,7 +187,7 @@ export function SensorControlToggle({ className, showStatusLabel = false }: Sens
       source,
       accuracyDeg,
       error,
-    });
+    };
   }, [
     accuracyDeg,
     calibration.required,
@@ -157,10 +195,16 @@ export function SensorControlToggle({ className, showStatusLabel = false }: Sens
     error,
     isPermissionGranted,
     isSupported,
-    setSensorRuntime,
+    sensorControl,
+    shouldPreferDesktopCameraFirst,
     source,
     status,
+    stellarium.arMode,
   ]);
+
+  useEffect(() => {
+    setSensorRuntime(projectedSensorRuntime);
+  }, [projectedSensorRuntime, setSensorRuntime]);
 
   useEffect(() => {
     if (sensorControl || stellarium.arMode) return;

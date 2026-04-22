@@ -18,6 +18,12 @@ const DEGRADED_SOURCE_STATUS_REASONS = [
 ] as const;
 
 const DAILY_KNOWLEDGE_UI_KEYS = [
+  'dailyKnowledge.activeDateLabel',
+  'dailyKnowledge.browsingDate',
+  'dailyKnowledge.previousDate',
+  'dailyKnowledge.nextDate',
+  'dailyKnowledge.goToToday',
+  'dailyKnowledge.sourceStatusForDate',
   'dailyKnowledge.refreshCurrentDate',
   'dailyKnowledge.freshness.fresh-online',
   'dailyKnowledge.freshness.stale-cache',

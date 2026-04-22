@@ -19,6 +19,9 @@ SkyMap 采用多层安全防护架构：
 ├─────────────────────────────────────┤
 │           数据层                    │
 │      JSON 存储 | 路径沙箱            │
+├─────────────────────────────────────┤
+│         密钥保险箱                   │
+│      系统钥匙串 | OS Keyring         │
 └─────────────────────────────────────┘
 ```
 
@@ -108,6 +111,38 @@ fn get_safe_path(app: &AppHandle, filename: &str) -> Result<PathBuf, String> {
 
     Ok(data_dir.join(filename))
 }
+```
+
+### 5. 密钥保险箱（Secret Vault）
+
+对于 API 密钥等敏感凭证，使用系统钥匙串存储：
+
+```rust
+use crate::platform::secret_vault;
+
+#[tauri::command]
+pub async fn save_api_key(service: String, key: String) -> Result<(), String> {
+    secret_vault::set_secret(&service, &key)
+        .map_err(|e| format!("保存密钥失败: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_api_key(service: String) -> Result<Option<String>, String> {
+    secret_vault::get_secret(&service)
+        .map_err(|e| format!("读取密钥失败: {}", e))
+}
+```
+
+前端调用：
+
+```typescript
+import { invoke } from '@tauri-apps/api/core';
+
+// 保存 API 密钥
+await invoke('save_api_key', { service: 'map-tile-provider', key: 'sk-xxx' });
+
+// 读取 API 密钥
+const key = await invoke<string>('get_api_key', { service: 'map-tile-provider' });
 ```
 
 ## 前端安全开发
@@ -219,6 +254,8 @@ cargo test security_tests
 - URL 验证测试
 - 大小限制测试
 - 速率限制测试
+- 路径沙箱测试
+- 密钥保险箱测试
 - 集成测试
 
 ### 添加新的安全测试
@@ -240,6 +277,7 @@ fn test_my_security_feature() {
 - [ ] 是否接受用户输入？需要大小验证吗？
 - [ ] 是否接受 URL？需要 URL 验证吗？
 - [ ] 是否操作文件？路径安全吗？
+- [ ] 是否处理敏感凭证？需要使用 Secret Vault 吗？
 - [ ] 是否添加了相应的测试？
 
 ### 代码审查检查清单
@@ -250,6 +288,7 @@ fn test_my_security_feature() {
 - [ ] 所有 URL 都经过验证
 - [ ] 敏感操作有速率限制
 - [ ] 文件操作在沙箱内
+- [ ] API 密钥不硬编码，使用 Secret Vault
 
 ## 常见安全问题
 
@@ -270,6 +309,12 @@ fn test_my_security_feature() {
 **问题**：攻击者可以访问应用目录外的文件。
 
 **解决方案**：验证文件名，使用路径沙箱。
+
+### 4. 密钥泄露
+
+**问题**：API 密钥硬编码在源码或存储在明文配置中。
+
+**解决方案**：使用 `platform/secret_vault.rs` 将密钥存储在系统钥匙串中。
 
 ## 参考资源
 

@@ -181,7 +181,32 @@ jest.mock('@/components/ui/separator', () => ({
 }));
 
 jest.mock('@/components/ui/slider', () => ({
-  Slider: (props: Record<string, unknown>) => <input data-testid="slider" type="range" {...props} />,
+  Slider: ({
+    value,
+    onValueChange,
+    min,
+    max,
+    step,
+    className,
+  }: {
+    value?: number[];
+    onValueChange?: (value: number[]) => void;
+    min?: number;
+    max?: number;
+    step?: number;
+    className?: string;
+  }) => (
+    <input
+      data-testid="slider"
+      type="range"
+      value={value?.[0] ?? 0}
+      min={min}
+      max={max}
+      step={step}
+      className={className}
+      onChange={(event) => onValueChange?.([Number(event.target.value)])}
+    />
+  ),
 }));
 
 jest.mock('@/components/ui/select', () => ({

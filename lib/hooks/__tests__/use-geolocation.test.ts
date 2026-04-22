@@ -13,7 +13,7 @@ const mockGeolocation = {
 
 // Mock permissions API
 const mockPermissions = {
-  query: jest.fn().mockResolvedValue({ state: 'granted' }),
+  query: jest.fn(),
 };
 
 // Mock GeolocationPositionError
@@ -53,6 +53,8 @@ describe('useGeolocation', () => {
       writable: true,
       configurable: true,
     });
+
+    mockPermissions.query.mockImplementation(() => new Promise(() => undefined));
   });
 
   // ============================================================================

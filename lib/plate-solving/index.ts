@@ -11,5 +11,6 @@ export * from './image-utils';
 export * from './online-solve-types';
 export * from './online-solve-contract';
 export * from './online-solve-dispatcher';
+export * from './result-consumption';
 export * from './solve-utils';
 export * from './wcs-transform';

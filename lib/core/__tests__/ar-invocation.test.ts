@@ -29,6 +29,7 @@ describe('ar-invocation', () => {
       sensorSupported: true,
       sensorPermissionGranted: true,
       sensorCalibrationRequired: true,
+      runtimeClass: 'browser-mobile',
     });
 
     expect(seed.sensorControlEnabled).toBe(true);
@@ -37,6 +38,25 @@ describe('ar-invocation', () => {
       isPermissionGranted: true,
       status: 'calibration-required',
       calibrationRequired: true,
+    });
+  });
+
+  it('defaults desktop entry to camera-first even when orientation permissions look granted', () => {
+    const seed = deriveARInvocationSeed({
+      sensorSupported: true,
+      sensorPermissionGranted: true,
+      sensorCalibrationRequired: false,
+      runtimeClass: 'tauri-desktop',
+    });
+
+    expect(seed.sensorControlEnabled).toBe(false);
+    expect(seed.sensorRuntime).toMatchObject({
+      isSupported: false,
+      isPermissionGranted: false,
+      status: 'unsupported',
+      calibrationRequired: false,
+      source: 'none',
+      error: 'Desktop AR defaults to camera-first mode until sensor data is confirmed.',
     });
   });
 

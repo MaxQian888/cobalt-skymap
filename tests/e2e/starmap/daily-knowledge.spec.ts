@@ -270,6 +270,25 @@ test.describe('Daily Knowledge', () => {
     await expect(dialog.getByText(/curated fallback|本地策展回退/i)).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
   });
 
+  test('can browse adjacent dates and return to today', async ({ page }) => {
+    await seedStarmapState(page, { enabled: true, autoShow: false, onlineEnhancement: false });
+    await openReadyStarmap(page);
+    await openDailyKnowledgeManually(page);
+
+    const dialog = page.locator('[role="dialog"]').filter({ hasText: /daily knowledge|每日知识/i });
+    await expect(dialog).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+
+    const previousDateButton = dialog.getByRole('button', { name: /previous date|前一天/i });
+    const nextDateButton = dialog.getByRole('button', { name: /next date|后一天/i });
+    const todayButton = dialog.getByRole('button', { name: /today|回到今天/i });
+
+    await expect(todayButton).toBeDisabled();
+    await previousDateButton.click();
+    await expect(todayButton).toBeEnabled({ timeout: TEST_TIMEOUTS.medium });
+    await nextDateButton.click();
+    await expect(todayButton).toBeDisabled({ timeout: TEST_TIMEOUTS.medium });
+  });
+
   test('offline degraded mode surfaces fallback messaging', async ({ page }) => {
     await seedStarmapState(page, { enabled: true, autoShow: false, onlineEnhancement: true });
     await openReadyStarmap(page);
@@ -285,6 +304,9 @@ test.describe('Daily Knowledge', () => {
       dialog.getByText(
         /NASA APOD was skipped because the app is offline|当前处于离线状态，已跳过 NASA APOD/i
       )
+    ).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
+    await expect(
+      dialog.getByText(/source status for|来源状态/i)
     ).toBeVisible({ timeout: TEST_TIMEOUTS.medium });
   });
 });

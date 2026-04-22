@@ -11,8 +11,7 @@ test.describe('Search Functionality', () => {
   test.beforeEach(async ({ page }) => {
     // Initialize page object for potential future use
     new StarmapPage(page);
-    // Use skipWasmWait for faster tests - search UI is available before WASM loads
-    await waitForStarmapReady(page, { skipWasmWait: true });
+    await waitForStarmapReady(page);
   });
 
   test.describe('Search Input', () => {
@@ -288,6 +287,7 @@ test.describe('Search Functionality', () => {
     test('@smoke @regression should return selectable M31 results with stable selectors', async ({ page }) => {
       const searchInput = await ensureSearchPanelOpen(page);
       await searchInput.fill(TEST_OBJECTS.M31.name);
+      await page.keyboard.press('Enter');
 
       const options = await waitForSearchResults(page, 1);
       await expect(page.locator('[data-testid="starmap-search-results"]').first()).toBeVisible();
@@ -295,13 +295,13 @@ test.describe('Search Functionality', () => {
     });
 
     test('@regression should select a search result and persist it to recent searches', async ({ page }) => {
-      await waitForStarmapReady(page);
       const searchInput = await ensureSearchPanelOpen(page);
       await searchInput.fill(TEST_OBJECTS.M31.name);
+      await page.keyboard.press('Enter');
 
       const options = await waitForSearchResults(page, 1);
       const firstOption = options.first();
-      await firstOption.locator('button').first().click();
+      await firstOption.click();
 
       await expect
         .poll(async () => page.evaluate(() => {

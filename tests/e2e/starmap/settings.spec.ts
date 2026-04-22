@@ -279,20 +279,23 @@ test.describe('Settings Panel', () => {
         await settingsButton.click();
         await page.waitForTimeout(500);
 
+        const settingsPanel = page.locator('[data-testid="settings-panel"]').first();
+
         const connectionSection = page.getByText(/connection|连接/i).first();
         if (await connectionSection.isVisible().catch(() => false)) {
           await connectionSection.click();
           await page.waitForTimeout(200);
         }
 
-        const ipInput = page.locator('input').first();
+        const ipInput = settingsPanel.getByRole('textbox').first();
         if (await ipInput.isVisible().catch(() => false)) {
           const originalValue = await ipInput.inputValue();
           await ipInput.fill('10.9.8.7');
           await ipInput.blur();
 
-          const cancelButton = page.getByRole('button', { name: /cancel|取消/i }).first();
+          const cancelButton = settingsPanel.getByRole('button', { name: /cancel|取消/i }).first();
           if (await cancelButton.isVisible().catch(() => false)) {
+            await expect(cancelButton).toBeEnabled();
             await cancelButton.click();
             await expect(ipInput).toHaveValue(originalValue);
           }

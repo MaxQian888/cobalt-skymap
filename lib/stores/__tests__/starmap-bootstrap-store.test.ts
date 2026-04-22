@@ -23,16 +23,16 @@ describe('useStarmapBootstrapStore', () => {
     expect(state.resources.cache_index.state).toBe('pending');
   });
 
-  it('transitions to ready when all critical resources are ready', () => {
+  it('transitions to ready when only blocking-critical resources are ready', () => {
     const store = useStarmapBootstrapStore.getState();
     store.beginSession();
     store.markResourceReady('engine_core');
     store.markResourceReady('settings_snapshot');
-    store.markResourceReady('cache_index');
 
     const state = useStarmapBootstrapStore.getState();
     expect(state.outcome).toBe('ready');
     expect(state.inFlight).toBe(false);
+    expect(state.resources.cache_index.state).toBe('pending');
   });
 
   it('transitions to failed when a critical resource fails before any critical resource is ready', () => {
@@ -63,12 +63,24 @@ describe('useStarmapBootstrapStore', () => {
     store.beginSession();
     store.markResourceReady('engine_core');
     store.markResourceReady('settings_snapshot');
-    store.markResourceReady('cache_index');
     store.markResourceFailed('online_metadata', 'provider_timeout');
 
     const state = useStarmapBootstrapStore.getState();
     expect(state.outcome).toBe('degraded');
     expect(state.resources.online_metadata.state).toBe('failed');
+    expect(state.inFlight).toBe(false);
+  });
+
+  it('treats cache-index failure as deferred degradation instead of blocking readiness', () => {
+    const store = useStarmapBootstrapStore.getState();
+    store.beginSession();
+    store.markResourceReady('engine_core');
+    store.markResourceReady('settings_snapshot');
+    store.markResourceFailed('cache_index', 'cache_index_unsupported');
+
+    const state = useStarmapBootstrapStore.getState();
+    expect(state.outcome).toBe('degraded');
+    expect(state.resources.cache_index.state).toBe('failed');
     expect(state.inFlight).toBe(false);
   });
 
@@ -89,5 +101,35 @@ describe('useStarmapBootstrapStore', () => {
     expect(state.resources.engine_core.state).toBe('pending');
     expect(retryDiagnostic?.attempt).toBe(2);
     expect(retryDiagnostic?.reason).toBe('script_timeout');
+  });
+
+  it('ignores stale session updates when a newer session is active', () => {
+    const store = useStarmapBootstrapStore.getState();
+    const firstSession = store.beginSession();
+
+    store.requestRecovery();
+    const secondSession = store.beginSession();
+    store.markResourceFailed('cache_index', 'stale_cache_failure', { sessionId: firstSession });
+
+    const state = useStarmapBootstrapStore.getState();
+    expect(secondSession).not.toBe(firstSession);
+    expect(state.resources.cache_index.state).toBe('pending');
+    expect(state.diagnostics.some((item) => item.reason === 'stale_cache_failure')).toBe(false);
+  });
+
+  it('records warm-path reuse when a new session starts after a ready startup', () => {
+    const store = useStarmapBootstrapStore.getState();
+    store.beginSession();
+    store.markResourceReady('engine_core');
+    store.markResourceReady('settings_snapshot');
+
+    const nextSession = store.beginSession();
+    const state = useStarmapBootstrapStore.getState();
+    const warmReuseDiagnostic = state.diagnostics.find(
+      (item) => item.sessionId === nextSession && item.event === 'warm_path_reused'
+    );
+
+    expect(state.warmStartUsed).toBe(true);
+    expect(warmReuseDiagnostic?.reason).toBe('previous_ready_session');
   });
 });

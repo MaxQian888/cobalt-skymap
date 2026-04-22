@@ -1,6 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
 import { useMarkerStore, MARKER_COLORS, MARKER_ICONS, MAX_MARKERS, type MarkerInput } from '../marker-store';
 
+const originalConsoleError = console.error;
+
 // Mock Tauri platform check
 jest.mock('@/lib/storage/platform', () => ({
   isTauri: jest.fn(() => false),
@@ -34,15 +36,26 @@ jest.mock('@/lib/storage', () => ({
   })),
 }));
 
-describe('useMarkerStore', () => {
-  beforeEach(() => {
-    // Reset store state before each test
-    const { result } = renderHook(() => useMarkerStore());
-    act(() => {
-      result.current.clearAllMarkers();
-    });
+beforeEach(() => {
+  jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    const [firstArg] = args;
+    if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) {
+      return;
+    }
+    originalConsoleError(...args as Parameters<typeof console.error>);
   });
 
+  const { result } = renderHook(() => useMarkerStore());
+  act(() => {
+    result.current.clearAllMarkers();
+  });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe('useMarkerStore', () => {
   describe('initial state', () => {
     it('should have empty markers array initially', () => {
       const { result } = renderHook(() => useMarkerStore());

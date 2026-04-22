@@ -1,6 +1,10 @@
 import {
   buildTargetDisplayModel,
   formatAngle,
+  getCalculationSourceLabelKey,
+  getCalculationStateLabelKey,
+  getSelectionFallbackLabelKey,
+  getSelectionSourceLabelKey,
   formatMagnitude,
   formatMoonDistance,
   formatTargetTimestamp,
@@ -127,6 +131,63 @@ describe('target-display-model', () => {
     it('returns null when no selected object is provided', () => {
       expect(buildTargetDisplayModel({ selectedObject: null })).toBeNull();
     });
+
+    it('builds selection metadata for coordinate fallback selections without astro data', () => {
+      const model = buildTargetDisplayModel({
+        selectedObject: {
+          ...mockSelectedObject,
+          names: ['00h 42m 44s +41° 16\' 09"'],
+          selectionSource: 'coordinate',
+          selectionFallback: 'coordinate_fallback',
+          sourceCatalog: null,
+          selectionTimestamp: '2026-03-09T20:10:12Z',
+        },
+      });
+
+      expect(model?.sections.selectionMetadata).toEqual(
+        expect.objectContaining({
+          selectionSource: 'coordinate',
+          selectionFallback: 'coordinate_fallback',
+        })
+      );
+      expect(model?.sections.advancedMetadata).toBeNull();
+    });
+
+    it('preserves enriched selection metadata when astro data is available', () => {
+      const model = buildTargetDisplayModel({
+        selectedObject: {
+          ...mockSelectedObject,
+          selectionSource: 'enriched',
+          selectionFallback: 'resolved',
+          sourceCatalog: 'SIMBAD',
+          selectionTimestamp: '2026-03-09T20:10:12Z',
+        },
+        targetData: {
+          altitude: 41.3,
+          azimuth: 182.1,
+          moonDistance: 62.4,
+          visibility: mockVisibility,
+          feasibility: mockFeasibility,
+          frame: 'OBSERVED',
+          timeScale: 'UT1',
+          qualityFlag: 'precise',
+          dataFreshness: 'fresh',
+          updatedAt: '2026-03-09T20:10:12Z',
+          calculationSource: 'calculation',
+          calculationDegraded: false,
+          calculationTimestamp: '2026-03-09T20:10:12Z',
+          riskHints: [],
+        },
+      });
+
+      expect(model?.sections.selectionMetadata).toEqual(
+        expect.objectContaining({
+          selectionSource: 'enriched',
+          selectionFallback: 'resolved',
+          sourceCatalog: 'SIMBAD',
+        })
+      );
+    });
   });
 
   describe('calculation quality state', () => {
@@ -138,6 +199,27 @@ describe('target-display-model', () => {
 
     it('marks non-fallback data as normal', () => {
       expect(getCalculationQualityState('precise', 'fresh')).toBe('normal');
+    });
+  });
+
+  describe('presentation semantics helpers', () => {
+    it('maps calculation state to localization keys', () => {
+      expect(getCalculationStateLabelKey('normal')).toBe('objectDetail.calculationState.normal');
+      expect(getCalculationStateLabelKey('degraded')).toBe('objectDetail.calculationState.degraded');
+    });
+
+    it('maps calculation source to localization keys', () => {
+      expect(getCalculationSourceLabelKey('tauri')).toBe('objectDetail.calculationSource.tauri');
+      expect(getCalculationSourceLabelKey('engine')).toBe('objectDetail.calculationSource.engine');
+      expect(getCalculationSourceLabelKey('fallback')).toBe('objectDetail.calculationSource.fallback');
+      expect(getCalculationSourceLabelKey('calculation')).toBe('objectDetail.calculationSource.calculation');
+    });
+
+    it('maps selection source and fallback states to localization keys', () => {
+      expect(getSelectionSourceLabelKey('coordinate')).toBe('objectDetail.selectionSource.coordinate');
+      expect(getSelectionSourceLabelKey('enriched')).toBe('objectDetail.selectionSource.enriched');
+      expect(getSelectionFallbackLabelKey('coordinate_fallback')).toBe('objectDetail.selectionFallback.coordinate_fallback');
+      expect(getSelectionFallbackLabelKey('resolved')).toBe('objectDetail.selectionFallback.resolved');
     });
   });
 });

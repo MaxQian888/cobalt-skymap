@@ -5,6 +5,8 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { CoordinateTab } from '../coordinate-tab';
 
+const originalConsoleError = console.error;
+
 const mockRunCalculatorCoordinates = jest.fn();
 const mockAltAzToRaDecAtTime = jest.fn();
 const mockGalacticToRaDec = jest.fn();
@@ -92,10 +94,21 @@ function createCoordinateResult() {
 describe('CoordinateTab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const [firstArg] = args;
+      if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) {
+        return;
+      }
+      originalConsoleError(...args as Parameters<typeof console.error>);
+    });
     mockRunCalculatorCoordinates.mockResolvedValue(createCoordinateResult());
     mockAltAzToRaDecAtTime.mockReturnValue({ ra: 12.5, dec: 34.5 });
     mockGalacticToRaDec.mockReturnValue({ ra: 22.5, dec: 11.5 });
     mockEclipticToRaDec.mockReturnValue({ ra: 44.5, dec: -12.5 });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('runs the coordinate calculation and renders result badges', async () => {

@@ -138,6 +138,7 @@ import { useLocations, tauriApi } from '@/lib/tauri';
 import { acquireCurrentLocation } from '@/lib/services/location-acquisition';
 import { geocodingService } from '@/lib/services/geocoding-service';
 import { useWebLocationStore } from '@/lib/stores/web-location-store';
+import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 
 const mockUseLocations = useLocations as jest.Mock;
 const mockTauriApi = tauriApi as jest.Mocked<typeof tauriApi>;
@@ -394,6 +395,7 @@ describe('LocationManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     useWebLocationStore.setState({ locations: [] });
+    useMapInteractionStore.getState().reset();
     mockResolveDraftMetadata.mockResolvedValue({
       requestId: 1,
       stale: false,
@@ -1396,6 +1398,13 @@ describe('LocationManager', () => {
       expect(screen.getByDisplayValue('Tokyo, Japan')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Asia/Tokyo')).toBeInTheDocument();
       expect(screen.getAllByText(/locations\.metadataDerived|Derived/).length).toBeGreaterThan(0);
+      expect(useMapInteractionStore.getState().siteContext).toMatchObject({
+        kind: 'draft',
+        sourceSurface: 'location-manager',
+        coordinates: { latitude: 35.6762, longitude: 139.6503 },
+        summaryStatus: 'ready',
+        displayName: 'Tokyo, Japan',
+      });
     });
 
     it('shows unresolved metadata guidance and allows retry without overwriting notes', async () => {
@@ -1468,6 +1477,12 @@ describe('LocationManager', () => {
       });
 
       expect(notesInput.value).toBe('Keep this note');
+      expect(useMapInteractionStore.getState().siteContext).toMatchObject({
+        kind: 'draft',
+        sourceSurface: 'location-manager',
+        summaryStatus: 'ready',
+        actions: ['save-location-draft', 'discard-location-draft'],
+      });
     });
 
     it('ignores late metadata responses after the add form is cancelled', async () => {

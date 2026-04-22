@@ -11,10 +11,14 @@ import {
   Eye,
   Copy,
   Check,
+  Sparkles,
+  ScanSearch,
+  TriangleAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
   TooltipContent,
@@ -30,7 +34,14 @@ export type { SolveResultCardProps } from '@/types/starmap/plate-solving';
 // Component
 // ============================================================================
 
-export function SolveResultCard({ result, onGoTo }: SolveResultCardProps) {
+export function SolveResultCard({
+  result,
+  onGoTo,
+  consumption,
+  onSelectObject,
+  onNavigateAnnotation,
+  onCreateMarkerFromAnnotation,
+}: SolveResultCardProps) {
   const t = useTranslations();
   const [copied, setCopied] = useState(false);
   const parsedError = (() => {
@@ -131,6 +142,120 @@ export function SolveResultCard({ result, onGoTo }: SolveResultCardProps) {
                 )}
               </Tooltip>
             </div>
+
+            {consumption && (
+              <div className="mt-4 space-y-3 rounded-lg border border-border/60 bg-background/40 p-3">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">
+                    <span>{t('plateSolving.annotationCount') || 'Annotations'}</span>
+                    <span className="ml-1">{consumption.artifacts.annotationCount}</span>
+                  </Badge>
+                  <Badge variant="outline">
+                    <span>{t('plateSolving.detectedObjects') || 'Detected Objects'}</span>
+                    <span className="ml-1">{consumption.objects.count}</span>
+                  </Badge>
+                  {consumption.artifacts.wcsState === 'missing' && (
+                    <Badge variant="outline" className="border-amber-500/40 text-amber-300">
+                      {t('plateSolving.wcsMissing') || 'WCS missing'}
+                    </Badge>
+                  )}
+                </div>
+
+                {consumption.objects.previewNames.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <ScanSearch className="h-3.5 w-3.5" />
+                      <span>{t('plateSolving.detectedObjects') || 'Detected Objects'}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {consumption.objects.previewNames.map((name) => (
+                        onSelectObject ? (
+                          <Button
+                            key={name}
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="h-7 rounded-full px-3 text-xs"
+                            onClick={() => onSelectObject(name)}
+                          >
+                            {name}
+                          </Button>
+                        ) : (
+                          <Badge key={name} variant="secondary">{name}</Badge>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {consumption.analysis.available && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>{t('plateSolving.analysisSummary') || 'Analysis Summary'}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>{t('plateSolving.analysisStars') || 'Stars'}: {consumption.analysis.starCount}</div>
+                      <div>{t('plateSolving.analysisMedianHfd') || 'Median HFD'}: {consumption.analysis.medianHfd ?? '--'}</div>
+                    </div>
+                  </div>
+                )}
+
+                {consumption.annotations.some((annotation) => annotation.actionability.disabledReason) && (
+                  <div className="space-y-1">
+                    {consumption.annotations
+                      .filter((annotation) => annotation.actionability.disabledReason)
+                      .map((annotation) => (
+                        <div
+                          key={`${annotation.names.join('-')}-${annotation.annotationType}`}
+                          className="flex items-center gap-2 text-xs text-amber-300"
+                        >
+                          <TriangleAlert className="h-3.5 w-3.5" />
+                          <span>
+                            {t(`plateSolving.annotationActionDisabled.${annotation.actionability.disabledReason}`) || annotation.actionability.disabledReason}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+
+                {consumption.annotations.some((annotation) => annotation.actionability.canNavigate && annotation.derivedCoordinates) && (
+                  <div className="space-y-2">
+                    {consumption.annotations
+                      .filter((annotation) => annotation.actionability.canNavigate && annotation.derivedCoordinates)
+                      .map((annotation) => (
+                        <div
+                          key={`${annotation.names.join('-')}-${annotation.annotationType}-actions`}
+                          className="flex flex-wrap gap-2"
+                        >
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => onNavigateAnnotation?.(annotation.derivedCoordinates!)}
+                          >
+                            {t('plateSolving.goToAnnotation') || 'Go to Annotation'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={() => onCreateMarkerFromAnnotation?.({
+                              ra: annotation.derivedCoordinates!.ra,
+                              dec: annotation.derivedCoordinates!.dec,
+                              name: annotation.names[0] ?? annotation.annotationType,
+                            })}
+                          >
+                            {t('plateSolving.addAnnotationMarker') || 'Add Marker'}
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

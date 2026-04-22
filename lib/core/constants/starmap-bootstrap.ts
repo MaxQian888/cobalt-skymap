@@ -19,6 +19,7 @@ export interface StarmapBootstrapResourceDefinition {
   description: string;
   tier: StarmapDataTier;
   critical: boolean;
+  blocking: boolean;
   fallbackOrder: number;
 }
 
@@ -29,6 +30,7 @@ export const STARMAP_BOOTSTRAP_RESOURCES: readonly StarmapBootstrapResourceDefin
     description: 'Stellarium engine script and WASM runtime initialization.',
     tier: 'core',
     critical: true,
+    blocking: true,
     fallbackOrder: 0,
   },
   {
@@ -37,14 +39,16 @@ export const STARMAP_BOOTSTRAP_RESOURCES: readonly StarmapBootstrapResourceDefin
     description: 'Persisted starmap settings hydration before first interactive render.',
     tier: 'core',
     critical: true,
+    blocking: true,
     fallbackOrder: 1,
   },
   {
     id: 'cache_index',
     label: 'Cache Index',
-    description: 'Unified cache migration/index readiness for startup fetch interception.',
+    description: 'Deferred cache migration/index readiness for warm-path startup reuse.',
     tier: 'core',
-    critical: true,
+    critical: false,
+    blocking: false,
     fallbackOrder: 2,
   },
   {
@@ -53,6 +57,7 @@ export const STARMAP_BOOTSTRAP_RESOURCES: readonly StarmapBootstrapResourceDefin
     description: 'Optional online resources that can be populated after first render.',
     tier: 'enrichment',
     critical: false,
+    blocking: false,
     fallbackOrder: 3,
   },
 ] as const;

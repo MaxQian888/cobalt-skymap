@@ -77,10 +77,11 @@ jest.mock('../catalog-data', () => ({
 describe('useSkyAtlasStore', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    const { result } = renderHook(() => useSkyAtlasStore());
     act(() => {
-      result.current.resetFilters();
-      result.current.selectObject(null);
+      const store = useSkyAtlasStore.getState();
+      store.cancelSearch();
+      store.resetFilters();
+      store.selectObject(null);
     });
   });
 
@@ -217,11 +218,13 @@ describe('useSkyAtlasStore', () => {
   });
 
   describe('setPage', () => {
-    it('should update current page', () => {
+    it('should update current page', async () => {
       const { result } = renderHook(() => useSkyAtlasStore());
 
-      act(() => {
+      await act(async () => {
         result.current.setPage(2);
+        await Promise.resolve();
+        await Promise.resolve();
       });
 
       expect(result.current.currentPage).toBe(2);

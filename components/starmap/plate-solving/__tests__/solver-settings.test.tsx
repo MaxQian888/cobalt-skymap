@@ -119,6 +119,10 @@ const mockValidateSolverPath = jest.requireMock('@/lib/tauri/plate-solver-api').
 
 describe('SolverSettings', () => {
   beforeEach(() => {
+    const detectSolvers = jest.fn().mockResolvedValue(undefined);
+    const loadConfig = jest.fn().mockResolvedValue(undefined);
+    const saveConfig = jest.fn().mockResolvedValue(undefined);
+
     // Reset store state
     usePlateSolverStore.setState({
       detectedSolvers: [
@@ -193,6 +197,9 @@ describe('SolverSettings', () => {
         checkedAt: null,
         message: null,
       },
+      detectSolvers,
+      loadConfig,
+      saveConfig,
     });
     jest.clearAllMocks();
     mockTranslate.mockImplementation((key: string) => key);

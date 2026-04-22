@@ -100,13 +100,13 @@ describe('starmap-data-tier', () => {
     const readiness = deriveStarmapTierReadiness([
       { id: 'engine_core', tier: 'core', critical: true, state: 'ready' },
       { id: 'settings_snapshot', tier: 'core', critical: true, state: 'ready' },
-      { id: 'cache_index', tier: 'core', critical: true, state: 'ready' },
+      { id: 'cache_index', tier: 'core', critical: false, state: 'failed' },
       { id: 'catalog_index', tier: 'catalog', critical: false, state: 'loading' },
       { id: 'survey_index', tier: 'survey', critical: false, state: 'failed' },
       { id: 'online_metadata', tier: 'enrichment', critical: false, state: 'failed' },
     ]);
 
-    expect(readiness.core).toBe('ready');
+    expect(readiness.core).toBe('degraded');
     expect(readiness.catalog).toBe('degraded');
     expect(readiness.survey).toBe('blocked');
     expect(readiness.enrichment).toBe('blocked');

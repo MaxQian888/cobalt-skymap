@@ -39,11 +39,12 @@ import {
   DSO_TYPE_LABELS,
   CONSTELLATION_NAMES,
 } from '@/lib/catalogs';
-import type { WUTObject } from './types';
+import type { AstroCalculatorObserverContext, WUTObject } from './types';
 
 interface WUTTabProps {
   latitude: number;
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
   onSelectObject: (ra: number, dec: number) => void;
   onAddToList: (name: string, ra: number, dec: number) => void;
 }
@@ -55,7 +56,7 @@ function isHourInWindow(hour: number, startHour: number, endHour: number): boole
   return hour >= startHour || hour <= endHour;
 }
 
-export function WUTTab({ latitude, longitude, onSelectObject, onAddToList }: WUTTabProps) {
+export function WUTTab({ latitude, longitude, observerContext: _observerContext, onSelectObject, onAddToList }: WUTTabProps) {
   const t = useTranslations();
   const [objectType, setObjectType] = useState<'all' | 'galaxy' | 'nebula' | 'cluster' | 'planetary'>('all');
   const [magnitudeRange, setMagnitudeRange] = useState<[number, number]>([0, 12]);

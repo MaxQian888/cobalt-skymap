@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { TrendingUp, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Item, ItemActions, ItemContent, ItemTitle } from '@/components/ui/item';
 import {
   Tooltip,
   TooltipContent,
@@ -47,17 +48,28 @@ export function FeasibilityBadge({
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className={cn(
-            'flex items-center justify-between p-1.5 rounded text-xs',
-            getFeasibilityColor(feasibility.recommendation),
-            className,
-          )}>
-            <div className="flex items-center gap-1.5">
-              <TrendingUp className="h-3 w-3" />
-              <span className="capitalize">{t(`shotList.feasibility.${feasibility.recommendation}`)}</span>
-            </div>
-            <span className="font-mono">{feasibility.score}/100</span>
-          </div>
+          <Item
+            variant="muted"
+            size="sm"
+            className={cn(
+              'justify-between rounded-lg text-xs',
+              getFeasibilityColor(feasibility.recommendation),
+              className,
+            )}
+          >
+            <ItemContent className="min-w-0 gap-0">
+              <ItemTitle className="gap-1.5 text-xs font-medium">
+                {feasibility.recommendation === 'excellent' || feasibility.recommendation === 'good'
+                  ? <TrendingUp className="h-3 w-3" />
+                  : <AlertTriangle className="h-3 w-3" />
+                }
+                <span className="capitalize">{t(`shotList.feasibility.${feasibility.recommendation}`)}</span>
+              </ItemTitle>
+            </ItemContent>
+            <ItemActions className="font-mono text-xs">
+              <span>{feasibility.score}/100</span>
+            </ItemActions>
+          </Item>
         </TooltipTrigger>
         <TooltipContent side={tooltipSide} className="max-w-56">
           {tooltipContent}

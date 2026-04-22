@@ -29,14 +29,20 @@ function hasTourCheckpoint(
   );
 }
 
+function isOnboardingEntrySuppressed(
+  state: OnboardingEntryResolverState,
+): boolean {
+  return state.hasCompletedOnboarding || !state.showOnNextVisit;
+}
+
 export function resolveOnboardingEntrySurface(
   state: OnboardingEntryResolverState,
 ): OnboardingEntrySurface {
-  if (state.isTourActive || hasTourCheckpoint(state.resumeCheckpoint)) {
+  if (state.isTourActive) {
     return 'resume-tour';
   }
 
-  if (state.isSetupOpen || hasSetupCheckpoint(state.resumeCheckpoint)) {
+  if (state.isSetupOpen) {
     return 'setup';
   }
 
@@ -44,14 +50,23 @@ export function resolveOnboardingEntrySurface(
     return 'tour-hub';
   }
 
+  if (isOnboardingEntrySuppressed(state)) {
+    return 'idle';
+  }
+
+  if (hasTourCheckpoint(state.resumeCheckpoint)) {
+    return 'resume-tour';
+  }
+
+  if (hasSetupCheckpoint(state.resumeCheckpoint)) {
+    return 'setup';
+  }
+
   if (
     !state.hasSeenWelcome
-    && state.showOnNextVisit
-    && !state.hasCompletedOnboarding
   ) {
     return 'welcome';
   }
 
   return 'idle';
 }
-

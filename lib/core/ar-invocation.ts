@@ -1,4 +1,5 @@
 import type { ARLaunchAssistantReason } from '@/lib/core/ar-launch-assistant';
+import type { ARAdaptationRuntimeClass } from '@/lib/core/ar-adaptation';
 import type {
   ARCameraRuntimeState,
   ARRecoveryAction,
@@ -9,6 +10,7 @@ export interface ARInvocationSeedInput {
   sensorSupported: boolean;
   sensorPermissionGranted: boolean;
   sensorCalibrationRequired: boolean;
+  runtimeClass?: ARAdaptationRuntimeClass;
 }
 
 export interface ARInvocationSeed {
@@ -36,6 +38,8 @@ export interface ARCameraDiagnosticSummary {
 export function deriveARInvocationSeed(
   input: ARInvocationSeedInput,
 ): ARInvocationSeed {
+  const runtimeClass = input.runtimeClass ?? 'browser-mobile';
+
   if (!input.sensorSupported) {
     return {
       sensorControlEnabled: false,
@@ -48,6 +52,22 @@ export function deriveARInvocationSeed(
         source: 'none',
         accuracyDeg: null,
         error: 'Device orientation not supported',
+      },
+    };
+  }
+
+  if (runtimeClass !== 'browser-mobile') {
+    return {
+      sensorControlEnabled: false,
+      sensorRuntime: {
+        isSupported: false,
+        isPermissionGranted: false,
+        status: 'unsupported',
+        calibrationRequired: input.sensorCalibrationRequired,
+        degradedReason: null,
+        source: 'none',
+        accuracyDeg: null,
+        error: 'Desktop AR defaults to camera-first mode until sensor data is confirmed.',
       },
     };
   }

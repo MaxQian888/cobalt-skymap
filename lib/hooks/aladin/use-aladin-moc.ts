@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, type RefObject } from 'react';
+import { useEffect, useRef, useCallback, useState, type RefObject } from 'react';
 import type A from 'aladin-lite';
 import { setMocStyleCompat } from '@/lib/aladin/aladin-compat';
 import { useSettingsStore } from '@/lib/stores/settings-store';
@@ -73,11 +73,13 @@ export function useAladinMOC({
 
   const mocInstancesRef = useRef<Map<string, MocHandle>>(new Map());
   const aladinStaticRef = useRef<typeof A | null>(null);
+  const [staticApiReady, setStaticApiReady] = useState(false);
 
   useEffect(() => {
     if (!engineReady || skyEngine !== 'aladin') return;
     import('aladin-lite').then((m) => {
       aladinStaticRef.current = m.default;
+      setStaticApiReady(true);
     }).catch((err) => {
       logger.warn('Failed to load aladin-lite static API for MOC', err);
     });
@@ -86,13 +88,21 @@ export function useAladinMOC({
   useEffect(() => {
     const aladin = aladinRef.current;
     const AStatic = aladinStaticRef.current;
-    if (!aladin || !AStatic || !engineReady || skyEngine !== 'aladin') return;
+    if (!aladin || !AStatic || !engineReady || skyEngine !== 'aladin' || !staticApiReady) return;
 
     const active = mocInstancesRef.current;
 
     for (const layer of mocLayers) {
       const key = sourceKey(layer);
       const existing = active.get(layer.id);
+
+      if (!layer.visible) {
+        if (existing) {
+          try { existing.moc.hide(); } catch { /* ignore */ }
+          active.delete(layer.id);
+        }
+        continue;
+      }
 
       if (existing && existing.sourceKey !== key) {
         try { existing.moc.hide(); } catch { /* ignore */ }
@@ -122,6 +132,9 @@ export function useAladinMOC({
           return created;
         } catch (error) {
           logger.warn(`Failed to add MOC: ${layer.name}`, error);
+          if (layer.visible) {
+            updateMocLayer(layer.id, { visible: false });
+          }
           return null;
         }
       })();
@@ -141,7 +154,7 @@ export function useAladinMOC({
       try { handle.moc.hide(); } catch { /* ignore */ }
       active.delete(id);
     }
-  }, [aladinRef, engineReady, mocLayers, skyEngine]);
+  }, [aladinRef, engineReady, mocLayers, skyEngine, staticApiReady, updateMocLayer]);
 
   const addMOC = useCallback((url: string, name: string, color = '#3b82f6') => {
     addMocLayer({

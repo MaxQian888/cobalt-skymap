@@ -49,6 +49,7 @@ export interface CoordinateComputationInput {
   observer: ObserverLocation;
   date: Date;
   refraction?: RefractionMode;
+  contextKey?: string;
 }
 
 export interface CoordinateComputationResult {
@@ -88,6 +89,7 @@ export interface EphemerisRequest {
   steps: number;
   refraction?: RefractionMode;
   customCoordinate?: EquatorialCoordinate;
+  contextKey?: string;
 }
 
 export interface EphemerisResponse {
@@ -102,6 +104,7 @@ export interface RiseTransitSetRequest {
   date: Date;
   minAltitude?: number;
   customCoordinate?: EquatorialCoordinate;
+  contextKey?: string;
 }
 
 export interface RiseTransitSetResponse {
@@ -138,6 +141,7 @@ export interface PhenomenaRequest {
   endDate: Date;
   observer: ObserverLocation;
   includeMinor?: boolean;
+  contextKey?: string;
 }
 
 export interface PhenomenaResponse {
@@ -149,6 +153,7 @@ export interface AlmanacRequest {
   date: Date;
   observer: ObserverLocation;
   refraction?: RefractionMode;
+  contextKey?: string;
 }
 
 export interface AlmanacResponse {

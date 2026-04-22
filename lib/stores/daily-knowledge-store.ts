@@ -29,6 +29,13 @@ export function getLocalDateKey(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+function shiftDateKey(dateKey: string, offsetDays: number): string {
+  const [year, month, day] = dateKey.split('-').map((segment) => Number.parseInt(segment, 10));
+  const nextDate = new Date(year, (month || 1) - 1, day || 1);
+  nextDate.setDate(nextDate.getDate() + offsetDays);
+  return getLocalDateKey(nextDate);
+}
+
 const DEFAULT_FILTERS: DailyKnowledgeFilters = {
   query: '',
   category: 'all',
@@ -48,6 +55,7 @@ interface DailyKnowledgePersistedState {
 
 interface DailyKnowledgeState extends DailyKnowledgePersistedState {
   open: boolean;
+  activeDateKey: string;
   loading: boolean;
   error: string | null;
   currentItem: DailyKnowledgeItem | null;
@@ -63,6 +71,9 @@ interface DailyKnowledgeState extends DailyKnowledgePersistedState {
   loadDaily: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
   loadByDate: (dateKey: string, entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
   refreshCurrentDate: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
+  browsePreviousDate: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
+  browseNextDate: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
+  goToToday: (entry?: DailyKnowledgeHistoryEntry) => Promise<void>;
   next: () => void;
   prev: () => void;
   random: () => void;
@@ -107,6 +118,7 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
       viewMode: isMobile() ? 'feed' : 'pager',
       wheelPagingEnabled: false,
       open: false,
+      activeDateKey: getLocalDateKey(),
       loading: false,
       error: null,
       currentItem: null,
@@ -121,12 +133,13 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
         if (!useSettingsStore.getState().preferences.dailyKnowledgeEnabled) return;
         set({ open: true });
         const state = get();
-        const today = getLocalDateKey();
-        const shouldRefreshForToday =
-          state.items.length === 0 || state.items[0]?.dateKey !== today;
+        const activeDateKey =
+          state.activeDateKey ?? state.currentItem?.dateKey ?? state.items[0]?.dateKey ?? getLocalDateKey();
+        const shouldRefreshForActiveDate =
+          state.items.length === 0 || state.items[0]?.dateKey !== activeDateKey;
 
-        if (shouldRefreshForToday) {
-          await get().loadDaily(entry);
+        if (shouldRefreshForActiveDate) {
+          await get().loadByDate(activeDateKey, entry);
         } else if (state.currentItem) {
           const current = state.currentItem;
           get().recordHistory(current.id, entry, current.dateKey);
@@ -142,8 +155,20 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
 
       refreshCurrentDate: async (entry = 'manual') => {
         const activeDateKey =
-          get().currentItem?.dateKey ?? get().items[0]?.dateKey ?? getLocalDateKey();
+          get().activeDateKey ?? get().currentItem?.dateKey ?? get().items[0]?.dateKey ?? getLocalDateKey();
         await get().loadByDate(activeDateKey, entry);
+      },
+
+      browsePreviousDate: async (entry = 'manual') => {
+        await get().loadByDate(shiftDateKey(get().activeDateKey, -1), entry);
+      },
+
+      browseNextDate: async (entry = 'manual') => {
+        await get().loadByDate(shiftDateKey(get().activeDateKey, 1), entry);
+      },
+
+      goToToday: async (entry = 'manual') => {
+        await get().loadByDate(getLocalDateKey(), entry);
       },
 
       loadByDate: async (dateKey, entry = 'manual') => {
@@ -155,7 +180,7 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
         );
         const previousCurrentItemId =
           get().currentItem?.dateKey === dateKey ? get().currentItem?.id : null;
-        set({ loading: true, error: null });
+        set({ loading: true, error: null, activeDateKey: dateKey });
         try {
           const result = await getDailyKnowledge(dateKey, locale, {
             locale,
@@ -163,10 +188,10 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
             recentHistoryItemIds,
             repeatWindowDays: DAILY_KNOWLEDGE_REPEAT_WINDOW_DAYS,
           });
-          const nextCurrentItem =
-            (previousCurrentItemId
-              ? result.items.find((item) => item.id === previousCurrentItemId) ?? null
-              : null) ?? result.selected;
+          const previousCurrentItem = previousCurrentItemId
+            ? result.items.find((item) => item.id === previousCurrentItemId)
+            : undefined;
+          const nextCurrentItem = previousCurrentItem ?? result.selected;
           set({
             loading: false,
             items: result.items,
@@ -175,6 +200,7 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
             usedCuratedFallback: result.usedCuratedFallback,
             fallbackReason: result.fallbackReason,
             resolutionMode: result.resolutionMode,
+            activeDateKey: result.requestedDateKey,
             lastSeenItemId: nextCurrentItem.id,
             lastShownDate: entry === 'auto' ? dateKey : get().lastShownDate,
           });
@@ -187,6 +213,7 @@ export const useDailyKnowledgeStore = create<DailyKnowledgeState>()(
             usedCuratedFallback: false,
             fallbackReason: null,
             resolutionMode: get().resolutionMode,
+            activeDateKey: dateKey,
           });
         }
       },

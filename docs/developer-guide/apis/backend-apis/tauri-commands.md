@@ -927,7 +927,7 @@ const imported = await targetListApi.importTargets('/path/to/bookmarks.json');
 
 - `export_targets`, `import_targets`
 
-**总计: 130+ 个 Tauri 命令**
+**总计: 150+ 个 Tauri 命令**
 
 ## 应用控制 API
 

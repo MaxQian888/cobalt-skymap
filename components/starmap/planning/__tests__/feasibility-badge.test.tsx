@@ -16,6 +16,21 @@ jest.mock('@/components/ui/badge', () => ({
   ),
 }));
 
+jest.mock('@/components/ui/item', () => ({
+  Item: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
+    <div data-testid="item" data-slot="item" className={className}>{children}</div>
+  ),
+  ItemContent: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
+    <div data-testid="item-content" data-slot="item-content" className={className}>{children}</div>
+  ),
+  ItemTitle: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
+    <div data-testid="item-title" data-slot="item-title" className={className}>{children}</div>
+  ),
+  ItemActions: ({ children, className }: React.PropsWithChildren<{ className?: string }>) => (
+    <div data-testid="item-actions" data-slot="item-actions" className={className}>{children}</div>
+  ),
+}));
+
 jest.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
   TooltipTrigger: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
@@ -48,6 +63,11 @@ describe('FeasibilityBadge', () => {
   it('renders inline variant', () => {
     render(<FeasibilityBadge feasibility={mockFeasibility} variant="inline" />);
     expect(screen.getByText('85/100')).toBeInTheDocument();
+  });
+
+  it('renders inline variant with shadcn item surface', () => {
+    render(<FeasibilityBadge feasibility={mockFeasibility} variant="inline" />);
+    expect(screen.getByTestId('item')).toHaveAttribute('data-slot', 'item');
   });
 
   it('displays score details in tooltip', () => {

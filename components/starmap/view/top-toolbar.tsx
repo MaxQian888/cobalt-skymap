@@ -74,6 +74,7 @@ export const TopToolbar = memo(function TopToolbar({
   onSetFov,
   onNavigate,
   onGoToCoordinates,
+  onSelectObject,
 }: TopToolbarProps) {
   const t = useTranslations();
   const { isTauriEnv, shell, handleMaximize, handleStartWindowDrag } = useWindowControls();
@@ -254,7 +255,7 @@ export const TopToolbar = memo(function TopToolbar({
             {/* Instruments & Analysis Group */}
             <ToolbarGroup gap="none" className="p-0.5">
               <div data-tour-id="plate-solver">
-                <PlateSolverUnified onGoToCoordinates={onGoToCoordinates} />
+                <PlateSolverUnified onGoToCoordinates={onGoToCoordinates} onSelectObject={onSelectObject} />
               </div>
               <div data-tour-id="ocular">
                 <OcularSimulator onApplyFov={onSetFov} currentFov={currentFov} />

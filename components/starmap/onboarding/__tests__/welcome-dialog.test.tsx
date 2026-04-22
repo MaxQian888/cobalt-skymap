@@ -196,6 +196,28 @@ describe('WelcomeDialog', () => {
     expect(useOnboardingStore.getState().hasSeenWelcome).toBe(true);
   });
 
+  it('should not reopen after skipping for now until onboarding is explicitly restarted', async () => {
+    const { rerender } = render(<WelcomeDialog />);
+
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Skip for now')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Skip for now'));
+
+    rerender(<WelcomeDialog />);
+
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+
+    expect(screen.queryByText('Welcome to SkyMap')).not.toBeInTheDocument();
+  });
+
   it('should handle dont show again checkbox', async () => {
     render(<WelcomeDialog />);
     

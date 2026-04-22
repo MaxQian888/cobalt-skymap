@@ -8,7 +8,19 @@ import { SolarSystemTab } from '../solar-system-tab';
 const mockRunCalculatorEphemerisBatch = jest.fn();
 const mockRunCalculatorRiseTransitSetBatch = jest.fn();
 const mockSummarizeCalculatorMeta = jest.fn();
+const mockFetchSmallBodyEphemeris = jest.fn();
+const mockCopyTextWithFeedback = jest.fn();
+const mockAddTarget = jest.fn();
+const mockCreateList = jest.fn(() => 'list-1');
+const mockSetActiveList = jest.fn();
+const mockAddEntryToList = jest.fn((listId: string, target: Record<string, unknown>) => ({
+  id: 'entry-1',
+  listId,
+  ...target,
+}));
+const mockLaunchPlannerWithDraftSeed = jest.fn();
 const translate = (key: string) => key;
+const originalConsoleError = console.error;
 
 jest.mock('next-intl', () => ({
   useTranslations: () => translate,
@@ -18,6 +30,29 @@ jest.mock('../orchestrator', () => ({
   runCalculatorEphemerisBatch: (...args: unknown[]) => mockRunCalculatorEphemerisBatch(...args),
   runCalculatorRiseTransitSetBatch: (...args: unknown[]) => mockRunCalculatorRiseTransitSetBatch(...args),
   summarizeCalculatorMeta: (...args: unknown[]) => mockSummarizeCalculatorMeta(...args),
+}));
+
+jest.mock('../small-body-adapter', () => ({
+  fetchSmallBodyEphemeris: (...args: unknown[]) => mockFetchSmallBodyEphemeris(...args),
+}));
+
+jest.mock('@/lib/utils/clipboard-feedback', () => ({
+  copyTextWithFeedback: (...args: unknown[]) => mockCopyTextWithFeedback(...args),
+}));
+
+jest.mock('@/lib/stores/target-list-store', () => ({
+  useTargetListStore: (selector: (state: unknown) => unknown) => selector({
+    addTarget: mockAddTarget,
+    createList: mockCreateList,
+    setActiveList: mockSetActiveList,
+    addEntryToList: mockAddEntryToList,
+  }),
+}));
+
+jest.mock('@/lib/stores/planning-ui-store', () => ({
+  usePlanningUiStore: (selector: (state: unknown) => unknown) => selector({
+    launchPlannerWithDraftSeed: mockLaunchPlannerWithDraftSeed,
+  }),
 }));
 
 jest.mock('@/components/ui/input', () => ({
@@ -39,6 +74,18 @@ jest.mock('@/components/ui/label', () => ({
 jest.mock('@/components/ui/badge', () => ({
   Badge: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
     <span {...props}>{children}</span>
+  ),
+}));
+
+jest.mock('@/components/ui/button', () => ({
+  Button: ({
+    children,
+    onClick,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }) => (
+    <button type="button" onClick={onClick} {...props}>
+      {children}
+    </button>
   ),
 }));
 
@@ -126,6 +173,18 @@ function createRtsRow() {
 describe('SolarSystemTab', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const [firstArg] = args;
+      if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) {
+        return;
+      }
+      if (String(firstArg).includes('Not implemented: navigation')) {
+        return;
+      }
+      originalConsoleError(...args as Parameters<typeof console.error>);
+    });
+    URL.createObjectURL = jest.fn(() => 'blob:solar-system-export');
+    URL.revokeObjectURL = jest.fn();
     mockRunCalculatorEphemerisBatch.mockImplementation((requests: Array<{ body: string }>) =>
       Promise.resolve(requests.map((request) => createEphemerisRow(request.body))),
     );
@@ -141,6 +200,26 @@ describe('SolarSystemTab', () => {
       warningsCount: 0,
       latestComputedAt: '2025-01-01T00:05:00.000Z',
     }));
+    mockFetchSmallBodyEphemeris.mockResolvedValue({
+      points: [{
+        date: new Date('2025-01-01T00:00:00.000Z'),
+        ra: 210,
+        dec: -5,
+        altitude: 15,
+        azimuth: 220,
+        magnitude: 14.2,
+      }],
+      meta: {
+        source: 'horizons',
+        degraded: false,
+        warnings: [],
+        resolvedName: '1P/Halley',
+      },
+    });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('loads solar system rows and shows meta/count badges', async () => {
@@ -197,6 +276,51 @@ describe('SolarSystemTab', () => {
 
     expect(onSharedDateChange).toHaveBeenCalledWith('2025-07-01');
     expect(onSharedTimeChange).toHaveBeenCalledWith('21:45');
+  });
+
+  it('passes observer context keys into batch requests', async () => {
+    render(
+      <SolarSystemTab
+        latitude={39.9}
+        longitude={116.4}
+        observerContext={{
+          locationName: 'Mountain Base',
+          latitude: 39.9,
+          longitude: 116.4,
+          elevation: 1250,
+          timezone: 'Asia/Shanghai',
+          sharedDate: '2025-01-01',
+          sharedTime: '22:00',
+          constraints: { minAltitude: 15, moonInterference: 'moderate' },
+          source: 'saved-location',
+          contextKey: 'site-a',
+        }}
+      />,
+    );
+
+    await screen.findByText('Sun');
+
+    const ephemerisRequests = mockRunCalculatorEphemerisBatch.mock.calls.at(-1)?.[0] as Array<{ contextKey?: string }>;
+    const rtsRequests = mockRunCalculatorRiseTransitSetBatch.mock.calls.at(-1)?.[0] as Array<{ contextKey?: string }>;
+
+    expect(ephemerisRequests.every((item) => item.contextKey === 'site-a')).toBe(true);
+    expect(rtsRequests.every((item) => item.contextKey === 'site-a')).toBe(true);
+  });
+
+  it('appends a small-body spotlight row when a minor-object query is provided', async () => {
+    render(<SolarSystemTab latitude={39.9} longitude={116.4} />);
+
+    fireEvent.change(screen.getByLabelText('astroCalc.minorObjectQuery'), {
+      target: { value: '1P/Halley' },
+    });
+
+    await waitFor(() => {
+      expect(mockFetchSmallBodyEphemeris).toHaveBeenCalledWith(expect.objectContaining({
+        query: '1P/Halley',
+      }));
+    });
+
+    expect(await screen.findByText('1P/Halley')).toBeInTheDocument();
   });
 
   it('renders no-data state when the batch responses are empty', async () => {
@@ -262,5 +386,76 @@ describe('SolarSystemTab', () => {
     expect(screen.getAllByText('--').length).toBeGreaterThanOrEqual(4);
     expect(screen.getByText('10.00°')).toHaveClass('text-yellow-500');
     expect(screen.getByText('-5.00°')).toHaveClass('text-red-500');
+  });
+
+  it('renders result actions and per-row handoff controls', async () => {
+    render(
+      <SolarSystemTab
+        latitude={39.9}
+        longitude={116.4}
+        observerContext={{
+          locationName: 'Mountain Base',
+          latitude: 39.9,
+          longitude: 116.4,
+          elevation: 1250,
+          timezone: 'Asia/Shanghai',
+          sharedDate: '2025-01-01',
+          sharedTime: '22:00',
+          constraints: { minAltitude: 15, moonInterference: 'moderate' },
+          source: 'saved-location',
+          contextKey: 'site-a',
+        }}
+      />,
+    );
+
+    await screen.findByText('Sun');
+
+    fireEvent.click(screen.getByRole('button', { name: 'astroCalc.copyResults' }));
+    await waitFor(() => {
+      expect(mockCopyTextWithFeedback).toHaveBeenCalledWith(expect.objectContaining({
+        text: expect.stringContaining('Mountain Base'),
+      }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'astroCalc.exportResults' }));
+    expect(URL.createObjectURL).toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText('astroCalc.addToList: Sun'));
+    expect(mockAddTarget).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Sun',
+      ra: 100,
+      dec: 20,
+    }));
+
+    fireEvent.click(screen.getByLabelText('astroCalc.openPlanner: Sun'));
+    expect(mockCreateList).toHaveBeenCalled();
+    expect(mockSetActiveList).toHaveBeenCalledWith('list-1');
+    expect(mockAddEntryToList).toHaveBeenCalledWith('list-1', expect.objectContaining({
+      name: 'Sun',
+      ra: 100,
+      dec: 20,
+    }));
+    expect(mockLaunchPlannerWithDraftSeed).toHaveBeenCalledWith(expect.objectContaining({
+      constraints: expect.objectContaining({
+        minAltitude: 15,
+      }),
+    }));
+  });
+
+  it('uses responsive wrappers for header and row-level result actions', async () => {
+    render(<SolarSystemTab latitude={39.9} longitude={116.4} />);
+
+    await screen.findByText('Sun');
+
+    const actionBar = screen.getByTestId('astro-calculator-result-actions');
+    expect(actionBar.className).toContain('grid');
+    expect(actionBar.className).toContain('sm:flex');
+    expect(screen.getByRole('button', { name: 'astroCalc.copyResults' }).className).toContain('w-full');
+    expect(screen.getByRole('button', { name: 'astroCalc.exportResults' }).className).toContain('sm:w-auto');
+
+    const rowActions = screen.getByTestId('astro-calculator-row-actions-Sun');
+    expect(rowActions.className).toContain('flex-wrap');
+    expect(screen.getByLabelText('astroCalc.addToList: Sun').className).toContain('shrink-0');
+    expect(screen.getByLabelText('astroCalc.openPlanner: Sun').className).toContain('shrink-0');
   });
 });

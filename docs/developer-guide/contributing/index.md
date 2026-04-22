@@ -8,13 +8,13 @@
 
 发现问题？请创建 Issue：
 
-1. 访问 [GitHub Issue 表单](https://github.com/ElementAstro/cobalt-skymap/issues/new)
+1. 访问 [GitHub Issues](https://github.com/ElementAstro/cobalt-skymap/issues/new)
 2. 搜索是否已有相同问题
 3. 如果没有，创建新 Issue
 4. 详细描述问题
 5. 如有需要，附上应用内导出的诊断包（手动上传附件）
 
-**好的 Issue 模板**:
+**好的 Issue 模板**：
 
 ```markdown
 ## 问题描述
@@ -123,9 +123,10 @@ git push origin feature/my-awesome-feature
 - 函数使用 camelCase
 - 常量使用 UPPER_SNAKE_CASE
 - 组件文件：kebab-case.tsx
+- 使用 `createLogger()` 替代 `console.*`
 
 ```typescript
-// ✅ 好的示例
+// 好的示例
 interface ButtonProps {
   variant?: 'primary' | 'secondary';
   onClick?: () => void;
@@ -148,7 +149,7 @@ export function Button({ variant = 'primary', onClick }: ButtonProps) {
 - 处理错误
 
 ```rust
-// ✅ 好的示例
+// 好的示例
 #[tauri::command]
 async fn get_object_info(object_id: String) -> Result<ObjectInfo, String> {
     if object_id.is_empty() {
@@ -217,11 +218,12 @@ describe('calculateFOV', () => {
 
 ### 测试覆盖率
 
-保持测试覆盖率：
+项目覆盖率门槛：
 
-- 核心功能：> 80%
-- 工具函数：> 90%
-- 组件：> 70%
+- Branches: 50%
+- Functions: 35%
+- Lines: 60%
+- Statements: 60%
 
 ```bash
 # 运行测试并生成覆盖率报告
@@ -296,7 +298,7 @@ pnpm test:coverage
 - 保持组件小而专注
 
 ```typescript
-// ✅ 好的组件
+// 好的组件
 export function ObjectCard({ object }: { object: ObjectInfo }) {
   return (
     <Card>
@@ -314,7 +316,7 @@ export function ObjectCard({ object }: { object: ObjectInfo }) {
 - 使用派生状态
 
 ```typescript
-// ✅ 好的状态管理
+// 好的状态管理
 const useObjectData = (objectId: string) => {
   const data = useObjectStore(state => state.objects[objectId]);
   const fetchObject = useObjectStore(state => state.fetchObject);
@@ -338,14 +340,13 @@ const useObjectData = (objectId: string) => {
 - 验证输入参数
 
 ```rust
-// ✅ 好的命令
+// 好的命令
 #[tauri::command]
 async fn add_telescope(
     name: String,
     aperture: u32,
     focal_length: u32
 ) -> Result<Telescope, String> {
-    // 验证输入
     if name.trim().is_empty() {
         return Err("Name cannot be empty".to_string());
     }
@@ -354,7 +355,6 @@ async fn add_telescope(
         return Err("Aperture and focal length must be positive".to_string());
     }
 
-    // 处理逻辑
     let telescope = Telescope::new(name, aperture, focal_length);
     save_telescope(&telescope).await?;
 
@@ -369,7 +369,7 @@ async fn add_telescope(
 - 记录错误日志
 
 ```rust
-// ✅ 好的错误处理
+// 好的错误处理
 #[tauri::command]
 async fn load_data(id: String) -> Result<Data, String> {
     match database::load(&id).await {
@@ -386,7 +386,7 @@ async fn load_data(id: String) -> Result<Data, String> {
 
 ### 代码注释
 
-- 解释"为什么"而不是"是什么"
+- 解释「为什么」而不是「是什么」
 - 注释复杂的算法
 - 记录重要的决策
 
@@ -438,7 +438,7 @@ function calculateFOV(telescope: Telescope, camera: Camera): FOVInfo {
 ```
 MAJOR.MINOR.PATCH
 
-例如：1.2.3
+例如：0.1.0
 - MAJOR: 不兼容的 API 变更
 - MINOR: 向后兼容的功能新增
 - PATCH: 向后兼容的 Bug 修复
@@ -467,15 +467,13 @@ MAJOR.MINOR.PATCH
 
 - GitHub Issues: 技术问题
 - GitHub Discussions: 一般讨论
-- Email: support@example.com
 
 ## 认可贡献者
 
 我们会在以下地方认可贡献者：
 
-- [ Contributors](https://github.com/ElementAstro/cobalt-skymap/graphs/contributors) 部分
+- [Contributors](https://github.com/ElementAstro/cobalt-skymap/graphs/contributors) 页面
 - Release Notes 中
-- 项目网站上的贡献者列表
 
 ## 许可证
 
@@ -486,4 +484,3 @@ MAJOR.MINOR.PATCH
 感谢您的贡献！一起让 SkyMap 变得更好！
 
 返回：[开发指南](../index.md)
-

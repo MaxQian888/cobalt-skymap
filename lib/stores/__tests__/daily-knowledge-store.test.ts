@@ -27,6 +27,7 @@ const mockGetDailyKnowledge = getDailyKnowledge as jest.MockedFunction<typeof ge
 const mockResolveObjectName = resolveObjectName as jest.MockedFunction<typeof resolveObjectName>;
 
 const baseResult = {
+  requestedDateKey: '2026-02-20',
   items: [
     {
       id: 'curated-andromeda-distance',
@@ -93,6 +94,7 @@ function resetDailyStore() {
     viewMode: 'pager',
     wheelPagingEnabled: false,
     open: false,
+    activeDateKey: getLocalDateKey(),
     loading: false,
     error: null,
     currentItem: null,
@@ -267,6 +269,7 @@ describe('daily-knowledge-store', () => {
     useDailyKnowledgeStore.setState({
       items: [preservedItem],
       currentItem: preservedItem,
+      activeDateKey: '2026-02-20',
       filters: {
         query: 'm31',
         category: 'all',
@@ -288,6 +291,89 @@ describe('daily-knowledge-store', () => {
     expect(state.filters.query).toBe('m31');
     expect(state.viewMode).toBe('feed');
     expect(state.resolutionMode).toBe('fresh-online');
+  });
+
+  it('tracks active date and can browse adjacent dates without resetting interaction state', async () => {
+    mockGetDailyKnowledge
+      .mockResolvedValueOnce({
+        ...baseResult,
+        requestedDateKey: '2026-02-20',
+      })
+      .mockResolvedValueOnce({
+        ...baseResult,
+        requestedDateKey: '2026-02-21',
+        items: [
+          {
+            ...baseResult.selected,
+            id: 'next-day-item',
+            dateKey: '2026-02-21',
+            title: 'Next Day Item',
+          },
+        ],
+        selected: {
+          ...baseResult.selected,
+          id: 'next-day-item',
+          dateKey: '2026-02-21',
+          title: 'Next Day Item',
+        },
+      });
+
+    useDailyKnowledgeStore.setState({
+      activeDateKey: '2026-02-20',
+      filters: {
+        query: 'm31',
+        category: 'all',
+        source: 'all',
+        favoritesOnly: false,
+      },
+      viewMode: 'feed',
+    });
+
+    await useDailyKnowledgeStore.getState().loadByDate('2026-02-20', 'manual');
+    await useDailyKnowledgeStore.getState().browseNextDate();
+
+    const state = useDailyKnowledgeStore.getState();
+    expect(mockGetDailyKnowledge).toHaveBeenLastCalledWith(
+      '2026-02-21',
+      'en',
+      expect.objectContaining({ onlineEnhancement: true })
+    );
+    expect(state.activeDateKey).toBe('2026-02-21');
+    expect(state.currentItem?.dateKey).toBe('2026-02-21');
+    expect(state.filters.query).toBe('m31');
+    expect(state.viewMode).toBe('feed');
+  });
+
+  it('returns to today after browsing another date', async () => {
+    useDailyKnowledgeStore.setState({
+      activeDateKey: '2026-02-18',
+    });
+
+    mockGetDailyKnowledge.mockResolvedValue({
+      ...baseResult,
+      requestedDateKey: getLocalDateKey(),
+      items: [
+        {
+          ...baseResult.selected,
+          id: 'today-item',
+          dateKey: getLocalDateKey(),
+        },
+      ],
+      selected: {
+        ...baseResult.selected,
+        id: 'today-item',
+        dateKey: getLocalDateKey(),
+      },
+    });
+
+    await useDailyKnowledgeStore.getState().goToToday('manual');
+
+    expect(mockGetDailyKnowledge).toHaveBeenCalledWith(
+      getLocalDateKey(),
+      'en',
+      expect.objectContaining({ onlineEnhancement: true })
+    );
+    expect(useDailyKnowledgeStore.getState().activeDateKey).toBe(getLocalDateKey());
   });
 
   it('falls back to the refreshed selected item when the previous current item disappears', async () => {

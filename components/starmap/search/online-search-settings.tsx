@@ -276,7 +276,7 @@ export function SourceBadge({ source }: { source: string }) {
   
   return (
     <Tooltip>
-      <TooltipTrigger>
+      <TooltipTrigger asChild>
         <Badge 
           variant="outline" 
           className={`h-4 text-[9px] px-1 ${SOURCE_COLOR_MAP[source] || 'bg-gray-500/10 text-gray-500'}`}
@@ -303,7 +303,7 @@ export function OnlineStatusIndicator() {
   
   return (
     <Tooltip>
-      <TooltipTrigger>
+      <TooltipTrigger asChild>
         <div className={`flex items-center gap-1 text-xs ${
           isOnlineMode && anyOnline ? 'text-green-500' : 'text-muted-foreground'
         }`}>

@@ -22,6 +22,8 @@ let mockARSessionStatus: ARSessionStatus = 'ready';
 let mockIsSupported = true;
 let mockIsPermissionGranted = false;
 let mockSensorPath: 'sensor-primary' | 'camera-primary' | 'manual-only' = 'sensor-primary';
+let mockRuntimeClass: 'browser-mobile' | 'browser-desktop' | 'tauri-desktop' = 'browser-mobile';
+let mockOperatingMode: 'sensor-first' | 'camera-first' | 'manual-first' = 'sensor-first';
 
 interface SettingsState {
   stellarium: {
@@ -101,7 +103,8 @@ jest.mock('@/lib/hooks/use-ar-adaptation', () => ({
     recoveryMode: 'compact-strip',
     cameraControlMode: 'compact-strip',
     sensorPath: mockSensorPath,
-    runtimeClass: 'browser-mobile',
+    runtimeClass: mockRuntimeClass,
+    operatingMode: mockOperatingMode,
     layoutTier: 'phone-compact',
     controlDensity: 'compact',
     capabilityTier: 'limited',
@@ -145,6 +148,8 @@ describe('ARModeToggle', () => {
     mockIsSupported = true;
     mockIsPermissionGranted = false;
     mockSensorPath = 'sensor-primary';
+    mockRuntimeClass = 'browser-mobile';
+    mockOperatingMode = 'sensor-first';
   });
 
   it('renders a button with test id', () => {
@@ -209,5 +214,35 @@ describe('ARModeToggle', () => {
 
     expect(screen.getByTestId('ar-mode-toggle')).toHaveAttribute('aria-label', 'settings.arAdaptationCameraFirst');
     expect(screen.getByTestId('ar-mode-toggle')).toHaveAttribute('data-ar-sensor-path', 'camera-primary');
+  });
+
+  it('keeps desktop AR entry in camera-first mode even when the browser reports granted orientation permission', () => {
+    mockIsSupported = true;
+    mockIsPermissionGranted = true;
+    mockSensorPath = 'camera-primary';
+    mockRuntimeClass = 'tauri-desktop';
+    mockOperatingMode = 'camera-first';
+
+    renderWithProviders(<ARModeToggle />);
+    fireEvent.click(screen.getByTestId('ar-mode-toggle'));
+
+    expect(mockSetStellariumSetting).toHaveBeenCalledWith('sensorControl', false);
+    expect(mockSetSensorRuntime).toHaveBeenCalledWith(expect.objectContaining({
+      isSupported: false,
+      isPermissionGranted: false,
+      status: 'unsupported',
+    }));
+  });
+
+  it('uses manual-first tooltip copy when desktop AR cannot provide camera or sensor guidance', () => {
+    mockArMode = true;
+    mockARSessionStatus = 'blocked';
+    mockSensorPath = 'manual-only';
+    mockRuntimeClass = 'browser-desktop';
+    mockOperatingMode = 'manual-first';
+
+    renderWithProviders(<ARModeToggle />);
+
+    expect(screen.getByTestId('ar-mode-toggle')).toHaveAttribute('aria-label', 'settings.arAdaptationManualOnly');
   });
 });

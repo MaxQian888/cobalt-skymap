@@ -19,6 +19,8 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-set-focus",
     "core:window:allow-is-maximized",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-fullscreen",
     "fs:default",
     "fs:allow-app-read",
     "fs:allow-app-write",

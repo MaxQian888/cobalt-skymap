@@ -12,6 +12,7 @@ import {
   ASTRO_EVENT_SOURCES,
   SATELLITE_SOURCES,
 } from '../astro-data-sources';
+import { logManager } from '@/lib/logger';
 
 // Mock fetch
 const mockFetch = jest.fn();
@@ -24,6 +25,7 @@ describe('astro-data-sources', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetch.mockReset();
+    logManager.initialize({ enableConsole: false, enablePersistence: false });
   });
 
   describe('ASTRO_EVENT_SOURCES', () => {
@@ -450,17 +452,15 @@ describe('astro-data-sources', () => {
     it('should return empty array without API key', async () => {
       const { fetchSatellitePasses } = await import('../astro-data-sources');
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      logManager.initialize({ enableConsole: true, enablePersistence: false });
 
       const passes = await fetchSatellitePasses(25544, 45.0, -75.0, 0, 2, 300);
 
       expect(passes).toEqual([]);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('N2YO API key not provided'),
-        expect.anything(),
-        expect.anything(),
-        expect.anything()
-      );
+      expect(consoleSpy).toHaveBeenCalled();
+      expect(consoleSpy.mock.calls.flat().join(' ')).toContain('N2YO API key not provided');
       consoleSpy.mockRestore();
+      logManager.initialize({ enableConsole: false, enablePersistence: false });
     });
 
     it('should fetch passes with valid API key', async () => {

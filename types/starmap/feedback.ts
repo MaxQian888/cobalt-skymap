@@ -28,6 +28,8 @@ export interface SplashScreenProps {
   minDuration?: number;
   /** When true, splash will begin its fade-out sequence regardless of minDuration */
   isReady?: boolean;
+  /** Optional non-blocking readiness hint shown before splash dismisses */
+  completionHint?: string | null;
 }
 
 /** Generated star data for splash screen star field */

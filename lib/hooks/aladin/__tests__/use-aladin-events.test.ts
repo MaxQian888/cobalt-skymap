@@ -113,6 +113,8 @@ describe('useAladinEvents', () => {
       expect.objectContaining({
         raDeg: 180,
         decDeg: 45,
+        selectionSource: 'coordinate',
+        selectionFallback: 'coordinate_fallback',
       })
     );
   });
@@ -249,6 +251,62 @@ describe('useAladinEvents', () => {
         decDeg: 22.0145,
         type: 'nebula',
         magnitude: 8.4,
+        selectionSource: 'catalog',
+      })
+    );
+  });
+
+  it('should publish enriched selection metadata when SIMBAD resolves a clicked coordinate', async () => {
+    const mockAladin = createMockAladin();
+    const onSelectionChange = jest.fn();
+    mockSearchOnlineByCoordinates.mockResolvedValue({
+      results: [
+        {
+          id: 'm42',
+          name: 'M42',
+          canonicalId: 'M42',
+          identifiers: ['M42', 'NGC 1976'],
+          confidence: 0.99,
+          alternateNames: ['NGC 1976'],
+          ra: 180,
+          dec: 45,
+          raString: '12h 00m 00s',
+          decString: '+45° 00\' 00"',
+          type: 'Nebula',
+          category: 'nebula',
+          magnitude: 4,
+          source: 'simbad',
+        },
+      ],
+      sources: ['simbad'],
+      totalCount: 1,
+      searchTimeMs: 12,
+    });
+
+    renderHook(() =>
+      useAladinEvents({
+        containerRef: { current: createContainer() },
+        aladinRef: { current: mockAladin as never },
+        engineReady: true,
+        onSelectionChange,
+        onContextMenu: jest.fn(),
+      })
+    );
+
+    const clickHandler = mockAladin.on.mock.calls.find(
+      (c: [string, unknown]) => c[0] === 'click'
+    )?.[1] as (event: unknown) => void;
+
+    clickHandler({ ra: 180, dec: 45, x: 400, y: 300 });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onSelectionChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        names: ['M42', 'NGC 1976'],
+        selectionSource: 'enriched',
+        selectionFallback: 'resolved',
+        sourceCatalog: 'SIMBAD',
       })
     );
   });

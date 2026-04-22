@@ -2,7 +2,9 @@
  * @jest-environment jsdom
  */
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
+
+const originalConsoleError = console.error;
 
 const mockSetLocation = jest.fn();
 const defaultLocationState = {
@@ -91,13 +93,32 @@ Object.defineProperty(navigator, 'geolocation', {
 
 import { LocationSettings } from '../location-settings';
 
+async function renderLocationSettings() {
+  const view = render(<LocationSettings />);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  return view;
+}
+
+beforeEach(() => {
+  jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+    const [firstArg] = args;
+    if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) {
+      return;
+    }
+    originalConsoleError(...args as Parameters<typeof console.error>);
+  });
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 describe('LocationSettings', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPermissionsQuery.mockResolvedValue({
-      state: 'prompt',
-      addEventListener: jest.fn(),
-    });
+    mockPermissionsQuery.mockImplementation(() => new Promise(() => undefined));
   });
 
   it('renders location settings section', () => {
@@ -135,11 +156,14 @@ describe('LocationSettings', () => {
   });
 
   it('renders get location button when permission is not denied', async () => {
-    render(<LocationSettings />);
-    // Wait for permission check to complete
-    await new Promise(resolve => setTimeout(resolve, 0));
+    mockPermissionsQuery.mockResolvedValue({
+      state: 'prompt',
+      addEventListener: jest.fn(),
+    });
+    await renderLocationSettings();
     expect(screen.getAllByTestId('button').length).toBeGreaterThan(0);
   });
+
 });
 
 describe('LocationSettings permission edge cases', () => {
@@ -153,8 +177,7 @@ describe('LocationSettings permission edge cases', () => {
       addEventListener: jest.fn(),
     });
 
-    render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await renderLocationSettings();
     expect(screen.getByTestId('collapsible')).toBeInTheDocument();
   });
 
@@ -164,16 +187,14 @@ describe('LocationSettings permission edge cases', () => {
       addEventListener: jest.fn(),
     });
 
-    render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await renderLocationSettings();
     expect(screen.getByTestId('collapsible')).toBeInTheDocument();
   });
 
   it('handles permission query error', async () => {
     mockPermissionsQuery.mockRejectedValue(new Error('Permission query failed'));
 
-    render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await renderLocationSettings();
     expect(screen.getByTestId('collapsible')).toBeInTheDocument();
   });
 
@@ -358,14 +379,15 @@ describe('LocationSettings geolocation callbacks', () => {
       });
     });
 
-    render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await renderLocationSettings();
 
     // Click the get/refresh location button
     const buttons = screen.getAllByTestId('button');
     const locationButton = buttons.find(b => b.textContent?.includes('settings.refreshLocation') || b.textContent?.includes('settings.getLocation'));
     if (locationButton) {
-      fireEvent.click(locationButton);
+      await act(async () => {
+        fireEvent.click(locationButton);
+      });
       expect(mockSetLocation).toHaveBeenCalledWith({
         latitude: 51.5074,
         longitude: -0.1278,
@@ -379,13 +401,14 @@ describe('LocationSettings geolocation callbacks', () => {
       error({ code: 1, PERMISSION_DENIED: 1, message: 'User denied' });
     });
 
-    render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await renderLocationSettings();
 
     const buttons = screen.getAllByTestId('button');
     const locationButton = buttons.find(b => b.textContent?.includes('settings.refreshLocation') || b.textContent?.includes('settings.getLocation'));
     if (locationButton) {
-      fireEvent.click(locationButton);
+      await act(async () => {
+        fireEvent.click(locationButton);
+      });
       // After denied, the component should still be rendered
       expect(screen.getByTestId('collapsible')).toBeInTheDocument();
     }
@@ -396,13 +419,14 @@ describe('LocationSettings geolocation callbacks', () => {
       error({ code: 2, PERMISSION_DENIED: 1, message: 'Position unavailable' });
     });
 
-    render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await renderLocationSettings();
 
     const buttons = screen.getAllByTestId('button');
     const locationButton = buttons.find(b => b.textContent?.includes('settings.refreshLocation') || b.textContent?.includes('settings.getLocation'));
     if (locationButton) {
-      fireEvent.click(locationButton);
+      await act(async () => {
+        fireEvent.click(locationButton);
+      });
       expect(screen.getByTestId('collapsible')).toBeInTheDocument();
     }
   });
@@ -414,13 +438,14 @@ describe('LocationSettings geolocation callbacks', () => {
       });
     });
 
-    render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await renderLocationSettings();
 
     const buttons = screen.getAllByTestId('button');
     const locationButton = buttons.find(b => b.textContent?.includes('settings.refreshLocation') || b.textContent?.includes('settings.getLocation'));
     if (locationButton) {
-      fireEvent.click(locationButton);
+      await act(async () => {
+        fireEvent.click(locationButton);
+      });
       expect(mockSetLocation).toHaveBeenCalledWith({
         latitude: 48.8566,
         longitude: 2.3522,
@@ -443,8 +468,7 @@ describe('LocationSettings permission change listener', () => {
       removeEventListener: mockRemoveEventListener,
     });
 
-    const { unmount } = render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    const { unmount } = await renderLocationSettings();
 
     expect(mockAddEventListener).toHaveBeenCalledWith('change', expect.any(Function));
 
@@ -458,8 +482,7 @@ describe('LocationSettings permission change listener', () => {
       // No addEventListener/removeEventListener
     });
 
-    const { unmount } = render(<LocationSettings />);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    const { unmount } = await renderLocationSettings();
     expect(screen.getByTestId('collapsible')).toBeInTheDocument();
     // Should not throw on unmount
     unmount();

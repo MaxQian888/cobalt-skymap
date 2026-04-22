@@ -11,9 +11,11 @@ import { parseRACoordinate } from '@/lib/astronomy/coordinates/conversions';
 import { dateToJulianDate, mjdToUTC, utcToMJD } from '@/lib/astronomy/time/julian';
 import { getGMSTForDate, getLSTForDate } from '@/lib/astronomy/time/sidereal';
 import { getHourAngleAtTime } from '@/lib/astronomy/coordinates/transforms';
+import type { AstroCalculatorObserverContext } from './types';
 
 interface TimeTabProps {
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
   sharedDate?: string;
   sharedTime?: string;
   onSharedDateChange?: (nextDate: string) => void;
@@ -33,6 +35,7 @@ function toDateTimeInput(date: Date): string {
 
 export function TimeTab({
   longitude,
+  observerContext: _observerContext,
   sharedDate,
   sharedTime,
   onSharedDateChange,

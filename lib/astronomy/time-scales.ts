@@ -16,6 +16,7 @@ const EOP_STALE_DAYS = 90;
 const DEFAULT_DUT1_SECONDS = 0;
 const DEFAULT_TAI_MINUS_UTC = 37;
 const TT_MINUS_TAI_SECONDS = 32.184;
+const EOP_BACKGROUND_REFRESH_COOLDOWN_MS = 60_000;
 
 export interface EopSnapshot {
   dut1: number;
@@ -44,6 +45,8 @@ export interface TimeScaleContext {
 
 let runtimeEopPayload: EopCachePayload | null = null;
 let eopLoadAttempted = false;
+let backgroundRefreshPromise: Promise<boolean> | null = null;
+let lastBackgroundRefreshStartedAt = 0;
 
 function normalizeJd(jd: number): number {
   if (!Number.isFinite(jd)) return dateToJulianDate(new Date());
@@ -217,12 +220,25 @@ export function triggerBackgroundEopRefresh(date: Date = new Date()): void {
   if (typeof window === 'undefined' || !navigator.onLine) return;
   const status = getEopSnapshot(date);
   if (status.freshness === 'fresh') return;
+  if (backgroundRefreshPromise) return;
 
-  void refreshEopData().then((ok) => {
-    if (!ok) {
-      logger.debug('EOP background refresh skipped - no source available');
-    }
-  });
+  const now = Date.now();
+  if (now - lastBackgroundRefreshStartedAt < EOP_BACKGROUND_REFRESH_COOLDOWN_MS) {
+    return;
+  }
+
+  lastBackgroundRefreshStartedAt = now;
+
+  backgroundRefreshPromise = refreshEopData()
+    .then((ok) => {
+      if (!ok) {
+        logger.debug('EOP background refresh skipped - no source available');
+      }
+      return ok;
+    })
+    .finally(() => {
+      backgroundRefreshPromise = null;
+    });
 }
 
 export function jdToIsoTimestamp(jd: number): string {

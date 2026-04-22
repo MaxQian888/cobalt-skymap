@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { GitHubIcon } from '@/components/icons';
 import {
   Info,
-  Github,
   ExternalLink,
   Database,
   Heart,
@@ -120,7 +120,7 @@ export function AboutSettings() {
             className="w-full justify-start gap-2"
             onClick={() => void openExternalUrl(EXTERNAL_LINKS.repository)}
           >
-            <Github className="h-4 w-4" />
+            <GitHubIcon className="h-4 w-4" />
             {t('settingsNew.about.sourceCode')}
           </Button>
           <Button

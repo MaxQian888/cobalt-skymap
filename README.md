@@ -1,49 +1,83 @@
 # SkyMap
 
-A modern desktop star map and astronomy planning application built with **Next.js 16**, **React 19**, and **Tauri 2.9**. It integrates with the Stellarium Web Engine for sky visualization, observation planning, and astronomical calculations.
+A modern desktop star map and astronomy planning application built with **Next.js 16**, **React 19**, and **Tauri 2.9**. It integrates the Stellarium Web Engine for real-time sky visualization and provides a comprehensive toolkit for observation planning, equipment management, and astronomical calculations.
 
 [中文文档](./README_zh.md) | [Changelog](./CHANGELOG.md)
 
 ## Features
 
-- **Star Map Visualization** - Integrated Stellarium Web Engine for real-time sky rendering
-- **Observation Planning** - Tools for planning astronomy sessions and tracking targets
-- **Equipment Management** - Manage telescopes, cameras, and eyepieces with FOV calculation
-- **Astronomical Calculations** - 9-tab Astro Calculator (WUT, Positions, RTS, Ephemeris, Almanac, Phenomena, Coordinate, Time, Solar System)
-- **Unified Engine** - `lib/astronomy/engine` with Tauri-first backend and `astronomy-engine` fallback for web/offline parity
-- **Frame/Timescale Contract** - Unified ICRF/CIRS/OBSERVED pipeline with UTC/UT1/TT metadata
-- **Adaptive Recommendations** - Imaging / visual / hybrid target scoring with confidence indicators
-- **Offline Precision Fallback** - Built-in EOP baseline with background refresh when online
-- **Desktop Native** - Built with Tauri 2.9 for high performance and system integration
-- **Modern UI** - Tailwind CSS v4 with Geist font and dark mode support
-- **shadcn/ui** - High-quality accessible components built on Radix UI
-- **Zustand** - Lightweight and robust state management
-- **i18n Support** - Multi-language support (English/Chinese) via next-intl
-- **Security** - Rate limiting, input validation, SSRF protection
+### Sky Visualization
+
+- **Stellarium Web Engine** - Real-time, interactive sky rendering with accurate star positions, constellations, and deep-sky objects
+- **Aladin Lite Dual-Engine** - Switch between Stellarium and Aladin Lite for multi-wavelength sky surveys and FITS image overlays
+- **AR Mode** - Overlay the celestial sphere onto your camera feed for immersive stargazing
+- **Sky Markers & Bookmarks** - Pin custom markers and save favorite views for quick navigation
+- **Satellite Tracking** - Track satellites and artificial objects in real time
+
+### Observation Planning
+
+- **Session Planner** - Plan observation sessions with altitude charts, visibility windows, and optimal timing recommendations
+- **Target Recommendations** - Adaptive scoring for imaging, visual, and hybrid observing with confidence indicators
+- **Messier Marathon** - Dedicated workflow for Messier Marathon events with session execution helpers
+- **Observation Log** - Record and review your observation sessions with structured notes
+- **Mount Safety Simulator** - Simulate GEM mount sequences to check for meridian flips, hour-angle limits, and pier collisions before slewing
+
+### Equipment & Tools
+
+- **Equipment Management** - Configure telescopes, cameras, and eyepieces with FOV overlay calculations
+- **Plate Solving** - Online plate-solving workflow to match your images against star catalogs
+- **Telescope Mount Control** - ALPACA-compatible mount control with real-time status polling and slew commands
+- **Exposure Calculator** - Imaging exposure time recommendations based on sky quality and equipment
+- **Ocular Simulator** - Simulate the field of view through your eyepiece or camera sensor
+
+### Astronomy Engine
+
+- **Unified Calculation Engine** - Tauri-first Rust backend with a pure-JS `astronomy-engine` fallback, ensuring identical results across desktop and web builds
+- **Astro Calculator** - Nine dedicated tabs covering What's Up Tonight, Positions, Rise/Transit/Set, Ephemeris, Almanac, Phenomena, Coordinate Conversion, Time, and Solar System
+- **Coordinate Pipeline** - Unified ICRF/CIRS/OBSERVED frame contract with UTC/UT1/TT metadata propagation
+- **Offline Precision** - Built-in EOP baseline data with background incremental refresh when online
+- **Daily Knowledge** - Curated astronomy facts and events delivered on startup
+
+### UI & Accessibility
+
+- **Modern Interface** - Tailwind CSS v4 with the Geist typeface, dark mode, and a fully customizable theme workbench
+- **Accessible Components** - shadcn/ui built on Radix UI primitives with full keyboard navigation
+- **Night Vision Mode** - Red-light filter to preserve dark adaptation
+- **Multi-language** - English and Chinese via next-intl
+- **Responsive Layout** - Optimized for desktop with refined touch support for tablets
+- **Auto-Updater** - Built-in update mechanism for desktop builds
+
+### Security
+
+- **Rate Limiting** - Sliding-window algorithm prevents API abuse
+- **Input Validation** - Strict size limits on JSON, CSV, and tile data
+- **SSRF Protection** - URL validation blocks private IPs and dangerous protocols
+- **Path Sandboxing** - Prevents directory traversal in file storage operations
+- **Secret Vault** - Secure storage for API keys and sensitive credentials via Tauri's keyring integration
 
 ## Tech Stack
 
 | Layer | Technologies |
 |-------|-------------|
 | **Frontend** | Next.js 16 (App Router), React 19, TypeScript |
-| **Styling** | Tailwind CSS v4, shadcn/ui |
+| **Styling** | Tailwind CSS v4, shadcn/ui, Geist |
 | **State** | Zustand |
 | **Desktop** | Tauri 2.9 (Rust) |
-| **Astronomy** | Stellarium Web Engine, custom astronomical calculation libraries |
+| **Astronomy** | Stellarium Web Engine, Aladin Lite, custom calculation libraries |
 | **i18n** | next-intl |
-| **Storage** | JSON File Storage |
-| **Security** | Rate limiting, URL validation, size limits |
+| **Storage** | JSON File Storage (backend), localStorage (web fallback) |
+| **Security** | Rate limiting, URL validation, size limits, secret vault |
 
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
 
-### For Web Development
+### Web Development
 
 - **Node.js** 20.x or later
 - **pnpm** 9.x or later (recommended)
 
-### For Desktop Development
+### Desktop Development
 
 - **Rust** 1.75 or later
 - **System Dependencies**:
@@ -82,11 +116,11 @@ Starts the Next.js dev server at [http://localhost:1420](http://localhost:1420).
 pnpm tauri dev
 ```
 
-Launches the Tauri desktop app with hot-reloading for both Rust and Frontend.
+Launches the Tauri desktop app with hot-reloading for both the frontend and the Rust backend.
 
 ## Building for Production
 
-### Build Web Application (Static Export)
+### Web Application (Static Export)
 
 ```bash
 pnpm build
@@ -94,13 +128,20 @@ pnpm build
 
 Outputs to the `out/` directory.
 
-### Build Desktop Application
+### Desktop Application
 
 ```bash
+# Default build
 pnpm tauri build
+
+# Pre-configured desktop build (includes dependency generation)
+pnpm build:desktop
+
+# Windows-specific build
+pnpm build:desktop:windows
 ```
 
-Generates installers in `src-tauri/target/release/bundle/`.
+Installers are generated in `src-tauri/target/release/bundle/`.
 
 ## Project Structure
 
@@ -111,53 +152,54 @@ skymap/
 │   ├── starmap/           # Star map UI components
 │   │   ├── canvas/        # Stellarium Web Engine canvas wrapper
 │   │   ├── view/          # Main sky view component
-│   │   ├── search/        # Object search, advanced search
-│   │   ├── settings/      # Settings panels and dialogs
-│   │   ├── controls/      # Zoom, navigation, bookmarks
+│   │   ├── search/        # Object search, advanced search, catalog queries
+│   │   ├── settings/      # Settings panels, dialogs, and theme workbench
+│   │   ├── controls/      # Zoom, navigation history, bookmarks
 │   │   ├── time/          # Time control and clock display
 │   │   ├── overlays/      # FOV simulator, satellite tracker, sky markers
-│   │   ├── planning/      # Altitude charts, exposure calculator, session planning
-│   │   ├── objects/       # Object info panels, detail drawers
-│   │   ├── management/    # Equipment, location, cache managers
-│   │   ├── knowledge/     # Daily astronomy knowledge
-│   │   ├── mount/         # Telescope mount control
-│   │   ├── onboarding/    # Welcome dialog and tour
+│   │   ├── planning/      # Altitude charts, exposure calculator, session planner, mount safety simulator
+│   │   ├── objects/       # Object info panels, detail drawers, image galleries
+│   │   ├── management/    # Equipment, location, cache, and data managers
+│   │   ├── knowledge/     # Daily astronomy knowledge and startup dialog
+│   │   ├── mount/         # Telescope mount control interface
+│   │   ├── onboarding/    # Welcome dialog and interactive tour
+│   │   ├── plate-solving/ # Image capture and online plate solving
 │   │   └── map/           # Leaflet-based location picker
 │   ├── common/            # Shared components (theme, language, log viewer)
-│   ├── icons/             # Brand icons, SkyMap logo
+│   ├── icons/             # Brand icons and SkyMap logo
 │   └── ui/                # shadcn/ui components
 ├── lib/                    # Core logic
 │   ├── astronomy/         # Astronomical calculations
-│   │   ├── coordinates/   # Coordinate conversions
-│   │   ├── time/          # Julian date, sidereal time
-│   │   ├── celestial/     # Sun, Moon calculations
-│   │   ├── visibility/    # Target visibility
-│   │   ├── twilight/      # Twilight times
-│   │   ├── imaging/       # Exposure calculations
-│   │   ├── engine/        # Unified Tauri/fallback astronomy engine
+│   │   ├── coordinates/   # Coordinate conversions (equatorial, horizontal, galactic)
+│   │   ├── time/          # Julian date, sidereal time, time-scale contracts
+│   │   ├── celestial/     # Sun, Moon, and planetary calculations
+│   │   ├── visibility/    # Target visibility and circumpolar analysis
+│   │   ├── twilight/      # Twilight times (civil, nautical, astronomical)
+│   │   ├── imaging/       # Exposure and imaging feasibility calculations
+│   │   ├── engine/        # Unified Tauri-first / fallback astronomy engine
 │   │   ├── horizon/       # Custom horizon profiles
-│   │   └── object-resolver/ # Object name parsing
+│   │   └── object-resolver/ # Object name parsing (catalog, minor body, coordinate)
 │   ├── stores/            # Zustand state management (26+ stores)
-│   ├── tauri/             # Tauri API wrappers
-│   ├── services/          # External API services
+│   ├── tauri/             # Tauri API wrappers (astronomy, mount, cache, updater, etc.)
+│   ├── services/          # External API services (search, map tiles, daily knowledge)
 │   ├── hooks/             # Custom React hooks (37+ hooks)
 │   ├── catalogs/          # Astronomical catalog data
 │   ├── logger/            # Structured logging system
-│   ├── storage/           # Storage abstraction layer
-│   ├── cache/             # Cache compression, config, migration
-│   └── ...                # core, constants, data, feedback, aladin, etc.
+│   ├── storage/           # Storage abstraction layer (Tauri / web adapters)
+│   ├── cache/             # Cache compression, configuration, and migration
+│   └── ...                # core, constants, data, feedback, aladin, plate-solving, security
 ├── src-tauri/             # Rust backend
 │   └── src/
-│       ├── astronomy/     # Coordinate transforms, events
-│       ├── data/          # JSON storage, equipment, locations, targets
-│       ├── cache/         # Offline tile caching, unified cache
-│       ├── network/       # HTTP client, security, rate limiting
-│       ├── platform/      # App settings, updater, plate solver
-│       └── mount/         # ALPACA mount client, simulator
-├── public/                 # Static assets including Stellarium engine
+│       ├── astronomy/     # Coordinate transforms, ephemeris, and astronomical events
+│       ├── data/          # JSON storage for equipment, locations, targets, markers
+│       ├── cache/         # Offline tile caching and unified network cache
+│       ├── network/       # HTTP client, security, and rate limiting
+│       ├── platform/      # App settings, auto-updater, plate solver
+│       └── mount/         # ALPACA mount client, simulator, and command handlers
+├── public/                 # Static assets (includes Stellarium engine)
 ├── i18n/                   # Internationalization
 │   └── messages/          # Translation files (en.json, zh.json)
-└── docs/                   # Documentation (MkDocs)
+└── docs/                   # MkDocs-based documentation
 ```
 
 ## Testing
@@ -168,19 +210,26 @@ skymap/
 pnpm test              # Run all tests
 pnpm test:watch        # Watch mode
 pnpm test:coverage     # With coverage report
+pnpm test -- path/to/file   # Run a specific test file
 ```
+
+Coverage thresholds: branches 50%, functions 35%, lines 60%, statements 60%.
 
 ### E2E Tests (Playwright)
 
 ```bash
-pnpm exec playwright test
+pnpm test:e2e                  # Run all E2E tests
+pnpm test:e2e:smoke            # Smoke tests only (Chromium)
+pnpm test:e2e:regression       # Regression tests (Chromium, desktop)
+pnpm exec playwright test      # Direct invocation
 ```
 
-### Linting
+### Linting & Type Checking
 
 ```bash
-pnpm lint              # ESLint (Frontend)
-cargo clippy           # Clippy (Rust)
+pnpm lint                        # ESLint (frontend)
+pnpm exec tsc --noEmit          # TypeScript type checking
+cargo clippy                     # Clippy (Rust)
 ```
 
 ### Security Tests
@@ -190,14 +239,15 @@ cd src-tauri
 cargo test security_tests
 ```
 
-## Security Features
+## Security
 
-SkyMap includes multiple security layers:
+SkyMap includes defense-in-depth security measures:
 
-- **Rate Limiting** - Sliding window algorithm prevents API abuse
+- **Rate Limiting** - Sliding-window algorithm prevents API abuse
 - **Input Validation** - Size limits on JSON, CSV, and tile data
 - **SSRF Protection** - URL validation blocks private IPs and dangerous protocols
-- **Storage Security** - Path sandboxing prevents path traversal attacks
+- **Storage Security** - Path sandboxing prevents directory-traversal attacks
+- **Secret Vault** - API keys and sensitive credentials are stored in the OS keyring
 
 See [Security Documentation](./docs/security/security-features.md) for details.
 
@@ -214,4 +264,3 @@ Full documentation is available in the `docs/` directory:
 ## License
 
 MIT License
-

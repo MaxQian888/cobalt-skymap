@@ -9,6 +9,10 @@ export { TimeTab } from './time-tab';
 export { SolarSystemTab } from './solar-system-tab';
 export { SortableHeader } from './sortable-header';
 export {
+  buildAstroCalculatorObserverContext,
+  DEFAULT_ASTRO_CALCULATOR_OBSERVER_CONSTRAINTS,
+} from './observer-context';
+export {
   ASTRO_CALCULATOR_CAPABILITY_MATRIX,
   ASTRO_CALCULATOR_TAB_ORDER,
 } from './capability-matrix';
@@ -22,4 +26,12 @@ export {
   runCalculatorRiseTransitSetBatch,
   summarizeCalculatorMeta,
 } from './orchestrator';
-export type { CelestialPosition, EphemerisEntry, WUTObject, PhenomenaEvent } from './types';
+export type {
+  AstroCalculatorObserverConstraints,
+  AstroCalculatorObserverContext,
+  AstroCalculatorObserverContextInput,
+  CelestialPosition,
+  EphemerisEntry,
+  WUTObject,
+  PhenomenaEvent,
+} from './types';

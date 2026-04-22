@@ -3,6 +3,7 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
+import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 
 const mockRouterPush = jest.fn();
 const mockNavigationPush = jest.fn();
@@ -205,6 +206,7 @@ describe('useStellariumViewState', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    useMapInteractionStore.getState().reset();
 
     mockViewDirection = { ra: Math.PI, dec: Math.PI / 6 };
     mockStel = { ready: true };
@@ -293,6 +295,16 @@ describe('useStellariumViewState', () => {
       fov: 60,
       name: 'M42',
     });
+    expect(useMapInteractionStore.getState().targetContext).toMatchObject({
+      primaryName: 'M42',
+      siteCoordinates: { latitude: 35, longitude: 139 },
+    });
+
+    act(() => {
+      result.current.handleSelectionChange(null);
+    });
+
+    expect(useMapInteractionStore.getState().targetContext).toBeNull();
 
     act(() => {
       result.current.handleSetFramingCoordinates({

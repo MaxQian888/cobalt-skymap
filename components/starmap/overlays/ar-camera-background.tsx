@@ -26,6 +26,41 @@ import { getARSurfaceLayoutTokens, withSafeAreaInset } from '@/lib/constants/ar-
 
 const logger = createLogger('ar-camera-background');
 
+function areValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) {
+    return true;
+  }
+
+  if (Array.isArray(left) && Array.isArray(right)) {
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    return left.every((item, index) => areValuesEqual(item, right[index]));
+  }
+
+  if (
+    left !== null &&
+    right !== null &&
+    typeof left === 'object' &&
+    typeof right === 'object'
+  ) {
+    const leftEntries = Object.entries(left);
+    const rightEntries = Object.entries(right);
+
+    if (leftEntries.length !== rightEntries.length) {
+      return false;
+    }
+
+    return leftEntries.every(([key, value]) =>
+      Object.prototype.hasOwnProperty.call(right, key)
+      && areValuesEqual(value, (right as Record<string, unknown>)[key]),
+    );
+  }
+
+  return false;
+}
+
 interface ARCameraBackgroundProps {
   enabled: boolean;
   className?: string;
@@ -39,6 +74,7 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
   const handledRetryRequestRef = useRef(0);
   const handledRevertProfileRequestRef = useRef(0);
   const recordedManualProfileSignatureRef = useRef<string | null>(null);
+  const lastStartSignatureRef = useRef<string | null>(null);
 
   const stellarium = useSettingsStore((state) => state.stellarium);
   const setStellariumSetting = useSettingsStore((state) => state.setStellariumSetting);
@@ -92,6 +128,22 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
     () => JSON.stringify(profileLayers),
     [profileLayers],
   );
+  const preferredDevice = stellarium.arCameraPreferredDevice ?? null;
+  const rememberedAcquisition = stellarium.arCameraLastKnownGoodAcquisition ?? null;
+  const startRequestSignature = useMemo(
+    () => [
+      enabled ? 'enabled' : 'disabled',
+      profileSignature,
+      preferredDevice?.deviceId ?? 'system-default',
+      preferredDevice?.groupId ?? 'no-group',
+    ].join('|'),
+    [
+      enabled,
+      preferredDevice?.deviceId,
+      preferredDevice?.groupId,
+      profileSignature,
+    ],
+  );
 
   const camera = useCamera({
     facingMode: profileLayers.userOverrides.facingMode,
@@ -99,6 +151,30 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
     preferredDevice: stellarium.arCameraPreferredDevice ?? null,
     lastKnownGoodAcquisition: stellarium.arCameraLastKnownGoodAcquisition ?? null,
   });
+  const {
+    stream: cameraStream,
+    isLoading: cameraIsLoading,
+    error: cameraError,
+    errorType: cameraErrorType,
+    facingMode: cameraFacingMode,
+    devices: cameraDevices,
+    capabilities: cameraCapabilities,
+    normalizedCapabilities,
+    effectiveProfile,
+    profileApplyError,
+    profileFallbackReason,
+    lastKnownGoodProfile,
+    lastKnownGoodAcquisition,
+    acquisitionDiagnostics,
+    isSupported: cameraIsSupported,
+    hasMultipleCameras,
+    torchOn,
+    start: startCamera,
+    stop: stopCamera,
+    switchCamera,
+    applyProfileLayers: applyCameraProfileLayers,
+    toggleTorch,
+  } = camera;
   const arSession = useARSessionStatus({ enabled });
 
   const setCameraRuntime = useARRuntimeStore((state) => state.setCameraRuntime);
@@ -181,28 +257,35 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
   // Start/stop camera based on enabled prop
   useEffect(() => {
     if (enabled) {
-      void camera.start({
+      if (lastStartSignatureRef.current === startRequestSignature) {
+        return;
+      }
+      lastStartSignatureRef.current = startRequestSignature;
+      void startCamera({
         profileLayers,
-        preferredDevice: stellarium.arCameraPreferredDevice ?? null,
-        lastKnownGoodAcquisition: stellarium.arCameraLastKnownGoodAcquisition ?? null,
+        preferredDevice,
+        lastKnownGoodAcquisition: rememberedAcquisition,
       });
       setRecoveryNoticeKey(null);
     } else {
-      camera.stop();
+      lastStartSignatureRef.current = null;
+      stopCamera();
     }
   }, [
-    camera,
     enabled,
+    preferredDevice,
     profileLayers,
+    rememberedAcquisition,
     setRecoveryNoticeKey,
-    stellarium.arCameraLastKnownGoodAcquisition,
-    stellarium.arCameraPreferredDevice,
+    startRequestSignature,
+    startCamera,
+    stopCamera,
   ]);
 
   useEffect(() => {
-    if (!enabled || !camera.stream) return;
-    void camera.applyProfileLayers(profileLayers);
-  }, [camera, enabled, profileSignature, profileLayers]);
+    if (!enabled || !cameraStream) return;
+    void applyCameraProfileLayers(profileLayers);
+  }, [applyCameraProfileLayers, cameraStream, enabled, profileSignature, profileLayers]);
 
   useEffect(() => {
     if (!enabled) {
@@ -211,49 +294,69 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
     }
 
     setCameraRuntime({
-      isSupported: camera.isSupported,
-      isLoading: camera.isLoading,
-      hasStream: Boolean(camera.stream),
-      errorType: camera.errorType,
-      capabilityMap: camera.normalizedCapabilities,
-      effectiveProfile: camera.effectiveProfile,
-      profileApplyError: camera.profileApplyError,
-      profileFallbackReason: camera.profileFallbackReason,
-      lastKnownGoodProfile: camera.lastKnownGoodProfile,
-      lastKnownGoodAcquisition: camera.lastKnownGoodAcquisition,
-      availableDevices: camera.devices,
-      acquisitionDiagnostics: camera.acquisitionDiagnostics,
+      isSupported: cameraIsSupported,
+      isLoading: cameraIsLoading,
+      hasStream: Boolean(cameraStream),
+      errorType: cameraErrorType,
+      capabilityMap: normalizedCapabilities,
+      effectiveProfile,
+      profileApplyError,
+      profileFallbackReason,
+      lastKnownGoodProfile,
+      lastKnownGoodAcquisition,
+      availableDevices: cameraDevices,
+      acquisitionDiagnostics,
     });
   }, [
-    camera.effectiveProfile,
-    camera.errorType,
-    camera.isLoading,
-    camera.isSupported,
-    camera.lastKnownGoodProfile,
-    camera.lastKnownGoodAcquisition,
-    camera.devices,
-    camera.acquisitionDiagnostics,
-    camera.normalizedCapabilities,
-    camera.profileApplyError,
-    camera.profileFallbackReason,
-    camera.stream,
+    acquisitionDiagnostics,
+    cameraDevices,
+    cameraErrorType,
+    cameraIsLoading,
+    cameraIsSupported,
+    cameraStream,
     enabled,
+    effectiveProfile,
+    lastKnownGoodAcquisition,
+    lastKnownGoodProfile,
+    normalizedCapabilities,
+    profileApplyError,
+    profileFallbackReason,
     resetCameraRuntime,
     setCameraRuntime,
   ]);
 
   useEffect(() => {
-    if (camera.lastKnownGoodAcquisition) {
-      setStellariumSetting('arCameraLastKnownGoodAcquisition', camera.lastKnownGoodAcquisition);
+    if (
+      lastKnownGoodAcquisition &&
+      !areValuesEqual(stellarium.arCameraLastKnownGoodAcquisition, lastKnownGoodAcquisition)
+    ) {
+      setStellariumSetting('arCameraLastKnownGoodAcquisition', lastKnownGoodAcquisition);
     }
-    if (camera.acquisitionDiagnostics.stalePreferredDevice) {
+    if (
+      acquisitionDiagnostics.stalePreferredDevice &&
+      !areValuesEqual(stellarium.arCameraPreferredDevice, {
+        deviceId: null,
+        label: null,
+        groupId: null,
+      })
+    ) {
       setStellariumSetting('arCameraPreferredDevice', {
         deviceId: null,
         label: null,
         groupId: null,
       });
     }
-    if (camera.acquisitionDiagnostics.staleRememberedDevice) {
+    if (
+      acquisitionDiagnostics.staleRememberedDevice &&
+      !areValuesEqual(stellarium.arCameraLastKnownGoodAcquisition, {
+        deviceId: null,
+        label: null,
+        groupId: null,
+        facingMode: 'environment',
+        stage: null,
+        updatedAt: null,
+      })
+    ) {
       setStellariumSetting('arCameraLastKnownGoodAcquisition', {
         deviceId: null,
         label: null,
@@ -264,9 +367,11 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
       });
     }
   }, [
-    camera.acquisitionDiagnostics.stalePreferredDevice,
-    camera.acquisitionDiagnostics.staleRememberedDevice,
-    camera.lastKnownGoodAcquisition,
+    acquisitionDiagnostics.stalePreferredDevice,
+    acquisitionDiagnostics.staleRememberedDevice,
+    lastKnownGoodAcquisition,
+    stellarium.arCameraLastKnownGoodAcquisition,
+    stellarium.arCameraPreferredDevice,
     setStellariumSetting,
   ]);
 
@@ -274,47 +379,49 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
     if (retryCameraRequestVersion === handledRetryRequestRef.current) return;
     handledRetryRequestRef.current = retryCameraRequestVersion;
     if (!enabled) return;
-    void camera.start({
+    lastStartSignatureRef.current = startRequestSignature;
+    void startCamera({
       profileLayers,
-      preferredDevice: stellarium.arCameraPreferredDevice ?? null,
-      lastKnownGoodAcquisition: stellarium.arCameraLastKnownGoodAcquisition ?? null,
+      preferredDevice,
+      lastKnownGoodAcquisition: rememberedAcquisition,
     });
     if (stellarium.arAdaptiveLearningEnabled) {
       const nextState = applyARAdaptiveLearnerEvent(stellarium.arAdaptiveLearnerState, {
         type: 'session_summary',
-        averageFps: camera.effectiveProfile?.targetFps ?? (stellarium.arCameraTargetFps ?? 30),
+        averageFps: effectiveProfile?.targetFps ?? (stellarium.arCameraTargetFps ?? 30),
         recoveryActionsPerSession: 1,
       });
       setStellariumSetting('arAdaptiveLearnerState', nextState);
     }
     setRecoveryNoticeKey(null);
   }, [
-    camera,
     enabled,
+    effectiveProfile?.targetFps,
+    preferredDevice,
     profileLayers,
+    rememberedAcquisition,
     retryCameraRequestVersion,
     setRecoveryNoticeKey,
     setStellariumSetting,
+    startRequestSignature,
+    startCamera,
     stellarium.arAdaptiveLearnerState,
     stellarium.arAdaptiveLearningEnabled,
-    stellarium.arCameraLastKnownGoodAcquisition,
-    stellarium.arCameraPreferredDevice,
     stellarium.arCameraTargetFps,
-    camera.effectiveProfile?.targetFps,
   ]);
 
   useEffect(() => {
     if (switchCameraRequestVersion === 0) return;
     if (!enabled) return;
-    void camera.switchCamera();
-  }, [camera, enabled, switchCameraRequestVersion]);
+    void switchCamera();
+  }, [enabled, switchCameraRequestVersion, switchCamera]);
 
   useEffect(() => {
     if (revertProfileRequestVersion === handledRevertProfileRequestRef.current) return;
     handledRevertProfileRequestRef.current = revertProfileRequestVersion;
 
     if (!enabled) return;
-    const lastGood = camera.lastKnownGoodProfile;
+    const lastGood = lastKnownGoodProfile;
     if (!lastGood) {
       setRecoveryNoticeKey('settings.arRecoveryNoKnownGoodProfile');
       return;
@@ -339,8 +446,8 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
     }
     setRecoveryNoticeKey(null);
   }, [
-    camera.lastKnownGoodProfile,
     enabled,
+    lastKnownGoodProfile,
     revertProfileRequestVersion,
     setRecoveryNoticeKey,
     setStellariumSetting,
@@ -349,33 +456,33 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
   ]);
 
   useEffect(() => {
-    if (!enabled || !camera.effectiveProfile) return;
+    if (!enabled || !effectiveProfile) return;
 
     if (!stellarium.arAdaptiveLearningEnabled) return;
-    const signature = `${camera.effectiveProfile.resolutionTier}:${camera.effectiveProfile.targetFps}:${camera.effectiveProfile.stabilizationStrength.toFixed(2)}:${camera.effectiveProfile.sensorSmoothingFactor.toFixed(2)}:${camera.effectiveProfile.calibrationSensitivity.toFixed(2)}`;
+    const signature = `${effectiveProfile.resolutionTier}:${effectiveProfile.targetFps}:${effectiveProfile.stabilizationStrength.toFixed(2)}:${effectiveProfile.sensorSmoothingFactor.toFixed(2)}:${effectiveProfile.calibrationSensitivity.toFixed(2)}`;
     if (recordedManualProfileSignatureRef.current === signature) return;
     const shouldRecordManualOverride =
-      profileLayers.userOverrides.targetFps === camera.effectiveProfile.targetFps
-      && profileLayers.userOverrides.resolutionTier === camera.effectiveProfile.resolutionTier;
+      profileLayers.userOverrides.targetFps === effectiveProfile.targetFps
+      && profileLayers.userOverrides.resolutionTier === effectiveProfile.resolutionTier;
 
     if (!shouldRecordManualOverride) return;
 
     const nextState = applyARAdaptiveLearnerEvent(stellarium.arAdaptiveLearnerState, {
       type: 'manual_profile_override',
       overrides: {
-        targetFps: camera.effectiveProfile.targetFps,
-        resolutionTier: camera.effectiveProfile.resolutionTier,
-        stabilizationStrength: camera.effectiveProfile.stabilizationStrength,
-        sensorSmoothingFactor: camera.effectiveProfile.sensorSmoothingFactor,
-        calibrationSensitivity: camera.effectiveProfile.calibrationSensitivity,
+        targetFps: effectiveProfile.targetFps,
+        resolutionTier: effectiveProfile.resolutionTier,
+        stabilizationStrength: effectiveProfile.stabilizationStrength,
+        sensorSmoothingFactor: effectiveProfile.sensorSmoothingFactor,
+        calibrationSensitivity: effectiveProfile.calibrationSensitivity,
       },
     });
 
     setStellariumSetting('arAdaptiveLearnerState', nextState);
     recordedManualProfileSignatureRef.current = signature;
   }, [
-    camera.effectiveProfile,
     enabled,
+    effectiveProfile,
     profileLayers.userOverrides.resolutionTier,
     profileLayers.userOverrides.targetFps,
     setStellariumSetting,
@@ -390,29 +497,29 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
   // Attach stream to video element
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !camera.stream) return;
-    video.srcObject = camera.stream;
-  }, [camera.stream]);
+    if (!video || !cameraStream) return;
+    video.srcObject = cameraStream;
+  }, [cameraStream]);
 
   if (!enabled) return null;
 
   // Error state
-  if (camera.error) {
+  if (cameraError) {
     return (
       <div className={cn('absolute inset-0 z-0 flex items-center justify-center bg-black/90', className)}>
         <div className="flex flex-col items-center gap-3 text-center px-6">
           <AlertCircle className="h-10 w-10 text-red-400" />
           <p className="text-sm text-red-300">
-            {camera.errorType === 'permission-denied'
+            {cameraErrorType === 'permission-denied'
               ? t('settings.arCameraPermission')
-              : camera.errorType === 'not-supported'
+              : cameraErrorType === 'not-supported'
                 ? t('settings.arNotSupported')
                 : t('settings.arCameraError')}
           </p>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => void camera.start({ profileLayers })}
+            onClick={() => void startCamera({ profileLayers })}
           >
             {t('common.retry')}
           </Button>
@@ -427,7 +534,7 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
         ref={videoRef}
         className={cn(
           'w-full h-full object-cover',
-          camera.facingMode === 'user' && 'scale-x-[-1]'
+          cameraFacingMode === 'user' && 'scale-x-[-1]'
         )}
         autoPlay
         playsInline
@@ -447,41 +554,52 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
         </div>
       )}
 
-      {camera.profileFallbackReason && (
+      {profileFallbackReason && (
         <div className="absolute left-2 top-8 z-10 rounded-md bg-amber-500/25 px-2 py-1 text-[10px] text-amber-100 backdrop-blur-sm">
           {t('settings.arCameraFallbackApplied')}
         </div>
       )}
 
       {/* Camera controls overlay */}
-      {camera.stream && (
+      {cameraStream && (
         <div
-          className="absolute z-10 flex flex-col"
+          className={cn(
+            'absolute z-10 flex',
+            adaptation.runtimeClass === 'browser-mobile' ? 'flex-col' : 'flex-row items-center',
+          )}
           data-testid="ar-camera-controls"
           data-ar-camera-controls-mode={adaptation.cameraControlMode}
+          data-ar-operating-mode={adaptation.operatingMode}
+          data-ar-runtime-class={adaptation.runtimeClass}
           style={{
             top: withSafeAreaInset('top', cameraControlLayout.topOffsetRem),
             right: withSafeAreaInset('right', cameraControlLayout.sideInsetRem),
             gap: `${cameraControlLayout.gapRem}rem`,
           }}
         >
-          {camera.hasMultipleCameras && (
+          {hasMultipleCameras && (
             <Button
               variant="secondary"
               size="icon"
-              className="h-8 w-8 rounded-full bg-background/40 backdrop-blur-sm hover:bg-background/60"
-              onClick={() => void camera.switchCamera()}
+              className={cn(
+                'rounded-full bg-background/40 backdrop-blur-sm hover:bg-background/60',
+                adaptation.runtimeClass === 'browser-mobile' ? 'h-8 w-8' : 'h-9 w-9',
+              )}
+              onClick={() => void switchCamera()}
               aria-label={t('common.switchCamera') ?? 'Switch camera'}
             >
               <SwitchCamera className="h-4 w-4" />
             </Button>
           )}
-          {camera.capabilities.torch && (
+          {cameraCapabilities.torch && (
             <Button
-              variant={camera.torchOn ? 'default' : 'secondary'}
+              variant={torchOn ? 'default' : 'secondary'}
               size="icon"
-              className="h-8 w-8 rounded-full bg-background/40 backdrop-blur-sm hover:bg-background/60"
-              onClick={() => void camera.toggleTorch()}
+              className={cn(
+                'rounded-full bg-background/40 backdrop-blur-sm hover:bg-background/60',
+                adaptation.runtimeClass === 'browser-mobile' ? 'h-8 w-8' : 'h-9 w-9',
+              )}
+              onClick={() => void toggleTorch()}
               aria-label="Torch"
             >
               <Flashlight className="h-4 w-4" />
@@ -491,7 +609,7 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
       )}
 
       {/* Loading state */}
-      {camera.isLoading && (
+      {cameraIsLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/70">
           <div className="flex flex-col items-center gap-2">
             <Camera className="h-8 w-8 text-muted-foreground animate-pulse" />

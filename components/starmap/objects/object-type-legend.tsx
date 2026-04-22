@@ -9,6 +9,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -116,6 +117,9 @@ export const ObjectTypeLegend = memo(function ObjectTypeLegend({
               <Star className="h-5 w-5 text-primary" />
               {t('objectTypesTitle')}
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              {t('objectTypesTitle')}
+            </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] max-h-[60dvh] pr-4">
             <ObjectTypeLegendContent />

@@ -75,9 +75,13 @@ const mockStore: {
   sourceStatuses: Array<{ source: string; state: string; reason: string; itemCount: number; transport: string }>;
   usedCuratedFallback: boolean;
   resolutionMode: 'fresh-online' | 'stale-cache' | 'curated-fallback';
+  activeDateKey: string;
   closeDialog: jest.Mock;
   loadDaily: jest.Mock;
   refreshCurrentDate: jest.Mock;
+  browsePreviousDate: jest.Mock;
+  browseNextDate: jest.Mock;
+  goToToday: jest.Mock;
   next: jest.Mock;
   prev: jest.Mock;
   random: jest.Mock;
@@ -116,9 +120,13 @@ const mockStore: {
   ],
   usedCuratedFallback: true,
   resolutionMode: 'curated-fallback',
+  activeDateKey: '2026-02-20',
   closeDialog: jest.fn(),
   loadDaily: jest.fn(),
   refreshCurrentDate: jest.fn(),
+  browsePreviousDate: jest.fn(),
+  browseNextDate: jest.fn(),
+  goToToday: jest.fn(),
   next: jest.fn(),
   prev: jest.fn(),
   random: jest.fn(),
@@ -179,6 +187,7 @@ describe('daily-knowledge-dialog', () => {
     ];
     mockStore.usedCuratedFallback = true;
     mockStore.resolutionMode = 'curated-fallback';
+    mockStore.activeDateKey = '2026-02-20';
     mockStore.viewMode = 'pager';
     mockStore.wheelPagingEnabled = false;
     mockCopyTextWithFeedback.mockResolvedValue(true);
@@ -203,9 +212,9 @@ describe('daily-knowledge-dialog', () => {
     });
     expect(mockStore.setFilters).toHaveBeenCalledWith({ query: 'M31' });
 
-    fireEvent.click(findButtonByIcon('lucide-chevron-left'));
-    fireEvent.click(findButtonByIcon('lucide-chevron-right'));
-    fireEvent.click(findButtonByIcon('lucide-shuffle'));
+    fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.prev' }));
+    fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.random' }));
 
     expect(mockStore.prev).toHaveBeenCalled();
     expect(mockStore.next).toHaveBeenCalled();
@@ -313,6 +322,20 @@ describe('daily-knowledge-dialog', () => {
     fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.refreshCurrentDate' }));
 
     expect(mockStore.refreshCurrentDate).toHaveBeenCalledWith('manual');
+  });
+
+  it('shows active date context and date navigation controls', () => {
+    render(<DailyKnowledgeDialog />);
+
+    expect(screen.getByText('dailyKnowledge.activeDateLabel')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.previousDate' }));
+    fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.nextDate' }));
+    fireEvent.click(screen.getByRole('button', { name: 'dailyKnowledge.goToToday' }));
+
+    expect(mockStore.browsePreviousDate).toHaveBeenCalledWith('manual');
+    expect(mockStore.browseNextDate).toHaveBeenCalledWith('manual');
+    expect(mockStore.goToToday).toHaveBeenCalledWith('manual');
   });
 
   it('uses share->clipboard fallback and supports copy action', async () => {

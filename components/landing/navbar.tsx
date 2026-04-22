@@ -12,8 +12,8 @@ import {
 } from '@/components/ui/sheet';
 import { LanguageSwitcher } from '@/components/common/language-switcher';
 import { ThemeToggle } from '@/components/common/theme-toggle';
-import { Github, Menu } from 'lucide-react';
-import { SkyMapLogo } from '@/components/icons';
+import { Menu } from 'lucide-react';
+import { GitHubIcon, SkyMapLogo } from '@/components/icons';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { EXTERNAL_LINKS } from '@/lib/constants/external-links';
@@ -51,7 +51,7 @@ function NavLink({ item, label, className, activeHref, onClick }: NavLinkProps) 
         className={cn('text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5', className)}
         onClick={onClick}
       >
-        <Github className="h-4 w-4" />
+        <GitHubIcon className="h-4 w-4" />
         {label}
       </a>
     );

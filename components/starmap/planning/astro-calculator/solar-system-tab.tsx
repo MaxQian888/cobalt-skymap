@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, Orbit } from 'lucide-react';
+import { AlertTriangle, Download, ListPlus, NotebookPen, Orbit } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { isExplicitMinorObjectQuery } from '@/lib/astronomy/object-resolver/parser/minor-parser';
 import { type EngineBody } from '@/lib/astronomy/engine';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
 import { formatTimeShort } from '@/lib/astronomy/time/formats';
@@ -26,10 +28,22 @@ import {
   summarizeCalculatorMeta,
   type CalculatorMetaSummary,
 } from './orchestrator';
+import {
+  fetchSmallBodyEphemeris,
+} from './small-body-adapter';
+import {
+  AstroCalculatorResultActionsBar,
+  AstroCalculatorRowActions,
+  ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME,
+  ASTRO_CALCULATOR_ROW_ACTION_BUTTON_CLASSNAME,
+} from './result-action-layout';
+import { useAstroCalculatorResultActions } from './result-actions';
+import type { AstroCalculatorObserverContext } from './types';
 
 interface SolarSystemTabProps {
   latitude: number;
   longitude: number;
+  observerContext?: AstroCalculatorObserverContext;
   sharedDate?: string;
   sharedTime?: string;
   onSharedDateChange?: (nextDate: string) => void;
@@ -37,7 +51,7 @@ interface SolarSystemTabProps {
 }
 
 interface SolarSystemRow {
-  body: EngineBody;
+  body: string;
   ra: number;
   dec: number;
   altitude: number;
@@ -68,9 +82,27 @@ function toDateInput(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function getExplicitMinorObjectQuery(input: string): string | null {
+  const query = input.trim();
+  if (!query) {
+    return null;
+  }
+  if (isExplicitMinorObjectQuery(query)) {
+    return query;
+  }
+
+  const slashIndex = query.indexOf('/');
+  if (slashIndex > 0 && isExplicitMinorObjectQuery(query.slice(0, slashIndex))) {
+    return query;
+  }
+
+  return null;
+}
+
 export function SolarSystemTab({
   latitude,
   longitude,
+  observerContext,
   sharedDate,
   sharedTime,
   onSharedDateChange,
@@ -79,14 +111,43 @@ export function SolarSystemTab({
   const t = useTranslations();
   const [date, setDate] = useState(sharedDate ?? toDateInput(new Date()));
   const [time, setTime] = useState(sharedTime ?? '22:00');
+  const [minorObjectQuery, setMinorObjectQuery] = useState('');
   const [includePluto, setIncludePluto] = useState(true);
   const [rows, setRows] = useState<SolarSystemRow[]>([]);
   const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [sourceDiagnostics, setSourceDiagnostics] = useState<string[]>([]);
+  const {
+    copyResults,
+    exportResults,
+    addTargetToList,
+    openPlannerForTarget,
+  } = useAstroCalculatorResultActions(observerContext);
 
   const dateTime = useMemo(() => new Date(`${date}T${time}:00`), [date, time]);
   const bodies = useMemo(() => includePluto ? [...BASE_BODIES, 'Pluto' as const] : BASE_BODIES, [includePluto]);
+  const explicitMinorObjectQuery = useMemo(() => getExplicitMinorObjectQuery(minorObjectQuery), [minorObjectQuery]);
+  const exportLines = useMemo(() => {
+    return [
+      `Date: ${date}`,
+      `Time: ${time}`,
+      `Include Pluto: ${includePluto}`,
+      '',
+      ...rows.map((row) => [
+        row.body,
+        `RA=${degreesToHMS(row.ra)}`,
+        `Dec=${degreesToDMS(row.dec)}`,
+        `Alt=${row.altitude.toFixed(2)}`,
+        `Az=${row.azimuth.toFixed(2)}`,
+        `Mag=${row.magnitude !== undefined ? row.magnitude.toFixed(2) : '--'}`,
+        `Phase=${row.phaseFraction !== undefined ? `${(row.phaseFraction * 100).toFixed(1)}%` : '--'}`,
+        `Rise=${formatTimeShort(row.riseTime)}`,
+        `Transit=${formatTimeShort(row.transitTime)}`,
+        `Set=${formatTimeShort(row.setTime)}`,
+      ].join(' | ')),
+    ];
+  }, [date, includePluto, rows, time]);
 
   useEffect(() => {
     if (sharedDate && sharedDate !== date) {
@@ -116,6 +177,7 @@ export function SolarSystemTab({
               startDate: dateTime,
               stepHours: 24,
               steps: 1,
+              contextKey: observerContext?.contextKey,
             })),
             { concurrency: 3 },
           ),
@@ -124,6 +186,7 @@ export function SolarSystemTab({
               body,
               observer: { latitude, longitude },
               date: dateTime,
+              contextKey: observerContext?.contextKey,
             })),
             { concurrency: 3 },
           ),
@@ -148,18 +211,75 @@ export function SolarSystemTab({
           };
         });
 
-        const combinedMeta = summarizeCalculatorMeta([
+        const metaEntries = [
           ...ephemerisResults.map(item => item.meta),
           ...rtsResults.map(item => item.meta),
-        ]);
+        ];
+        const nextSourceDiagnostics: string[] = [];
+
+        if (explicitMinorObjectQuery) {
+          const smallBodyResult = await fetchSmallBodyEphemeris({
+            query: explicitMinorObjectQuery,
+            observer: {
+              latitude,
+              longitude,
+              elevation: observerContext?.elevation,
+            },
+            startDate: dateTime,
+            stepHours: 24,
+            steps: 1,
+          });
+          const spotlight = smallBodyResult.points[0];
+
+          if (spotlight) {
+            const [smallBodyRts] = await runCalculatorRiseTransitSetBatch([
+              {
+                body: 'Custom',
+                observer: { latitude, longitude },
+                date: spotlight.date,
+                contextKey: observerContext?.contextKey,
+                customCoordinate: {
+                  ra: spotlight.ra,
+                  dec: spotlight.dec,
+                },
+              },
+            ]);
+
+            nextRows.push({
+              body: smallBodyResult.meta.resolvedName,
+              ra: spotlight.ra,
+              dec: spotlight.dec,
+              altitude: spotlight.altitude,
+              azimuth: spotlight.azimuth,
+              magnitude: spotlight.magnitude,
+              phaseFraction: undefined,
+              riseTime: smallBodyRts.response.riseTime,
+              transitTime: smallBodyRts.response.transitTime,
+              setTime: smallBodyRts.response.setTime,
+            });
+
+            metaEntries.push(smallBodyRts.meta);
+          }
+
+          nextSourceDiagnostics.push(
+            `Small-body query=${explicitMinorObjectQuery}`,
+            `Small-body source=${smallBodyResult.meta.source}`,
+            `Resolved target=${smallBodyResult.meta.resolvedName}`,
+            ...smallBodyResult.meta.warnings,
+          );
+        }
+
+        const combinedMeta = summarizeCalculatorMeta(metaEntries);
 
         if (!cancelled) {
           setRows(nextRows);
+          setSourceDiagnostics(nextSourceDiagnostics);
           setMetaSummary(combinedMeta);
         }
       } catch (runError) {
         if (!cancelled) {
           setRows([]);
+          setSourceDiagnostics([]);
           setMetaSummary(null);
           setError(runError instanceof Error ? runError.message : t('astroCalc.calculationFailed'));
         }
@@ -174,7 +294,7 @@ export function SolarSystemTab({
     return () => {
       cancelled = true;
     };
-  }, [bodies, dateTime, latitude, longitude, t]);
+  }, [bodies, dateTime, explicitMinorObjectQuery, latitude, longitude, observerContext?.contextKey, observerContext?.elevation, t]);
 
   return (
     <div className="space-y-4">
@@ -223,6 +343,57 @@ export function SolarSystemTab({
         </div>
       </div>
 
+      <div className="space-y-1.5">
+        <Label className="text-xs">{t('astroCalc.minorObjectQuery')}</Label>
+        <Input
+          value={minorObjectQuery}
+          onChange={(event) => setMinorObjectQuery(event.target.value)}
+          aria-label={t('astroCalc.minorObjectQuery')}
+          placeholder={t('astroCalc.minorObjectPlaceholder')}
+          className="h-8"
+        />
+      </div>
+
+      {rows.length > 0 && (
+        <AstroCalculatorResultActionsBar>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.copyResults')}
+            onClick={() => void copyResults({
+              title: t('astroCalc.solarSystem'),
+              fileStem: 'astro-calculator-solar-system',
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            {t('astroCalc.copyResults')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.exportResults')}
+            onClick={() => exportResults({
+              title: t('astroCalc.solarSystem'),
+              fileStem: 'astro-calculator-solar-system',
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {t('astroCalc.exportResults')}
+          </Button>
+        </AstroCalculatorResultActionsBar>
+      )}
+
       {error && (
         <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="h-3.5 w-3.5" />
@@ -250,6 +421,7 @@ export function SolarSystemTab({
                 <TableHead>{t('astroCalc.rise')}</TableHead>
                 <TableHead>{t('astroCalc.transit')}</TableHead>
                 <TableHead>{t('astroCalc.set')}</TableHead>
+                <TableHead>{t('astroCalc.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -271,6 +443,38 @@ export function SolarSystemTab({
                   <TableCell className="font-mono text-xs">{formatTimeShort(row.riseTime)}</TableCell>
                   <TableCell className="font-mono text-xs">{formatTimeShort(row.transitTime)}</TableCell>
                   <TableCell className="font-mono text-xs">{formatTimeShort(row.setTime)}</TableCell>
+                  <TableCell>
+                    <AstroCalculatorRowActions rowKey={row.body}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={ASTRO_CALCULATOR_ROW_ACTION_BUTTON_CLASSNAME}
+                        aria-label={`${t('astroCalc.addToList')}: ${row.body}`}
+                        onClick={() => addTargetToList({
+                          name: row.body,
+                          ra: row.ra,
+                          dec: row.dec,
+                        })}
+                      >
+                        <ListPlus className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={ASTRO_CALCULATOR_ROW_ACTION_BUTTON_CLASSNAME}
+                        aria-label={`${t('astroCalc.openPlanner')}: ${row.body}`}
+                        onClick={() => openPlannerForTarget({
+                          name: row.body,
+                          ra: row.ra,
+                          dec: row.dec,
+                        })}
+                      >
+                        <NotebookPen className="h-3.5 w-3.5" />
+                      </Button>
+                    </AstroCalculatorRowActions>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -8,11 +8,11 @@ SkyMap 支持多种部署方式：
 
 ### 桌面应用部署
 
-- **Windows**: MSI安装包
-- **macOS**: DMG安装包
-- **Linux**: AppImage、deb、rpm包
+- **Windows**: MSI 安装包
+- **macOS**: DMG 安装包
+- **Linux**: AppImage、deb、rpm 包
 
-### Web应用部署
+### Web 应用部署
 
 - **静态托管**: Vercel、Netlify
 - **自托管**: Nginx、Apache
@@ -21,9 +21,9 @@ SkyMap 支持多种部署方式：
 
 ### 前置要求
 
-- Rust 工具链（1.70+）
-- Node.js (20+)
-- pnpm 或 npm
+- Rust 工具链（1.75+）
+- Node.js（20+）
+- pnpm（9+）
 - 操作系统特定工具
 
 ### Windows
@@ -44,13 +44,19 @@ cd cobalt-skymap
 # 安装依赖
 pnpm install
 
-# 构建
+# 构建（默认）
 pnpm tauri build
+
+# 或使用预配置构建脚本
+pnpm build:desktop
+
+# Windows 专属构建
+pnpm build:desktop:windows
 ```
 
 #### 输出位置
 
-- MSI安装包: `src-tauri/target/release/bundle/msi/`
+- MSI 安装包: `src-tauri/target/release/bundle/msi/`
 - 可执行文件: `src-tauri/target/release/`
 
 ### macOS
@@ -77,7 +83,7 @@ pnpm tauri build
 
 #### 输出位置
 
-- DMG安装包: `src-tauri/target/release/bundle/dmg/`
+- DMG 安装包: `src-tauri/target/release/bundle/dmg/`
 - 应用程序: `src-tauri/target/release/bundle/macos/`
 
 ### Linux
@@ -87,7 +93,7 @@ pnpm tauri build
 ```bash
 # Ubuntu/Debian
 sudo apt update
-sudo apt install libwebkit2gtk-4.0-dev \
+sudo apt install libwebkit2gtk-4.1-dev \
     build-essential \
     curl \
     wget \
@@ -123,30 +129,30 @@ pnpm tauri build
 #### 输出位置
 
 - AppImage: `src-tauri/target/release/bundle/appimage/`
-- deb包: `src-tauri/target/release/bundle/deb/`
-- rpm包: `src-tauri/target/release/bundle/rpm/`
+- deb 包: `src-tauri/target/release/bundle/deb/`
+- rpm 包: `src-tauri/target/release/bundle/rpm/`
 
-## Web应用部署
+## Web 应用部署
 
 ### 构建静态站点
 
 ```bash
-# 构建Next.js应用
+# 构建 Next.js 应用
 pnpm build
 
 # 输出在 out/ 目录
 ```
 
-### Vercel部署（推荐）
+### Vercel 部署（推荐）
 
-1. 推送代码到GitHub
+1. 推送代码到 GitHub
 2. 在 [Vercel](https://vercel.com) 导入项目
-3. Vercel自动检测Next.js并配置
+3. Vercel 自动检测 Next.js 并配置
 4. 点击部署
 
-### Netlify部署
+### Netlify 部署
 
-1. 推送代码到GitHub
+1. 推送代码到 GitHub
 2. 在 [Netlify](https://netlify.com) 导入项目
 3. 配置构建设置：
    - 构建命令: `pnpm build`
@@ -155,7 +161,7 @@ pnpm build
 
 ### 静态托管部署
 
-#### Nginx配置
+#### Nginx 配置
 
 ```nginx
 server {
@@ -170,7 +176,7 @@ server {
 }
 ```
 
-#### Apache配置
+#### Apache 配置
 
 ```apache
 <VirtualHost *:80>
@@ -190,7 +196,7 @@ server {
 
 ## 代码签名
 
-### Windows代码签名
+### Windows 代码签名
 
 使用 [SignTool](https://docs.microsoft.com/en-us/windows/win32/seccrypto/signtool) 对应用进行签名：
 
@@ -198,7 +204,7 @@ server {
 signtool sign /f certificate.pfx /p password /t timestamp_url cobalt-skymap.msi
 ```
 
-### macOS代码签名
+### macOS 代码签名
 
 ```bash
 # 安装证书
@@ -207,10 +213,10 @@ signtool sign /f certificate.pfx /p password /t timestamp_url cobalt-skymap.msi
 # 签名应用
 codesign --sign "Developer ID Application: Your Name" \
     --force --deep \
-    src-tauri/target/release/bundle/macos/SkyMapTest.app
+    src-tauri/target/release/bundle/macos/SkyMap.app
 
-# 公证应用（需要Apple Developer账号）
-xcrun notarytool submit SkyMapTest.dmg \
+# 公证应用（需要 Apple Developer 账号）
+xcrun notarytool submit SkyMap.dmg \
     --apple-id "your@email.com" \
     --password "app-specific-password" \
     --team-id "team-id" \
@@ -224,20 +230,20 @@ xcrun notarytool submit SkyMapTest.dmg \
 使用语义化版本：
 
 - **MAJOR.MINOR.PATCH**
-- 例如: 1.0.0, 1.1.0, 1.1.1
+- 例如: 0.1.0, 0.2.0, 0.2.1
 
 ### 发布流程
 
 1. 更新版本号
-2. 更新CHANGELOG
-3. 创建Git标签
+2. 更新 CHANGELOG
+3. 创建 Git 标签
 4. 构建所有平台的安装包
-5. 上传到GitHub Releases
+5. 上传到 GitHub Releases
 6. 发布公告
 
 ### 自动化构建
 
-使用GitHub Actions自动构建：
+使用 GitHub Actions 自动构建：
 
 ```yaml
 name: Build Release
@@ -274,7 +280,7 @@ jobs:
 
 1. 启用压缩
 2. 移除不必要的依赖
-3. 使用LTO（Link Time Optimization）
+3. 使用 LTO（Link Time Optimization）
 4. 精简资源文件
 
 ### 启动优化
@@ -287,7 +293,7 @@ jobs:
 
 ### 内置更新
 
-SkyMap 内置更新机制：
+SkyMap 桌面端内置自动更新机制：
 
 - 自动检查更新
 - 下载更新包
@@ -325,21 +331,21 @@ https://github.com/ElementAstro/cobalt-skymap/releases/latest/download/latest.js
 
 ### 常见构建问题
 
-#### Rust编译失败
+#### Rust 编译失败
 
 ```bash
 # 清理缓存
 cd src-tauri
 cargo clean
 
-# 更新Rust
+# 更新 Rust
 rustup update
 ```
 
 #### 前端构建失败
 
 ```bash
-# 清理Next.js缓存
+# 清理 Next.js 缓存
 rm -rf .next out
 
 # 重新安装依赖
@@ -347,10 +353,10 @@ rm -rf node_modules pnpm-lock.yaml
 pnpm install
 ```
 
-#### Tauri CLI错误
+#### Tauri CLI 错误
 
 ```bash
-# 重新安装Tauri CLI
+# 重新安装 Tauri CLI
 pnpm remove -D @tauri-apps/cli
 pnpm add -D @tauri-apps/cli
 ```
@@ -360,4 +366,3 @@ pnpm add -D @tauri-apps/cli
 - [构建指南](desktop/building.md)
 - [开发环境](../developer-guide/development-environment/setup.md)
 - [项目结构](../developer-guide/project-structure/index.md)
-

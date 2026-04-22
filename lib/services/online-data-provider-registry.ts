@@ -36,6 +36,25 @@ export type ProviderCapability =
   | 'image_enrichment'
   | 'survey_enrichment';
 
+export type ObjectInfoTargetClass =
+  | 'deep-sky'
+  | 'star'
+  | 'planetary'
+  | 'small-body'
+  | 'extragalactic'
+  | 'generic';
+
+export type ObjectInfoResponseMode =
+  | 'json'
+  | 'xml'
+  | 'votable'
+  | 'hips2fits'
+  | 'html'
+  | 'local';
+
+export type ObjectInfoAuthorityLevel = 'authoritative' | 'reference' | 'fallback-local';
+export type ObjectInfoHealthCheckStrategy = 'query' | 'lookup' | 'cutout' | 'none' | 'disabled';
+
 export type RenderProviderTier = Exclude<StarmapDataTier, 'core'>;
 export type RenderProviderWorkflow = 'search' | 'objectInfo' | 'render';
 
@@ -52,6 +71,13 @@ interface ObjectInfoProviderConfig {
   priority: number;
   timeout: number;
   apiEndpoint?: string;
+  targetClasses: readonly ObjectInfoTargetClass[];
+  responseMode: ObjectInfoResponseMode;
+  authorityLevel: ObjectInfoAuthorityLevel;
+  healthCheck: {
+    strategy: ObjectInfoHealthCheckStrategy;
+    probePath?: string;
+  };
 }
 
 interface RenderProviderConfig {
@@ -124,6 +150,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 1,
       timeout: 5000,
       apiEndpoint: '/simbad/sim-tap/sync',
+      targetClasses: ['deep-sky', 'star', 'extragalactic', 'generic'],
+      responseMode: 'json',
+      authorityLevel: 'authoritative',
+      healthCheck: {
+        strategy: 'query',
+        probePath: '/simbad/sim-tap/sync',
+      },
     },
     render: {
       enabled: true,
@@ -152,6 +185,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 3,
       timeout: 5000,
       apiEndpoint: '/sbdb.api',
+      targetClasses: ['small-body'],
+      responseMode: 'json',
+      authorityLevel: 'authoritative',
+      healthCheck: {
+        strategy: 'query',
+        probePath: '/sbdb.api?sstr=1P&phys-par=1',
+      },
     },
     render: {
       enabled: true,
@@ -203,6 +243,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 4,
       timeout: 5000,
       apiEndpoint: '/viz-bin/votable',
+      targetClasses: ['deep-sky', 'extragalactic', 'generic'],
+      responseMode: 'votable',
+      authorityLevel: 'reference',
+      healthCheck: {
+        strategy: 'query',
+        probePath: '/viz-bin/votable?-source=I/239/hip_main&-c=M31&-c.rs=1',
+      },
     },
     render: {
       enabled: true,
@@ -231,6 +278,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 5,
       timeout: 5000,
       apiEndpoint: '/cgi-bin/objsearch',
+      targetClasses: ['extragalactic', 'generic'],
+      responseMode: 'xml',
+      authorityLevel: 'reference',
+      healthCheck: {
+        strategy: 'lookup',
+        probePath: '/cgi-bin/objsearch?objname=M31&of=xml_main',
+      },
     },
     render: {
       enabled: true,
@@ -251,6 +305,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 2,
       timeout: 5000,
       apiEndpoint: '/api/rest_v1/page/summary',
+      targetClasses: ['deep-sky', 'star', 'planetary', 'small-body', 'extragalactic', 'generic'],
+      responseMode: 'json',
+      authorityLevel: 'reference',
+      healthCheck: {
+        strategy: 'lookup',
+        probePath: '/api/rest_v1/page/summary/M31',
+      },
     },
     render: {
       enabled: true,
@@ -270,6 +331,12 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       enabled: true,
       priority: 4,
       timeout: 10000,
+      targetClasses: ['deep-sky', 'star', 'planetary', 'small-body', 'extragalactic', 'generic'],
+      responseMode: 'html',
+      authorityLevel: 'reference',
+      healthCheck: {
+        strategy: 'cutout',
+      },
     },
     render: {
       enabled: true,
@@ -290,6 +357,13 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       priority: 6,
       timeout: 5000,
       apiEndpoint: '/planetary/apod',
+      targetClasses: ['deep-sky', 'planetary', 'generic'],
+      responseMode: 'json',
+      authorityLevel: 'reference',
+      healthCheck: {
+        strategy: 'lookup',
+        probePath: '/planetary/apod',
+      },
     },
     render: {
       enabled: true,
@@ -314,6 +388,12 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       enabled: true,
       priority: 0,
       timeout: 100,
+      targetClasses: ['deep-sky', 'star', 'planetary', 'small-body', 'extragalactic', 'generic'],
+      responseMode: 'local',
+      authorityLevel: 'fallback-local',
+      healthCheck: {
+        strategy: 'none',
+      },
     },
     render: {
       enabled: true,
@@ -332,6 +412,12 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
       enabled: true,
       priority: 0,
       timeout: 100,
+      targetClasses: ['deep-sky', 'star', 'planetary', 'small-body', 'extragalactic', 'generic'],
+      responseMode: 'local',
+      authorityLevel: 'authoritative',
+      healthCheck: {
+        strategy: 'none',
+      },
     },
     render: {
       enabled: true,
@@ -345,6 +431,10 @@ export const ONLINE_DATA_PROVIDER_REGISTRY: Record<string, OnlineDataProviderDef
 };
 
 export function getSearchProviderDefinition(id: SearchProviderId): OnlineDataProviderDefinition {
+  return ONLINE_DATA_PROVIDER_REGISTRY[id];
+}
+
+export function getObjectInfoProviderDefinition(id: ObjectInfoDataProviderId): OnlineDataProviderDefinition {
   return ONLINE_DATA_PROVIDER_REGISTRY[id];
 }
 
@@ -432,6 +522,13 @@ export function getDefaultObjectInfoDataSourceConfigs(): Array<{
   description: string;
   renderTier: Extract<RenderProviderTier, 'enrichment'>;
   fallbackRole: StarmapSourceFallbackRole;
+  targetClasses: readonly ObjectInfoTargetClass[];
+  responseMode: ObjectInfoResponseMode;
+  authorityLevel: ObjectInfoAuthorityLevel;
+  healthCheck: {
+    strategy: ObjectInfoHealthCheckStrategy;
+    probePath?: string;
+  };
 }> {
   return (['simbad', 'wikipedia', 'sbdb', 'vizier', 'ned'] as const).map((providerId) => {
     const provider = ONLINE_DATA_PROVIDER_REGISTRY[providerId];
@@ -447,6 +544,10 @@ export function getDefaultObjectInfoDataSourceConfigs(): Array<{
       description: provider.description,
       renderTier: provider.render?.tier === 'enrichment' ? 'enrichment' : 'enrichment',
       fallbackRole: provider.render?.fallbackRole ?? 'fallback',
+      targetClasses: provider.objectInfo?.targetClasses ?? ['generic'],
+      responseMode: provider.objectInfo?.responseMode ?? 'json',
+      authorityLevel: provider.objectInfo?.authorityLevel ?? 'reference',
+      healthCheck: provider.objectInfo?.healthCheck ?? { strategy: 'disabled' },
     };
   });
 }

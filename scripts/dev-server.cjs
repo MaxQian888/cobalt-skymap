@@ -17,13 +17,21 @@ const { execSync, spawn } = require("child_process");
 // Config
 // ---------------------------------------------------------------------------
 
-const args = process.argv.slice(2);
-const killFlag = args.includes("--kill");
-const portArgIdx = args.indexOf("--port");
-const DEV_PORT =
-  portArgIdx !== -1 && args[portArgIdx + 1]
-    ? Number(args[portArgIdx + 1])
-    : Number(process.env.DEV_PORT) || 1420;
+function parseCliConfig(args = process.argv.slice(2), env = process.env) {
+  const killFlag = args.includes("--kill");
+  const portArgIdx = args.indexOf("--port");
+  const devPort =
+    portArgIdx !== -1 && args[portArgIdx + 1]
+      ? Number(args[portArgIdx + 1])
+      : Number(env.DEV_PORT) || 1420;
+
+  return {
+    killFlag,
+    devPort,
+  };
+}
+
+const { killFlag, devPort: DEV_PORT } = parseCliConfig();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -72,6 +80,42 @@ function killPid(pid) {
   } catch {
     return false;
   }
+}
+
+function buildNextDevSpawnSpec({
+  port,
+  env = process.env,
+  cwd = process.cwd(),
+  nextBinPath = require.resolve("next/dist/bin/next"),
+} = {}) {
+  return {
+    command: process.execPath,
+    args: [nextBinPath, "dev", "-p", String(port)],
+    options: {
+      stdio: "inherit",
+      shell: false,
+      windowsHide: true,
+      env: { ...env, PORT: String(port) },
+      cwd,
+    },
+  };
+}
+
+function launchNextDevServer({
+  port,
+  env = process.env,
+  cwd = process.cwd(),
+  nextBinPath,
+  spawnImpl = spawn,
+} = {}) {
+  const { command, args, options } = buildNextDevSpawnSpec({
+    port,
+    env,
+    cwd,
+    nextBinPath,
+  });
+
+  return spawnImpl(command, args, options);
 }
 
 // ---------------------------------------------------------------------------
@@ -125,12 +169,7 @@ async function main() {
   console.log(`✓  Port ${DEV_PORT} is available. Starting Next.js dev server…\n`);
 
   // Spawn next dev with the guaranteed port
-  const child = spawn("npx", ["next", "dev", "-p", String(DEV_PORT)], {
-    stdio: "inherit",
-    shell: true,
-    env: { ...process.env, PORT: String(DEV_PORT) },
-    cwd: process.cwd(),
-  });
+  const child = launchNextDevServer({ port: DEV_PORT });
 
   // Forward exit signals so Tauri can clean up
   child.on("exit", (code) => process.exit(code ?? 0));
@@ -138,4 +177,19 @@ async function main() {
   process.on("SIGTERM", () => child.kill("SIGTERM"));
 }
 
-main();
+module.exports = {
+  buildNextDevSpawnSpec,
+  findPidOnPort,
+  isPortFree,
+  killPid,
+  launchNextDevServer,
+  main,
+  parseCliConfig,
+};
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { logManager } from '@/lib/logger';
 
 // Mock storage module - use factory functions to avoid hoisting issues
 jest.mock('@/lib/storage', () => {
@@ -150,6 +151,7 @@ import { DataManager } from '../data-manager';
 describe('DataManager', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    logManager.initialize({ enableConsole: false, enablePersistence: false });
     mockIsTauri.mockReturnValue(false);
     mockStorage.getStorageStats.mockResolvedValue({
       total_size: 1024,
@@ -292,6 +294,7 @@ describe('DataManager', () => {
 
     it('handles storage stats error gracefully', async () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      logManager.initialize({ enableConsole: true, enablePersistence: false });
       mockStorage.getStorageStats.mockRejectedValue(new Error('Failed to load'));
 
       render(<DataManager />);
@@ -306,6 +309,7 @@ describe('DataManager', () => {
       });
 
       consoleSpy.mockRestore();
+      logManager.initialize({ enableConsole: false, enablePersistence: false });
     });
   });
 

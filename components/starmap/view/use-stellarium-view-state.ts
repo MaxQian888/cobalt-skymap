@@ -4,6 +4,7 @@ import { useState, useReducer, useRef, useCallback, useEffect, useMemo } from 'r
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useStellariumStore, useFramingStore, useMountStore, useEquipmentStore, useMarkerStore } from '@/lib/stores';
+import { buildContinuityTargetSummary, useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 import { useTargetListStore } from '@/lib/stores/target-list-store';
 import { useSettingsStore } from '@/lib/stores/settings-store';
 import { useNavigationHistoryStore } from '@/lib/hooks';
@@ -121,6 +122,8 @@ export function useStellariumViewState() {
 
   // Navigation history store
   const pushNavigationHistory = useNavigationHistoryStore((state) => state.push);
+  const setTargetContext = useMapInteractionStore((state) => state.setTargetContext);
+  const clearTargetContext = useMapInteractionStore((state) => state.clearTargetContext);
 
   // Single centralized view direction polling — updates the store
   useEffect(() => {
@@ -186,15 +189,26 @@ export function useStellariumViewState() {
   const handleSelectionChange = useCallback((selection: SelectedObjectData | null) => {
     if (selection) {
       setIsSearchOpen(false);
+      const mountProfile = useMountStore.getState().profileInfo.AstrometrySettings;
+      setTargetContext(
+        buildContinuityTargetSummary(selection, {
+          siteCoordinates: {
+            latitude: mountProfile.Latitude,
+            longitude: mountProfile.Longitude,
+          },
+        })
+      );
       pushNavigationHistory({
         ra: selection.raDeg,
         dec: selection.decDeg,
         fov: lastFovRef.current,
         name: selection.names[0],
       });
+    } else {
+      clearTargetContext();
     }
     setSelectedObject(selection);
-  }, [pushNavigationHistory]);
+  }, [clearTargetContext, pushNavigationHistory, setTargetContext]);
 
   // Handle FOV change with rAF throttling
   const handleFovChange = useCallback((fov: number) => {

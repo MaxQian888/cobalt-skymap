@@ -195,6 +195,16 @@ describe('TonightRecommendations', () => {
     const tooltips = screen.getAllByTestId('tooltip');
     expect(tooltips.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('uses themed surface styling for tonight conditions', () => {
+    const { container } = render(<TonightRecommendations />);
+    const themedConditions = container.querySelector('.theme-surface-strong');
+
+    expect(themedConditions).toBeInTheDocument();
+    expect(themedConditions?.className).not.toContain('from-slate');
+    expect(themedConditions?.className).not.toContain('border-slate');
+    expect(themedConditions?.className).not.toContain('text-slate');
+  });
 });
 
 

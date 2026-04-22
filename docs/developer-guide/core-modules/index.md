@@ -4,7 +4,7 @@
 
 ## 模块概览
 
-SkyMap 的核心业务逻辑位于 `lib/` 目录，采用模块化架构设计：
+SkyMap 的核心业务逻辑位于 `lib/` 和 `src-tauri/src/` 目录，采用模块化架构设计：
 
 ```mermaid
 graph TD
@@ -21,38 +21,49 @@ graph TD
         D --> I[twilight/]
         D --> J[imaging/]
         D --> K[horizon/]
+        D --> L[engine/]
+        D --> M[object-resolver/]
+        D --> N[mount-safety.ts]
+        D --> O[mount-simulator.ts]
     end
 
     subgraph 数据层
-        L[catalogs/] --> M[catalog-data.ts]
-        L --> N[search-engine.ts]
-        L --> O[scoring-algorithms.ts]
-        L --> P[recommendation-engine.ts]
+        P[catalogs/] --> Q[catalog-data.ts]
+        P --> R[search-engine.ts]
+        P --> S[scoring-algorithms.ts]
+        P --> T[recommendation-engine.ts]
     end
 
     subgraph 服务层
-        Q[services/] --> R[astro-events/]
-        Q --> S[satellite/]
-        Q --> T[hips/]
-        Q --> U[object-info/]
-        Q --> V[map-providers/]
+        U[services/] --> V[astro-events/]
+        U --> W[satellite/]
+        U --> X[hips/]
+        U --> Y[object-info/]
+        U --> Z[map-providers/]
+        U --> AA[daily-knowledge/]
+        U --> AB[search/]
     end
 
     subgraph 状态层
-        W[stores/] --> X[stellarium-store]
-        W --> Y[equipment-store]
-        W --> Z[target-list-store]
-        W --> AA[marker-store]
-        W --> AB[settings-store]
-        W --> AC[theme-store]
+        AC[stores/] --> AD[stellarium-store]
+        AC --> AE[equipment-store]
+        AC --> AF[target-list-store]
+        AC --> AG[marker-store]
+        AC --> AH[settings-store]
+        AC --> AI[theme-store]
+        AC --> AJ[mount-store]
+        AC --> AK[daily-knowledge-store]
+        AC --> AL[session-plan-store]
     end
 
     subgraph 基础设施层
-        AD[tauri/] --> AE[api.ts]
-        AD --> AF[hooks.ts]
-        AG[storage/] --> AH[platform.ts]
-        AI[offline/] --> AJ[cache-manager.ts]
-        AK[plate-solving/] --> AL[astrometry-api.ts]
+        AM[tauri/] --> AN[api.ts]
+        AM --> AO[mount-api.ts]
+        AM --> AP[secret-vault-api.ts]
+        AQ[storage/] --> AR[platform.ts]
+        AS[cache/] --> AT[integration-policy.ts]
+        AU[plate-solving/] --> AV[astrometry-api.ts]
+        AW[logger/] --> AX[transports/]
     end
 ```
 
@@ -71,8 +82,8 @@ graph TD
 | 模块 | 路径 | 说明 |
 |------|------|------|
 | **services** | `lib/services/` | 外部数据服务集成 |
-| **hooks** | `lib/hooks/` | React 自定义 Hooks |
-| **stores** | `lib/stores/` | Zustand 状态管理 |
+| **hooks** | `lib/hooks/` | React 自定义 Hooks（37+） |
+| **stores** | `lib/stores/` | Zustand 状态管理（26+） |
 
 ### 基础设施模块
 
@@ -80,10 +91,10 @@ graph TD
 |------|------|------|
 | **tauri** | `lib/tauri/` | Tauri 后端 API 封装 |
 | **storage** | `lib/storage/` | 跨平台存储抽象 |
-| **offline** | `lib/offline/` | 离线缓存管理 |
+| **cache** | `lib/cache/` | 缓存压缩、配置、迁移 |
 | **plate-solving** | `lib/plate-solving/` | 解析天文图像坐标 |
-| **translations** | `lib/translations/` | 天体名称翻译 |
-| **i18n** | `lib/i18n/` | 国际化支持 |
+| **logger** | `lib/logger/` | 结构化日志系统 |
+| **security** | `lib/security/` | 前端安全工具 |
 
 ## 模块依赖关系
 
@@ -109,13 +120,15 @@ hooks/ ◄───────────────────────�
 translations/ ◄────────────────────────────────────────┘
    │
    ▼
-storage/ ◄─────── i18n/, offline/, tauri/, plate-solving/
+storage/ ◄─────── i18n/, cache/, tauri/, plate-solving/, logger/
 ```
 
 ## 详细文档
 
-- **[星图核心](starmap-core.md)** - Stellarium 引擎集成和星图渲染
-- **[天文计算](astronomy-engine.md)** - 天文计算引擎详解
+- **[星图核心](starmap-core.md)** — Stellarium 引擎集成和星图渲染
+- **[天文计算](astronomy-engine.md)** — 天文计算引擎详解
+- **[赤道仪控制](mount-control.md)** — ALPACA 赤道仪客户端
+- **[解板系统](plate-solving.md)** — 在线 Plate Solving 工作流
 
 ## 快速导入
 
@@ -123,12 +136,13 @@ storage/ ◄─────── i18n/, offline/, tauri/, plate-solving/
 // 状态管理
 import { useStellariumStore, useSettingsStore } from '@/lib/stores';
 import { useEquipmentStore, useTargetListStore } from '@/lib/stores';
-import { useMarkerStore, useThemeStore } from '@/lib/stores';
+import { useMarkerStore, useThemeStore, useMountStore } from '@/lib/stores';
 
 // React Hooks
 import { useGeolocation, useObjectSearch } from '@/lib/hooks';
 import { useTonightRecommendations, useTargetPlanner } from '@/lib/hooks';
 import { useCelestialName, useDeviceOrientation } from '@/lib/hooks';
+import { useMountPolling, useObjectActions } from '@/lib/hooks';
 
 // 天文计算
 import { raDecToAltAz, formatRA, formatDec } from '@/lib/astronomy';
@@ -148,10 +162,10 @@ import { hipsService, geocodingService } from '@/lib/services';
 
 // Tauri API
 import { tauriApi, astronomyApi, storageApi } from '@/lib/tauri';
-import { targetListApi, markersApi, httpApi } from '@/lib/tauri';
+import { targetListApi, markersApi, httpApi, mountApi } from '@/lib/tauri';
 
-// 离线缓存
-import { cacheManager, useOfflineStore } from '@/lib/offline';
+// 日志
+import { createLogger } from '@/lib/logger';
 
 // Plate Solving
 import { solveImage, parseFITS } from '@/lib/plate-solving';
@@ -166,6 +180,7 @@ import { solveImage, parseFITS } from '@/lib/plate-solving';
 - **services**: 外部 API 集成
 - **stores**: 全局状态管理
 - **hooks**: React 业务逻辑封装
+- **logger**: 结构化日志，替代 console.*
 
 ### 2. 类型安全
 
@@ -188,4 +203,3 @@ import { solveImage, parseFITS } from '@/lib/plate-solving';
 ---
 
 下一步：[星图核心](starmap-core.md)
-

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, type RefObject } from 'react';
+import { useEffect, useRef, useCallback, useState, type RefObject } from 'react';
 import type A from 'aladin-lite';
 import { getSurveyById } from '@/lib/core/constants/sky-surveys';
 import { removeImageLayerCompat } from '@/lib/aladin/aladin-compat';
@@ -49,11 +49,13 @@ export function useAladinLayers({
 
   const surveyInstancesRef = useRef<Map<string, HpxImageSurvey>>(new Map());
   const aladinStaticRef = useRef<typeof A | null>(null);
+  const [staticApiReady, setStaticApiReady] = useState(false);
 
   useEffect(() => {
     if (!engineReady || skyEngine !== 'aladin') return;
     import('aladin-lite').then((m) => {
       aladinStaticRef.current = m.default;
+      setStaticApiReady(true);
     }).catch((err) => {
       logger.warn('Failed to load aladin-lite static API for layers', err);
     });
@@ -62,7 +64,7 @@ export function useAladinLayers({
   useEffect(() => {
     const aladin = aladinRef.current;
     const AStatic = aladinStaticRef.current;
-    if (!aladin || !AStatic || !engineReady || skyEngine !== 'aladin') return;
+    if (!aladin || !AStatic || !engineReady || skyEngine !== 'aladin' || !staticApiReady) return;
 
     const active = surveyInstancesRef.current;
 
@@ -86,6 +88,7 @@ export function useAladinLayers({
           active.set(layer.id, survey);
         } catch (error) {
           logger.warn(`Failed to add overlay layer: ${layer.name}`, error);
+          updateImageOverlayLayer(layer.id, { enabled: false });
           continue;
         }
       }
@@ -95,6 +98,7 @@ export function useAladinLayers({
         survey.setBlendingConfig(layer.additive);
       } catch (error) {
         logger.warn(`Failed to update overlay layer: ${layer.name}`, error);
+        updateImageOverlayLayer(layer.id, { enabled: false });
       }
     }
 
@@ -103,7 +107,7 @@ export function useAladinLayers({
       try { removeImageLayerCompat(aladin, layerId); } catch { /* ignore */ }
       active.delete(layerId);
     }
-  }, [aladinRef, engineReady, overlayLayers, skyEngine]);
+  }, [aladinRef, engineReady, overlayLayers, skyEngine, staticApiReady, updateImageOverlayLayer]);
 
   const addOverlayLayer = useCallback((surveyId: string, name: string) => {
     const survey = getSurveyById(surveyId);

@@ -117,6 +117,15 @@ describe('object-info-config', () => {
         expect(source.fallbackRole).toBeTruthy();
       });
     });
+
+    it('should include executable support metadata from provider defaults', () => {
+      DEFAULT_DATA_SOURCES.forEach((source) => {
+        expect(source.targetClasses.length).toBeGreaterThan(0);
+        expect(source.responseMode).toBeDefined();
+        expect(source.authorityLevel).toBeDefined();
+        expect(source.healthCheck.strategy).toBeDefined();
+      });
+    });
   });
 
   describe('getObjectInfoConfigMigratedState', () => {
@@ -143,6 +152,10 @@ describe('object-info-config', () => {
       expect(migrated.imageSources[0].fallbackRole).toBeTruthy();
       expect(migrated.dataSources[0].renderTier).toBe('enrichment');
       expect(migrated.dataSources[0].fallbackRole).toBeTruthy();
+      expect(migrated.dataSources[0].targetClasses.length).toBeGreaterThan(0);
+      expect(migrated.dataSources[0].responseMode).toBeDefined();
+      expect(migrated.dataSources[0].authorityLevel).toBeDefined();
+      expect(migrated.dataSources[0].healthCheck.strategy).toBeDefined();
     });
   });
 
@@ -418,6 +431,22 @@ describe('object-info-config', () => {
 
       expect(result.online).toBe(false);
     });
+
+    it('uses a cutout-aligned GET probe for image sources', async () => {
+      mockPerformanceNow.mockReturnValueOnce(0).mockReturnValueOnce(100);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true });
+
+      await checkImageSourceHealth({
+        ...DEFAULT_IMAGE_SOURCES[0],
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('hips-image-services/hips2fits'),
+        expect.objectContaining({
+          method: 'GET',
+        })
+      );
+    });
   });
 
   describe('checkDataSourceHealth', () => {
@@ -434,7 +463,7 @@ describe('object-info-config', () => {
       expect(result.online).toBe(true);
     });
 
-    it('should handle 405 as acceptable for HEAD requests', async () => {
+    it('treats non-success provider probe responses as offline', async () => {
       mockPerformanceNow.mockReturnValueOnce(0).mockReturnValueOnce(50);
       (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 405 });
 
@@ -444,7 +473,40 @@ describe('object-info-config', () => {
 
       const result = await checkDataSourceHealth(source);
 
+      expect(result.online).toBe(false);
+    });
+
+    it('uses the provider health strategy probe path for query providers', async () => {
+      mockPerformanceNow.mockReturnValueOnce(0).mockReturnValueOnce(50);
+      (global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200 });
+
+      await checkDataSourceHealth({
+        ...DEFAULT_DATA_SOURCES.find((source) => source.id === 'simbad')!,
+      });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/simbad/sim-tap/sync'),
+        expect.objectContaining({
+          method: 'GET',
+        })
+      );
+    });
+
+    it('treats local fallback providers as passively healthy without fetch probes', async () => {
+      mockPerformanceNow.mockReturnValueOnce(0).mockReturnValueOnce(5);
+
+      const result = await checkDataSourceHealth({
+        ...DEFAULT_DATA_SOURCES[0],
+        id: 'local-fallback',
+        type: 'custom',
+        authorityLevel: 'fallback-local',
+        responseMode: 'local',
+        targetClasses: ['generic'],
+        healthCheck: { strategy: 'none' },
+      });
+
       expect(result.online).toBe(true);
+      expect(global.fetch).not.toHaveBeenCalled();
     });
   });
 

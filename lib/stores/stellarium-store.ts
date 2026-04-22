@@ -126,13 +126,22 @@ function applyLandscapeAndFog(
 
   const landscapeKey = settings.landscapesVisible ? 'guereins' : 'gray';
   const landscapeUrl = `${baseUrl}landscapes/${landscapeKey}`;
-  (addDataSource as (options: { url: string; key?: string }) => void)({
-    url: landscapeUrl,
-    key: landscapeKey,
-  });
-
-  setIfSupported(core, 'landscapes.visible', true);
-  setIfSupported(core, 'landscapes.fog_visible', settings.fogVisible);
+  try {
+    (addDataSource as (options: { url: string; key?: string }) => void)({
+      url: landscapeUrl,
+      key: landscapeKey,
+    });
+    setIfSupported(core, 'landscapes.visible', true);
+    setIfSupported(core, 'landscapes.fog_visible', settings.fogVisible);
+  } catch (error) {
+    logger.warn('Failed to load Stellarium landscape data source, disabling landscape overlay', {
+      landscapeKey,
+      landscapeUrl,
+      error,
+    });
+    setIfSupported(core, 'landscapes.visible', false);
+    setIfSupported(core, 'landscapes.fog_visible', false);
+  }
 }
 
 function applySurvey(core: StellariumEngine['core'], settings: StellariumSettings): void {

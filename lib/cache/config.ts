@@ -138,11 +138,11 @@ export const STARMAP_TIER_PREFETCH_RESOURCES: Readonly<Record<StarmapDataTier, r
     '/stellarium-js/stellarium-web-engine.js',
   ],
   catalog: [
-    '/stellarium-data/stars/info.json',
-    '/stellarium-data/dso/info.json',
+    '/stellarium-data/stars/properties',
+    '/stellarium-data/dso/properties',
   ],
   survey: [
-    '/stellarium-data/surveys/dss/info.json',
+    '/stellarium-data/surveys/dss/properties',
   ],
   enrichment: [],
 } as const;

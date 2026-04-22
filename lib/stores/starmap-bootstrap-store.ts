@@ -10,12 +10,14 @@ import { createLogger } from '@/lib/logger';
 const logger = createLogger('starmap-bootstrap-store');
 
 type BootstrapResourceState = 'pending' | 'loading' | 'ready' | 'failed';
+type BootstrapStageClassification = 'blocking' | 'deferred';
 
 export interface StarmapBootstrapResourceRuntime {
   id: StarmapBootstrapResourceId;
   label: string;
   tier: (typeof STARMAP_BOOTSTRAP_RESOURCES)[number]['tier'];
   critical: boolean;
+  blocking: boolean;
   state: BootstrapResourceState;
   attempts: number;
   startedAt: number | null;
@@ -34,15 +36,24 @@ export interface StarmapBootstrapDiagnostic {
     | 'resource_retry'
     | 'resource_failed'
     | 'session_finalized'
-    | 'recovery_requested';
+    | 'recovery_requested'
+    | 'warm_path_reused';
   timestamp: number;
+  classification?: BootstrapStageClassification;
   attempt?: number;
   reason?: string;
+  durationMs?: number;
 }
 
 interface StageEventMetadata {
   attempt?: number;
   reason?: string;
+  classification?: BootstrapStageClassification;
+  sessionId?: string;
+}
+
+interface ResourceMutationOptions {
+  sessionId?: string;
 }
 
 export interface StarmapBootstrapStoreState {
@@ -50,15 +61,27 @@ export interface StarmapBootstrapStoreState {
   sessionId: string | null;
   sessionStartedAt: number | null;
   sessionEndedAt: number | null;
+  firstInteractiveReadyAt: number | null;
+  deferredWarmReadyAt: number | null;
+  warmStartUsed: boolean;
   inFlight: boolean;
   recoveryNonce: number;
   resources: Record<StarmapBootstrapResourceId, StarmapBootstrapResourceRuntime>;
   diagnostics: StarmapBootstrapDiagnostic[];
   beginSession: () => string;
-  markResourceLoading: (resourceId: StarmapBootstrapResourceId) => void;
-  markResourceReady: (resourceId: StarmapBootstrapResourceId) => void;
-  markResourceRetry: (resourceId: StarmapBootstrapResourceId, attempt: number, reason: string) => void;
-  markResourceFailed: (resourceId: StarmapBootstrapResourceId, reason: string) => void;
+  markResourceLoading: (resourceId: StarmapBootstrapResourceId, options?: ResourceMutationOptions) => void;
+  markResourceReady: (resourceId: StarmapBootstrapResourceId, options?: ResourceMutationOptions) => void;
+  markResourceRetry: (
+    resourceId: StarmapBootstrapResourceId,
+    attempt: number,
+    reason: string,
+    options?: ResourceMutationOptions
+  ) => void;
+  markResourceFailed: (
+    resourceId: StarmapBootstrapResourceId,
+    reason: string,
+    options?: ResourceMutationOptions
+  ) => void;
   recordStageEvent: (stage: string, event: 'start' | 'complete' | 'failed', metadata?: StageEventMetadata) => void;
   requestRecovery: () => number;
   reset: () => void;
@@ -75,6 +98,7 @@ function createResourceMap(): Record<StarmapBootstrapResourceId, StarmapBootstra
       label: resource.label,
       tier: resource.tier,
       critical: resource.critical,
+      blocking: resource.blocking,
       state: 'pending',
       attempts: 0,
       startedAt: null,
@@ -104,7 +128,15 @@ function deriveOutcome(
 function withSession(state: StarmapBootstrapStoreState): {
   nextState: Pick<
     StarmapBootstrapStoreState,
-    'sessionId' | 'sessionStartedAt' | 'sessionEndedAt' | 'outcome' | 'inFlight' | 'resources'
+    | 'sessionId'
+    | 'sessionStartedAt'
+    | 'sessionEndedAt'
+    | 'outcome'
+    | 'inFlight'
+    | 'resources'
+    | 'firstInteractiveReadyAt'
+    | 'deferredWarmReadyAt'
+    | 'warmStartUsed'
   >;
   sessionId: string;
 } {
@@ -118,6 +150,9 @@ function withSession(state: StarmapBootstrapStoreState): {
         outcome: state.outcome,
         inFlight: state.inFlight,
         resources: state.resources,
+        firstInteractiveReadyAt: state.firstInteractiveReadyAt,
+        deferredWarmReadyAt: state.deferredWarmReadyAt,
+        warmStartUsed: state.warmStartUsed,
       },
     };
   }
@@ -132,6 +167,9 @@ function withSession(state: StarmapBootstrapStoreState): {
       outcome: 'bootstrapping',
       inFlight: true,
       resources: createResourceMap(),
+      firstInteractiveReadyAt: null,
+      deferredWarmReadyAt: null,
+      warmStartUsed: false,
     },
   };
 }
@@ -145,11 +183,48 @@ function createSessionStartDiagnostic(sessionId: string): StarmapBootstrapDiagno
   };
 }
 
+function getResourceClassification(resourceId: StarmapBootstrapResourceId): BootstrapStageClassification {
+  const resource = STARMAP_BOOTSTRAP_RESOURCES.find((item) => item.id === resourceId);
+  return resource?.blocking ? 'blocking' : 'deferred';
+}
+
+function inferStageClassification(stage: string): BootstrapStageClassification {
+  if (stage.startsWith('cache_') || stage.includes('cache') || stage.startsWith('online_metadata')) {
+    return 'deferred';
+  }
+  return 'blocking';
+}
+
+function resolveSessionGuard(
+  state: StarmapBootstrapStoreState,
+  options?: ResourceMutationOptions
+): { ignored: true } | { ignored: false; sessionId: string; nextState: ReturnType<typeof withSession>['nextState'] } {
+  if (options?.sessionId && state.sessionId && options.sessionId !== state.sessionId) {
+    return { ignored: true };
+  }
+
+  const { sessionId, nextState } = withSession(state);
+  if (options?.sessionId && sessionId !== options.sessionId) {
+    return { ignored: true };
+  }
+
+  return { ignored: false, sessionId, nextState };
+}
+
+function areAllResourcesReady(
+  resources: Record<StarmapBootstrapResourceId, StarmapBootstrapResourceRuntime>
+): boolean {
+  return Object.values(resources).every((resource) => resource.state === 'ready');
+}
+
 export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set, get) => ({
   outcome: 'idle',
   sessionId: null,
   sessionStartedAt: null,
   sessionEndedAt: null,
+  firstInteractiveReadyAt: null,
+  deferredWarmReadyAt: null,
+  warmStartUsed: false,
   inFlight: false,
   recoveryNonce: 0,
   resources: createResourceMap(),
@@ -163,6 +238,10 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
 
     const sessionId = createSessionId();
     const diagnostic = createSessionStartDiagnostic(sessionId);
+    const warmStartUsed =
+      existing.sessionId !== null &&
+      (existing.outcome === 'ready' || existing.outcome === 'degraded') &&
+      STARMAP_BOOTSTRAP_CRITICAL_RESOURCE_IDS.every((resourceId) => existing.resources[resourceId].state === 'ready');
 
     set((state) => ({
       ...state,
@@ -171,17 +250,38 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
       sessionId,
       sessionStartedAt: diagnostic.timestamp,
       sessionEndedAt: null,
+      firstInteractiveReadyAt: null,
+      deferredWarmReadyAt: null,
+      warmStartUsed,
       resources: createResourceMap(),
-      diagnostics: [...state.diagnostics, diagnostic],
+      diagnostics: [
+        ...state.diagnostics,
+        diagnostic,
+        ...(warmStartUsed
+          ? [{
+              sessionId,
+              stage: 'session',
+              event: 'warm_path_reused' as const,
+              timestamp: diagnostic.timestamp,
+              classification: 'deferred' as const,
+              reason: 'previous_ready_session',
+            }]
+          : []),
+      ],
     }));
 
     logger.info('Starmap bootstrap session started', { sessionId });
     return sessionId;
   },
 
-  markResourceLoading: (resourceId) => {
+  markResourceLoading: (resourceId, options) => {
     set((state) => {
-      const { sessionId, nextState } = withSession(state);
+      const resolved = resolveSessionGuard(state, options);
+      if (resolved.ignored) {
+        return state;
+      }
+
+      const { sessionId, nextState } = resolved;
       const resource = nextState.resources[resourceId];
       const now = Date.now();
 
@@ -205,6 +305,7 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
         stage: resourceId,
         event: 'resource_loading',
         timestamp: now,
+        classification: getResourceClassification(resourceId),
         attempt: nextState.resources[resourceId].attempts,
       });
 
@@ -216,9 +317,14 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
     });
   },
 
-  markResourceReady: (resourceId) => {
+  markResourceReady: (resourceId, options) => {
     set((state) => {
-      const { sessionId, nextState } = withSession(state);
+      const resolved = resolveSessionGuard(state, options);
+      if (resolved.ignored) {
+        return state;
+      }
+
+      const { sessionId, nextState } = resolved;
       const resource = nextState.resources[resourceId];
       const now = Date.now();
       const updatedResources = {
@@ -232,6 +338,14 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
       };
       const nextOutcome = deriveOutcome(updatedResources);
       const shouldFinalize = nextOutcome !== 'bootstrapping';
+      const firstInteractiveReadyAt =
+        nextOutcome !== 'bootstrapping' && nextState.firstInteractiveReadyAt === null
+          ? now
+          : nextState.firstInteractiveReadyAt;
+      const deferredWarmReadyAt =
+        areAllResourcesReady(updatedResources)
+          ? now
+          : nextState.deferredWarmReadyAt;
 
       const diagnostics = [...state.diagnostics];
       if (sessionId !== state.sessionId) {
@@ -242,6 +356,8 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
         stage: resourceId,
         event: 'resource_ready',
         timestamp: now,
+        classification: getResourceClassification(resourceId),
+        durationMs: resource.startedAt ? now - resource.startedAt : undefined,
       });
       if (shouldFinalize) {
         diagnostics.push({
@@ -249,6 +365,7 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
           stage: 'session',
           event: 'session_finalized',
           timestamp: now,
+          classification: 'blocking',
           reason: nextOutcome,
         });
       }
@@ -260,14 +377,21 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
         outcome: nextOutcome,
         inFlight: !shouldFinalize,
         sessionEndedAt: shouldFinalize ? now : null,
+        firstInteractiveReadyAt,
+        deferredWarmReadyAt,
         diagnostics,
       };
     });
   },
 
-  markResourceRetry: (resourceId, attempt, reason) => {
+  markResourceRetry: (resourceId, attempt, reason, options) => {
     set((state) => {
-      const { sessionId, nextState } = withSession(state);
+      const resolved = resolveSessionGuard(state, options);
+      if (resolved.ignored) {
+        return state;
+      }
+
+      const { sessionId, nextState } = resolved;
       const resource = nextState.resources[resourceId];
       const now = Date.now();
       nextState.resources = {
@@ -289,6 +413,7 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
         stage: resourceId,
         event: 'resource_retry',
         timestamp: now,
+        classification: getResourceClassification(resourceId),
         attempt,
         reason,
       });
@@ -304,13 +429,18 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
       resourceId,
       attempt,
       reason,
-      sessionId: get().sessionId,
+      sessionId: options?.sessionId ?? get().sessionId,
     });
   },
 
-  markResourceFailed: (resourceId, reason) => {
+  markResourceFailed: (resourceId, reason, options) => {
     set((state) => {
-      const { sessionId, nextState } = withSession(state);
+      const resolved = resolveSessionGuard(state, options);
+      if (resolved.ignored) {
+        return state;
+      }
+
+      const { sessionId, nextState } = resolved;
       const resource = nextState.resources[resourceId];
       const now = Date.now();
       const updatedResources = {
@@ -334,8 +464,10 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
         stage: resourceId,
         event: 'resource_failed',
         timestamp: now,
+        classification: getResourceClassification(resourceId),
         attempt: resource.attempts,
         reason,
+        durationMs: resource.startedAt ? now - resource.startedAt : undefined,
       });
       if (shouldFinalize) {
         diagnostics.push({
@@ -343,6 +475,7 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
           stage: 'session',
           event: 'session_finalized',
           timestamp: now,
+          classification: 'blocking',
           reason: nextOutcome,
         });
       }
@@ -361,13 +494,19 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
     logger.error('Starmap bootstrap resource failed', {
       resourceId,
       reason,
-      sessionId: get().sessionId,
+      sessionId: options?.sessionId ?? get().sessionId,
     });
   },
 
   recordStageEvent: (stage, event, metadata) => {
     set((state) => {
+      if (metadata?.sessionId && state.sessionId && metadata.sessionId !== state.sessionId) {
+        return state;
+      }
       const { sessionId, nextState } = withSession(state);
+      if (metadata?.sessionId && sessionId !== metadata.sessionId) {
+        return state;
+      }
       const now = Date.now();
       const diagnostics = [...state.diagnostics];
       if (sessionId !== state.sessionId) {
@@ -378,6 +517,7 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
         stage,
         event: 'stage',
         timestamp: now,
+        classification: metadata?.classification ?? inferStageClassification(stage),
         attempt: metadata?.attempt,
         reason: metadata?.reason ? `${event}:${metadata.reason}` : event,
       });
@@ -393,7 +533,8 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
   requestRecovery: () => {
     let nextNonce = 0;
     set((state) => {
-      const sessionId = state.sessionId ?? createSessionId();
+      const previousSessionId = state.sessionId ?? createSessionId();
+      const sessionId = createSessionId();
       nextNonce = state.recoveryNonce + 1;
       const now = Date.now();
       const resetResources = { ...state.resources };
@@ -414,19 +555,24 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
         outcome: 'bootstrapping',
         inFlight: true,
         sessionId,
-        sessionStartedAt: state.sessionStartedAt ?? now,
+        sessionStartedAt: now,
         sessionEndedAt: null,
+        firstInteractiveReadyAt: null,
+        deferredWarmReadyAt: null,
+        warmStartUsed: false,
         resources: resetResources,
         recoveryNonce: nextNonce,
         diagnostics: [
           ...state.diagnostics,
           {
-            sessionId,
+            sessionId: previousSessionId,
             stage: 'session',
             event: 'recovery_requested',
             timestamp: now,
+            classification: 'blocking',
             attempt: nextNonce,
           },
+          createSessionStartDiagnostic(sessionId),
         ],
       };
     });
@@ -440,6 +586,9 @@ export const useStarmapBootstrapStore = create<StarmapBootstrapStoreState>((set,
       sessionId: null,
       sessionStartedAt: null,
       sessionEndedAt: null,
+      firstInteractiveReadyAt: null,
+      deferredWarmReadyAt: null,
+      warmStartUsed: false,
       inFlight: false,
       recoveryNonce: 0,
       resources: createResourceMap(),

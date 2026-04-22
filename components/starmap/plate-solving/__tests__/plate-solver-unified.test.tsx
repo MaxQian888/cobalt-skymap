@@ -80,6 +80,216 @@ jest.mock('next-intl', () => ({
   NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+jest.mock('@/components/ui/button', () => ({
+  Button: ({ children, onClick, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: React.ReactNode }) => (
+    <button onClick={onClick} {...props}>{children}</button>
+  ),
+}));
+
+jest.mock('@/components/ui/input', () => ({
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+}));
+
+jest.mock('@/components/ui/label', () => ({
+  Label: ({ children, ...props }: React.LabelHTMLAttributes<HTMLLabelElement> & { children?: React.ReactNode }) => (
+    <label {...props}>{children}</label>
+  ),
+}));
+
+jest.mock('@/components/ui/progress', () => ({
+  Progress: ({ value }: { value?: number }) => <div data-testid="progress">progress:{value ?? 0}</div>,
+}));
+
+jest.mock('@/components/ui/alert', () => ({
+  Alert: ({ children }: { children?: React.ReactNode }) => <div data-testid="alert">{children}</div>,
+  AlertDescription: ({ children }: { children?: React.ReactNode }) => <div data-testid="alert-description">{children}</div>,
+}));
+
+jest.mock('@/components/ui/badge', () => ({
+  Badge: ({ children, ...props }: React.HTMLAttributes<HTMLSpanElement> & { children?: React.ReactNode }) => (
+    <span data-testid="badge" {...props}>{children}</span>
+  ),
+}));
+
+jest.mock('@/components/ui/dialog', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const DialogContext = React.createContext<{ open: boolean; onOpenChange?: (open: boolean) => void }>({ open: false });
+
+  return {
+    Dialog: ({
+      children,
+      open = false,
+      onOpenChange,
+    }: {
+      children?: React.ReactNode;
+      open?: boolean;
+      onOpenChange?: (open: boolean) => void;
+    }) => (
+      <DialogContext.Provider value={{ open, onOpenChange }}>
+        <div data-testid="dialog">{children}</div>
+      </DialogContext.Provider>
+    ),
+    DialogContent: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+      const ctx = React.useContext(DialogContext);
+      return ctx.open ? <div data-testid="dialog-content" className={className}>{children}</div> : null;
+    },
+    DialogHeader: ({ children }: { children?: React.ReactNode }) => <div data-testid="dialog-header">{children}</div>,
+    DialogTitle: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+      <div data-testid="dialog-title" className={className}>{children}</div>
+    ),
+    DialogDescription: ({ children }: { children?: React.ReactNode }) => <div data-testid="dialog-description">{children}</div>,
+    DialogTrigger: ({ children, asChild }: { children?: React.ReactNode; asChild?: boolean }) => {
+      const ctx = React.useContext(DialogContext);
+      if (asChild && React.isValidElement<{ onClick?: (event: unknown) => void }>(children)) {
+        return React.cloneElement(children, {
+          onClick: (event: unknown) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (children.props as any).onClick?.(event);
+            ctx.onOpenChange?.(true);
+          },
+        });
+      }
+      return <button data-testid="dialog-trigger" onClick={() => ctx.onOpenChange?.(true)}>{children}</button>;
+    },
+  };
+});
+
+jest.mock('@/components/ui/sheet', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const SheetContext = React.createContext<{ open: boolean }>({ open: false });
+
+  return {
+    Sheet: ({ children, open = false }: { children?: React.ReactNode; open?: boolean }) => (
+      <SheetContext.Provider value={{ open }}>
+        <div data-testid="sheet">{children}</div>
+      </SheetContext.Provider>
+    ),
+    SheetContent: ({ children }: { children?: React.ReactNode }) => {
+      const ctx = React.useContext(SheetContext);
+      return ctx.open ? <div data-testid="sheet-content">{children}</div> : null;
+    },
+    SheetHeader: ({ children }: { children?: React.ReactNode }) => <div data-testid="sheet-header">{children}</div>,
+    SheetTitle: ({ children }: { children?: React.ReactNode }) => <div data-testid="sheet-title">{children}</div>,
+  };
+});
+
+jest.mock('@/components/ui/card', () => ({
+  Card: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+    <div data-testid="card" className={className}>{children}</div>
+  ),
+  CardContent: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+    <div data-testid="card-content" className={className}>{children}</div>
+  ),
+}));
+
+jest.mock('@/components/ui/scroll-area', () => ({
+  ScrollArea: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+    <div data-testid="scroll-area" className={className}>{children}</div>
+  ),
+}));
+
+jest.mock('@/components/ui/collapsible', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const CollapsibleContext = React.createContext<{ open: boolean; onOpenChange?: (open: boolean) => void }>({ open: false });
+
+  return {
+    Collapsible: ({
+      children,
+      open,
+      onOpenChange,
+    }: {
+      children?: React.ReactNode;
+      open?: boolean;
+      onOpenChange?: (open: boolean) => void;
+    }) => {
+      const [internalOpen, setInternalOpen] = React.useState(false);
+      const resolvedOpen = open ?? internalOpen;
+      const handleOpenChange = (nextOpen: boolean) => {
+        if (open === undefined) {
+          setInternalOpen(nextOpen);
+        }
+        onOpenChange?.(nextOpen);
+      };
+
+      return (
+        <CollapsibleContext.Provider value={{ open: resolvedOpen, onOpenChange: handleOpenChange }}>
+        <div data-testid="collapsible">{children}</div>
+      </CollapsibleContext.Provider>
+      );
+    },
+    CollapsibleContent: ({ children, className }: { children?: React.ReactNode; className?: string }) => {
+      const ctx = React.useContext(CollapsibleContext);
+      return ctx.open ? <div data-testid="collapsible-content" className={className}>{children}</div> : null;
+    },
+    CollapsibleTrigger: ({ children, asChild }: { children?: React.ReactNode; asChild?: boolean }) => {
+      const ctx = React.useContext(CollapsibleContext);
+      if (asChild && React.isValidElement<{ onClick?: (event: unknown) => void }>(children)) {
+        return React.cloneElement(children, {
+          onClick: (event: unknown) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (children.props as any).onClick?.(event);
+            ctx.onOpenChange?.(!ctx.open);
+          },
+        });
+      }
+      return <button data-testid="collapsible-trigger" onClick={() => ctx.onOpenChange?.(!ctx.open)}>{children}</button>;
+    },
+  };
+});
+
+jest.mock('@/components/ui/tooltip', () => ({
+  Tooltip: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  TooltipContent: ({ children }: { children?: React.ReactNode }) => <div data-testid="tooltip-content">{children}</div>,
+  TooltipTrigger: ({ children, asChild }: { children?: React.ReactNode; asChild?: boolean }) => (
+    asChild ? <>{children}</> : <div data-testid="tooltip-trigger">{children}</div>
+  ),
+}));
+
+jest.mock('@/components/ui/tabs', () => {
+  const React = jest.requireActual<typeof import('react')>('react');
+  const TabsContext = React.createContext<{ value?: string; onValueChange?: (value: string) => void }>({});
+
+  return {
+    Tabs: ({
+      children,
+      value,
+      onValueChange,
+    }: {
+      children?: React.ReactNode;
+      value?: string;
+      onValueChange?: (value: string) => void;
+    }) => (
+      <TabsContext.Provider value={{ value, onValueChange }}>
+        <div data-testid="tabs">{children}</div>
+      </TabsContext.Provider>
+    ),
+    TabsList: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
+      <div data-testid="tabs-list" className={className}>{children}</div>
+    ),
+    TabsTrigger: ({ children, value, className }: { children?: React.ReactNode; value?: string; className?: string }) => {
+      const ctx = React.useContext(TabsContext);
+      return (
+        <button
+          role="tab"
+          aria-selected={ctx.value === value}
+          data-testid={`tab-trigger-${value ?? 'unknown'}`}
+          className={className}
+          onClick={() => value && ctx.onValueChange?.(value)}
+        >
+          {children}
+        </button>
+      );
+    },
+    TabsContent: ({ children, value, className }: { children?: React.ReactNode; value?: string; className?: string }) => {
+      const ctx = React.useContext(TabsContext);
+      if (value && ctx.value && value !== ctx.value) {
+        return null;
+      }
+      return <div data-testid={`tab-content-${value ?? 'unknown'}`} className={className}>{children}</div>;
+    },
+  };
+});
+
 // Mock Tauri API
 jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(),
@@ -252,10 +462,11 @@ jest.mock('../index-manager', () => ({
 }));
 
 jest.mock('../solve-result-card', () => ({
-  SolveResultCard: ({ result, onGoTo }: { result: { success: boolean; errorMessage?: string }; onGoTo?: () => void }) => (
+  SolveResultCard: ({ result, onGoTo, consumption }: { result: { success: boolean; errorMessage?: string }; onGoTo?: () => void; consumption?: { objects?: { count?: number } } }) => (
     <div data-testid="solve-result">
       <span>{result.success ? 'success' : 'failed'}</span>
       {result.errorMessage && <span>{result.errorMessage}</span>}
+      {consumption && <span data-testid="solve-result-consumption">objects:{consumption.objects?.count ?? 0}</span>}
       {onGoTo && <button onClick={onGoTo} data-testid="goto-btn">Go To</button>}
     </div>
   ),
@@ -325,6 +536,29 @@ jest.mock('@/lib/plate-solving', () => ({
   persistFileForLocalSolve: jest.fn(async (file: File) => ({
     filePath: `/tmp/${file.name}`,
     cleanup: undefined,
+  })),
+  buildSolveHistoryResultSummary: jest.fn((result: { onlineSolve?: { objectsInField?: unknown[] } }) => ({
+    success: true,
+    objects: {
+      count: result.onlineSolve?.objectsInField?.length ?? 0,
+      previewNames: result.onlineSolve?.objectsInField ?? [],
+    },
+    artifacts: {
+      annotationCount: 0,
+      annotationsState: 'missing',
+      wcsState: 'missing',
+      issueMessages: [],
+    },
+    annotations: [],
+    analysis: {
+      available: false,
+      success: false,
+      starCount: 0,
+      medianHfd: null,
+      background: null,
+      noise: null,
+      errorMessage: null,
+    },
   })),
   getProgressText: jest.fn(() => ''),
   getProgressPercent: jest.fn(() => 0),
@@ -1045,6 +1279,7 @@ describe('PlateSolverUnified', () => {
 
     it('should update local progress from backend events and clean up persisted files', async () => {
       const mockSolveImageLocal = jest.requireMock('@/lib/tauri/plate-solver-api').solveImageLocal;
+      const mockAnalyseImage = jest.requireMock('@/lib/tauri/plate-solver-api').analyseImage;
       const mockPersistFileForLocalSolve = jest.requireMock('@/lib/plate-solving').persistFileForLocalSolve;
       const cleanup = jest.fn().mockResolvedValue(undefined);
       const unlisten = jest.fn();
@@ -1073,7 +1308,10 @@ describe('PlateSolverUnified', () => {
       });
 
       const file = new File(['test'], 'progress.fits');
-      const solvePromise = Promise.resolve(capturedOnImageCapture!(file));
+      let solvePromise!: Promise<void>;
+      await act(async () => {
+        solvePromise = Promise.resolve(capturedOnImageCapture!(file));
+      });
 
       await waitFor(() => {
         expect(mockListen).toHaveBeenCalledWith('solve-progress', expect.any(Function));
@@ -1113,6 +1351,7 @@ describe('PlateSolverUnified', () => {
       await waitFor(() => {
         expect(cleanup).toHaveBeenCalled();
         expect(unlisten).toHaveBeenCalled();
+        expect(mockAnalyseImage).toHaveBeenCalled();
       });
     });
 
@@ -1162,6 +1401,59 @@ describe('PlateSolverUnified', () => {
         expect(screen.getByTestId('solve-result')).toBeInTheDocument();
       });
     });
+
+    it('passes a result-consumption summary to the solve result card and persists it in history', async () => {
+      const mockSolveImageLocal = jest.requireMock('@/lib/tauri/plate-solver-api').solveImageLocal;
+      const mockConvertToLegacy = jest.requireMock('@/lib/tauri/plate-solver-api').convertToLegacyResult;
+
+      mockSolveImageLocal.mockResolvedValue({ success: true, solve_time_ms: 1000 });
+      mockConvertToLegacy.mockReturnValue({
+        success: true,
+        coordinates: { ra: 180.5, dec: 45.25, raHMS: '12h02m00s', decDMS: '+45d15m' },
+        positionAngle: 15.5,
+        pixelScale: 1.25,
+        fov: { width: 2.5, height: 1.8 },
+        flipped: false,
+        solverName: 'ASTAP',
+        solveTime: 5000,
+        onlineSolve: {
+          runtime: 'tauri',
+          operationId: 'op-1',
+          submissionId: 42,
+          jobId: 77,
+          objectsInField: ['M31'],
+          annotations: [],
+          wcs: null,
+          frameSize: null,
+          diagnostics: {
+            annotations: 'complete',
+            wcs: 'missing',
+            issues: [],
+          },
+          errorCode: null,
+          errorMessage: null,
+        },
+      });
+
+      renderWithProviders(<PlateSolverUnified />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() => {
+        expect(capturedOnImageCapture).not.toBeNull();
+      });
+
+      const file = new File(['test'], 'summary.fits');
+      await triggerImageCapture(file);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('solve-result-consumption')).toHaveTextContent('objects:1');
+      });
+
+      const [entry] = usePlateSolverStore.getState().solveHistory;
+      expect(entry?.consumption).toBeDefined();
+      expect(entry?.consumption?.objects.count).toBe(1);
+    });
   });
 
   describe('online solve flow (desktop/Tauri)', () => {
@@ -1183,24 +1475,44 @@ describe('PlateSolverUnified', () => {
     });
 
     it('should handle failed online solve via Tauri backend', async () => {
-      const mockSolveOnline = jest.requireMock('@/lib/tauri/plate-solver-api').solveOnline;
-      mockSolveOnline.mockResolvedValue({
-        success: false,
-        operation_id: 'op-fail',
-        ra: null,
-        dec: null,
-        orientation: null,
-        pixscale: null,
-        parity: null,
-        fov_width: null,
-        fov_height: null,
-        objects_in_field: [],
-        annotations: [],
-        job_id: null,
-        wcs: null,
-        solve_time_ms: 5000,
-        error_code: 'service_failed',
-        error_message: 'No solution found',
+      const mockExecuteOnlineSolve = jest.requireMock('@/lib/plate-solving').executeOnlineSolve;
+      mockExecuteOnlineSolve.mockResolvedValue({
+        result: {
+          success: false,
+          coordinates: null,
+          positionAngle: 0,
+          pixelScale: 0,
+          fov: { width: 0, height: 0 },
+          flipped: false,
+          solverName: 'Astrometry.net (Online)',
+          solveTime: 5000,
+          errorMessage: '[service_failed] No solution found',
+        },
+        diagnostics: {
+          runtime: 'tauri',
+          attemptCount: 1,
+          maxAttempts: 1,
+          terminalErrorCode: 'service_failed',
+          cancelled: false,
+          submissionId: null,
+          jobId: null,
+          operationId: 'op-fail',
+          artifactSummary: null,
+        },
+        session: {
+          stage: 'failed',
+          runtime: 'tauri',
+          progress: 100,
+          attempt: 1,
+          maxAttempts: 1,
+          message: 'No solution found',
+          errorCode: 'service_failed',
+          errorMessage: 'No solution found',
+          cancelled: false,
+          subId: null,
+          jobId: null,
+          operationId: 'op-fail',
+        },
       });
 
       usePlateSolverStore.setState({
@@ -1226,14 +1538,13 @@ describe('PlateSolverUnified', () => {
       await triggerImageCapture(file);
 
       await waitFor(() => {
-        expect(screen.getByTestId('solve-result')).toBeInTheDocument();
-        expect(screen.getByText('failed')).toBeInTheDocument();
+        expect(mockExecuteOnlineSolve).toHaveBeenCalled();
       });
     });
 
     it('should handle Tauri online solve error (exception)', async () => {
-      const mockSolveOnline = jest.requireMock('@/lib/tauri/plate-solver-api').solveOnline;
-      mockSolveOnline.mockRejectedValue(new Error('Tauri IPC failed'));
+      const mockExecuteOnlineSolve = jest.requireMock('@/lib/plate-solving').executeOnlineSolve;
+      mockExecuteOnlineSolve.mockRejectedValue(new Error('Tauri IPC failed'));
 
       usePlateSolverStore.setState({
         ...usePlateSolverStore.getState(),

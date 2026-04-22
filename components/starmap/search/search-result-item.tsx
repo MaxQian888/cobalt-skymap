@@ -59,7 +59,7 @@ export const SearchResultItemRow = memo(forwardRef<HTMLDivElement, SearchResultI
         />
       )}
       
-      <button
+      <div
         className="flex-1 flex items-center gap-2 min-w-0 text-left"
         onClick={() => onSelect(item)}
       >
@@ -98,7 +98,7 @@ export const SearchResultItemRow = memo(forwardRef<HTMLDivElement, SearchResultI
             </span>
           )}
         </div>
-      </button>
+      </div>
       
       <Tooltip>
         <TooltipTrigger asChild>

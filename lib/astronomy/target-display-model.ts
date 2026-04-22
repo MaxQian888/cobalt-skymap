@@ -32,6 +32,8 @@ export type AltitudeVisibilityState = 'below_horizon' | 'observable' | 'optimal'
 export type MoonInterferenceLevel = 'high' | 'moderate' | 'low';
 export type CalculationQualityState = 'normal' | 'degraded';
 export type CalculationSourceState = 'tauri' | 'fallback' | 'calculation' | 'engine';
+export type SelectionSourceState = 'engine' | 'catalog' | 'coordinate' | 'enriched';
+export type SelectionFallbackState = 'resolved' | 'catalog_partial' | 'coordinate_fallback';
 
 export interface TargetAstroDisplayData {
   altitude: number;
@@ -91,11 +93,19 @@ export interface TargetDisplayAdvancedMetadataSection {
   calculationTimestamp: string | null;
 }
 
+export interface TargetDisplaySelectionMetadataSection {
+  selectionSource: SelectionSourceState;
+  selectionFallback: SelectionFallbackState;
+  sourceCatalog: string | null;
+  selectionTimestamp: string | null;
+}
+
 export interface TargetDisplayModel {
   sections: {
     identity: TargetDisplayIdentitySection;
     liveStatus: TargetDisplayLiveStatusSection | null;
     planningMetrics: TargetDisplayPlanningMetricsSection | null;
+    selectionMetadata: TargetDisplaySelectionMetadataSection | null;
     advancedMetadata: TargetDisplayAdvancedMetadataSection | null;
   };
 }
@@ -136,6 +146,22 @@ export function getCalculationQualityState(
 ): CalculationQualityState {
   if (explicitDegraded) return 'degraded';
   return qualityFlag === 'fallback' || dataFreshness === 'fallback' ? 'degraded' : 'normal';
+}
+
+export function getCalculationStateLabelKey(state: CalculationQualityState): string {
+  return `objectDetail.calculationState.${state}`;
+}
+
+export function getCalculationSourceLabelKey(source: CalculationSourceState): string {
+  return `objectDetail.calculationSource.${source}`;
+}
+
+export function getSelectionSourceLabelKey(source: SelectionSourceState): string {
+  return `objectDetail.selectionSource.${source}`;
+}
+
+export function getSelectionFallbackLabelKey(state: SelectionFallbackState): string {
+  return `objectDetail.selectionFallback.${state}`;
 }
 
 export function getAltitudeStateTextClass(state: AltitudeVisibilityState): string {
@@ -226,12 +252,23 @@ export function buildTargetDisplayModel({
     },
   };
 
+  const selectionMetadata: TargetDisplaySelectionMetadataSection = {
+    selectionSource: selectedObject.selectionSource ?? 'engine',
+    selectionFallback: selectedObject.selectionFallback ?? 'resolved',
+    sourceCatalog: selectedObject.sourceCatalog ?? null,
+    selectionTimestamp: formatTargetTimestamp(
+      selectedObject.selectionTimestamp ?? selectedObject.coordinateTimestamp,
+      locale,
+    ),
+  };
+
   if (!targetData) {
     return {
       sections: {
         identity,
         liveStatus: null,
         planningMetrics: null,
+        selectionMetadata,
         advancedMetadata: null,
       },
     };
@@ -278,6 +315,7 @@ export function buildTargetDisplayModel({
       identity,
       liveStatus,
       planningMetrics,
+      selectionMetadata,
       advancedMetadata,
     },
   };

@@ -1,4 +1,11 @@
 import { Star, Target, Compass } from 'lucide-react';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
 
 const STARMAP_STARS = [
   { w: 2, t: 12, l: 15, o: 0.8 }, { w: 1, t: 28, l: 42, o: 0.5 }, { w: 3, t: 8, l: 72, o: 0.9 },
@@ -9,6 +16,30 @@ const STARMAP_STARS = [
   { w: 2, t: 68, l: 18, o: 0.6 }, { w: 1, t: 52, l: 75, o: 0.4 }, { w: 3, t: 25, l: 48, o: 0.7 },
   { w: 1, t: 85, l: 62, o: 0.3 }, { w: 2, t: 42, l: 8, o: 0.8 },
 ];
+
+const FEATURED_OBJECTS = [
+  {
+    name: 'M31 - Andromeda Galaxy',
+    ra: 'RA: 00h 42m 44s',
+    dec: "Dec: +41° 16'",
+    mag: 'Mag: 3.4',
+    accentClassName: 'bg-blue-400',
+  },
+  {
+    name: 'M42 - Orion Nebula',
+    ra: 'RA: 05h 35m 17s',
+    dec: "Dec: -05° 23'",
+    mag: 'Mag: 4.0',
+    accentClassName: 'bg-emerald-400',
+  },
+  {
+    name: 'Mars - Planet',
+    ra: 'RA: 07h 41m 12s',
+    dec: "Dec: +24° 05'",
+    mag: 'Mag: -1.2',
+    accentClassName: 'bg-orange-400',
+  },
+] as const;
 
 export function MockStarmapUI() {
   return (
@@ -36,16 +67,34 @@ export function MockStarmapUI() {
         ))}
       </div>
       {/* Mock info panel */}
-      <div className="absolute bottom-3 left-3 right-3 bg-black/40 backdrop-blur-md rounded-lg p-3 border border-white/10">
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="w-2 h-2 rounded-full bg-blue-400" />
-          <span className="text-white/90 text-xs font-medium">M31 - Andromeda Galaxy</span>
-        </div>
-        <div className="flex gap-4 text-[10px] text-white/50">
-          <span>RA: 00h 42m 44s</span>
-          <span>Dec: +41° 16&apos;</span>
-          <span>Mag: 3.4</span>
-        </div>
+      <div className="absolute bottom-3 left-3 right-3">
+        <Carousel opts={{ loop: true }} className="mx-8">
+          <CarouselContent className="-ml-0">
+            {FEATURED_OBJECTS.map((object) => (
+              <CarouselItem key={object.name} className="pl-0">
+                <div className="bg-black/40 backdrop-blur-md rounded-lg p-3 border border-white/10">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className={`w-2 h-2 rounded-full ${object.accentClassName}`} />
+                    <span className="text-white/90 text-xs font-medium">{object.name}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/50">
+                    <span>{object.ra}</span>
+                    <span>{object.dec}</span>
+                    <span>{object.mag}</span>
+                  </div>
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          <CarouselPrevious
+            variant="ghost"
+            className="left-[-2rem] size-7 border border-white/10 bg-black/35 text-white/80 hover:bg-black/50 hover:text-white"
+          />
+          <CarouselNext
+            variant="ghost"
+            className="right-[-2rem] size-7 border border-white/10 bg-black/35 text-white/80 hover:bg-black/50 hover:text-white"
+          />
+        </Carousel>
       </div>
       {/* Mock crosshair */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">

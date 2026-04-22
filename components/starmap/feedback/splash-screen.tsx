@@ -13,6 +13,7 @@ export function SplashScreen({
   onComplete, 
   minDuration = 2500,
   isReady = false,
+  completionHint = null,
 }: SplashScreenProps) {
   const t = useTranslations();
   const prefersReducedMotion = usePrefersReducedMotion();
@@ -64,10 +65,19 @@ export function SplashScreen({
     if (!isReady || phase === 'fadeout') return;
     // Defer state update to next microtask to avoid sync setState in effect
     const id = requestAnimationFrame(() => {
-      if (isReadyRef.current) handleSkip();
+      if (!isReadyRef.current) return;
+      if (completionHint) {
+        setTimeout(() => {
+          if (isReadyRef.current) {
+            handleSkip();
+          }
+        }, prefersReducedMotion ? 0 : 600);
+        return;
+      }
+      handleSkip();
     });
     return () => cancelAnimationFrame(id);
-  }, [isReady, phase, handleSkip]);
+  }, [isReady, phase, handleSkip, completionHint, prefersReducedMotion]);
 
   useEffect(() => {
     if (prefersReducedMotion) {
@@ -343,6 +353,11 @@ export function SplashScreen({
               {Math.round(Math.min(progress, 100))}%
             </p>
           </div>
+          {completionHint ? (
+            <p className="mt-3 text-[11px] text-amber-300/90" data-testid="splash-completion-hint">
+              {completionHint}
+            </p>
+          ) : null}
         </div>
       </div>
       

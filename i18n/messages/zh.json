@@ -31,6 +31,7 @@
     "share": "分享",
     "undo": "撤销",
     "refresh": "刷新",
+    "switchCamera": "切换相机",
     "percent": "%",
     "pixels": "像素",
     "unknown": "未知",
@@ -44,6 +45,7 @@
     "loading": "正在加载星图...",
     "loadingStars": "正在加载星表数据...",
     "loadingEngine": "正在初始化引擎...",
+    "cacheWarmupDeferred": "缓存预热将在后台继续进行",
     "poweredBy": "由 Stellarium Web Engine 提供支持",
     "skipHint": "按任意键或点击跳过"
   },
@@ -64,6 +66,7 @@
     "depPackage": "包名",
     "depVersion": "版本",
     "depTypeLabel": "类型",
+    "depSourceLabel": "来源",
     "totalDeps": "共 {count} 个包",
     "appDescription": "基于 Stellarium Web Engine 的现代化网页版天文应用",
     "licenseDesc": {
@@ -79,11 +82,26 @@
     "depType": {
       "core": "核心",
       "dev": "开发",
+      "framework": "框架",
+      "desktop": "桌面",
       "style": "样式",
       "state": "状态",
       "i18n": "国际化",
       "ui": "界面",
-      "util": "工具"
+      "util": "工具",
+      "astronomy": "天文",
+      "mapping": "地图",
+      "testing": "测试",
+      "tooling": "工具链",
+      "other": "其他"
+    },
+    "depSource": {
+      "npm": "npm",
+      "cargo": "Cargo"
+    },
+    "depRuntime": {
+      "shared": "共享运行时",
+      "desktop": "桌面运行时"
     },
     "credit": {
       "hipsSurveys": "HiPS 巡天",
@@ -120,7 +138,12 @@
     "closeConfirmTitle": "确认关闭星图？",
     "closeConfirmMessage": "确定要关闭星图并返回首页吗？",
     "confirmClose": "关闭",
-    "dontShowAgain": "不再显示此提示"
+    "dontShowAgain": "不再显示此提示",
+    "context": {
+      "activeSite": "当前观测点",
+      "activeTarget": "当前目标",
+      "returnToTarget": "返回目标视图"
+    }
   },
   "compass": {
     "n": "北",
@@ -270,6 +293,17 @@
     "renameSetup": "重命名预设",
     "deleteSetup": "删除预设",
     "targetFraming": "目标构图",
+    "fitStatusTooLarge": "构图过大",
+    "fitStatusTight": "构图紧凑",
+    "fitStatusGood": "构图合适",
+    "fitStatusRoomy": "构图宽松",
+    "fitStatusUnknown": "构图未知",
+    "fitRatioLabel": "贴合比：{ratio}",
+    "fitStatusNoSize": "缺少目标尺寸数据，无法估算构图贴合度。",
+    "centerTarget": "目标居中",
+    "autoAlign": "自动对齐",
+    "suggestedRotationLabel": "建议旋转：{angle}°",
+    "orientationUnavailable": "缺少目标朝向数据。",
     "noTargetSelected": "未选择目标",
     "cameraTab": "相机",
     "opticsTab": "光学",
@@ -611,6 +645,7 @@
     "arCameraDeviceSystemDefault": "系统默认",
     "arCameraLastFailureStage": "上次回退阶段",
     "arCameraRememberedPlan": "正在重试上一次成功的相机路径",
+    "arCameraFallbackApplied": "已启用回退配置",
     "arRecoveryOpenCameraSettings": "??????",
     "arRecoveryRevertProfile": "????????",
     "arLaunchTitle": "AR ????",
@@ -848,6 +883,12 @@
     "addObs": "添加观测",
     "searchPlaceholder": "搜索天体...",
     "searchHint": "搜索您的观测历史",
+    "filterFromDate": "开始日期",
+    "filterToDate": "结束日期",
+    "filterObjectType": "天体类型",
+    "filterAny": "任意",
+    "filterMinRating": "最低评分",
+    "clearFilters": "清除筛选",
     "totalSessions": "会话数",
     "totalObs": "观测数",
     "uniqueObjects": "天体数",
@@ -877,6 +918,7 @@
     "plannerDraftCreated": "已生成会话计划草稿",
     "noPlannerSession": "未找到可用的已保存计划",
     "createFailed": "创建会话失败",
+    "objectNameRequired": "请输入天体名称",
     "observationAdded": "观测记录已添加",
     "addFailed": "添加观测失败",
     "sessionEnded": "会话已结束",
@@ -908,10 +950,13 @@
     "deleteConfirmDesc": "此操作无法撤销，确定要删除吗？",
     "editSession": "编辑会话",
     "editSessionDesc": "更新此观测会话。",
+    "editObservation": "编辑观测记录",
+    "editObsDesc": "更新当前选中的观测记录。",
     "observationDeleted": "观测记录已删除",
     "monthlyTrend": "月度趋势",
     "exportSuccess": "导出完成",
     "exportFailed": "导出失败",
+    "openSession": "打开会话",
     "executionWorkspace": "执行工作区",
     "executionSummaryCompleted": "已完成 {count} 个",
     "executionSummarySkipped": "已跳过 {count} 个",
@@ -964,6 +1009,10 @@
     "catalogPresets": "星表预设",
     "autoSearch": "输入时自动搜索",
     "foundResults": "找到 {count} 个结果",
+    "localResultsReady": "本地结果已就绪，正在合并在线更新...",
+    "partialResults": "部分结果可用：部分数据源失败时仍显示已获取的匹配项。",
+    "partialResultsBadge": "部分结果",
+    "onlineLabel": "在线",
     "coordinateFormats": "支持的格式：",
     "decimal": "十进制度数",
     "onlineSearch": "在线搜索",
@@ -1001,7 +1050,8 @@
       "galaxies": "星系",
       "nebulae": "星云",
       "planets": "行星",
-      "clusters": "星团"
+      "clusters": "星团",
+      "messier": "梅西耶"
     },
     "sortByDistance": "距离",
     "sortByAltitude": "高度",
@@ -1980,10 +2030,10 @@
       "roundRobinDesc": "在提供商之间轮流切换"
     }
   },
-  "objectDetail": {
-    "overview": "概览",
-    "images": "图像",
-    "observation": "观测",
+    "objectDetail": {
+      "overview": "概览",
+      "images": "图像",
+      "observation": "观测",
     "viewDetails": "查看详情",
     "properties": "物理属性",
     "morphology": "形态类型",
@@ -2006,8 +2056,47 @@
     "fullscreen": "全屏查看",
     "frameTimeScale": "参考系 / 时标",
     "qualityEop": "质量 / EOP",
+    "systemMetadata": "系统元数据",
+    "calculationSummary": "计算来源",
+    "selectionSourceLabel": "选择来源",
+    "selectionFallbackLabel": "选择状态",
+    "sourceCatalog": "来源目录",
+    "tonightSummary": "今夜摘要",
     "timestamp": "时间戳",
-    "riskHints": "风险提示",
+      "riskHints": "风险提示",
+      "acceptedSource": "采用来源",
+      "fallbackSource": "回退来源",
+      "localFallback": "本地兜底",
+      "remoteUnavailable": "远程补全暂不可用",
+      "degradedSourceState": "部分来源当前无法为该目标提供数据",
+      "unsupportedSourceState": "该来源不支持当前目标",
+      "emptySourceState": "来源已响应，但没有返回匹配数据",
+      "calculationState": {
+        "normal": "正常",
+        "degraded": "降级"
+      },
+      "sourceAuthority": {
+        "authoritative": "权威远程来源",
+        "reference": "参考来源",
+        "fallback-local": "本地兜底来源"
+      },
+    "calculationSource": {
+      "tauri": "Tauri",
+      "fallback": "回退",
+      "calculation": "计算",
+      "engine": "引擎"
+    },
+    "selectionSource": {
+      "engine": "引擎选择",
+      "catalog": "目录选择",
+      "coordinate": "坐标选择",
+      "enriched": "增强选择"
+    },
+    "selectionFallback": {
+      "resolved": "已解析对象",
+      "catalog_partial": "目录部分元数据",
+      "coordinate_fallback": "坐标回退"
+    },
     "altitudeState": {
       "optimal": "最佳高度",
       "observable": "地平线以上",
@@ -2024,9 +2113,9 @@
       "low-feasibility": "可行性低"
     }
   },
-  "sourceConfig": {
-    "title": "信息来源",
-    "configDescription": "配置天体图像和数据来源",
+    "sourceConfig": {
+      "title": "信息来源",
+      "configDescription": "配置天体图像和数据来源",
     "imageSources": "图像来源",
     "dataSourcesLabel": "数据来源",
     "globalSettings": "全局设置",
@@ -2052,13 +2141,29 @@
     "sourceDescription": "描述",
     "descriptionPlaceholder": "简短描述此来源",
     "statusUnknown": "状态未知",
-    "statusChecking": "检查中...",
-    "statusOnline": "在线",
-    "statusOffline": "离线",
-    "statusError": "错误",
-    "responseTime": "响应时间",
-    "autoSkipOffline": "自动跳过离线来源",
-    "autoSkipOfflineDescription": "自动跳过检测为离线的来源",
+      "statusChecking": "检查中...",
+      "statusOnline": "在线",
+      "statusOffline": "离线",
+      "statusError": "错误",
+      "statusUnsupported": "不支持",
+      "statusDegraded": "降级",
+      "statusEmpty": "无匹配数据",
+      "responseTime": "响应时间",
+      "authorityLevel": "来源级别",
+      "healthStrategy": "探测策略",
+      "targetSupport": "支持目标",
+      "diagnostic": {
+        "authoritative": "权威远程元数据",
+        "reference": "参考或补充型远程内容",
+        "fallback-local": "本地整理的兜底内容",
+        "query": "查询式探测",
+        "lookup": "查找式探测",
+        "cutout": "切片生成探测",
+        "none": "被动健康状态",
+        "disabled": "健康探测已禁用"
+      },
+      "autoSkipOffline": "自动跳过离线来源",
+      "autoSkipOfflineDescription": "自动跳过检测为离线的来源",
     "imageTimeout": "图像加载超时",
     "apiTimeout": "API 请求超时",
     "defaultImageSize": "默认图像尺寸 (角分)",
@@ -2084,6 +2189,7 @@
     "skip": "跳过",
     "finish": "完成",
     "restartTour": "重新开始引导",
+    "restartAll": "重新开始新手引导",
     "restartAllDescription": "可从头重新开始完整的新手设置与功能导览。",
     "moduleRestartDescription": "可随时重新进入模块导览，复习对应功能流程。",
     "transition": {
@@ -2671,6 +2777,18 @@
     "solveComplete": "解析完成！",
     "objectsInField": "视场内天体",
     "annotations": "标注",
+    "detectedObjects": "已识别天体",
+    "annotationCount": "标注数量",
+    "analysisSummary": "图像分析摘要",
+    "analysisStars": "星点数",
+    "analysisMedianHfd": "中位 HFD",
+    "wcsMissing": "缺少 WCS 元数据",
+    "goToAnnotation": "前往该标注",
+    "addAnnotationMarker": "添加为标记",
+    "annotationActionDisabled": {
+      "missing_wcs": "标注动作需要 WCS 元数据",
+      "missing_frame_size": "标注动作需要图像尺寸元数据"
+    },
     "orientation": "方位角",
     "parity": "奇偶性",
     "jobId": "任务 ID",
@@ -2846,6 +2964,7 @@
       "screenReaderOptimizedDesc": "为屏幕阅读器优化界面"
     },
     "notifications": {
+      "title": "通知",
       "general": "通知",
       "enableToasts": "显示通知",
       "enableToastsDesc": "为事件和状态变更显示提示通知",
@@ -2861,6 +2980,7 @@
       "satelliteAlertsDesc": "卫星可见性和跟踪事件通知"
     },
     "search": {
+      "title": "搜索",
       "behavior": "搜索行为",
       "fuzzySearch": "模糊搜索",
       "fuzzySearchDesc": "允许天体名称的近似匹配（如 'andrmeda' → 仙女座）",
@@ -3568,6 +3688,14 @@
     "night": "夜间",
     "daylight": "白天",
     "targetName": "目标名称",
+    "minorObjectQuery": "小天体查询",
+    "minorObjectPlaceholder": "1P/Halley、(433)、C/2023 A3...",
+    "copyResults": "复制结果",
+    "exportResults": "导出结果",
+    "openPlanner": "打开规划器",
+    "actions": "操作",
+    "copySuccess": "已复制到剪贴板。",
+    "copyFailed": "复制失败。",
     "daysAhead": "未来天数",
     "circumpolar": "拱极星",
     "date": "日期",
@@ -4046,6 +4174,17 @@
     "title": "每日知识",
     "subtitle": "参考 KStars 与 Stellarium 工作流的每日天文知识内容。",
     "open": "每日知识",
+    "practicalInsights": "实用观测提示",
+    "observationTips": "观测建议",
+    "noObservationTips": "该条目暂时没有可展示的观测建议。",
+    "bestViewingMonthsLabel": "最佳观测月份",
+    "allYear": "全年",
+    "difficultyBadge": {
+      "beginner": "入门",
+      "intermediate": "进阶",
+      "advanced": "高级",
+      "expert": "专家"
+    },
     "searchPlaceholder": "搜索标题、摘要或标签...",
     "categoryAll": "全部分类",
     "categoryObject": "天体",
@@ -4072,6 +4211,12 @@
     "next": "下一条",
     "random": "随机",
     "history": "历史记录",
+    "activeDateLabel": "当前查看：{date}",
+    "browsingDate": "正在浏览其他日期",
+    "previousDate": "前一天",
+    "nextDate": "后一天",
+    "goToToday": "回到今天",
+    "sourceStatusForDate": "{date} 的来源状态",
     "refreshCurrentDate": "刷新当前日期",
     "resultCount": "{count} 条结果",
     "freshness": {

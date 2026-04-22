@@ -3,7 +3,17 @@
  * Uses satellite.js for accurate orbital calculations
  */
 
-import * as satellite from 'satellite.js';
+import {
+  twoline2satrec,
+  propagate,
+  gstime,
+  eciToGeodetic,
+  degreesToRadians,
+  ecfToLookAngles,
+  eciToEcf,
+  radiansToDegrees,
+} from '@/lib/vendor/satellite-js-v7';
+import type { EciVec3, GeodeticLocation, SatRec } from '@/lib/vendor/satellite-js-v7';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('satellite-propagator');
@@ -72,9 +82,9 @@ export interface SatellitePass {
 /**
  * Parse TLE data from CelesTrak format
  */
-export function parseTLE(tle: TLEData): satellite.SatRec | null {
+export function parseTLE(tle: TLEData): SatRec | null {
   try {
-    const satrec = satellite.twoline2satrec(tle.line1, tle.line2);
+    const satrec = twoline2satrec(tle.line1, tle.line2);
     return satrec;
   } catch (error) {
     logger.error('Failed to parse TLE', error);
@@ -90,13 +100,13 @@ export function parseTLE(tle: TLEData): satellite.SatRec | null {
  * Calculate satellite position at a given time
  */
 export function calculatePosition(
-  satrec: satellite.SatRec,
+  satrec: SatRec,
   date: Date,
   observer: ObserverLocation
 ): SatellitePosition | null {
   try {
     // Propagate satellite position
-    const positionAndVelocity = satellite.propagate(satrec, date);
+    const positionAndVelocity = propagate(satrec, date);
     
     if (!positionAndVelocity || !positionAndVelocity.position || typeof positionAndVelocity.position === 'boolean') {
       return null;
@@ -106,31 +116,31 @@ export function calculatePosition(
       return null;
     }
     
-    const positionEci = positionAndVelocity.position as satellite.EciVec3<number>;
-    const velocityEci = positionAndVelocity.velocity as satellite.EciVec3<number>;
+    const positionEci = positionAndVelocity.position as EciVec3<number>;
+    const velocityEci = positionAndVelocity.velocity as EciVec3<number>;
     
     // Get GMST for coordinate conversion
-    const gmst = satellite.gstime(date);
+    const gmst = gstime(date);
     
     // Convert ECI to geodetic coordinates
-    const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+    const positionGd = eciToGeodetic(positionEci, gmst);
     
     // Observer position in geodetic
-    const observerGd: satellite.GeodeticLocation = {
-      longitude: satellite.degreesToRadians(observer.longitude),
-      latitude: satellite.degreesToRadians(observer.latitude),
+    const observerGd: GeodeticLocation = {
+      longitude: degreesToRadians(observer.longitude),
+      latitude: degreesToRadians(observer.latitude),
       height: observer.altitude / 1000, // Convert to km
     };
     
     // Calculate look angles (azimuth, elevation, range)
-    const lookAngles = satellite.ecfToLookAngles(
+    const lookAngles = ecfToLookAngles(
       observerGd,
-      satellite.eciToEcf(positionEci, gmst)
+      eciToEcf(positionEci, gmst)
     );
     
     // Convert to degrees
-    const azimuth = satellite.radiansToDegrees(lookAngles.azimuth);
-    const elevation = satellite.radiansToDegrees(lookAngles.elevation);
+    const azimuth = radiansToDegrees(lookAngles.azimuth);
+    const elevation = radiansToDegrees(lookAngles.elevation);
     const range = lookAngles.rangeSat;
     
     // Calculate velocity magnitude
@@ -148,8 +158,8 @@ export function calculatePosition(
     const isVisible = elevation > 0 && isSunlit && isObserverInDarkness(observer, date);
     
     return {
-      latitude: satellite.radiansToDegrees(positionGd.latitude),
-      longitude: satellite.radiansToDegrees(positionGd.longitude),
+      latitude: radiansToDegrees(positionGd.latitude),
+      longitude: radiansToDegrees(positionGd.longitude),
       altitude: positionGd.height,
       azimuth: (azimuth + 360) % 360, // Normalize to 0-360
       elevation,
@@ -169,16 +179,16 @@ export function calculatePosition(
 /**
  * Convert ECI coordinates to RA/Dec
  */
-function eciToRaDec(positionEci: satellite.EciVec3<number>, gmst: number): { ra: number; dec: number } {
+function eciToRaDec(positionEci: EciVec3<number>, gmst: number): { ra: number; dec: number } {
   // Convert ECI to ECEF
-  const ecf = satellite.eciToEcf(positionEci, gmst);
+  const ecf = eciToEcf(positionEci, gmst);
   
   // Calculate RA and Dec
   const r = Math.sqrt(ecf.x ** 2 + ecf.y ** 2 + ecf.z ** 2);
-  const dec = satellite.radiansToDegrees(Math.asin(positionEci.z / r));
+  const dec = radiansToDegrees(Math.asin(positionEci.z / r));
   
   // RA from ECI coordinates (not ECEF)
-  let ra = satellite.radiansToDegrees(Math.atan2(positionEci.y, positionEci.x));
+  let ra = radiansToDegrees(Math.atan2(positionEci.y, positionEci.x));
   if (ra < 0) ra += 360;
   
   return { ra, dec };
@@ -187,7 +197,7 @@ function eciToRaDec(positionEci: satellite.EciVec3<number>, gmst: number): { ra:
 /**
  * Check if satellite is sunlit (simplified calculation)
  */
-function checkSunlit(positionEci: satellite.EciVec3<number>, date: Date): boolean {
+function checkSunlit(positionEci: EciVec3<number>, date: Date): boolean {
   // Simplified: calculate sun position and check if satellite is in Earth's shadow
   const sunPos = getSunPosition(date);
   
@@ -302,7 +312,7 @@ function getJulianDate(date: Date): number {
  * Predict satellite passes for the next N hours
  */
 export function predictPasses(
-  satrec: satellite.SatRec,
+  satrec: SatRec,
   observer: ObserverLocation,
   startTime: Date,
   hours: number = 24,
@@ -378,7 +388,7 @@ export function predictPasses(
  * Calculate positions for multiple satellites
  */
 export function calculateMultiplePositions(
-  satellites: Array<{ satrec: satellite.SatRec; id: string; name: string }>,
+  satellites: Array<{ satrec: SatRec; id: string; name: string }>,
   date: Date,
   observer: ObserverLocation
 ): Array<{ id: string; name: string; position: SatellitePosition | null }> {
@@ -393,7 +403,7 @@ export function calculateMultiplePositions(
  * Update satellite positions in real-time
  */
 export function createPositionUpdater(
-  satellites: Array<{ satrec: satellite.SatRec; id: string; name: string }>,
+  satellites: Array<{ satrec: SatRec; id: string; name: string }>,
   observer: ObserverLocation,
   onUpdate: (positions: Array<{ id: string; name: string; position: SatellitePosition | null }>) => void,
   intervalMs: number = 1000

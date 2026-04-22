@@ -101,6 +101,7 @@ jest.mock('@/lib/services/map-config', () => ({
 
 import { geocodingService } from '@/lib/services/geocoding-service';
 import { mapConfig } from '@/lib/services/map-config';
+import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 
 const mockGeocode = geocodingService.geocode as jest.Mock;
 const mockReverseGeocode = geocodingService.reverseGeocode as jest.Mock;
@@ -197,6 +198,7 @@ describe('MapLocationPicker', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLeafletState.latestProps = null;
+    useMapInteractionStore.getState().reset();
     Object.defineProperty(window.navigator, 'onLine', {
       configurable: true,
       value: true,
@@ -997,6 +999,46 @@ describe('MapLocationPicker', () => {
           longitude: 139.6503,
         })
       );
+    });
+
+    it('publishes draft continuity context before apply and committed context after apply', async () => {
+      render(
+        <MapLocationPicker
+          onLocationChange={mockOnLocationChange}
+          initialLocation={{ latitude: 10, longitude: 20 }}
+          commitMode="staged"
+          draftMetadataState={{
+            coordinates: { latitude: 51.5074, longitude: -0.1278 },
+            summaryStatus: 'partial',
+            issues: [
+              { field: 'timezone', reason: 'timezone_unavailable', message: 'Timezone unavailable' },
+            ],
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('leaflet-location-change'));
+
+      await waitFor(() => {
+        expect(useMapInteractionStore.getState().siteContext).toMatchObject({
+          kind: 'draft',
+          sourceSurface: 'map-picker',
+          coordinates: { latitude: 51.5074, longitude: -0.1278 },
+          summaryStatus: 'partial',
+          actions: ['retry-metadata', 'open-provider-settings', 'save-location-draft', 'discard-location-draft'],
+        });
+      });
+
+      fireEvent.click(screen.getByTestId('map-apply-selection'));
+
+      await waitFor(() => {
+        expect(useMapInteractionStore.getState().siteContext).toMatchObject({
+          kind: 'committed',
+          sourceSurface: 'map-picker',
+          coordinates: { latitude: 51.5074, longitude: -0.1278 },
+          summaryStatus: 'partial',
+        });
+      });
     });
   });
 

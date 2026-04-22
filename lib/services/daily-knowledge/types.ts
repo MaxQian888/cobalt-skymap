@@ -162,6 +162,7 @@ export interface DailyKnowledgeOptions {
 }
 
 export interface DailyKnowledgeServiceResult {
+  requestedDateKey: string;
   items: DailyKnowledgeItem[];
   selected: DailyKnowledgeItem;
   sourceStatuses: DailyKnowledgeSourceStatus[];

@@ -37,6 +37,14 @@ function makeBaseInfo(overrides: Partial<ObjectDetailedInfo> = {}): ObjectDetail
     decString: '-04° 00\'',
     images: [],
     sources: ['Local'],
+    provenance: {
+      description: {
+        acceptedSource: 'Local',
+        authorityLevel: 'fallback-local',
+        contributors: ['Local'],
+      },
+    },
+    diagnostics: [],
     ...overrides,
   };
 }
@@ -57,6 +65,12 @@ describe('object-info-service enrichment', () => {
         description: 'SIMBAD Astronomical Database',
         status: 'online',
         builtIn: true,
+        renderTier: 'enrichment',
+        fallbackRole: 'primary',
+        targetClasses: ['deep-sky', 'star', 'extragalactic', 'generic'],
+        responseMode: 'json',
+        authorityLevel: 'authoritative',
+        healthCheck: { strategy: 'query', probePath: '/simbad/sim-tap/sync' },
       },
       {
         id: 'wikipedia',
@@ -70,6 +84,12 @@ describe('object-info-service enrichment', () => {
         description: 'Wikipedia summaries',
         status: 'online',
         builtIn: true,
+        renderTier: 'enrichment',
+        fallbackRole: 'fallback',
+        targetClasses: ['deep-sky', 'star', 'planetary', 'small-body', 'extragalactic', 'generic'],
+        responseMode: 'json',
+        authorityLevel: 'reference',
+        healthCheck: { strategy: 'lookup', probePath: '/api/rest_v1/page/summary/M31' },
       },
       {
         id: 'sbdb',
@@ -83,6 +103,12 @@ describe('object-info-service enrichment', () => {
         description: 'JPL Small-Body Database',
         status: 'online',
         builtIn: true,
+        renderTier: 'enrichment',
+        fallbackRole: 'fallback',
+        targetClasses: ['small-body'],
+        responseMode: 'json',
+        authorityLevel: 'authoritative',
+        healthCheck: { strategy: 'query', probePath: '/sbdb.api?sstr=1P&phys-par=1' },
       },
     ] as never);
   });
@@ -123,6 +149,11 @@ describe('object-info-service enrichment', () => {
 
     expect(enhanced.description).toContain('Halley');
     expect(enhanced.sources).toEqual(expect.arrayContaining(['Local', 'SIMBAD', 'Wikipedia', 'SBDB']));
+    expect(enhanced.provenance.description?.acceptedSource).toBe('Wikipedia');
+    expect(enhanced.provenance.description?.authorityLevel).toBe('reference');
+    expect(enhanced.provenance.description?.contributors).toEqual(
+      expect.arrayContaining(['Local', 'Wikipedia'])
+    );
   });
 
   it('does not overwrite an existing description when lower-priority providers return one', async () => {
@@ -153,5 +184,38 @@ describe('object-info-service enrichment', () => {
     const enhanced = await enhanceObjectInfo(makeBaseInfo({ description: 'Existing local description' }));
 
     expect(enhanced.description).toBe('Existing local description');
+    expect(enhanced.provenance.description?.acceptedSource).toBe('Local');
+    expect(enhanced.provenance.description?.contributors).toEqual(
+      expect.arrayContaining(['Local', 'Wikipedia'])
+    );
+  });
+
+  it('records unsupported diagnostics when a provider is enabled but not eligible for the target class', async () => {
+    mockSmartFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [['M31', 10.68, 41.27, 'G', null, 3.4, null, null, null, null]],
+      }),
+    } as never);
+
+    const enhanced = await enhanceObjectInfo(makeBaseInfo({
+      names: ['M31'],
+      type: 'Galaxy',
+      typeCategory: 'galaxy',
+      description: undefined,
+    }));
+
+    expect(mockSmartFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/sbdb.api'),
+      expect.anything()
+    );
+    expect(enhanced.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          providerId: 'sbdb',
+          status: 'unsupported',
+        }),
+      ])
+    );
   });
 });

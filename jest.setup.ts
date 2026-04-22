@@ -5,6 +5,7 @@
 
 import '@testing-library/jest-dom';
 import React from 'react';
+import { logManager } from '@/lib/logger';
 
 // Mock Next.js Image component
 jest.mock('next/image', () => ({
@@ -120,10 +121,10 @@ if (typeof window !== 'undefined') {
   Object.defineProperty(window, 'localStorage', { value: localStorageMock });
 }
 
-// Suppress console errors in tests (optional)
-// global.console = {
-//   ...console,
-//   error: jest.fn(),
-//   warn: jest.fn(),
-// };
+// Keep logger-backed console transport disabled in Jest by default so
+// expected error-path tests do not flood the output with transport noise.
+logManager.initialize({
+  enableConsole: false,
+  enablePersistence: false,
+});
 

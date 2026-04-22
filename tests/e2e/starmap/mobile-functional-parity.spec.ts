@@ -172,4 +172,61 @@ test.describe('Mobile Functional Parity', () => {
 
     await expect(page.getByText(/Calibrate sensor from Sensor Control to improve pointing\./i)).toBeVisible();
   });
+
+  test('keeps desktop AR launch in camera-first guidance when no live sensor path is available', async ({ page }) => {
+    await page.addInitScript(() => {
+      class MockDesktopDeviceOrientationEvent extends Event {}
+
+      Object.defineProperty(window, 'DeviceOrientationEvent', {
+        configurable: true,
+        writable: true,
+        value: MockDesktopDeviceOrientationEvent,
+      });
+
+      Object.defineProperty(window.navigator, 'maxTouchPoints', {
+        configurable: true,
+        value: 0,
+      });
+
+      const originalMatchMedia = window.matchMedia?.bind(window);
+      window.matchMedia = ((query: string) => {
+        if (query === '(pointer: coarse)') {
+          return {
+            matches: false,
+            media: query,
+            onchange: null,
+            addListener: () => {},
+            removeListener: () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            dispatchEvent: () => false,
+          } as MediaQueryList;
+        }
+
+        return originalMatchMedia
+          ? originalMatchMedia(query)
+          : {
+              matches: false,
+              media: query,
+              onchange: null,
+              addListener: () => {},
+              removeListener: () => {},
+              addEventListener: () => {},
+              removeEventListener: () => {},
+              dispatchEvent: () => false,
+            } as MediaQueryList;
+      }) as typeof window.matchMedia;
+    });
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await waitForStarmapReady(page, { skipWasmWait: true });
+
+    const arToggle = page.getByTestId('ar-mode-toggle').first();
+    await expect(arToggle).toBeVisible();
+    await arToggle.click();
+
+    await expect(arToggle).toHaveAttribute('data-ar-operating-mode', 'camera-first');
+    await expect(page.getByTestId('ar-launch-assistant')).toHaveAttribute('data-ar-operating-mode', 'camera-first');
+    await expect(page.getByText(/camera-first AR guidance path/i).first()).toBeVisible();
+  });
 });

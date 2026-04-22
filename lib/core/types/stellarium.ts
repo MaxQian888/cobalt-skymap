@@ -489,6 +489,10 @@ export interface SelectedObjectData {
   dec: string;
   raDeg: number;
   decDeg: number;
+  selectionSource?: 'engine' | 'catalog' | 'coordinate' | 'enriched';
+  selectionFallback?: 'resolved' | 'catalog_partial' | 'coordinate_fallback';
+  sourceCatalog?: string | null;
+  selectionTimestamp?: string;
   frame?: import('./astronomy').AstronomicalFrame;
   timeScale?: import('./astronomy').TimeScale;
   qualityFlag?: import('./astronomy').CoordinateQualityFlag;

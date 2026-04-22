@@ -2,6 +2,9 @@
  * Tests for cache/config.ts
  */
 
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import {
   CACHE_CONFIG,
   CACHEABLE_URL_PATTERNS,
@@ -106,8 +109,17 @@ describe('PREFETCH_RESOURCES', () => {
   });
 
   it('should include catalog bootstrap manifests for richer first render', () => {
-    expect(PREFETCH_RESOURCES.some((p) => p.includes('/stellarium-data/stars/info.json'))).toBe(true);
-    expect(PREFETCH_RESOURCES.some((p) => p.includes('/stellarium-data/dso/info.json'))).toBe(true);
+    expect(PREFETCH_RESOURCES.some((p) => p.includes('/stellarium-data/stars/properties'))).toBe(true);
+    expect(PREFETCH_RESOURCES.some((p) => p.includes('/stellarium-data/dso/properties'))).toBe(true);
+  });
+
+  it('should only include local prefetch resources that exist under public/', () => {
+    for (const resource of PREFETCH_RESOURCES) {
+      if (!resource.startsWith('/')) continue;
+      const relativePath = resource.replace(/^\//, '').replaceAll('/', '\\');
+      const absolutePath = join(process.cwd(), 'public', relativePath);
+      expect(existsSync(absolutePath)).toBe(true);
+    }
   });
 });
 
@@ -117,10 +129,10 @@ describe('getStarmapTierPrefetchResources', () => {
       expect.arrayContaining(['/stellarium-js/stellarium-web-engine.js'])
     );
     expect(getStarmapTierPrefetchResources('catalog')).toEqual(
-      expect.arrayContaining(['/stellarium-data/stars/info.json'])
+      expect.arrayContaining(['/stellarium-data/stars/properties'])
     );
     expect(getStarmapTierPrefetchResources('survey')).toEqual(
-      expect.arrayContaining(['/stellarium-data/surveys/dss/info.json'])
+      expect.arrayContaining(['/stellarium-data/surveys/dss/properties'])
     );
   });
 });

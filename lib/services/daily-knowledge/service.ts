@@ -134,6 +134,7 @@ function resolveStaleCacheResult(
 
   return {
     ...cachedResult,
+    requestedDateKey: cachedResult.requestedDateKey,
     sourceStatuses: markSelectedSourceAsStale(sourceStatuses, cachedResult.selected.source),
     usedCuratedFallback: false,
     fallbackReason: null,
@@ -431,6 +432,7 @@ export async function getDailyKnowledge(
     const deduped = applyLanguageStatus(dedupeItems(offlineItems), locale);
     const selected = deduped[0];
     const result = {
+      requestedDateKey: dateKey,
       items: deduped,
       selected,
       sourceStatuses: makeSkippedStatuses(!onlineEnhancement ? 'disabled' : 'offline'),
@@ -494,6 +496,7 @@ export async function getDailyKnowledge(
 
   const fallbackState = resolveFallbackState(selected, sourceStatuses, onlineEnhancement, onlineAvailable);
   const result = {
+    requestedDateKey: dateKey,
     items: merged,
     selected,
     sourceStatuses,

@@ -24,6 +24,7 @@ jest.mock('@tauri-apps/plugin-geolocation', () => ({
 }));
 
 import { isTauri, isMobile } from '@/lib/storage/platform';
+import { logManager } from '@/lib/logger';
 import { geolocationApi } from '../geolocation-api';
 
 const mockIsTauri = isTauri as jest.Mock;
@@ -34,6 +35,7 @@ describe('geolocationApi', () => {
     jest.clearAllMocks();
     mockIsTauri.mockReturnValue(true);
     mockIsMobile.mockReturnValue(true);
+    logManager.initialize({ enableConsole: false, enablePersistence: false });
   });
 
   describe('isAvailable', () => {
@@ -258,12 +260,14 @@ describe('geolocationApi', () => {
     it('should handle errors gracefully', async () => {
       mockCheckPermissions.mockRejectedValue(new Error('Permission error'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      logManager.initialize({ enableConsole: true, enablePersistence: false });
 
       const result = await geolocationApi.getPositionWithPermission();
 
       expect(result).toBeNull();
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
+      logManager.initialize({ enableConsole: false, enablePersistence: false });
     });
   });
 });

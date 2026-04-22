@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 
 jest.useFakeTimers();
 jest.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
@@ -38,7 +38,9 @@ import { BottomStatusBar, ViewCenterDisplay, LocationTimeDisplay } from '../bott
 
 describe('BottomStatusBar', () => {
   afterEach(() => {
-    jest.runOnlyPendingTimers();
+    act(() => {
+      jest.runOnlyPendingTimers();
+    });
   });
 
   it('renders without crashing', () => {
@@ -110,8 +112,10 @@ describe('LocationTimeDisplay', () => {
   });
 
   it('renders current time', () => {
-    jest.advanceTimersByTime(1100);
     const { container } = render(<LocationTimeDisplay />);
+    act(() => {
+      jest.advanceTimersByTime(1100);
+    });
     // Should contain some time text
     expect(container.textContent).toBeTruthy();
   });

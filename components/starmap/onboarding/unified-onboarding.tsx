@@ -33,6 +33,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
@@ -258,7 +259,10 @@ export function UnifiedOnboarding({
       {isSetupOpen && isConfigStep && (
         <Dialog open={isSetupOpen} onOpenChange={handleOpenChange}>
           <DialogContent className="sm:max-w-2xl max-h-[90vh] max-h-[90dvh] overflow-hidden bg-card/95 backdrop-blur-md border-border p-0">
-            <DialogTitle className="sr-only">{t('setupWizard.title')}</DialogTitle>
+            <DialogHeader className="sr-only">
+              <DialogTitle>{t('setupWizard.title')}</DialogTitle>
+              <DialogDescription>{t(`setupWizard.steps.${setupStep}.subtitle`)}</DialogDescription>
+            </DialogHeader>
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-primary/5" />
 
@@ -337,19 +341,21 @@ export function UnifiedOnboarding({
               </div>
             </div>
 
-            <div className="px-6 py-4 overflow-y-auto max-h-[50vh] max-h-[50dvh]">
-              <AnimatePresence mode="wait" initial={false}>
-                <motion.div
-                  key={setupStep}
-                  initial={{ opacity: 0, x: direction * 60 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: direction * -60 }}
-                  transition={{ duration: 0.2, ease: 'easeInOut' }}
-                >
-                  {stepContent}
-                </motion.div>
-              </AnimatePresence>
-            </div>
+            <ScrollArea className="max-h-[50vh] max-h-[50dvh]">
+              <div className="px-6 py-4">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={setupStep}
+                    initial={{ opacity: 0, x: direction * 60 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: direction * -60 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  >
+                    {stepContent}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            </ScrollArea>
 
             <Separator />
             <div className="flex items-center justify-between px-6 py-4 bg-muted/30">
@@ -396,7 +402,10 @@ export function UnifiedOnboarding({
       {isSetupOpen && setupStep === 'complete' && (
         <Dialog open={true} onOpenChange={() => handleSkip()}>
           <DialogContent className="sm:max-w-md bg-card/95 backdrop-blur-md border-border">
-            <DialogTitle className="sr-only">{t('setupWizard.steps.complete.title')}</DialogTitle>
+            <DialogHeader className="sr-only">
+              <DialogTitle>{t('setupWizard.steps.complete.title')}</DialogTitle>
+              <DialogDescription>{t('onboarding.transition.description')}</DialogDescription>
+            </DialogHeader>
             <SetupCompleteTransition onStartTour={finishSetupAndStartTour} onSkip={handleSkip} />
           </DialogContent>
         </Dialog>
@@ -432,86 +441,88 @@ export function UnifiedOnboarding({
             </DialogTitle>
             <DialogDescription>{t('onboarding.hub.description')}</DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 max-h-[45vh] max-h-[45dvh] overflow-y-auto pr-1">
-            {showMessierMarathonCard && (
-              <Card className="py-3 gap-0 border-primary/30 bg-primary/5">
-                <CardContent className="flex items-center justify-between gap-3 px-4">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm">{t('messierMarathon.title')}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {activeMessierSession
-                        ? t('onboarding.hub.messierMarathonResumeDescription')
-                        : t('onboarding.hub.messierMarathonDescription')}
-                    </p>
-                    <Badge variant="outline" className="mt-1.5 text-xs">
-                      {activeMessierSession
-                        ? t(`messierMarathon.readiness.${activeMessierSession.readiness}`)
-                        : t('onboarding.hub.seasonalGuide')}
-                    </Badge>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={activeMessierSession ? 'secondary' : 'default'}
-                    onClick={() => {
-                      setTourHubOpen(false);
-                      openMessierMarathonGuide();
-                    }}
-                  >
-                    {activeMessierSession
-                      ? t('onboarding.hub.resumeMarathon')
-                      : t('onboarding.hub.startMarathon')}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-            {moduleTours.map((tour) => {
-              const progress = getTourProgress(tour.id);
-              const done = completedTours.includes(tour.id);
-              return (
-                <Card key={tour.id} className="py-3 gap-0">
+          <ScrollArea className="max-h-[45vh] max-h-[45dvh] pr-1">
+            <div className="space-y-3">
+              {showMessierMarathonCard && (
+                <Card className="py-3 gap-0 border-primary/30 bg-primary/5">
                   <CardContent className="flex items-center justify-between gap-3 px-4">
                     <div className="min-w-0">
-                      <p className="font-medium text-sm">{t(tour.titleKey)}</p>
-                      <p className="text-xs text-muted-foreground">{t(tour.descriptionKey)}</p>
-                      <Badge
-                        variant={done ? 'secondary' : 'outline'}
-                        className="mt-1.5 text-xs"
-                      >
-                        {done
-                          ? t('onboarding.hub.completed')
-                          : t('onboarding.hub.progress', {
-                              current: Math.max(progress.currentStepIndex + 1, 0),
-                              total: progress.totalSteps,
-                            })}
+                      <p className="font-medium text-sm">{t('messierMarathon.title')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {activeMessierSession
+                          ? t('onboarding.hub.messierMarathonResumeDescription')
+                          : t('onboarding.hub.messierMarathonDescription')}
+                      </p>
+                      <Badge variant="outline" className="mt-1.5 text-xs">
+                        {activeMessierSession
+                          ? t(`messierMarathon.readiness.${activeMessierSession.readiness}`)
+                          : t('onboarding.hub.seasonalGuide')}
                       </Badge>
                     </div>
                     <Button
                       size="sm"
-                      variant={done ? 'outline' : 'default'}
+                      variant={activeMessierSession ? 'secondary' : 'default'}
                       onClick={() => {
                         setTourHubOpen(false);
-                        if (done) {
-                          restartTourModule(tour.id);
-                          return;
-                        }
-                        if (progress.currentStepIndex > 0 && !progress.completed) {
-                          resumeTour(tour.id);
-                          return;
-                        }
-                        startTourById(tour.id);
+                        openMessierMarathonGuide();
                       }}
                     >
-                      {done
-                        ? t('onboarding.hub.restart')
-                        : progress.currentStepIndex > 0 && !progress.completed
-                          ? t('onboarding.hub.resume')
-                          : t('onboarding.hub.start')}
+                      {activeMessierSession
+                        ? t('onboarding.hub.resumeMarathon')
+                        : t('onboarding.hub.startMarathon')}
                     </Button>
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+              )}
+              {moduleTours.map((tour) => {
+                const progress = getTourProgress(tour.id);
+                const done = completedTours.includes(tour.id);
+                return (
+                  <Card key={tour.id} className="py-3 gap-0">
+                    <CardContent className="flex items-center justify-between gap-3 px-4">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">{t(tour.titleKey)}</p>
+                        <p className="text-xs text-muted-foreground">{t(tour.descriptionKey)}</p>
+                        <Badge
+                          variant={done ? 'secondary' : 'outline'}
+                          className="mt-1.5 text-xs"
+                        >
+                          {done
+                            ? t('onboarding.hub.completed')
+                            : t('onboarding.hub.progress', {
+                                current: Math.max(progress.currentStepIndex + 1, 0),
+                                total: progress.totalSteps,
+                              })}
+                        </Badge>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={done ? 'outline' : 'default'}
+                        onClick={() => {
+                          setTourHubOpen(false);
+                          if (done) {
+                            restartTourModule(tour.id);
+                            return;
+                          }
+                          if (progress.currentStepIndex > 0 && !progress.completed) {
+                            resumeTour(tour.id);
+                            return;
+                          }
+                          startTourById(tour.id);
+                        }}
+                      >
+                        {done
+                          ? t('onboarding.hub.restart')
+                          : progress.currentStepIndex > 0 && !progress.completed
+                            ? t('onboarding.hub.resume')
+                            : t('onboarding.hub.start')}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </ScrollArea>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setTourHubOpen(false)}>
               {t('onboarding.hub.finishLater')}

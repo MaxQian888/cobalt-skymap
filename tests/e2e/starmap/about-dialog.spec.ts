@@ -6,8 +6,7 @@ test.describe('About Dialog', () => {
   test.beforeEach(async ({ page }) => {
     // Initialize page object for potential future use
     new StarmapPage(page);
-    // Use skipWasmWait for faster tests - about dialog works before WASM loads
-    await waitForStarmapReady(page, { skipWasmWait: true });
+    await waitForStarmapReady(page);
   });
 
   test.describe('Dialog Access', () => {
@@ -291,7 +290,7 @@ test.describe('About Dialog', () => {
       await page.locator('[data-testid="report-issue-button"]').first().click();
       await expect(page.locator('[data-testid="feedback-title-input"]').first()).toBeVisible();
 
-      await page.keyboard.press('Escape');
+      await page.getByRole('button', { name: /close|关闭/i }).first().click();
       await openAboutDialog(page);
       await expect(page.locator('[data-testid="about-dialog"]').first()).toBeVisible();
     });

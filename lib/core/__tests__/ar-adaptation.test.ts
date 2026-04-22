@@ -21,6 +21,7 @@ describe('ar-adaptation', () => {
     expect(context.assistantMode).toBe('edge-sheet');
     expect(context.recoveryMode).toBe('compact-strip');
     expect(context.sensorPath).toBe('sensor-primary');
+    expect(context.operatingMode).toBe('sensor-first');
   });
 
   it('classifies sensor-limited Tauri runtime as camera-first desktop AR', () => {
@@ -40,6 +41,25 @@ describe('ar-adaptation', () => {
     expect(context.layoutTier).toBe('desktop');
     expect(context.assistantMode).toBe('floating-card');
     expect(context.sensorPath).toBe('camera-primary');
+    expect(context.operatingMode).toBe('camera-first');
+  });
+
+  it('classifies desktop sessions without viable camera or sensor as manual-first', () => {
+    const context = deriveARAdaptationContext({
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
+      runtimeKind: 'browser',
+      cameraSupported: false,
+      capabilityMap: null,
+      sensorSupported: false,
+      sensorPermissionGranted: false,
+      sensorStatus: 'unsupported',
+    });
+
+    expect(context.runtimeClass).toBe('browser-desktop');
+    expect(context.sensorPath).toBe('manual-only');
+    expect(context.operatingMode).toBe('manual-first');
   });
 
   it('classifies tablet portrait as expanded mobile AR without desktop fallback', () => {

@@ -4,6 +4,8 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
+const originalConsoleError = console.error;
+
 // Mock next-intl
 const mockTranslate = jest.fn((key: string) => key);
 
@@ -272,6 +274,13 @@ describe('ImageCapture', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const [firstArg] = args;
+      if (typeof firstArg === 'string' && firstArg.includes('not wrapped in act')) {
+        return;
+      }
+      originalConsoleError(...args as Parameters<typeof console.error>);
+    });
     cameraState = { ...defaultCameraState };
     mockTranslate.mockImplementation((key: string) => key);
     mockIsMobile.mockReturnValue(false);
@@ -290,6 +299,10 @@ describe('ImageCapture', () => {
       new File(['compressed'], `compressed-${file.name}`, { type: file.type })
     ));
     mockFormatFileSize.mockImplementation((size: number) => `${size} bytes`);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('Rendering', () => {

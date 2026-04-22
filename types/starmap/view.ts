@@ -40,6 +40,7 @@ export interface TopToolbarProps {
   onSetFov: (fov: number) => void;
   onNavigate: (ra: number, dec: number, fov: number) => void;
   onGoToCoordinates: (ra: number, dec: number) => void;
+  onSelectObject?: (selection: SelectedObjectData) => void;
 }
 
 // ============================================================================
@@ -95,6 +96,7 @@ export interface MobileLayoutProps {
   onFovSliderChange: (fov: number) => void;
   onLocationChange: (lat: number, lon: number, alt: number) => void;
   onGoToCoordinates: (ra: number, dec: number) => void;
+  onSelectObject?: (selection: SelectedObjectData) => void;
   onOpenSearch: () => void;
   onOpenDetails: () => void;
   onOpenSessionPlanner: () => void;

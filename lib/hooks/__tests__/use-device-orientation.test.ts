@@ -583,4 +583,53 @@ describe('useDeviceOrientation', () => {
     expect(result.current.status).toBe('permission-required');
     expect(result.current.error).toBe('Permission request timed out');
   });
+
+  it('downgrades likely desktop runtimes when no orientation samples ever arrive', async () => {
+    jest.useFakeTimers();
+    const originalMatchMedia = window.matchMedia;
+    const originalMaxTouchPoints = window.navigator.maxTouchPoints;
+    try {
+      (global as unknown as { DeviceOrientationEvent: unknown }).DeviceOrientationEvent = class {};
+      Object.defineProperty(window.navigator, 'maxTouchPoints', {
+        configurable: true,
+        value: 0,
+      });
+      window.matchMedia = jest.fn().mockImplementation((query: string) => ({
+        matches: query === '(pointer: coarse)' ? false : false,
+        media: query,
+        onchange: null,
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+        addEventListener: jest.fn(),
+        removeEventListener: jest.fn(),
+        dispatchEvent: jest.fn(),
+      }));
+
+      const { result } = renderHook(() =>
+        useDeviceOrientation({
+          enabled: true,
+          calibration: {
+            azimuthOffsetDeg: 0,
+            altitudeOffsetDeg: 0,
+            required: false,
+            updatedAt: null,
+          },
+        })
+      );
+
+      await act(async () => {
+        jest.advanceTimersByTime(2500);
+      });
+
+      expect(result.current.isSupported).toBe(false);
+      expect(result.current.status).toBe('unsupported');
+    } finally {
+      window.matchMedia = originalMatchMedia;
+      Object.defineProperty(window.navigator, 'maxTouchPoints', {
+        configurable: true,
+        value: originalMaxTouchPoints,
+      });
+      jest.useRealTimers();
+    }
+  });
 });

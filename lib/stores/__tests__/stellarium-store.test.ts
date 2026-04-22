@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { useStellariumStore } from '../stellarium-store';
 import type { StellariumSettings } from '@/lib/core/types';
+import { logManager } from '@/lib/logger';
 
 // Mock translations
 jest.mock('@/lib/translations', () => ({
@@ -70,6 +71,7 @@ const createMockSettings = (overrides?: Partial<StellariumSettings>): Stellarium
 
 describe('useStellariumStore', () => {
   beforeEach(() => {
+    logManager.initialize({ enableConsole: false, enablePersistence: false });
     // Reset store state
     const { result } = renderHook(() => useStellariumStore());
     act(() => {
@@ -297,6 +299,7 @@ describe('useStellariumStore', () => {
     it('should warn if stel is not ready', () => {
       const { result } = renderHook(() => useStellariumStore());
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      logManager.initialize({ enableConsole: true, enablePersistence: false });
 
       act(() => {
         result.current.updateStellariumCore(createMockSettings());
@@ -308,6 +311,7 @@ describe('useStellariumStore', () => {
       const fullMessage = callArgs.join(' ');
       expect(fullMessage).toContain('Stellarium engine not ready, settings update skipped');
       consoleSpy.mockRestore();
+      logManager.initialize({ enableConsole: false, enablePersistence: false });
     });
 
     it('should update stellarium core settings when stel is available', () => {
@@ -447,6 +451,40 @@ describe('useStellariumStore', () => {
       });
 
       expect(mockCore.hips.visible).toBe(false);
+    });
+
+    it('keeps applying non-landscape settings when landscape data source loading fails', () => {
+      const { result } = renderHook(() => useStellariumStore());
+      const mockCore = {
+        hips: { visible: false, url: '' },
+        landscapes: {
+          addDataSource: jest.fn(() => {
+            throw new Error('function signature mismatch');
+          }),
+          visible: true,
+          fog_visible: true,
+        },
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mockStel = { core: mockCore } as any;
+
+      act(() => {
+        result.current.setStel(mockStel);
+        result.current.setBaseUrl('https://example.com/');
+        result.current.updateStellariumCore(
+          createMockSettings({
+            surveyEnabled: true,
+            surveyId: 'DSS',
+            landscapesVisible: true,
+            fogVisible: true,
+          })
+        );
+      });
+
+      expect(mockCore.hips.visible).toBe(true);
+      expect(mockCore.hips.url).toBe('https://hips.example/dss/');
+      expect(mockCore.landscapes.visible).toBe(false);
+      expect(mockCore.landscapes.fog_visible).toBe(false);
     });
   });
 
