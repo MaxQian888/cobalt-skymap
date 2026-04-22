@@ -67,3 +67,4 @@ nul
 .ace-tool/
 openspec
 .playwright-browsers
+.playwright-mcp/
