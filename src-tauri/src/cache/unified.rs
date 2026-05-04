@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{OnceLock, RwLock};
 use tauri::AppHandle;
 #[cfg(not(desktop))]
 use tauri::Manager;
@@ -22,8 +22,9 @@ use crate::network::{http_client, security};
 // ============================================================================
 
 /// Global in-memory cache index for faster access
-/// Uses OnceLock for lazy initialization and Mutex for thread safety
-static CACHE_INDEX: OnceLock<Mutex<Option<CacheIndexState>>> = OnceLock::new();
+/// Uses OnceLock for lazy initialization and RwLock for thread safety
+/// (reads of an already-loaded index are concurrent; writes serialize).
+static CACHE_INDEX: OnceLock<RwLock<Option<CacheIndexState>>> = OnceLock::new();
 
 /// Tracks the state of the in-memory cache index
 #[derive(Debug, Clone)]
@@ -50,9 +51,9 @@ impl CacheIndexState {
 /// Minimum interval between disk writes (5 seconds)
 const PERSIST_INTERVAL_MS: i64 = 5000;
 
-/// Get or initialize the global cache index mutex
-fn get_cache_index_mutex() -> &'static Mutex<Option<CacheIndexState>> {
-    CACHE_INDEX.get_or_init(|| Mutex::new(None))
+/// Get or initialize the global cache index lock
+fn get_cache_index_lock() -> &'static RwLock<Option<CacheIndexState>> {
+    CACHE_INDEX.get_or_init(|| RwLock::new(None))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,21 +165,33 @@ fn save_cache_index_to_disk(app: &AppHandle, index: &CacheIndex) -> Result<(), S
     Ok(())
 }
 
-/// Get or load the cache index (uses in-memory cache)
+/// Get or load the cache index (uses in-memory cache).
+/// Fast path takes a read lock; only the first uninitialized call upgrades
+/// to a write lock to load from disk.
 fn get_cache_index(app: &AppHandle) -> Result<CacheIndex, StorageError> {
-    let mutex = get_cache_index_mutex();
-    let mut guard = mutex
-        .lock()
-        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+    let lock = get_cache_index_lock();
 
-    match &*guard {
-        Some(state) => Ok(state.index.clone()),
-        None => {
-            let index = load_cache_index_from_disk(app)?;
-            *guard = Some(CacheIndexState::new(index.clone()));
-            Ok(index)
+    // Fast path: read lock allows concurrent readers once initialized.
+    {
+        let guard = lock
+            .read()
+            .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+        if let Some(state) = &*guard {
+            return Ok(state.index.clone());
         }
     }
+
+    // Slow path: take write lock to initialize. Re-check under the write
+    // guard in case another thread won the race.
+    let mut guard = lock
+        .write()
+        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+    if let Some(state) = &*guard {
+        return Ok(state.index.clone());
+    }
+    let index = load_cache_index_from_disk(app)?;
+    *guard = Some(CacheIndexState::new(index.clone()));
+    Ok(index)
 }
 
 /// Update the cache index (marks as dirty, persists if interval exceeded)
@@ -187,9 +200,9 @@ fn update_cache_index(
     index: CacheIndex,
     force_persist: bool,
 ) -> Result<(), StorageError> {
-    let mutex = get_cache_index_mutex();
-    let mut guard = mutex
-        .lock()
+    let lock = get_cache_index_lock();
+    let mut guard = lock
+        .write()
         .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
 
     let now = Utc::now().timestamp_millis();
@@ -228,9 +241,9 @@ fn update_cache_index(
 
 /// Force persist any dirty cache index to disk
 fn flush_cache_index(app: &AppHandle) -> Result<(), StorageError> {
-    let mutex = get_cache_index_mutex();
-    let mut guard = mutex
-        .lock()
+    let lock = get_cache_index_lock();
+    let mut guard = lock
+        .write()
         .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
 
     if let Some(state) = &*guard {
@@ -252,7 +265,7 @@ fn flush_cache_index(app: &AppHandle) -> Result<(), StorageError> {
 /// Invalidate the in-memory cache (forces reload from disk on next access)
 #[allow(dead_code)]
 fn invalidate_cache_index() {
-    if let Ok(mut guard) = get_cache_index_mutex().lock() {
+    if let Ok(mut guard) = get_cache_index_lock().write() {
         *guard = None;
     }
 }
@@ -307,7 +320,7 @@ pub async fn get_unified_cache_entry(
 
 /// Record a cache hit in the in-memory state
 fn record_cache_hit() {
-    if let Ok(mut guard) = get_cache_index_mutex().lock() {
+    if let Ok(mut guard) = get_cache_index_lock().write() {
         if let Some(state) = guard.as_mut() {
             state.hits += 1;
         }
@@ -316,7 +329,7 @@ fn record_cache_hit() {
 
 /// Record a cache miss in the in-memory state
 fn record_cache_miss() {
-    if let Ok(mut guard) = get_cache_index_mutex().lock() {
+    if let Ok(mut guard) = get_cache_index_lock().write() {
         if let Some(state) = guard.as_mut() {
             state.misses += 1;
         }
@@ -325,7 +338,7 @@ fn record_cache_miss() {
 
 /// Get cache hit rate from in-memory state
 fn get_hit_rate() -> f64 {
-    if let Ok(guard) = get_cache_index_mutex().lock() {
+    if let Ok(guard) = get_cache_index_lock().read() {
         if let Some(state) = &*guard {
             let total = state.hits + state.misses;
             if total > 0 {
@@ -752,7 +765,7 @@ mod tests {
         invalidate_cache_index();
 
         {
-            let mut state = get_cache_index_mutex().lock().unwrap();
+            let mut state = get_cache_index_lock().write().unwrap();
             *state = Some(CacheIndexState::new(CacheIndex::default()));
         }
 
@@ -761,7 +774,7 @@ mod tests {
         record_cache_hit();
 
         {
-            let state = get_cache_index_mutex().lock().unwrap();
+            let state = get_cache_index_lock().read().unwrap();
             let state = state.as_ref().unwrap();
             assert_eq!(state.hits, 2);
             assert_eq!(state.misses, 1);
@@ -863,13 +876,13 @@ mod tests {
     fn test_invalidate_cache_index_clears_global_state() {
         let _guard = cache_test_lock();
         {
-            let mut state = get_cache_index_mutex().lock().unwrap();
+            let mut state = get_cache_index_lock().write().unwrap();
             *state = Some(CacheIndexState::new(CacheIndex::default()));
         }
 
         invalidate_cache_index();
 
-        let state = get_cache_index_mutex().lock().unwrap();
+        let state = get_cache_index_lock().read().unwrap();
         assert!(state.is_none(), "invalidate should drop cached index state");
     }
 

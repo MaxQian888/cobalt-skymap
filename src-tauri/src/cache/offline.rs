@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{OnceLock, RwLock};
 use tauri::AppHandle;
 #[cfg(not(desktop))]
 use tauri::Manager;
@@ -15,12 +15,14 @@ use crate::data::StorageError;
 use crate::network::security::limits;
 use crate::utils::generate_id;
 
-/// Global in-memory cache data for offline tile metadata
-/// Avoids reading cache_meta.json from disk on every operation
-static OFFLINE_CACHE_DATA: OnceLock<Mutex<Option<CacheData>>> = OnceLock::new();
+/// Global in-memory cache data for offline tile metadata.
+/// Avoids reading cache_meta.json from disk on every operation.
+/// Uses an RwLock so concurrent `is_tile_cached` / `get_cache_stats` reads
+/// can proceed without blocking each other.
+static OFFLINE_CACHE_DATA: OnceLock<RwLock<Option<CacheData>>> = OnceLock::new();
 
-fn get_offline_cache_mutex() -> &'static Mutex<Option<CacheData>> {
-    OFFLINE_CACHE_DATA.get_or_init(|| Mutex::new(None))
+fn get_offline_cache_lock() -> &'static RwLock<Option<CacheData>> {
+    OFFLINE_CACHE_DATA.get_or_init(|| RwLock::new(None))
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,17 +163,30 @@ fn save_cache_data_to_disk(app: &AppHandle, data: &CacheData) -> Result<(), Stor
     Ok(())
 }
 
-/// Get cache data from in-memory cache, loading from disk if needed
+/// Get cache data from in-memory cache, loading from disk if needed.
+/// Fast path uses a read lock; only the first uninitialized call upgrades
+/// to a write lock to load from disk.
 fn get_cache_data(app: &AppHandle) -> Result<CacheData, StorageError> {
-    let mutex = get_offline_cache_mutex();
-    let mut guard = mutex
-        .lock()
-        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+    let lock = get_offline_cache_lock();
 
+    // Fast path: read lock allows concurrent readers once initialized.
+    {
+        let guard = lock
+            .read()
+            .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
+        if let Some(data) = &*guard {
+            return Ok(data.clone());
+        }
+    }
+
+    // Slow path: take write lock to initialize. Re-check under the write
+    // guard in case another thread won the race.
+    let mut guard = lock
+        .write()
+        .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
     if let Some(data) = &*guard {
         return Ok(data.clone());
     }
-
     let data = load_cache_data_from_disk(app)?;
     *guard = Some(data.clone());
     Ok(data)
@@ -179,9 +194,9 @@ fn get_cache_data(app: &AppHandle) -> Result<CacheData, StorageError> {
 
 /// Update cache data in memory and persist to disk
 fn update_cache_data(app: &AppHandle, data: CacheData) -> Result<(), StorageError> {
-    let mutex = get_offline_cache_mutex();
-    let mut guard = mutex
-        .lock()
+    let lock = get_offline_cache_lock();
+    let mut guard = lock
+        .write()
         .map_err(|e| StorageError::Other(format!("Lock error: {}", e)))?;
 
     save_cache_data_to_disk(app, &data)?;
@@ -192,7 +207,7 @@ fn update_cache_data(app: &AppHandle, data: CacheData) -> Result<(), StorageErro
 /// Invalidate the in-memory cache (forces reload from disk on next access)
 #[allow(dead_code)]
 fn invalidate_offline_cache() {
-    if let Ok(mut guard) = get_offline_cache_mutex().lock() {
+    if let Ok(mut guard) = get_offline_cache_lock().write() {
         *guard = None;
     }
 }
@@ -544,7 +559,7 @@ mod tests {
     #[test]
     fn test_invalidate_offline_cache_clears_in_memory_state() {
         let _guard = cache_test_lock();
-        let mut guard = get_offline_cache_mutex().lock().unwrap();
+        let mut guard = get_offline_cache_lock().write().unwrap();
         *guard = Some(CacheData {
             regions: vec![],
             tiles: HashMap::from([(
@@ -563,7 +578,7 @@ mod tests {
 
         invalidate_offline_cache();
 
-        let guard = get_offline_cache_mutex().lock().unwrap();
+        let guard = get_offline_cache_lock().read().unwrap();
         assert!(
             guard.is_none(),
             "invalidate should clear in-memory cache data"
