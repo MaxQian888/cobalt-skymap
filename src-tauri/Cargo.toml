@@ -35,7 +35,7 @@ url = "2.5"
 lazy_static = "1.5"
 once_cell = "1.19"
 futures-util = "0.3"
-tokio = { version = "1", features = ["sync", "time", "macros"] }
+tokio = { version = "1", features = ["sync", "time", "macros", "fs"] }
 time = { version = "0.3", features = ["formatting", "macros"] }
 keyring = "3"
 rand = "0.8"
@@ -65,3 +65,13 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-cli = "2"
 tauri-plugin-stronghold = "2"
 tauri-plugin-window-state = "2"
+
+# Release profile: optimized for runtime performance and binary size.
+# Trade-offs: ~30-60s longer release builds, but enables full LTO across
+# reqwest/serde/tokio/tauri crates and removes panic-unwind machinery.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+opt-level = 3
+panic = "abort"
+strip = "symbols"
