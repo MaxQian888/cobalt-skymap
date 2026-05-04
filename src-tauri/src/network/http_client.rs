@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::env;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use once_cell::sync::Lazy;
@@ -680,6 +680,27 @@ fn build_direct_client(
         .map_err(|e| HttpClientError::Request(e.to_string()))
 }
 
+/// Cache key for reusable reqwest::Client instances.
+/// Two clients with the same key produce identical behaviour, so we can share
+/// the underlying connection pool across requests.
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+struct ClientCacheKey {
+    timeout_secs: u64,
+    connect_timeout_ms: u64,
+    enable_compression: bool,
+    follow_redirects: bool,
+    max_redirects: u32,
+    user_agent: String,
+    disable_proxy: bool,
+    proxy_url: Option<String>,
+}
+
+/// Process-wide cache of reqwest clients keyed by configuration.
+/// reqwest clients hold an internal connection pool, so reusing them is the
+/// reqwest team's recommended pattern: <https://docs.rs/reqwest/latest/reqwest/struct.Client.html>.
+static HTTP_CLIENT_CACHE: Lazy<RwLock<HashMap<ClientCacheKey, reqwest::Client>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
 fn build_client_with_strategy(
     timeout_secs: u64,
     global_config: &HttpClientConfig,
@@ -689,6 +710,25 @@ fn build_client_with_strategy(
         return Err(HttpClientError::Request(error));
     }
 
+    let cache_key = ClientCacheKey {
+        timeout_secs,
+        connect_timeout_ms: global_config.connect_timeout_ms,
+        enable_compression: global_config.enable_compression,
+        follow_redirects: global_config.follow_redirects,
+        max_redirects: global_config.max_redirects,
+        user_agent: global_config.user_agent.clone(),
+        disable_proxy: strategy.disable_proxy,
+        proxy_url: strategy.proxy_url_to_apply.clone(),
+    };
+
+    // Fast path: cached client exists.
+    if let Ok(cache) = HTTP_CLIENT_CACHE.read() {
+        if let Some(client) = cache.get(&cache_key) {
+            return Ok((client.clone(), strategy));
+        }
+    }
+
+    // Slow path: construct a new client and cache it.
     let mut builder = build_base_client_builder(timeout_secs, global_config);
 
     if strategy.disable_proxy {
@@ -703,7 +743,21 @@ fn build_client_with_strategy(
         .build()
         .map_err(|e| HttpClientError::Request(e.to_string()))?;
 
+    if let Ok(mut cache) = HTTP_CLIENT_CACHE.write() {
+        // Re-check under the write lock in case another thread inserted first.
+        let cached = cache.entry(cache_key).or_insert_with(|| client.clone());
+        return Ok((cached.clone(), strategy));
+    }
+
     Ok((client, strategy))
+}
+
+/// Drop all cached HTTP clients. Called when the user changes proxy/timeout
+/// configuration so the next request rebuilds with the new settings.
+fn invalidate_http_client_cache() {
+    if let Ok(mut cache) = HTTP_CLIENT_CACHE.write() {
+        cache.clear();
+    }
 }
 
 /// Build a reqwest client with global configuration applied
@@ -734,6 +788,9 @@ pub fn set_http_config(config: HttpClientConfig) {
     if let Ok(mut cfg) = HTTP_CONFIG.lock() {
         *cfg = normalized;
     }
+    // The proxy URL, timeout, or compression settings may have changed, so
+    // any cached clients are no longer valid for future requests.
+    invalidate_http_client_cache();
     update_effective_proxy_state(strategy.state);
 }
 
