@@ -104,6 +104,11 @@ fn get_store_path(app: &AppHandle, store_name: &str) -> Result<PathBuf, StorageE
 }
 
 /// Save store data to file
+///
+/// Performance: uses `IgnoredAny` for cheap JSON validation (no `Value` tree
+/// allocation) and `tokio::fs` for non-blocking I/O. Writes go through a
+/// `.tmp` file + rename for crash-safety; on Windows and modern Linux/macOS
+/// the rename is atomic so a partial write never replaces a good file.
 #[tauri::command]
 pub async fn save_store_data(
     app: AppHandle,
@@ -116,10 +121,17 @@ pub async fn save_store_data(
     crate::network::security::validate_size(&data, crate::network::security::limits::MAX_JSON_SIZE)
         .map_err(|e| StorageError::Other(e.to_string()))?;
 
-    // Validate JSON before saving
-    let _: serde_json::Value = serde_json::from_str(&data)?;
+    // Validate JSON syntax without materializing the value tree.
+    serde_json::from_slice::<serde::de::IgnoredAny>(data.as_bytes())?;
 
-    fs::write(&path, &data)?;
+    let tmp_path = path.with_extension("json.tmp");
+    tokio::fs::write(&tmp_path, &data).await?;
+    if let Err(err) = tokio::fs::rename(&tmp_path, &path).await {
+        // Best-effort cleanup; ignore if the temp is already gone.
+        let _ = tokio::fs::remove_file(&tmp_path).await;
+        return Err(err.into());
+    }
+
     log::info!(
         "Saved store '{}' to {:?} ({} bytes)",
         store_name,
