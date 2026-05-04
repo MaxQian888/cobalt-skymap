@@ -1,9 +1,14 @@
 //! Tauri commands for mount control
 //!
-//! All commands are async and use a global `Mutex` to hold the active mount instance.
+//! All commands are async. The global `MOUNT` lock is an `RwLock` so that
+//! pure-read queries (capabilities, observing conditions, safety state) do
+//! not serialize behind in-flight writes (slew/sync/tracking changes that
+//! issue HTTP requests over Alpaca and may take ~100ms each).
+//! `mount_get_state` keeps a write lock because the simulator advances its
+//! internal clock on each call (`get_state(&mut self)` ticks the sim).
 
 use once_cell::sync::Lazy;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::mount::alpaca_client::AlpacaClient;
 use crate::mount::simulator::MountSimulator;
@@ -18,7 +23,7 @@ enum MountDriver {
     Alpaca(AlpacaClient),
 }
 
-static MOUNT: Lazy<Mutex<Option<MountDriver>>> = Lazy::new(|| Mutex::new(None));
+static MOUNT: Lazy<RwLock<Option<MountDriver>>> = Lazy::new(|| RwLock::new(None));
 
 /// Tracks the user-selected slew rate index (shared across drivers)
 static SLEW_RATE_INDEX: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(3);
@@ -34,7 +39,7 @@ pub async fn mount_connect(
     port: u16,
     device_id: u32,
 ) -> Result<MountCapabilities, MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
 
     // Disconnect existing if any
     if let Some(ref mut driver) = *guard {
@@ -75,7 +80,7 @@ pub async fn mount_connect(
 
 #[tauri::command]
 pub async fn mount_disconnect() -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     if let Some(ref mut driver) = *guard {
         match driver {
             MountDriver::Simulator(sim) => sim.disconnect()?,
@@ -92,7 +97,8 @@ pub async fn mount_disconnect() -> Result<(), MountError> {
 
 #[tauri::command]
 pub async fn mount_get_state() -> Result<MountState, MountError> {
-    let mut guard = MOUNT.lock().await;
+    // Write lock: simulator advances its internal clock on each get_state.
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => Ok(sim.get_state()),
         Some(MountDriver::Alpaca(client)) => {
@@ -106,7 +112,7 @@ pub async fn mount_get_state() -> Result<MountState, MountError> {
 
 #[tauri::command]
 pub async fn mount_get_capabilities() -> Result<MountCapabilities, MountError> {
-    let guard = MOUNT.lock().await;
+    let guard = MOUNT.read().await;
     match guard.as_ref() {
         Some(MountDriver::Simulator(sim)) => Ok(sim.get_capabilities()),
         Some(MountDriver::Alpaca(client)) => client.get_capabilities().await,
@@ -121,7 +127,7 @@ pub async fn mount_get_capabilities() -> Result<MountCapabilities, MountError> {
 /// Slew to coordinates (RA in degrees, Dec in degrees)
 #[tauri::command]
 pub async fn mount_slew_to(ra: f64, dec: f64) -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.slew_to(ra, dec),
         Some(MountDriver::Alpaca(client)) => {
@@ -136,7 +142,7 @@ pub async fn mount_slew_to(ra: f64, dec: f64) -> Result<(), MountError> {
 /// Sync mount to coordinates (RA in degrees, Dec in degrees)
 #[tauri::command]
 pub async fn mount_sync_to(ra: f64, dec: f64) -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.sync_to(ra, dec),
         Some(MountDriver::Alpaca(client)) => {
@@ -149,7 +155,7 @@ pub async fn mount_sync_to(ra: f64, dec: f64) -> Result<(), MountError> {
 
 #[tauri::command]
 pub async fn mount_abort_slew() -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.abort_slew(),
         Some(MountDriver::Alpaca(client)) => client.abort_slew().await,
@@ -163,7 +169,7 @@ pub async fn mount_abort_slew() -> Result<(), MountError> {
 
 #[tauri::command]
 pub async fn mount_park() -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.park(),
         Some(MountDriver::Alpaca(client)) => client.park().await,
@@ -173,7 +179,7 @@ pub async fn mount_park() -> Result<(), MountError> {
 
 #[tauri::command]
 pub async fn mount_unpark() -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.unpark(),
         Some(MountDriver::Alpaca(client)) => client.unpark().await,
@@ -187,7 +193,7 @@ pub async fn mount_unpark() -> Result<(), MountError> {
 
 #[tauri::command]
 pub async fn mount_set_tracking(enabled: bool) -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.set_tracking(enabled),
         Some(MountDriver::Alpaca(client)) => client.set_tracking(enabled).await,
@@ -197,7 +203,7 @@ pub async fn mount_set_tracking(enabled: bool) -> Result<(), MountError> {
 
 #[tauri::command]
 pub async fn mount_set_tracking_rate(rate: TrackingRate) -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.set_tracking_rate(rate),
         Some(MountDriver::Alpaca(client)) => client.set_tracking_rate(rate).await,
@@ -212,7 +218,7 @@ pub async fn mount_set_tracking_rate(rate: TrackingRate) -> Result<(), MountErro
 /// Move axis at a rate multiplier (e.g., 16.0 = 16x sidereal)
 #[tauri::command]
 pub async fn mount_move_axis(axis: MountAxis, rate: f64) -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.move_axis(axis, rate),
         Some(MountDriver::Alpaca(client)) => {
@@ -226,7 +232,7 @@ pub async fn mount_move_axis(axis: MountAxis, rate: f64) -> Result<(), MountErro
 
 #[tauri::command]
 pub async fn mount_stop_axis(axis: MountAxis) -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => sim.stop_axis(axis),
         Some(MountDriver::Alpaca(client)) => client.stop_axis(axis).await,
@@ -237,7 +243,7 @@ pub async fn mount_stop_axis(axis: MountAxis) -> Result<(), MountError> {
 /// Set the slew rate index (for UI display, simulator uses internally)
 #[tauri::command]
 pub async fn mount_set_slew_rate(index: usize) -> Result<(), MountError> {
-    let mut guard = MOUNT.lock().await;
+    let mut guard = MOUNT.write().await;
     match guard.as_mut() {
         Some(MountDriver::Simulator(sim)) => {
             sim.set_slew_rate_index(index);
@@ -263,7 +269,7 @@ pub async fn mount_discover() -> Result<Vec<DiscoveredDevice>, MountError> {
 
 #[tauri::command]
 pub async fn mount_get_observing_conditions() -> Result<ObservingConditions, MountError> {
-    let guard = MOUNT.lock().await;
+    let guard = MOUNT.read().await;
     match guard.as_ref() {
         Some(MountDriver::Simulator(_)) => Ok(ObservingConditions {
             cloud_cover: Some(20.0),
@@ -278,7 +284,7 @@ pub async fn mount_get_observing_conditions() -> Result<ObservingConditions, Mou
 
 #[tauri::command]
 pub async fn mount_get_safety_state() -> Result<SafetyState, MountError> {
-    let guard = MOUNT.lock().await;
+    let guard = MOUNT.read().await;
     match guard.as_ref() {
         Some(MountDriver::Simulator(_)) => Ok(SafetyState {
             is_safe: true,
@@ -295,11 +301,12 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
+    use tokio::sync::Mutex;
 
     static TEST_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
     async fn reset_mount_state() {
-        let mut guard = MOUNT.lock().await;
+        let mut guard = MOUNT.write().await;
         *guard = None;
         SLEW_RATE_INDEX.store(3, Ordering::Relaxed);
     }
