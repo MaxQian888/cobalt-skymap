@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import dynamic from 'next/dynamic';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 import { SkyMapCanvas } from '../canvas/sky-map-canvas';
@@ -23,7 +24,6 @@ import { BottomStatusBar } from './bottom-status-bar';
 import { useStellariumViewState } from './use-stellarium-view-state';
 import { UpdateBanner } from '../management/updater/update-banner';
 import { UpdateDialog } from '../management/updater/update-dialog';
-import { SessionPlanner } from '../planning/session-planner';
 import { MessierMarathonGuideDialog } from '../planning/messier-marathon-guide';
 import { PlateSolverUnified } from '../plate-solving/plate-solver-unified';
 import { isTauri } from '@/lib/tauri/app-control-api';
@@ -39,6 +39,14 @@ import { useARSessionStatus } from '@/lib/hooks/use-ar-session-status';
 import { useARAdaptation } from '@/lib/hooks/use-ar-adaptation';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
 import { cn } from '@/lib/utils';
+
+// SessionPlanner is the heaviest panel in the app (3000+ lines). Defer
+// loading its chunk until the user first opens the planner, then keep it
+// mounted so close/open animations remain smooth.
+const SessionPlanner = dynamic(
+  () => import('../planning/session-planner').then((m) => ({ default: m.SessionPlanner })),
+  { ssr: false },
+);
 
 interface StellariumViewProps {
   showSplash?: boolean;
@@ -139,6 +147,13 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
   const arAdaptation = useARAdaptation();
   const useCameraBlend = arMode && arSession.cameraLayerEnabled;
   const wasSessionPlannerOpenRef = useRef(sessionPlannerOpen);
+  // Latch: once the user opens the planner the chunk is loaded; keep the
+  // component mounted afterwards so exit animations and subsequent opens
+  // don't pay the chunk-fetch cost again.
+  const [sessionPlannerEverOpened, setSessionPlannerEverOpened] = useState(sessionPlannerOpen);
+  useEffect(() => {
+    if (sessionPlannerOpen) setSessionPlannerEverOpened(true);
+  }, [sessionPlannerOpen]);
   const wasSettingsDrawerOpenRef = useRef(settingsDrawerOpen);
   const handledCliSearchRef = useRef(0);
 
@@ -446,8 +461,8 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
           onNavigate={handleGoToCoordinates}
         />
 
-        {/* Session Planner Dialog (mounted once; triggered via store) */}
-        <SessionPlanner showTrigger={false} />
+        {/* Session Planner Dialog: lazy-mounted on first open, then retained. */}
+        {sessionPlannerEverOpened && <SessionPlanner showTrigger={false} />}
         <MessierMarathonGuideDialog />
         <PlateSolverUnified
           trigger={<span className="hidden" aria-hidden="true" />}
