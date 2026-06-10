@@ -24,6 +24,7 @@ import { useIsClient } from '@/lib/hooks/use-is-client';
 import { useARSessionStatus } from '@/lib/hooks/use-ar-session-status';
 import { isTauri } from '@/lib/tauri/app-control-api';
 import { cn } from '@/lib/utils';
+import { TOOLBAR_ICON_RESTING_CLASS } from './toolbar-button';
 import { SensorCalibrationDialog } from './sensor-calibration-dialog';
 
 const DESKTOP_CAMERA_FIRST_NOTICE = 'Desktop AR defaults to camera-first mode until sensor data is confirmed.';
@@ -365,10 +366,10 @@ export function SensorControlToggle({ className, showStatusLabel = false }: Sens
           data-sensor-status={status}
           disabled={!isSupported}
           className={cn(
-            'relative h-9 w-9 backdrop-blur-sm transition-colors',
+            'relative h-9 w-9 backdrop-blur-md transition-colors',
             sensorControl
               ? 'bg-primary/30 text-primary hover:bg-primary/40'
-              : 'bg-background/60 text-foreground hover:bg-background/80',
+              : TOOLBAR_ICON_RESTING_CLASS,
             className
           )}
           onClick={handleToggle}

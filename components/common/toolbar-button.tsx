@@ -10,9 +10,22 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-/** Shared resting style for bespoke stateful icon buttons in the toolbar (Sensor/AR/Language). */
-export const TOOLBAR_ICON_TOGGLE_CLASS =
-  "h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent rounded-md";
+/**
+ * Unified resting surface/color for toolbar icon toggles. Shared so the bespoke
+ * Sensor/AR toggles' resting branch matches the StatusToggleButton primitive
+ * (search/night) and the LanguageSwitcher — one resting look across the row
+ * (resolves the bg-card/60 vs bg-background/60 drift; ui-audit #11 / NEW-consistency-1).
+ * Apply to a toggle's OWN resting branch, never as a trailing className over an
+ * active conditional (it would override the active style).
+ */
+export const TOOLBAR_ICON_RESTING_CLASS =
+  "bg-card/60 border border-border/50 text-foreground/80 hover:text-foreground hover:bg-accent";
+
+/** Full resting class (sizing + blur + resting surface) for chrome-less, stateless toggles like LanguageSwitcher. */
+export const TOOLBAR_ICON_TOGGLE_CLASS = cn(
+  "h-9 w-9 rounded-md backdrop-blur-md",
+  TOOLBAR_ICON_RESTING_CLASS,
+);
 
 const toolbarButtonVariants = cva(
   "gap-1.5 transition-all duration-200 bg-card/80 backdrop-blur-sm border border-border/50 text-foreground/80 hover:text-foreground hover:bg-accent hover:border-border",

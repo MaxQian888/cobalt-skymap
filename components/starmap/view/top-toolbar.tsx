@@ -271,8 +271,8 @@ export const TopToolbar = memo(function TopToolbar({
               <div data-tour-id="night-mode">
                 <NightModeToggle />
               </div>
-              <SensorControlToggle className={TOOLBAR_ICON_TOGGLE_CLASS} />
-              <ARModeToggle className={TOOLBAR_ICON_TOGGLE_CLASS} />
+              <SensorControlToggle />
+              <ARModeToggle />
               <ObjectTypeLegend variant="popover" />
             </ToolbarGroup>
 

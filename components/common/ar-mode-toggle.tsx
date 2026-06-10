@@ -20,6 +20,7 @@ import {
   getARLaunchAssistantReason,
 } from '@/lib/core/ar-invocation';
 import { cn } from '@/lib/utils';
+import { TOOLBAR_ICON_RESTING_CLASS } from './toolbar-button';
 
 interface ARModeToggleProps {
   className?: string;
@@ -143,14 +144,14 @@ export function ARModeToggle({ className }: ARModeToggleProps) {
           data-ar-sensor-path={adaptation.sensorPath}
           data-ar-operating-mode={adaptation.operatingMode}
           className={cn(
-            'relative h-9 w-9 backdrop-blur-sm transition-colors',
+            'relative h-9 w-9 backdrop-blur-md transition-colors',
             arMode && arSession.status === 'ready'
               ? 'bg-blue-500/30 text-blue-400 hover:bg-blue-500/40'
               : arMode && arSession.status === 'preflight'
                 ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
                 : arMode
                   ? 'bg-orange-500/20 text-orange-300 hover:bg-orange-500/30'
-                  : 'bg-background/60 text-foreground hover:bg-background/80',
+                  : TOOLBAR_ICON_RESTING_CLASS,
             className
           )}
           onClick={() => void handleToggle()}
