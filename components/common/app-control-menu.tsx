@@ -329,22 +329,6 @@ export function AppControlMenu({ className, variant = "dropdown" }: AppControlMe
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
-            {!shell.showsNativeWindowControls && (
-              <>
-                <DropdownMenuItem onClick={handleMinimize}>
-                  <Minus className="mr-2 h-4 w-4" />
-                  {t("minimize")}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleMaximize}>
-                  {isMaximized ? (
-                    <Copy className="mr-2 h-4 w-4" />
-                  ) : (
-                    <Square className="mr-2 h-4 w-4" />
-                  )}
-                  {isMaximized ? t("restore") : t("maximize")}
-                </DropdownMenuItem>
-              </>
-            )}
             <DropdownMenuItem onClick={handleToggleFullscreen}>
               {isFullscreen ? (
                 <Minimize2 className="mr-2 h-4 w-4" />

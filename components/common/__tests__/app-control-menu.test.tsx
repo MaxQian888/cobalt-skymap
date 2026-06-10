@@ -157,6 +157,21 @@ describe('AppControlMenu', () => {
       expect(screen.queryByText('appControl.trayPositions')).not.toBeInTheDocument();
     });
 
+    it('renders exactly one Minimize / Maximize / Close item in the Tauri frameless dropdown', async () => {
+      await renderWithProviders(<AppControlMenu variant="dropdown" />);
+
+      await waitFor(() => {
+        expect(screen.getByText('appControl.reload')).toBeInTheDocument();
+      });
+
+      // Frameless Tauri (showsNativeWindowControls=false) must surface each
+      // window control exactly once — the dropdown previously duplicated the
+      // Minimize/Maximize block.
+      expect(screen.getAllByText('appControl.minimize')).toHaveLength(1);
+      expect(screen.getAllByText('appControl.maximize')).toHaveLength(1);
+      expect(screen.getAllByText('appControl.close')).toHaveLength(1);
+    });
+
     it('does not duplicate native window controls in macOS overlay shell mode', async () => {
       mockGetDesktopShell.mockResolvedValue({
         platform: 'macos',
