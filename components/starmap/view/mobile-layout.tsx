@@ -70,7 +70,10 @@ export const MobileLayout = memo(function MobileLayout({
   onOpenSettings,
 }: MobileLayoutProps) {
   const t = useTranslations();
-  const { currentSelection, observationSelection } = buildSelectionData(selectedObject);
+  const { currentSelection, observationSelection } = useMemo(
+    () => buildSelectionData(selectedObject),
+    [selectedObject],
+  );
 
   // Equipment FOV props — shared hook avoids duplicating 12+ selectors
   const {

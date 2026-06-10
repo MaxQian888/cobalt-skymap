@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -41,7 +41,10 @@ export const RightControlPanel = memo(function RightControlPanel({
   onLocationChange,
 }: RightControlPanelProps) {
   const t = useTranslations();
-  const { currentSelection, observationSelection } = buildSelectionData(selectedObject);
+  const { currentSelection, observationSelection } = useMemo(
+    () => buildSelectionData(selectedObject),
+    [selectedObject],
+  );
 
   // Equipment FOV props — shared hook avoids duplicating 12+ selectors
   const {
