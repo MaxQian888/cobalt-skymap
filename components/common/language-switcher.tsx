@@ -42,6 +42,7 @@ export function LanguageSwitcher({
               variant={variant}
               size={size}
               className={className}
+              aria-label={t('language')}
             >
               <Languages className="h-5 w-5" />
               {size !== 'icon' && <span className="ml-2">{localeNames[locale]}</span>}
