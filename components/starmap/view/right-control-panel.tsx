@@ -88,7 +88,7 @@ export const RightControlPanel = memo(function RightControlPanel({
       {/* Right Side Controls - Desktop Only - Vertically Centered */}
       <div
         data-starmap-ui-control="true"
-        className="flex items-center absolute right-[calc(0.75rem+var(--safe-area-right))] top-1/2 -translate-y-1/2 z-30 pointer-events-auto animate-fade-in"
+        className="flex items-center absolute right-[calc(var(--rail-gap)+var(--safe-area-right))] top-1/2 -translate-y-1/2 z-30 pointer-events-auto animate-fade-in"
       >
         {/* Collapse Toggle */}
         <Tooltip>
@@ -124,7 +124,7 @@ export const RightControlPanel = memo(function RightControlPanel({
           inert={collapsed || undefined}
         >
         <ScrollArea className="max-h-[calc(100dvh-160px)] overscroll-contain">
-        <div className="flex flex-col items-center gap-1.5 py-1.5 w-[52px]">
+        <div className="flex flex-col items-center gap-1.5 py-1.5 w-[var(--rail-width)]">
           {/* Zoom Controls */}
           <div className="bg-card/80 backdrop-blur-md rounded-lg border border-border/50 w-full" data-tour-id="zoom">
             <div data-tour-id="zoom-controls">
@@ -219,8 +219,14 @@ export const RightControlPanel = memo(function RightControlPanel({
       {/* Floating Astro Session Panel - Show conditions for selected object */}
       {selectedObject && showSessionPanel && (
         <div className={cn(
+          // Derived from the rail tokens so the panel tracks the rail AND
+          // respects the right safe-area inset (previously hard-coded right-10 /
+          // right-[72px] with no safe-area term, so it drifted off the rail on
+          // devices with a right inset — ui-audit #21).
           "block absolute top-20 pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-300",
-          collapsed ? "right-10" : "right-[72px]"
+          collapsed
+            ? "right-[calc(var(--rail-gap)+1.75rem+var(--safe-area-right))]"
+            : "right-[calc(var(--rail-gap)+var(--rail-width)+0.5rem+var(--safe-area-right))]"
         )}
           data-starmap-ui-control="true"
         >

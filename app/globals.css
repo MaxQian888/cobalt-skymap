@@ -310,6 +310,12 @@ html {
   --safe-area-bottom: 0px;
   --safe-area-left: 0px;
   --safe-area-right: 0px;
+  /* Desktop right control rail geometry — single source for the rail column
+     width and its gap from the viewport edge, so the floating session panel can
+     derive its offset (and respect the right safe-area inset) instead of using
+     hard-coded magic numbers (ui-audit #21). */
+  --rail-width: 52px;
+  --rail-gap: 0.75rem;
 }
 
 @supports (padding: env(safe-area-inset-top)) {
