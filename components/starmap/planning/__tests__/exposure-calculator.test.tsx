@@ -135,7 +135,11 @@ const mockUseEquipmentStore = jest.fn(() => ({
 }));
 
 jest.mock('@/lib/stores', () => ({
-  useEquipmentStore: () => mockUseEquipmentStore(),
+  // Apply the selector like the real Zustand store so per-field selectors work.
+  useEquipmentStore: (selector?: (s: ReturnType<typeof mockUseEquipmentStore>) => unknown) => {
+    const s = mockUseEquipmentStore();
+    return selector ? selector(s) : s;
+  },
 }));
 
 import { ExposureCalculator } from '../exposure-calculator';

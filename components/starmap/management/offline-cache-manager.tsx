@@ -66,19 +66,19 @@ export function OfflineCacheManager() {
   // Tauri cache hook for desktop-specific cache management
   const tauriCache = useCache();
   
-  const {
-    isOnline,
-    isInitialized,
-    layerStatuses,
-    isDownloading,
-    autoDownloadOnWifi,
-    initialize,
-    refreshStatuses,
-    downloadAllLayers,
-    cancelAllDownloads,
-    clearAllCache,
-    setAutoDownloadOnWifi,
-  } = useOfflineStore();
+  // Per-field selectors — avoid re-rendering the whole cache manager on every
+  // unrelated offline-store mutation. Actions are stable Zustand refs.
+  const isOnline = useOfflineStore((s) => s.isOnline);
+  const isInitialized = useOfflineStore((s) => s.isInitialized);
+  const layerStatuses = useOfflineStore((s) => s.layerStatuses);
+  const isDownloading = useOfflineStore((s) => s.isDownloading);
+  const autoDownloadOnWifi = useOfflineStore((s) => s.autoDownloadOnWifi);
+  const initialize = useOfflineStore((s) => s.initialize);
+  const refreshStatuses = useOfflineStore((s) => s.refreshStatuses);
+  const downloadAllLayers = useOfflineStore((s) => s.downloadAllLayers);
+  const cancelAllDownloads = useOfflineStore((s) => s.cancelAllDownloads);
+  const clearAllCache = useOfflineStore((s) => s.clearAllCache);
+  const setAutoDownloadOnWifi = useOfflineStore((s) => s.setAutoDownloadOnWifi);
 
   // Initialize on mount
   useEffect(() => {

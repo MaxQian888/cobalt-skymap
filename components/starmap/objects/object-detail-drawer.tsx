@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useReducer, memo, createElement } from 'react';
+import { useState, useEffect, useCallback, memo, createElement } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   X,
@@ -87,7 +87,7 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
   const [objectInfo, setObjectInfo] = useState<ObjectDetailedInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
-  const [tick, forceUpdate] = useReducer((x: number) => x + 1, 0);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const [copied, setCopied] = useState(false);
 
   const profileInfo = useMountStore((state) => state.profileInfo);
@@ -184,15 +184,15 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
     if (!open) return;
 
     const interval = setInterval(() => {
-      forceUpdate();
+      setCurrentTime(new Date());
     }, 30000); // Update every 30 seconds
 
     return () => clearInterval(interval);
   }, [open]);
 
-  // Calculate current astronomical data using shared hooks
-  void tick; // Referenced to suppress unused-variable warning; forceUpdate() triggers re-render
-  const currentTime = new Date();
+  // Calculate current astronomical data using shared hooks. currentTime lives in
+  // state and is advanced only by the 30s interval, so an unrelated re-render no
+  // longer mints a fresh Date and force-recomputes the astro hooks every render.
   const astroEnv = useAstroEnvironment(latitude, longitude, currentTime);
   const astroData = useTargetAstroData(selectedObject, latitude, longitude, astroEnv.moonRa, astroEnv.moonDec, currentTime);
 

@@ -192,11 +192,9 @@ const DSOCard = memo(function DSOCard({ object, onSelect, onAddToList, onGoto, i
 
 function FilterPanel({ isOpen, onToggle }: FilterPanelProps) {
   const t = useTranslations();
-  const {
-    filters,
-    setFilters,
-    resetFilters,
-  } = useSkyAtlasStore();
+  const filters = useSkyAtlasStore((s) => s.filters);
+  const setFilters = useSkyAtlasStore((s) => s.setFilters);
+  const resetFilters = useSkyAtlasStore((s) => s.resetFilters);
   
   const [localObjectName, setLocalObjectName] = useState(filters.objectName);
   
@@ -449,7 +447,7 @@ function FilterPanel({ isOpen, onToggle }: FilterPanelProps) {
 
 function NighttimeInfo() {
   const t = useTranslations();
-  const { nighttimeData } = useSkyAtlasStore();
+  const nighttimeData = useSkyAtlasStore((s) => s.nighttimeData);
   
   if (!nighttimeData) return null;
   
@@ -498,29 +496,28 @@ export function SkyAtlasPanel() {
   const latitude = profileInfo.AstrometrySettings.Latitude || 0;
   const longitude = profileInfo.AstrometrySettings.Longitude || 0;
   
-  // Sky Atlas store
-  const {
-    catalog,
-    searchResult,
-    isSearching,
-    selectedObject,
-    tonightsBest,
-    setLocation,
-    search,
-    selectObject,
-    filters,
-    setFilters,
-  } = useSkyAtlasStore();
+  // Sky Atlas store — per-field selectors. The ~260-object `catalog` is NEVER
+  // selected into render (it would re-render the whole panel whenever it loads);
+  // its length is read transiently via getState() inside the init effect.
+  const searchResult = useSkyAtlasStore((s) => s.searchResult);
+  const isSearching = useSkyAtlasStore((s) => s.isSearching);
+  const selectedObject = useSkyAtlasStore((s) => s.selectedObject);
+  const tonightsBest = useSkyAtlasStore((s) => s.tonightsBest);
+  const setLocation = useSkyAtlasStore((s) => s.setLocation);
+  const search = useSkyAtlasStore((s) => s.search);
+  const selectObject = useSkyAtlasStore((s) => s.selectObject);
+  const filters = useSkyAtlasStore((s) => s.filters);
+  const setFilters = useSkyAtlasStore((s) => s.setFilters);
   
   // Target list store for adding objects
   const addTarget = useTargetListStore((state) => state.addTarget);
   
   // Initialize when opened
   useEffect(() => {
-    if (isOpen && catalog.length === 0) {
+    if (isOpen && useSkyAtlasStore.getState().catalog.length === 0) {
       initializeSkyAtlas(latitude, longitude);
     }
-  }, [isOpen, catalog.length, latitude, longitude]);
+  }, [isOpen, latitude, longitude]);
   
   // Update location when it changes
   useEffect(() => {

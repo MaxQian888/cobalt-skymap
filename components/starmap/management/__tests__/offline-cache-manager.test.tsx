@@ -29,7 +29,9 @@ let mockOfflineState = {
 };
 
 jest.mock('@/lib/offline', () => ({
-  useOfflineStore: jest.fn(() => mockOfflineState),
+  // Apply the selector like the real Zustand store so per-field selectors work.
+  useOfflineStore: jest.fn((selector?: (s: typeof mockOfflineState) => unknown) =>
+    selector ? selector(mockOfflineState) : mockOfflineState),
   formatBytes: jest.fn((bytes: number) => `${bytes}B`),
   STELLARIUM_LAYERS: [
     { id: 'layer1', name: 'Stars', description: 'Star catalog', size: 1024 },

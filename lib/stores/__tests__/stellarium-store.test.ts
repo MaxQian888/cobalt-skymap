@@ -235,6 +235,60 @@ describe('useStellariumStore', () => {
     });
   });
 
+  describe('updateViewDirection', () => {
+    it('keeps the same viewDirection reference when the polled direction is unchanged', () => {
+      const { result } = renderHook(() => useStellariumStore());
+      // The engine helper returns a NEW object on every call but with identical
+      // values — this mirrors a static (non-panning) view. The store must not
+      // publish a new reference, otherwise every subscriber re-renders at the
+      // 2Hz poll cadence even when nothing moved.
+      const getViewDir = jest.fn(() => ({ ra: 1.2345, dec: 0.5, alt: 0.3, az: 2.1 }));
+
+      act(() => {
+        useStellariumStore.setState({ viewDirection: null });
+        result.current.setHelpers({ getCurrentViewDirection: getViewDir });
+      });
+
+      act(() => {
+        result.current.updateViewDirection();
+      });
+      const first = result.current.viewDirection;
+
+      act(() => {
+        result.current.updateViewDirection();
+      });
+      const second = result.current.viewDirection;
+
+      expect(first).not.toBeNull();
+      expect(second).toBe(first);
+    });
+
+    it('publishes a new viewDirection reference when the direction changes', () => {
+      const { result } = renderHook(() => useStellariumStore());
+      let ra = 1.0;
+      const getViewDir = jest.fn(() => ({ ra, dec: 0.5, alt: 0.3, az: 2.1 }));
+
+      act(() => {
+        useStellariumStore.setState({ viewDirection: null });
+        result.current.setHelpers({ getCurrentViewDirection: getViewDir });
+      });
+
+      act(() => {
+        result.current.updateViewDirection();
+      });
+      const first = result.current.viewDirection;
+
+      act(() => {
+        ra = 1.5; // user panned the view
+        result.current.updateViewDirection();
+      });
+      const second = result.current.viewDirection;
+
+      expect(second).not.toBe(first);
+      expect(second?.ra).toBe(1.5);
+    });
+  });
+
   describe('setAladin', () => {
     it('should set aladin instance', () => {
       const { result } = renderHook(() => useStellariumStore());

@@ -249,6 +249,26 @@ export const useMountStore = create<MountStoreState>()(
       clearLatestCommandFailure: () => set({ latestCommandFailure: null }),
 
       applyMountState: (s) => set((state) => {
+        // Short-circuit value-equal polls so an idle connected mount doesn't
+        // rebuild mountInfo + the operation-feedback maps (and re-render every
+        // subscriber) on every poll tick. Returning the SAME state reference
+        // makes Zustand's Object.is check skip the update entirely. Capability
+        // changes are handled by setCapabilities, so feedback can't go stale.
+        const prev = state.mountInfo;
+        if (
+          prev.Connected === s.connected &&
+          prev.Coordinates.RADegrees === s.ra &&
+          prev.Coordinates.Dec === s.dec &&
+          prev.Tracking === s.tracking &&
+          prev.TrackMode === s.trackingRate &&
+          prev.Slewing === s.slewing &&
+          prev.Parked === s.parked &&
+          prev.AtHome === s.atHome &&
+          prev.PierSide === s.pierSide &&
+          prev.SlewRateIndex === s.slewRateIndex
+        ) {
+          return state;
+        }
         const mountInfo = {
           Connected: s.connected,
           Coordinates: { RADegrees: s.ra, Dec: s.dec },

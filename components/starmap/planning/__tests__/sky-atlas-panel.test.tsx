@@ -34,7 +34,11 @@ jest.mock('@/lib/stores/target-list-store', () => ({
 }));
 
 jest.mock('@/lib/catalogs', () => ({
-  useSkyAtlasStore: jest.fn(() => ({
+  // Apply the selector like the real Zustand store, and expose getState() for
+  // transient reads (the panel reads catalog.length via getState()).
+  useSkyAtlasStore: Object.assign(
+    jest.fn((selector?: (s: Record<string, unknown>) => unknown) => {
+    const s: Record<string, unknown> = {
     catalog: [],
     objects: [],
     filteredObjects: [],
@@ -63,7 +67,11 @@ jest.mock('@/lib/catalogs', () => ({
     searchQuery: '',
     setLocation: jest.fn(),
     location: { latitude: 40.7128, longitude: -74.006 },
-  })),
+    };
+    return selector ? selector(s) : s;
+    }),
+    { getState: () => ({ catalog: [] as unknown[] }) },
+  ),
   initializeSkyAtlas: jest.fn(),
   DSO_CATALOG: [],
   MOON_PHASE_NAMES: {

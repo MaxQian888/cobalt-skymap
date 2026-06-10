@@ -74,6 +74,11 @@ function removeInvalidKey(
 export function useThemeCustomizationBindings() {
   const { theme, setTheme, resolvedTheme } = useTheme();
 
+  // NOTE: intentionally a whole-store read. This bindings hook consumes both
+  // reactive fields the theme store exposes (`customization` + `userPresets`),
+  // which together are essentially its entire reactive surface — per-field
+  // selectors would yield no re-render reduction here, only churn. (Audit #5
+  // does not apply to this hook.)
   const {
     customization,
     userPresets,

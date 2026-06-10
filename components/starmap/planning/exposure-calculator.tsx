@@ -171,14 +171,20 @@ export function ExposureCalculator({
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   
-  // Get defaults from equipment store
-  const equipmentStore = useEquipmentStore();
-  const exposureDefaults = equipmentStore.exposureDefaults;
-  
+  // Per-field selectors — ExposureCalculator must not re-render on unrelated
+  // equipment-store changes. Actions/getters are stable Zustand refs.
+  const exposureDefaults = useEquipmentStore((s) => s.exposureDefaults);
+  const storeFocalLength = useEquipmentStore((s) => s.focalLength);
+  const storeAperture = useEquipmentStore((s) => s.aperture);
+  const storePixelSize = useEquipmentStore((s) => s.pixelSize);
+  const sensorWidth = useEquipmentStore((s) => s.sensorWidth);
+  const sensorHeight = useEquipmentStore((s) => s.sensorHeight);
+  const getResolution = useEquipmentStore((s) => s.getResolution);
+
   // Equipment settings - prefer props, fallback to store
-  const [focalLength, setFocalLength] = useState(propFocalLength ?? equipmentStore.focalLength);
-  const [aperture, setAperture] = useState(propAperture ?? equipmentStore.aperture);
-  const [pixelSize, setPixelSize] = useState(propPixelSize ?? equipmentStore.pixelSize);
+  const [focalLength, setFocalLength] = useState(propFocalLength ?? storeFocalLength);
+  const [aperture, setAperture] = useState(propAperture ?? storeAperture);
+  const [pixelSize, setPixelSize] = useState(propPixelSize ?? storePixelSize);
   
   // Environment - use store defaults
   const [bortle, setBortle] = useState(exposureDefaults.bortle);
@@ -327,8 +333,8 @@ export function ExposureCalculator({
   }, [exposureTime, frameCount, ditherEnabled, ditherEvery]);
   
   const sensorResolution = useMemo(() => {
-    return equipmentStore.getResolution();
-  }, [equipmentStore]);
+    return getResolution();
+  }, [getResolution, sensorWidth, sensorHeight]);
 
   const fileSize = useMemo(() => {
     return estimateFileSize(binning, 16, sensorResolution.width, sensorResolution.height);
@@ -417,9 +423,9 @@ export function ExposureCalculator({
   }, []);
   
   const handleReset = useCallback(() => {
-    setFocalLength(propFocalLength ?? equipmentStore.focalLength);
-    setAperture(propAperture ?? equipmentStore.aperture);
-    setPixelSize(propPixelSize ?? equipmentStore.pixelSize);
+    setFocalLength(propFocalLength ?? storeFocalLength);
+    setAperture(propAperture ?? storeAperture);
+    setPixelSize(propPixelSize ?? storePixelSize);
     setBortle(exposureDefaults.bortle);
     setExposureTime(exposureDefaults.exposureTime);
     setGain(exposureDefaults.gain);
@@ -448,7 +454,7 @@ export function ExposureCalculator({
     setTargetSurfaceBrightness(exposureDefaults.targetSurfaceBrightness ?? 22);
     setTargetSignalRate(exposureDefaults.targetSignalRate ?? 0);
     setShowAdvanced(false);
-  }, [propFocalLength, propAperture, propPixelSize, equipmentStore, exposureDefaults]);
+  }, [propFocalLength, propAperture, propPixelSize, storeFocalLength, storeAperture, storePixelSize, exposureDefaults]);
 
   const handleCopy = useCallback(async () => {
     const text = `Exposure: ${exposureTime}s × ${frameCount} = ${formatDuration(totalIntegrationMinutes)}\nFilter: ${filter} | Gain: ${gain} | Binning: ${binning}`;

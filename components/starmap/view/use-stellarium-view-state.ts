@@ -138,26 +138,40 @@ export function useStellariumViewState() {
     return { ra: rad2deg(viewDirection.ra), dec: rad2deg(viewDirection.dec) };
   }, [viewDirection]);
 
-  // Track container bounds via ResizeObserver
+  // Track container bounds via ResizeObserver. The observer can fire many times
+  // per gesture; coalesce writes into a single rAF and skip no-op updates so the
+  // overlay tree (which consumes containerBounds) doesn't reconcile on every tick.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
+    let rafId: number | null = null;
+
     const updateBounds = () => {
+      rafId = null;
       const rect = el.getBoundingClientRect();
-      setContainerBounds({ width: rect.width, height: rect.height });
       containerBoundsRef.current = { left: rect.left, top: rect.top };
+      setContainerBounds((prev) =>
+        prev && prev.width === rect.width && prev.height === rect.height
+          ? prev
+          : { width: rect.width, height: rect.height },
+      );
     };
 
-    const observer = new ResizeObserver(() => {
-      updateBounds();
-    });
+    const scheduleUpdate = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(updateBounds);
+    };
 
+    const observer = new ResizeObserver(scheduleUpdate);
     observer.observe(el);
-    // Set initial bounds
+    // Set initial bounds synchronously.
     updateBounds();
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
   }, []);
 
   // Track last click position on container for info panel placement
@@ -377,6 +391,13 @@ export function useStellariumViewState() {
     });
   }, []);
 
+  // Stable session-panel toggle — passed to memo'd TopToolbar and the keyboard
+  // shortcut manager. Inlining `() => setShowSessionPanel(p => !p)` at the call
+  // sites created a fresh closure every render and defeated TopToolbar's memo.
+  const toggleSessionPanel = useCallback(() => {
+    setShowSessionPanel((prev) => !prev);
+  }, []);
+
   // Navigation handler
   const handleNavigate = useCallback((ra: number, dec: number, fov: number) => {
     safeSetViewDirection(ra, dec);
@@ -418,6 +439,7 @@ export function useStellariumViewState() {
     currentFov,
     showSessionPanel,
     setShowSessionPanel,
+    toggleSessionPanel,
     contextMenuCoords,
     clickPosition,
     containerBounds,

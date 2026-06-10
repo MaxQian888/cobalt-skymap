@@ -24,17 +24,18 @@ import { GRID_TYPE_OPTIONS, FRAME_COLORS, MAX_MOSAIC_ROWS, MAX_MOSAIC_COLS } fro
 
 export function FOVSettings() {
   const t = useTranslations();
-  const {
-    fovDisplay,
-    mosaic,
-    setFOVDisplay,
-    setFOVEnabled,
-    setGridType,
-    setMosaic,
-    setMosaicEnabled,
-    setMosaicGrid,
-    setMosaicOverlap,
-  } = useEquipmentStore();
+  // Per-field selectors — this panel must not re-render on unrelated equipment
+  // store changes (telescope/camera selection, sensor dims, etc.). Actions are
+  // stable Zustand refs.
+  const fovDisplay = useEquipmentStore((s) => s.fovDisplay);
+  const mosaic = useEquipmentStore((s) => s.mosaic);
+  const setFOVDisplay = useEquipmentStore((s) => s.setFOVDisplay);
+  const setFOVEnabled = useEquipmentStore((s) => s.setFOVEnabled);
+  const setGridType = useEquipmentStore((s) => s.setGridType);
+  const setMosaic = useEquipmentStore((s) => s.setMosaic);
+  const setMosaicEnabled = useEquipmentStore((s) => s.setMosaicEnabled);
+  const setMosaicGrid = useEquipmentStore((s) => s.setMosaicGrid);
+  const setMosaicOverlap = useEquipmentStore((s) => s.setMosaicOverlap);
 
   return (
     <div className="space-y-4">

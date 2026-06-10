@@ -172,19 +172,19 @@ export function useObjectSearch(): UseObjectSearchReturn {
   const stel = useStellariumStore((state) => state.stel);
   const targets = useTargetListStore((state) => state.targets);
 
-  // Search store integration for online search
-  const {
-    currentSearchMode,
-    settings: searchSettings,
-    getEnabledSources,
-    addRecentSearch: addStoreRecentSearch,
-    getRecentSearches,
-    clearRecentSearches: clearStoreRecentSearches,
-    updateAllOnlineStatus,
-    cacheSearchResults,
-    getCachedResults,
-    setMaxRecentSearches,
-  } = useSearchStore();
+  // Search store — per-field selectors so the search hook only re-renders when
+  // the reactive bits (mode/settings) change, not on any store mutation.
+  // Actions/getters are stable Zustand refs.
+  const currentSearchMode = useSearchStore((s) => s.currentSearchMode);
+  const searchSettings = useSearchStore((s) => s.settings);
+  const getEnabledSources = useSearchStore((s) => s.getEnabledSources);
+  const addStoreRecentSearch = useSearchStore((s) => s.addRecentSearch);
+  const getRecentSearches = useSearchStore((s) => s.getRecentSearches);
+  const clearStoreRecentSearches = useSearchStore((s) => s.clearRecentSearches);
+  const updateAllOnlineStatus = useSearchStore((s) => s.updateAllOnlineStatus);
+  const cacheSearchResults = useSearchStore((s) => s.cacheSearchResults);
+  const getCachedResults = useSearchStore((s) => s.getCachedResults);
+  const setMaxRecentSearches = useSearchStore((s) => s.setMaxRecentSearches);
 
   const enableFuzzySearch = useSettingsStore((s) => s.search.enableFuzzySearch);
   const autoSearchDelay = useSettingsStore((s) => s.search.autoSearchDelay);

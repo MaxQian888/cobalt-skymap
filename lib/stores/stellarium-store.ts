@@ -226,6 +226,27 @@ interface StellariumState {
   clearSavedViewState: () => void;
 }
 
+// Radians (~0.2 arcsec) — far below visual/display precision. Two polled view
+// directions within this tolerance on every numeric axis are treated as identical
+// so a static view does not publish a fresh reference each poll tick.
+const VIEW_DIRECTION_EPSILON = 1e-6;
+
+function isSameViewDirection(
+  a: NonNullable<StellariumState['viewDirection']>,
+  b: NonNullable<StellariumState['viewDirection']>,
+): boolean {
+  return (
+    Math.abs(a.ra - b.ra) < VIEW_DIRECTION_EPSILON &&
+    Math.abs(a.dec - b.dec) < VIEW_DIRECTION_EPSILON &&
+    Math.abs(a.alt - b.alt) < VIEW_DIRECTION_EPSILON &&
+    Math.abs(a.az - b.az) < VIEW_DIRECTION_EPSILON &&
+    a.frame === b.frame &&
+    a.timeScale === b.timeScale &&
+    a.qualityFlag === b.qualityFlag &&
+    a.dataFreshness === b.dataFreshness
+  );
+}
+
 export const useStellariumStore = create<StellariumState>((set, get) => ({
   stel: null,
   aladin: null,
@@ -263,13 +284,20 @@ export const useStellariumStore = create<StellariumState>((set, get) => ({
   }),
   updateViewDirection: () => {
     const fn = get().getCurrentViewDirection;
-    if (fn) {
-      try {
-        set({ viewDirection: fn() });
-      } catch {
-        // Engine not ready yet
-      }
+    if (!fn) return;
+    let next: StellariumState['viewDirection'];
+    try {
+      next = fn();
+    } catch {
+      // Engine not ready yet
+      return;
     }
+    const prev = get().viewDirection;
+    // Skip the publish when the view is static — keeping the same object
+    // reference prevents every viewDirection subscriber (top toolbar clock,
+    // bookmarks, status bar) from re-rendering at the 2Hz poll cadence.
+    if (next && prev && isSameViewDirection(prev, next)) return;
+    set({ viewDirection: next });
   },
   
   saveViewState: (fov?: number) => {
