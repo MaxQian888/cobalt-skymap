@@ -3,7 +3,6 @@
 import { memo, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { Search, X, Menu, RotateCcw, PanelLeftClose, PanelLeft, LogOut, Compass, Power } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -13,17 +12,13 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from '@/components/ui/drawer';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 
-import { ToolbarButton, ToolbarGroup } from '@/components/common/toolbar-button';
+import { ToolbarButton, ToolbarGroup, TOOLBAR_ICON_TOGGLE_CLASS } from '@/components/common/toolbar-button';
+import { StatusToggleButton } from '@/components/common/status-toggle-button';
 import { LanguageSwitcher } from '@/components/common/language-switcher';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { NightModeToggle } from '@/components/common/night-mode-toggle';
@@ -173,31 +168,16 @@ export const TopToolbar = memo(function TopToolbar({
           )}
 
           {/* Search Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div data-tour-id="search">
-                <Button
-                  data-tour-id="search-button"
-                  data-testid="search-toggle-button"
-                  aria-label={t('starmap.searchObjects')}
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "h-9 w-9 backdrop-blur-md border border-border/50 touch-target toolbar-btn",
-                    isSearchOpen
-                      ? "bg-primary/20 text-primary border-primary/50"
-                      : "bg-card/60 text-foreground/80 hover:text-foreground hover:bg-accent"
-                  )}
-                  onClick={onToggleSearch}
-                >
-                  {isSearchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-                </Button>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>{t('starmap.searchObjects')}</p>
-            </TooltipContent>
-          </Tooltip>
+          <div data-tour-id="search">
+            <StatusToggleButton
+              data-tour-id="search-button"
+              data-testid="search-toggle-button"
+              icon={isSearchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+              label={t('starmap.searchObjects')}
+              active={isSearchOpen}
+              onClick={onToggleSearch}
+            />
+          </div>
 
           {/* Discovery + Navigation groups — desktop shell only */}
           {!isMobileShell && (
@@ -289,10 +269,10 @@ export const TopToolbar = memo(function TopToolbar({
             {/* Display Mode Group */}
             <ToolbarGroup gap="none" className="p-0.5">
               <div data-tour-id="night-mode">
-                <NightModeToggle className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent rounded-md" />
+                <NightModeToggle />
               </div>
-              <SensorControlToggle className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent rounded-md" />
-              <ARModeToggle className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent rounded-md" />
+              <SensorControlToggle className={TOOLBAR_ICON_TOGGLE_CLASS} />
+              <ARModeToggle className={TOOLBAR_ICON_TOGGLE_CLASS} />
               <ObjectTypeLegend variant="popover" />
             </ToolbarGroup>
 
@@ -302,7 +282,7 @@ export const TopToolbar = memo(function TopToolbar({
                 <ThemeToggle variant="icon" className="h-9 w-9" />
               </div>
               <div data-tour-id="language">
-                <LanguageSwitcher className="h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent rounded-md" />
+                <LanguageSwitcher className={TOOLBAR_ICON_TOGGLE_CLASS} />
               </div>
             </ToolbarGroup>
           </div>

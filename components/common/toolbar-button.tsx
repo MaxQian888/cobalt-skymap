@@ -10,6 +10,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+/** Shared resting style for bespoke stateful icon buttons in the toolbar (Sensor/AR/Language). */
+export const TOOLBAR_ICON_TOGGLE_CLASS =
+  "h-9 w-9 text-foreground/80 hover:text-foreground hover:bg-accent rounded-md";
+
 const toolbarButtonVariants = cva(
   "gap-1.5 transition-all duration-200 bg-card/80 backdrop-blur-sm border border-border/50 text-foreground/80 hover:text-foreground hover:bg-accent hover:border-border",
   {
