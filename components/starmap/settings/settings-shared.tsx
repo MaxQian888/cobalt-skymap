@@ -70,7 +70,7 @@ export function ToggleItem({ id, label, checked, onCheckedChange, icon, descript
     <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
       <div className="flex-1 min-w-0 mr-2">
         <Label htmlFor={id} className="text-sm cursor-pointer flex items-center gap-2">
-          {icon && <span className="text-base">{icon}</span>}
+          {icon && <span className="text-base" aria-hidden="true">{icon}</span>}
           {label}
         </Label>
         {description && (

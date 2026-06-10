@@ -42,7 +42,7 @@ export function FOVSettings() {
       {/* Enable FOV Overlay */}
       <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-muted/30">
         <Label htmlFor="fov-enabled" className="text-sm cursor-pointer flex items-center gap-2">
-          <LayoutGrid className="h-4 w-4" />
+          <LayoutGrid className="h-4 w-4" aria-hidden="true" />
           {t('fov.showFovOverlay')}
         </Label>
         <Switch
@@ -79,11 +79,12 @@ export function FOVSettings() {
       {/* Mosaic Settings */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <Label className="flex items-center gap-2 text-sm">
-            <Grid3X3 className="h-4 w-4" />
+          <Label htmlFor="fov-mosaic-enabled" className="flex items-center gap-2 text-sm cursor-pointer">
+            <Grid3X3 className="h-4 w-4" aria-hidden="true" />
             {t('fov.enableMosaic')}
           </Label>
           <Switch
+            id="fov-mosaic-enabled"
             checked={mosaic.enabled}
             onCheckedChange={setMosaicEnabled}
           />
