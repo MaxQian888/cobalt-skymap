@@ -334,6 +334,7 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.session-planner.title',
     descriptionKey: 'onboarding.steps.session-planner.description',
     placement: 'bottom',
+    beforeEnterAction: { type: 'openToolbarOverflow' },
     fallbackMode: 'center',
   },
   'astro-events': {
@@ -345,6 +346,7 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.astro-events.title',
     descriptionKey: 'onboarding.steps.astro-events.description',
     placement: 'bottom',
+    beforeEnterAction: { type: 'openToolbarOverflow' },
     fallbackMode: 'skip',
   },
   'astro-calculator': {
@@ -356,6 +358,7 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.astro-calculator.title',
     descriptionKey: 'onboarding.steps.astro-calculator.description',
     placement: 'bottom',
+    beforeEnterAction: { type: 'openToolbarOverflow' },
     fallbackMode: 'skip',
   },
   markers: {
@@ -391,7 +394,10 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.satellite.title',
     descriptionKey: 'onboarding.steps.satellite.description',
     placement: 'bottom',
-    beforeEnterAction: { type: 'openMobileDrawer', section: 'satellite' },
+    beforeEnterAction: [
+      { type: 'openMobileDrawer', section: 'satellite' },
+      { type: 'openToolbarOverflow' },
+    ],
     fallbackMode: 'skip',
   },
   ocular: {
@@ -403,7 +409,10 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.ocular.title',
     descriptionKey: 'onboarding.steps.ocular.description',
     placement: 'bottom',
-    beforeEnterAction: { type: 'openMobileDrawer', section: 'ocular' },
+    beforeEnterAction: [
+      { type: 'openMobileDrawer', section: 'ocular' },
+      { type: 'openToolbarOverflow' },
+    ],
     fallbackMode: 'skip',
   },
   'plate-solver': {
@@ -415,7 +424,10 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.plate-solver.title',
     descriptionKey: 'onboarding.steps.plate-solver.description',
     placement: 'bottom',
-    beforeEnterAction: { type: 'openMobileDrawer', section: 'plate-solver' },
+    beforeEnterAction: [
+      { type: 'openMobileDrawer', section: 'plate-solver' },
+      { type: 'openToolbarOverflow' },
+    ],
     availability: (context) => context.isTauri,
     fallbackMode: 'skip',
   },
@@ -442,7 +454,10 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.theme.title',
     descriptionKey: 'onboarding.steps.theme.description',
     placement: 'bottom',
-    beforeEnterAction: { type: 'openMobileDrawer', section: 'theme' },
+    beforeEnterAction: [
+      { type: 'openMobileDrawer', section: 'theme' },
+      { type: 'openToolbarOverflow' },
+    ],
     fallbackMode: 'skip',
   },
   language: {
@@ -454,7 +469,10 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.language.title',
     descriptionKey: 'onboarding.steps.language.description',
     placement: 'bottom',
-    beforeEnterAction: { type: 'openMobileDrawer', section: 'language' },
+    beforeEnterAction: [
+      { type: 'openMobileDrawer', section: 'language' },
+      { type: 'openToolbarOverflow' },
+    ],
     fallbackMode: 'skip',
   },
   'night-mode': {
@@ -466,7 +484,10 @@ const CAPABILITY_REGISTRY: Record<string, Omit<CapabilityStep, 'tourId'>> = {
     titleKey: 'onboarding.steps.night-mode.title',
     descriptionKey: 'onboarding.steps.night-mode.description',
     placement: 'bottom',
-    beforeEnterAction: { type: 'openMobileDrawer', section: 'night-mode' },
+    beforeEnterAction: [
+      { type: 'openMobileDrawer', section: 'night-mode' },
+      { type: 'openToolbarOverflow' },
+    ],
     fallbackMode: 'skip',
   },
   'keyboard-shortcuts': {

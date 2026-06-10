@@ -92,10 +92,14 @@ export const TopToolbar = memo(function TopToolbar({
   const toggleSearchRequestId = useOnboardingBridgeStore((state) => state.toggleSearchRequestId);
   const toggleSessionPanelRequestId = useOnboardingBridgeStore((state) => state.toggleSessionPanelRequestId);
   const closeTransientPanelsRequestId = useOnboardingBridgeStore((state) => state.closeTransientPanelsRequestId);
+  const openToolbarOverflowRequestId = useOnboardingBridgeStore((state) => state.openToolbarOverflowRequestId);
+  const closeToolbarOverflowRequestId = useOnboardingBridgeStore((state) => state.closeToolbarOverflowRequestId);
   const handledSearchRequestRef = useRef(0);
   const handledToggleSearchRequestRef = useRef(0);
   const handledToggleSessionPanelRef = useRef(0);
   const handledCloseTransientRef = useRef(0);
+  const handledOverflowOpenRef = useRef(0);
+  const handledOverflowCloseRef = useRef(0);
 
   // Desktop top-bar priority+ overflow: fold the lowest-priority right-cluster
   // groups into a "More" popover when the justify-between row would clip.
@@ -150,6 +154,31 @@ export const TopToolbar = memo(function TopToolbar({
       }
     }
   }, [closeTransientPanelsRequestId, isSearchOpen, onToggleSearch]);
+
+  // Onboarding tour: reveal a folded toolbar group by opening the "More" menu.
+  // Setting open is safe even when nothing is folded — the menu only mounts when
+  // overflowIds is non-empty, so it has no effect until a group actually folds.
+  useEffect(() => {
+    if (
+      openToolbarOverflowRequestId > 0 &&
+      openToolbarOverflowRequestId !== handledOverflowOpenRef.current
+    ) {
+      handledOverflowOpenRef.current = openToolbarOverflowRequestId;
+      const timer = window.setTimeout(() => setOverflowMenuOpen(true), 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [openToolbarOverflowRequestId]);
+
+  useEffect(() => {
+    if (
+      closeToolbarOverflowRequestId > 0 &&
+      closeToolbarOverflowRequestId !== handledOverflowCloseRef.current
+    ) {
+      handledOverflowCloseRef.current = closeToolbarOverflowRequestId;
+      const timer = window.setTimeout(() => setOverflowMenuOpen(false), 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [closeToolbarOverflowRequestId]);
 
   const shellHorizontalPadding = isTauriEnv
     ? {

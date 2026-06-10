@@ -43,6 +43,7 @@ export type TourBeforeEnterActionType =
   | 'openSearch'
   | 'openMobileDrawer'
   | 'openDailyKnowledge'
+  | 'openToolbarOverflow'
   | 'closeTransientPanels';
 
 export interface TourBeforeEnterAction {

@@ -156,6 +156,12 @@ export function OnboardingTour({
             bridge.closeTransientPanels();
             bridge.openMobileDrawer(action.section);
             break;
+          case 'openToolbarOverflow':
+            // Desktop: reveal the folded toolbar group by opening the "More"
+            // overflow menu (no-op when nothing is folded). Closed on step exit.
+            bridge.openToolbarOverflow();
+            cleanups.push(() => bridge.closeToolbarOverflow());
+            break;
           case 'openDailyKnowledge':
             bridge.closeTransientPanels();
             bridge.openDailyKnowledge();

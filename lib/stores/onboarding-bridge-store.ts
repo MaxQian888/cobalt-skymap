@@ -12,6 +12,8 @@ interface OnboardingBridgeState {
   openDailyKnowledgeRequestId: number;
   mobileDrawerSection: string | null;
   closeTransientPanelsRequestId: number;
+  openToolbarOverflowRequestId: number;
+  closeToolbarOverflowRequestId: number;
 
   expandRightPanel: () => void;
   openSettingsDrawer: (tab?: string) => void;
@@ -22,6 +24,9 @@ interface OnboardingBridgeState {
   openMobileDrawer: (section?: string) => void;
   openDailyKnowledge: () => void;
   closeTransientPanels: () => void;
+  /** Reveal the desktop top-bar "More" overflow menu (tour reveal for folded groups). */
+  openToolbarOverflow: () => void;
+  closeToolbarOverflow: () => void;
 }
 
 export const useOnboardingBridgeStore = create<OnboardingBridgeState>()(
@@ -37,6 +42,8 @@ export const useOnboardingBridgeStore = create<OnboardingBridgeState>()(
     openDailyKnowledgeRequestId: 0,
     mobileDrawerSection: null,
     closeTransientPanelsRequestId: 0,
+    openToolbarOverflowRequestId: 0,
+    closeToolbarOverflowRequestId: 0,
 
     expandRightPanel: () =>
       set((state) => ({
@@ -81,6 +88,16 @@ export const useOnboardingBridgeStore = create<OnboardingBridgeState>()(
     closeTransientPanels: () =>
       set((state) => ({
         closeTransientPanelsRequestId: state.closeTransientPanelsRequestId + 1,
+      })),
+
+    openToolbarOverflow: () =>
+      set((state) => ({
+        openToolbarOverflowRequestId: state.openToolbarOverflowRequestId + 1,
+      })),
+
+    closeToolbarOverflow: () =>
+      set((state) => ({
+        closeToolbarOverflowRequestId: state.closeToolbarOverflowRequestId + 1,
       })),
   }),
 );
