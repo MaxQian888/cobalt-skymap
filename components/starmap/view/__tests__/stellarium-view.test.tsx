@@ -76,6 +76,7 @@ const mockViewState = {
   currentFov: 45,
   showSessionPanel: false,
   setShowSessionPanel: jest.fn(),
+  toggleSessionPanel: jest.fn(),
   contextMenuCoords: null as null | { ra: number; dec: number; raStr: string; decStr: string },
   clickPosition: null as null | { x: number; y: number },
   containerBounds: null as null | { width: number; height: number },
@@ -391,6 +392,7 @@ function resetViewState() {
     currentFov: 45,
     showSessionPanel: false,
     setShowSessionPanel: jest.fn(),
+    toggleSessionPanel: jest.fn(),
     contextMenuCoords: null,
     clickPosition: null,
     containerBounds: null,
@@ -472,7 +474,7 @@ describe('StellariumView', () => {
     expect(mockViewState.toggleSearch).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByTestId('ks-toggle-session'));
-    expect(mockViewState.setShowSessionPanel).toHaveBeenCalledTimes(1);
+    expect(mockViewState.toggleSessionPanel).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByTestId('ks-toggle-ar'));
     expect(mockArToggleButtonClick).toHaveBeenCalledTimes(1);

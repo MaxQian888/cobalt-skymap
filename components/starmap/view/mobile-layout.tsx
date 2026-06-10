@@ -270,7 +270,7 @@ export const MobileLayout = memo(function MobileLayout({
         data-starmap-ui-control="true"
         data-testid="mobile-action-rail"
         className={cn(
-          'sm:hidden absolute flex items-center gap-1 min-w-0 overflow-hidden rounded-lg border border-border/60 bg-card/90 p-1 backdrop-blur-md pointer-events-auto',
+          'absolute flex items-center gap-1 min-w-0 overflow-hidden rounded-lg border border-border/60 bg-card/90 p-1 backdrop-blur-md pointer-events-auto',
         )}
         style={{
           bottom: actionRailBottomOffset,
@@ -334,7 +334,7 @@ export const MobileLayout = memo(function MobileLayout({
         <div
           data-starmap-ui-control="true"
           data-testid="mobile-zoom-cluster"
-          className="sm:hidden absolute flex flex-col items-center gap-1 pointer-events-auto animate-slide-in-right"
+          className="absolute flex flex-col items-center gap-1 pointer-events-auto animate-slide-in-right"
           style={{ bottom: zoomBottomOffset, right: safeAreaRight }}
         >
           {/* Compact Zoom */}
@@ -356,7 +356,7 @@ export const MobileLayout = memo(function MobileLayout({
           data-starmap-ui-control="true"
           data-testid="mobile-bottom-tools-bar"
           className={cn(
-            'mobile-bottom-bar sm:hidden absolute flex items-center gap-0.5 bg-card/90 backdrop-blur-md rounded-lg border border-border/50 p-1 pointer-events-auto overflow-x-auto scrollbar-hide animate-slide-in-left',
+            'mobile-bottom-bar absolute flex items-center gap-0.5 bg-card/90 backdrop-blur-md rounded-lg border border-border/50 p-1 pointer-events-auto overflow-x-auto scrollbar-hide animate-slide-in-left',
             oneHandMode && 'one-hand-bottom-bar',
           )}
           style={{
@@ -389,7 +389,7 @@ export const MobileLayout = memo(function MobileLayout({
                     <Ellipsis className="h-4 w-4" />
                   </Button>
                 </DrawerTrigger>
-                <DrawerContent className="sm:hidden max-h-[70vh] max-h-[70dvh] bg-card border-border">
+                <DrawerContent className="max-h-[70vh] max-h-[70dvh] bg-card border-border">
                   <DrawerHeader>
                     <DrawerTitle>{t('settingsNew.mobile.moreToolsTitle')}</DrawerTitle>
                   </DrawerHeader>

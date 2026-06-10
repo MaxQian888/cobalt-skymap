@@ -85,7 +85,7 @@ export const RightControlPanel = memo(function RightControlPanel({
       {/* Right Side Controls - Desktop Only - Vertically Centered */}
       <div
         data-starmap-ui-control="true"
-        className="hidden sm:flex items-center absolute right-3 top-1/2 -translate-y-1/2 z-30 pointer-events-auto animate-fade-in"
+        className="flex items-center absolute right-[calc(0.75rem+var(--safe-area-right))] top-1/2 -translate-y-1/2 z-30 pointer-events-auto animate-fade-in"
       >
         {/* Collapse Toggle */}
         <Tooltip>
@@ -118,8 +118,9 @@ export const RightControlPanel = memo(function RightControlPanel({
             collapsed && 'translate-x-[calc(100%+16px)] opacity-0 pointer-events-none'
           )}
           aria-hidden={collapsed}
+          inert={collapsed || undefined}
         >
-        <ScrollArea className="max-h-[calc(100vh-160px)] max-h-[calc(100dvh-160px)] overscroll-contain">
+        <ScrollArea className="max-h-[calc(100dvh-160px)] overscroll-contain">
         <div className="flex flex-col items-center gap-1.5 py-1.5 w-[52px]">
           {/* Zoom Controls */}
           <div className="bg-card/80 backdrop-blur-md rounded-lg border border-border/50 w-full" data-tour-id="zoom">
@@ -215,12 +216,12 @@ export const RightControlPanel = memo(function RightControlPanel({
       {/* Floating Astro Session Panel - Show conditions for selected object */}
       {selectedObject && showSessionPanel && (
         <div className={cn(
-          "hidden sm:block absolute top-20 pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-300",
+          "block absolute top-20 pointer-events-auto animate-in fade-in slide-in-from-right-4 duration-300",
           collapsed ? "right-10" : "right-[72px]"
         )}
           data-starmap-ui-control="true"
         >
-          <ScrollArea className="max-h-[calc(100vh-180px)] max-h-[calc(100dvh-180px)]">
+          <ScrollArea className="max-h-[calc(100dvh-180px)]">
           <div className="bg-card/90 backdrop-blur-md rounded-lg border border-border/50 p-3 w-[300px] shadow-lg">
             <AstroSessionPanel
               selectedRa={selectedObject.raDeg}

@@ -61,7 +61,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
     setSelectedObject,
     currentFov,
     showSessionPanel,
-    setShowSessionPanel,
+    toggleSessionPanel,
     contextMenuCoords,
     clickPosition,
     containerBounds,
@@ -381,6 +381,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
         className={cn('relative w-full h-full overflow-hidden', arMode ? 'bg-transparent' : 'bg-black')}
         data-tour-id="canvas"
         data-testid="stellarium-view-root"
+        data-shell={isMobileShell ? 'mobile' : 'desktop'}
         data-ar-layout-tier={arAdaptation.layoutTier}
         data-ar-runtime-class={arAdaptation.runtimeClass}
         data-ar-sensor-path={arAdaptation.sensorPath}
@@ -393,7 +394,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
         {/* Keyboard Shortcuts Manager */}
         <KeyboardShortcutsManager
           onToggleSearch={handleSearchToggle}
-          onToggleSessionPanel={() => setShowSessionPanel(prev => !prev)}
+          onToggleSessionPanel={toggleSessionPanel}
           onToggleAr={handleToggleAr}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
@@ -507,12 +508,13 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
         {/* Top Toolbar */}
         <TopToolbar
           stel={!!stel || skyEngine === 'aladin'}
+          isMobileShell={isMobileShell}
           isSearchOpen={isSearchOpen}
           showSessionPanel={showSessionPanel}
           viewCenterRaDec={viewCenterRaDec}
           currentFov={currentFov}
           onToggleSearch={handleSearchToggle}
-          onToggleSessionPanel={() => setShowSessionPanel(prev => !prev)}
+          onToggleSessionPanel={toggleSessionPanel}
           onResetView={handleResetView}
           onCloseStarmapClick={handleCloseStarmapClick}
           onSetFov={handleSetFov}
@@ -530,19 +532,23 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
           onSelect={() => closeMobilePanelContext('search')}
         />
 
-        {/* Right Side Controls - Desktop */}
-        <RightControlPanel
-          stel={!!stel || skyEngine === 'aladin'}
-          currentFov={currentFov}
-          selectedObject={selectedObject}
-          showSessionPanel={showSessionPanel}
-          contextMenuCoords={contextMenuCoords}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onFovSliderChange={handleSetFov}
-          onGoToCoordinates={handleGoToCoordinates}
-          onLocationChange={handleLocationChange}
-        />
+        {/* Right Side Controls - Desktop shell only. Gated on the same
+            isMobileShell boolean as InfoPanel/BottomStatusBar so the desktop
+            rail never coexists with the mobile layer (the 640-900px dead-zone). */}
+        {!isMobileShell && (
+          <RightControlPanel
+            stel={!!stel || skyEngine === 'aladin'}
+            currentFov={currentFov}
+            selectedObject={selectedObject}
+            showSessionPanel={showSessionPanel}
+            contextMenuCoords={contextMenuCoords}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onFovSliderChange={handleSetFov}
+            onGoToCoordinates={handleGoToCoordinates}
+            onLocationChange={handleLocationChange}
+          />
+        )}
 
         {/* Mobile Layout */}
         {isMobileShell && (

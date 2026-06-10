@@ -207,6 +207,7 @@ import { TopToolbar } from '../top-toolbar';
 
 const defaultProps = {
   stel: false,
+  isMobileShell: false,
   isSearchOpen: false,
   showSessionPanel: false,
   viewCenterRaDec: { ra: 0, dec: 0 },
@@ -337,7 +338,7 @@ describe('TopToolbar', () => {
     mockIsTauri = true;
     mockOnboardingBridgeState.openMobileDrawerRequestId = 1;
 
-    const view = render(<TopToolbar {...defaultProps} stel={true} />);
+    const view = render(<TopToolbar {...defaultProps} stel={true} isMobileShell />);
 
     act(() => {
       jest.runOnlyPendingTimers();
@@ -349,7 +350,7 @@ describe('TopToolbar', () => {
     expect(mockQuitApp).toHaveBeenCalledTimes(1);
 
     mockOnboardingBridgeState.closeTransientPanelsRequestId = 2;
-    view.rerender(<TopToolbar {...defaultProps} stel={true} />);
+    view.rerender(<TopToolbar {...defaultProps} stel={true} isMobileShell />);
 
     act(() => {
       jest.runOnlyPendingTimers();
@@ -369,7 +370,7 @@ describe('TopToolbar', () => {
     mockSettingsState.skyEngine = 'aladin';
     mockOnboardingBridgeState.openMobileDrawerRequestId = 1;
 
-    render(<TopToolbar {...defaultProps} stel={false} />);
+    render(<TopToolbar {...defaultProps} stel={false} isMobileShell />);
 
     act(() => {
       jest.runOnlyPendingTimers();
@@ -392,5 +393,33 @@ describe('TopToolbar', () => {
 
     fireEvent.click(within(drawer).getByText('engine.switchToStellarium'));
     expect(mockSetSkyEngine).toHaveBeenCalledWith('stellarium');
+  });
+
+  it('mounts desktop tool groups and the center clock, and hides the mobile menu, in the desktop shell', () => {
+    const { container } = render(<TopToolbar {...defaultProps} isMobileShell={false} stel={true} />);
+
+    // Desktop tool groups are mounted
+    expect(screen.getByText('tonight')).toBeInTheDocument();
+    expect(screen.getByText('session-planner')).toBeInTheDocument();
+    expect(screen.getByText('app-controls')).toBeInTheDocument();
+    // Center clock is desktop-only
+    expect(screen.getByTestId('stellarium-clock')).toBeInTheDocument();
+    // The mobile hamburger is NOT mounted in the desktop shell
+    expect(container.querySelector('[data-tour-id="mobile-menu"]')).toBeNull();
+  });
+
+  it('mounts the mobile menu and unmounts desktop tool groups in the mobile shell', () => {
+    const { container } = render(<TopToolbar {...defaultProps} isMobileShell={true} stel={true} />);
+
+    // The mobile hamburger is mounted
+    expect(container.querySelector('[data-tour-id="mobile-menu"]')).not.toBeNull();
+    // Desktop-only tool group items are NOT mounted in the bar (drawer is closed)
+    expect(screen.queryByText('tonight')).not.toBeInTheDocument();
+    expect(screen.queryByText('session-planner')).not.toBeInTheDocument();
+    expect(screen.queryByText('app-controls')).not.toBeInTheDocument();
+    // Center clock is desktop-only, so it is absent in the mobile shell (clock lives in the drawer)
+    expect(screen.queryByTestId('stellarium-clock')).not.toBeInTheDocument();
+    // The search button stays available in both shells
+    expect(screen.getByTestId('search-toggle-button')).toBeInTheDocument();
   });
 });

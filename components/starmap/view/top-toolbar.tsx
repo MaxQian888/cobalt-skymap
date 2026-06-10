@@ -63,6 +63,7 @@ import type { TopToolbarProps } from '@/types/starmap/view';
 
 export const TopToolbar = memo(function TopToolbar({
   stel,
+  isMobileShell,
   isSearchOpen,
   showSessionPanel,
   viewCenterRaDec,
@@ -158,14 +159,18 @@ export const TopToolbar = memo(function TopToolbar({
       >
         {/* Left: Menu, Search, Discovery & Navigation */}
         <div className="flex items-center gap-1.5 pointer-events-auto">
-          {/* Mobile Menu */}
-          <MobileMenuDrawer stel={stel} onSetFov={onSetFov} currentFov={currentFov} />
-
-          {/* Mobile Sensor & AR Quick Access */}
-          <div className="md:hidden flex items-center gap-1">
-            <SensorControlToggle />
-            <ARModeToggle />
-          </div>
+          {/* Mobile-shell entry points: drawer + sensor/AR. Mounted ONLY in the
+              mobile shell so the stateful sensor/AR toggles never coexist with
+              their desktop twins (which would run a second orientation rAF loop). */}
+          {isMobileShell && (
+            <>
+              <MobileMenuDrawer stel={stel} onSetFov={onSetFov} currentFov={currentFov} />
+              <div className="flex items-center gap-1">
+                <SensorControlToggle />
+                <ARModeToggle />
+              </div>
+            </>
+          )}
 
           {/* Search Button */}
           <Tooltip>
@@ -174,6 +179,7 @@ export const TopToolbar = memo(function TopToolbar({
                 <Button
                   data-tour-id="search-button"
                   data-testid="search-toggle-button"
+                  aria-label={t('starmap.searchObjects')}
                   variant="ghost"
                   size="icon"
                   className={cn(
@@ -193,8 +199,9 @@ export const TopToolbar = memo(function TopToolbar({
             </TooltipContent>
           </Tooltip>
 
-          {/* Discovery Group - "What to observe" */}
-          <div className="hidden md:flex items-center gap-1.5">
+          {/* Discovery + Navigation groups — desktop shell only */}
+          {!isMobileShell && (
+          <div className="flex items-center gap-1.5">
             <ToolbarGroup gap="none" className="p-0.5" data-tour-id="tonight-button">
               <div data-tour-id="tonight">
                 <TonightRecommendations />
@@ -228,17 +235,21 @@ export const TopToolbar = memo(function TopToolbar({
               </div>
             </ToolbarGroup>
           </div>
+          )}
         </div>
 
-        {/* Center: Time Display */}
-        <div className="pointer-events-auto hidden sm:block animate-fade-in">
-          {(stel || skyEngine === 'aladin') && <StellariumClock />}
-        </div>
+        {/* Center: Time Display — desktop shell only (mobile shows it in the drawer) */}
+        {!isMobileShell && (
+          <div className="pointer-events-auto animate-fade-in">
+            {(stel || skyEngine === 'aladin') && <StellariumClock />}
+          </div>
+        )}
 
         {/* Right: Planning → Instruments → Config → Display → Preferences → View/Help → Window */}
         <div className="flex items-center gap-1.5 pointer-events-auto">
-          {/* Desktop Toolbar Groups */}
-          <div className="hidden md:flex items-center gap-1.5">
+          {/* Desktop Toolbar Groups — desktop shell only */}
+          {!isMobileShell && (
+          <div className="flex items-center gap-1.5">
             {/* Observation Planning Group */}
             <ToolbarGroup gap="none" className="p-0.5">
               <div data-tour-id="session-planner">
@@ -295,6 +306,7 @@ export const TopToolbar = memo(function TopToolbar({
               </div>
             </ToolbarGroup>
           </div>
+          )}
 
           {/* View & Help Group (always visible) */}
           <ToolbarGroup gap="none" className="p-0.5">
@@ -328,9 +340,11 @@ export const TopToolbar = memo(function TopToolbar({
               className="hover:text-destructive hover:bg-destructive/10"
               onClick={onCloseStarmapClick}
             />
-            <div className="hidden md:flex">
-              <AppControlMenu variant="inline" />
-            </div>
+            {!isMobileShell && (
+              <div className="flex">
+                <AppControlMenu variant="inline" />
+              </div>
+            )}
           </ToolbarGroup>
         </div>
       </div>
@@ -521,10 +535,11 @@ const MobileMenuDrawer = memo(function MobileMenuDrawer({
       <DrawerTrigger asChild>
         <Button
           data-tour-id="mobile-menu"
+          aria-label={t('starmap.title')}
           variant="ghost"
           size="icon"
           data-starmap-ui-control="true"
-          className="h-9 w-9 bg-card/60 backdrop-blur-md border border-border/50 text-foreground/80 hover:text-foreground hover:bg-accent md:hidden touch-target toolbar-btn"
+          className="h-9 w-9 bg-card/60 backdrop-blur-md border border-border/50 text-foreground/80 hover:text-foreground hover:bg-accent touch-target toolbar-btn"
         >
           <Menu className="h-4 w-4" />
         </Button>

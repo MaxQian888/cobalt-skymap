@@ -94,35 +94,27 @@ test.describe('Mobile Functional Parity', () => {
     await expectMinimumTouchTarget(settingsRailButton, 'mobile settings rail button');
     await expectMinimumTouchTarget(detailRailButton, 'mobile details rail button');
 
-    await page.setViewportSize({ width: 812, height: 375 });
+    // Landscape phone: 812x375 falls under the useMobileShell landscape rule
+    // (width>height && width<=1200 && height<=640) → isMobileShell=true. After the
+    // breakpoint unification this renders the SAME mobile surfaces as portrait —
+    // unconditionally, with no desktop fallback and no hidden half-state. These
+    // assertions previously used `.or()` desktop fallbacks + `if (visible)` guards
+    // that MASKED the dead-zone; they are now unconditional.
+    await expect(searchRailButton).toBeVisible();
+    await expect(planningRailButton).toBeVisible();
+    await expect(settingsRailButton).toBeVisible();
+    await expect(detailRailButton).toBeVisible();
 
-    const landscapeSearchEntry = page.getByTestId('mobile-rail-search')
-      .or(page.locator('[data-tour-id="search-button"]').first())
-      .first();
-    const landscapePlanningEntry = page.getByTestId('mobile-rail-planning')
-      .or(page.locator('[data-tour-id="session-planner"]').first())
-      .first();
-    const landscapeSettingsEntry = page.getByTestId('mobile-rail-settings')
-      .or(page.getByTestId('settings-button'))
-      .first();
+    await expect(actionRail).toBeVisible();
+    await expect(bottomTools).toBeVisible();
+    await expect(zoomCluster).toBeVisible();
+    await expect(markersTool).toBeVisible();
 
-    await expect(landscapeSearchEntry).toBeVisible();
-    await expect(landscapePlanningEntry).toBeVisible();
-    await expect(landscapeSettingsEntry).toBeVisible();
+    await expectInViewport(page, actionRail, 'mobile action rail (landscape)');
+    await expectInViewport(page, zoomCluster, 'mobile zoom cluster (landscape)');
 
-    const actionRailVisible = await actionRail.isVisible().catch(() => false);
-    const bottomToolsVisible = await bottomTools.isVisible().catch(() => false);
-    const zoomClusterVisible = await zoomCluster.isVisible().catch(() => false);
-
-    if (actionRailVisible) {
-      await expectInViewport(page, actionRail, 'mobile action rail (landscape)');
-    }
-    if (bottomToolsVisible) {
-      await expect(markersTool).toBeVisible();
-    }
-    if (zoomClusterVisible) {
-      await expectInViewport(page, zoomCluster, 'mobile zoom cluster (landscape)');
-    }
+    // The desktop vertical rail must NOT coexist with the mobile layer.
+    await expect(page.getByTestId('right-control-panel-content')).toHaveCount(0);
   });
 
   test('shows actionable fallback when sensor permission is denied in AR flow', async ({ page }) => {

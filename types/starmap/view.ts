@@ -29,6 +29,14 @@ export interface ObservationSelection extends CurrentSelection {
 
 export interface TopToolbarProps {
   stel: boolean;
+  /**
+   * Single source of truth for the mobile/desktop shell split (from
+   * useMobileShell). The toolbar conditionally MOUNTS the mobile vs desktop
+   * subtrees off this boolean instead of CSS sm/md breakpoints, so a stateful
+   * control (sensor/AR orientation loops) only ever mounts once, and the
+   * 640-900px / landscape dead-zones cannot occur.
+   */
+  isMobileShell: boolean;
   isSearchOpen: boolean;
   showSessionPanel: boolean;
   viewCenterRaDec: { ra: number; dec: number };

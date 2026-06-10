@@ -3,6 +3,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ----------------------------------------------------------------------------
+   Single source of truth for the mobile/desktop shell decision.
+   `useMobileShell()` (components/starmap/view/use-mobile-shell.ts) sets
+   data-shell on the starmap root; these variants let any descendant key its
+   layout off that one decision instead of ad-hoc sm:/md: breakpoints, which
+   previously disagreed with the JS 900px threshold and left a broken
+   640-900px dead zone. Usage: `shell-desktop:flex shell-mobile:hidden`.
+   ---------------------------------------------------------------------------- */
+@custom-variant shell-mobile (&:where([data-shell="mobile"] *));
+@custom-variant shell-desktop (&:where([data-shell="desktop"] *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -749,9 +760,11 @@ html.no-transitions *::after {
   min-height: var(--component-control-height);
 }
 
-/* Mobile bottom bar safe area */
+/* Mobile bottom bar. The bar is absolutely positioned with
+   bottom: calc(3.75rem + var(--safe-area-bottom)), so it already clears the
+   safe area — the safe-area inset must NOT be double-counted in padding. */
 .mobile-bottom-bar {
-  padding-bottom: calc(0.5rem + var(--safe-area-bottom));
+  padding-bottom: 0.5rem;
 }
 
 /* Keep the mobile action rail reachable on very narrow phones. */

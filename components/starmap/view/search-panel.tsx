@@ -114,7 +114,7 @@ export const SearchPanel = memo(forwardRef<StellariumSearchRef, SearchPanelProps
           <DrawerContent
             data-testid="search-panel"
             data-starmap-ui-control="true"
-            className="sm:hidden max-h-[75vh] max-h-[75dvh] bg-card border-border"
+            className="max-h-[75vh] max-h-[75dvh] bg-card border-border"
           >
             <DrawerHeader className="pb-2 flex flex-row items-center justify-between border-b">
               <DrawerTitle className="text-base text-foreground">{t('starmap.searchObjects')}</DrawerTitle>
