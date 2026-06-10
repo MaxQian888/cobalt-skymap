@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, memo } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   List,
@@ -128,7 +128,7 @@ interface TargetCardProps {
   onEdit: (target: TargetItem) => void;
 }
 
-function TargetCard({
+const TargetCard = memo(function TargetCard({
   target, index, total, isSelected, isActive, isManualSort,
   feasibility, planTarget, t,
   onToggleSelection, onNavigate, onStatusChange, onDelete,
@@ -379,7 +379,8 @@ function TargetCard({
       </CardContent>
     </Card>
   );
-}
+});
+TargetCard.displayName = 'TargetCard';
 
 
 export function ShotList({
@@ -448,36 +449,46 @@ export function ShotList({
   const latitude = profileInfo.AstrometrySettings.Latitude || 0;
   const longitude = profileInfo.AstrometrySettings.Longitude || 0;
 
-  // Calculate multi-target plan with feasibility
+  // Calculate multi-target plan with feasibility. Gated on `open`: every
+  // consumer lives inside the (closed-unmounted) DrawerContent, so there is no
+  // reason to run this O(n^2) plan while the shot list is closed.
   const targetPlan = useMemo(() => {
-    if (targets.length === 0) return null;
-    
+    if (!open || targets.length === 0) return null;
+
     const targetData = targets.map(t => ({
       id: t.id,
       name: t.name,
       ra: t.ra,
       dec: t.dec,
     }));
-    
-    return planMultipleTargets(targetData, latitude, longitude);
-  }, [targets, latitude, longitude]);
 
-  // Get feasibility for individual targets
+    return planMultipleTargets(targetData, latitude, longitude);
+  }, [open, targets, latitude, longitude]);
+
+  // Get feasibility for individual targets (also drawer-only, gated on `open`).
   const targetFeasibility = useMemo(() => {
     const feasibilityMap = new Map<string, ImagingFeasibility>();
-    
+    if (!open) return feasibilityMap;
+
     targets.forEach(target => {
       const feasibility = calculateImagingFeasibility(
         target.ra, target.dec, latitude, longitude
       );
       feasibilityMap.set(target.id, feasibility);
     });
-    
-    return feasibilityMap;
-  }, [targets, latitude, longitude]);
 
-  // Filtered targets
-  const filteredTargets = getFilteredTargets();
+    return feasibilityMap;
+  }, [open, targets, latitude, longitude]);
+
+  // Filtered targets — memoized on the real filter inputs (all subscribed
+  // above) so an unrelated ShotList re-render doesn't re-run the filter/sort.
+  const filteredTargets = useMemo(
+    () => getFilteredTargets(),
+    // getFilteredTargets reads these store slices internally; list them so the
+    // memo recomputes when the filter/sort inputs change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getFilteredTargets, targets, showArchived, searchQuery, filterStatus, sortBy],
+  );
 
   const handleAddCurrentTarget = useCallback(() => {
     if (!currentSelection) return;
@@ -586,7 +597,17 @@ export function ShotList({
   }, [removeTarget, addTarget, t]);
 
   // Grouped targets for rendering
-  const groupedTargets = useMemo(() => getGroupedTargets(), [getGroupedTargets]);
+  // Drawer-only and correctly keyed. The previous memo keyed on the stable
+  // getGroupedTargets ref, so it computed once and went stale when the targets
+  // or filters changed (the grouped view showed outdated groups).
+  const groupedTargets = useMemo(
+    () => (open ? getGroupedTargets() : new Map<string, TargetItem[]>()),
+    // getGroupedTargets re-derives from the filtered targets + groupBy; key on
+    // them so the grouped view stays fresh (the old [getGroupedTargets] memo
+    // keyed on a stable ref and never updated).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open, getGroupedTargets, filteredTargets, groupBy],
+  );
   const hasActiveFilters = searchQuery.trim() !== '' || filterStatus !== 'all' || filterPriority !== 'all';
   const isManualSort = sortBy === 'manual';
 
