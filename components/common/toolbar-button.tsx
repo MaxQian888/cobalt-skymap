@@ -107,12 +107,19 @@ export interface ToolbarGroupProps {
   className?: string;
   /** Gap between buttons */
   gap?: "none" | "sm" | "md";
+  /** Layout axis (default horizontal) */
+  orientation?: "horizontal" | "vertical";
 }
 
 /**
  * Container for grouping toolbar buttons together
  */
-export function ToolbarGroup({ children, className, gap = "sm" }: ToolbarGroupProps) {
+export function ToolbarGroup({
+  children,
+  className,
+  gap = "sm",
+  orientation = "horizontal",
+}: ToolbarGroupProps) {
   const gapClass = {
     none: "gap-0",
     sm: "gap-1",
@@ -122,9 +129,10 @@ export function ToolbarGroup({ children, className, gap = "sm" }: ToolbarGroupPr
   return (
     <div
       role="toolbar"
-      aria-orientation="horizontal"
+      aria-orientation={orientation}
       className={cn(
         "flex items-center",
+        orientation === "vertical" ? "flex-col" : "flex-row",
         "bg-card/60 backdrop-blur-md",
         "border border-border/50 rounded-lg",
         "p-1",

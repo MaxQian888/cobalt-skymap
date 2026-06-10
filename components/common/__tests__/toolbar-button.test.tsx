@@ -140,6 +140,28 @@ describe('ToolbarGroup', () => {
     );
     expect(container.querySelector('.flex')).toHaveClass('gap-2');
   });
+
+  it('defaults to horizontal orientation', () => {
+    render(
+      <ToolbarGroup>
+        <div>Child</div>
+      </ToolbarGroup>
+    );
+    const toolbar = screen.getByRole('toolbar');
+    expect(toolbar).toHaveAttribute('aria-orientation', 'horizontal');
+    expect(toolbar).toHaveClass('flex-row');
+  });
+
+  it('applies vertical orientation', () => {
+    render(
+      <ToolbarGroup orientation="vertical">
+        <div>Child</div>
+      </ToolbarGroup>
+    );
+    const toolbar = screen.getByRole('toolbar');
+    expect(toolbar).toHaveAttribute('aria-orientation', 'vertical');
+    expect(toolbar).toHaveClass('flex-col');
+  });
 });
 
 describe('ToolbarSeparator', () => {
