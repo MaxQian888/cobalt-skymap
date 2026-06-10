@@ -54,42 +54,63 @@ export interface UseToolbarOverflowResult {
 }
 
 /**
- * Content-measuring priority+ overflow for an icon toolbar. Observes the
- * container width via ResizeObserver, caches each foldable group's measured
- * width (icon buttons are fixed-width, so a one-time measure is stable across
- * locales), and folds the lowest-priority groups when the row would overflow.
+ * Content-measuring priority+ overflow for an icon toolbar laid out as a
+ * `justify-between` row. The naive `scrollWidth > clientWidth` check is
+ * unreliable here — with slack, `justify-between` spreads the row's children so
+ * `scrollWidth === clientWidth`. Instead we sum the row's direct children's
+ * intrinsic widths (`justify-between` grows the gaps, not the children), add the
+ * cached width of any currently-folded group back, subtract the overflow
+ * trigger, and add horizontal padding — reconstructing the viewport-independent
+ * "all inline" content width on every tick. That makes folding/un-folding stable
+ * and loop-free (the row is full-width, so folding never resizes the observed
+ * element — only a real viewport resize re-runs the measurement).
  *
- * `groups` MUST be referentially stable (memoize it at the call site), since it
- * is a dependency of the measurement callback.
+ * `rowRef` is the `justify-between` row; attach `registerGroup(id)` to each
+ * foldable group wrapper inside it. `groups` MUST be referentially stable
+ * (memoize it at the call site).
  */
 export function useToolbarOverflow(
-  containerRef: RefObject<HTMLElement | null>,
+  rowRef: RefObject<HTMLElement | null>,
   groups: ToolbarOverflowGroup[],
   options: { moreButtonWidth?: number; enabled?: boolean } = {},
 ): UseToolbarOverflowResult {
   const { moreButtonWidth = 44, enabled = true } = options;
   const [overflowIds, setOverflowIds] = useState<Set<string>>(() => new Set());
+  const overflowRef = useRef(overflowIds);
+  useEffect(() => {
+    overflowRef.current = overflowIds;
+  }, [overflowIds]);
   const groupElsRef = useRef<Map<string, HTMLElement>>(new Map());
   const widthCacheRef = useRef<Map<string, number>>(new Map());
-  const baseWidthRef = useRef<number | null>(null);
+  const paddingRef = useRef<number | null>(null);
+  const refCbCacheRef = useRef<Map<string, (el: HTMLElement | null) => void>>(new Map());
 
-  const registerGroup = useCallback(
-    (id: string) => (el: HTMLElement | null) => {
-      if (el) groupElsRef.current.set(id, el);
-      else groupElsRef.current.delete(id);
-    },
-    [],
-  );
+  // Stable per-id ref callback so attaching it does not thrash on every render.
+  const registerGroup = useCallback((id: string) => {
+    let cb = refCbCacheRef.current.get(id);
+    if (!cb) {
+      cb = (el: HTMLElement | null) => {
+        if (el) groupElsRef.current.set(id, el);
+        else groupElsRef.current.delete(id);
+      };
+      refCbCacheRef.current.set(id, cb);
+    }
+    return cb;
+  }, []);
 
   const recompute = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const row = rowRef.current;
+    if (!row) return;
     if (!enabled) {
       setOverflowIds((prev) => (prev.size === 0 ? prev : new Set()));
       return;
     }
 
-    // Cache the width of every currently-inline foldable group.
+    const available = row.clientWidth;
+    if (available <= 0) return; // not laid out yet
+
+    // Cache the width of every currently-inline foldable group (fixed-width
+    // icon buttons → a measured width stays valid once folded into the menu).
     for (const g of groups) {
       const el = groupElsRef.current.get(g.id);
       if (el) {
@@ -98,19 +119,29 @@ export function useToolbarOverflow(
       }
     }
 
+    if (paddingRef.current === null) {
+      const cs = getComputedStyle(row);
+      const p = Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
+      if (Number.isFinite(p)) paddingRef.current = p;
+    }
+    const paddingX = paddingRef.current ?? 0;
+
+    // Reconstruct the viewport-independent "all inline" content width.
+    let childrenSum = 0;
+    for (const child of Array.from(row.children)) {
+      childrenSum += (child as HTMLElement).getBoundingClientRect().width;
+    }
+    const current = overflowRef.current;
+    let foldedWidth = 0;
+    for (const id of current) foldedWidth += widthCacheRef.current.get(id) ?? 0;
+    const moreShownWidth = current.size > 0 ? moreButtonWidth : 0;
+    const fullContentWidth = childrenSum + foldedWidth - moreShownWidth + paddingX;
+
     const sumFoldable = groups.reduce(
       (s, g) => s + (widthCacheRef.current.get(g.id) ?? 0),
       0,
     );
-
-    // Capture the non-foldable base width once, on the first laid-out pass when
-    // nothing is folded yet (scrollWidth then reflects the full content width).
-    if (baseWidthRef.current === null) {
-      const base = container.scrollWidth - sumFoldable;
-      if (base > 0) baseWidthRef.current = base;
-    }
-    const baseWidth = baseWidthRef.current ?? container.clientWidth;
-    const available = container.clientWidth;
+    const baseWidth = fullContentWidth - sumFoldable;
 
     const next = computeToolbarOverflow(
       available,
@@ -120,14 +151,14 @@ export function useToolbarOverflow(
       moreButtonWidth,
     );
     setOverflowIds((prev) => (setsEqual(prev, next) ? prev : next));
-  }, [containerRef, enabled, groups, moreButtonWidth]);
+  }, [rowRef, enabled, groups, moreButtonWidth]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container || typeof ResizeObserver === 'undefined') {
-      recompute();
-      return;
-    }
+    const row = rowRef.current;
+    // No measurement off the main browser layout path (SSR / jsdom): overflow
+    // stays empty (everything renders inline), which is the correct fallback.
+    if (!row || typeof ResizeObserver === 'undefined') return;
+
     let raf = 0;
     const schedule = () => {
       if (typeof requestAnimationFrame === 'undefined') {
@@ -137,14 +168,15 @@ export function useToolbarOverflow(
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(recompute);
     };
+    // ResizeObserver fires its callback once on observe(), giving the initial
+    // measurement without a synchronous setState inside the effect.
     const observer = new ResizeObserver(schedule);
-    observer.observe(container);
-    recompute();
+    observer.observe(row);
     return () => {
       if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(raf);
       observer.disconnect();
     };
-  }, [containerRef, recompute]);
+  }, [rowRef, recompute]);
 
   return { overflowIds, registerGroup };
 }

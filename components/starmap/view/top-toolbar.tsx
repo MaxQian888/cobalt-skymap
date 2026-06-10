@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { memo, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { Search, X, Menu, RotateCcw, PanelLeftClose, PanelLeft, LogOut, Compass, Power } from 'lucide-react';
 
@@ -19,6 +19,8 @@ import { Switch } from '@/components/ui/switch';
 
 import { ToolbarButton, ToolbarGroup, TOOLBAR_ICON_TOGGLE_CLASS } from '@/components/common/toolbar-button';
 import { StatusToggleButton } from '@/components/common/status-toggle-button';
+import { TopToolbarOverflowMenu } from './top-toolbar-overflow-menu';
+import { useToolbarOverflow, type ToolbarOverflowGroup } from '@/lib/hooks/use-toolbar-overflow';
 import { LanguageSwitcher } from '@/components/common/language-switcher';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { NightModeToggle } from '@/components/common/night-mode-toggle';
@@ -56,6 +58,17 @@ import {
 } from '@/lib/constants/mobile-tools';
 import type { TopToolbarProps } from '@/types/starmap/view';
 
+// Desktop right-cluster groups that fold into the "More" overflow menu when the
+// row would otherwise clip. Lower priority folds first (Preferences → Display →
+// Instruments → Planning). Config / View-Help / Window are never folded. Stable
+// module-level reference so it can be a useToolbarOverflow dependency.
+const TOOLBAR_FOLDABLE_GROUPS: ToolbarOverflowGroup[] = [
+  { id: 'preferences', priority: 1 },
+  { id: 'display', priority: 2 },
+  { id: 'instruments', priority: 3 },
+  { id: 'planning', priority: 4 },
+];
+
 export const TopToolbar = memo(function TopToolbar({
   stel,
   isMobileShell,
@@ -83,6 +96,16 @@ export const TopToolbar = memo(function TopToolbar({
   const handledToggleSearchRequestRef = useRef(0);
   const handledToggleSessionPanelRef = useRef(0);
   const handledCloseTransientRef = useRef(0);
+
+  // Desktop top-bar priority+ overflow: fold the lowest-priority right-cluster
+  // groups into a "More" popover when the justify-between row would clip.
+  const toolbarRowRef = useRef<HTMLDivElement | null>(null);
+  const { overflowIds, registerGroup } = useToolbarOverflow(
+    toolbarRowRef,
+    TOOLBAR_FOLDABLE_GROUPS,
+    { enabled: !isMobileShell },
+  );
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false);
 
   useEffect(() => {
     if (
@@ -135,6 +158,68 @@ export const TopToolbar = memo(function TopToolbar({
       }
     : undefined;
 
+  // Foldable desktop right-cluster groups (rendered inline OR inside the "More"
+  // overflow popover, per useToolbarOverflow). Config / View-Help / Window stay
+  // inline. Each node is rendered in exactly one place at a time.
+  const planningGroup = (
+    <ToolbarGroup gap="none" className="p-0.5">
+      <div data-tour-id="session-planner">
+        <SessionPlannerButton />
+      </div>
+      <div data-tour-id="astro-events">
+        <AstroEventsCalendar />
+      </div>
+      <div data-tour-id="astro-calculator">
+        <AstroCalculatorDialog />
+      </div>
+    </ToolbarGroup>
+  );
+  const instrumentsGroup = (
+    <ToolbarGroup gap="none" className="p-0.5">
+      <div data-tour-id="plate-solver">
+        <PlateSolverUnified onGoToCoordinates={onGoToCoordinates} onSelectObject={onSelectObject} />
+      </div>
+      <div data-tour-id="ocular">
+        <OcularSimulator onApplyFov={onSetFov} currentFov={currentFov} />
+      </div>
+      <div data-tour-id="satellite">
+        <SatelliteTracker />
+      </div>
+    </ToolbarGroup>
+  );
+  const displayGroup = (
+    <ToolbarGroup gap="none" className="p-0.5">
+      <div data-tour-id="night-mode">
+        <NightModeToggle />
+      </div>
+      <SensorControlToggle />
+      <ARModeToggle />
+      <ObjectTypeLegend variant="popover" />
+    </ToolbarGroup>
+  );
+  const preferencesGroup = (
+    <ToolbarGroup gap="none" className="p-0.5">
+      <div data-tour-id="theme">
+        <ThemeToggle variant="icon" className="h-9 w-9" />
+      </div>
+      <div data-tour-id="language">
+        <LanguageSwitcher className={TOOLBAR_ICON_TOGGLE_CLASS} />
+      </div>
+    </ToolbarGroup>
+  );
+  const foldableNodes: Record<string, ReactNode> = {
+    planning: planningGroup,
+    instruments: instrumentsGroup,
+    display: displayGroup,
+    preferences: preferencesGroup,
+  };
+  const renderInline = (id: string) =>
+    overflowIds.has(id) ? null : (
+      <div ref={registerGroup(id)} className="flex">
+        {foldableNodes[id]}
+      </div>
+    );
+
   return (
     <div
       className="absolute top-0 left-0 right-0 z-30 pointer-events-none safe-area-top animate-fade-in"
@@ -148,6 +233,7 @@ export const TopToolbar = memo(function TopToolbar({
       )}
 
       <div
+        ref={toolbarRowRef}
         data-starmap-ui-control="true"
         className="relative p-2 sm:p-3 flex items-center justify-between"
         style={{ zIndex: 1, ...shellHorizontalPadding }}
@@ -227,36 +313,16 @@ export const TopToolbar = memo(function TopToolbar({
 
         {/* Right: Planning → Instruments → Config → Display → Preferences → View/Help → Window */}
         <div className="flex items-center gap-1.5 pointer-events-auto">
-          {/* Desktop Toolbar Groups — desktop shell only */}
+          {/* Desktop Toolbar Groups — desktop shell only. Foldable groups
+              (Planning/Instruments/Display/Preferences) collapse into the "More"
+              overflow popover, lowest-priority first, when the row would clip.
+              Visual order: Planning · Instruments · Config · Display · Preferences · More. */}
           {!isMobileShell && (
           <div className="flex items-center gap-1.5">
-            {/* Observation Planning Group */}
-            <ToolbarGroup gap="none" className="p-0.5">
-              <div data-tour-id="session-planner">
-                <SessionPlannerButton />
-              </div>
-              <div data-tour-id="astro-events">
-                <AstroEventsCalendar />
-              </div>
-              <div data-tour-id="astro-calculator">
-                <AstroCalculatorDialog />
-              </div>
-            </ToolbarGroup>
+            {renderInline('planning')}
+            {renderInline('instruments')}
 
-            {/* Instruments & Analysis Group */}
-            <ToolbarGroup gap="none" className="p-0.5">
-              <div data-tour-id="plate-solver">
-                <PlateSolverUnified onGoToCoordinates={onGoToCoordinates} onSelectObject={onSelectObject} />
-              </div>
-              <div data-tour-id="ocular">
-                <OcularSimulator onApplyFov={onSetFov} currentFov={currentFov} />
-              </div>
-              <div data-tour-id="satellite">
-                <SatelliteTracker />
-              </div>
-            </ToolbarGroup>
-
-            {/* Configuration Group */}
+            {/* Configuration Group — never folded */}
             <ToolbarGroup gap="none" className="p-0.5" data-tour-id="settings-button">
               <div data-tour-id="settings">
                 <UnifiedSettings />
@@ -266,25 +332,21 @@ export const TopToolbar = memo(function TopToolbar({
               </div>
             </ToolbarGroup>
 
-            {/* Display Mode Group */}
-            <ToolbarGroup gap="none" className="p-0.5">
-              <div data-tour-id="night-mode">
-                <NightModeToggle />
-              </div>
-              <SensorControlToggle />
-              <ARModeToggle />
-              <ObjectTypeLegend variant="popover" />
-            </ToolbarGroup>
+            {renderInline('display')}
+            {renderInline('preferences')}
 
-            {/* UI Preferences Group */}
-            <ToolbarGroup gap="none" className="p-0.5">
-              <div data-tour-id="theme">
-                <ThemeToggle variant="icon" className="h-9 w-9" />
-              </div>
-              <div data-tour-id="language">
-                <LanguageSwitcher className={TOOLBAR_ICON_TOGGLE_CLASS} />
-              </div>
-            </ToolbarGroup>
+            {overflowIds.size > 0 && (
+              <TopToolbarOverflowMenu open={overflowMenuOpen} onOpenChange={setOverflowMenuOpen}>
+                {TOOLBAR_FOLDABLE_GROUPS
+                  .filter((group) => overflowIds.has(group.id))
+                  .sort((a, b) => b.priority - a.priority)
+                  .map((group) => (
+                    <div key={group.id} data-overflow-group={group.id}>
+                      {foldableNodes[group.id]}
+                    </div>
+                  ))}
+              </TopToolbarOverflowMenu>
+            )}
           </div>
           )}
 
