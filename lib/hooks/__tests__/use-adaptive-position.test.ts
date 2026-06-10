@@ -37,6 +37,18 @@ describe('useAdaptivePosition', () => {
     expect(result.current.top).toBeGreaterThan(0);
   });
 
+  it('never positions a panel under the top bar, even when taller than the container', () => {
+    const { result } = renderHook(() => {
+      const ref = useRef<HTMLDivElement | null>(null);
+      // Container shorter than the default 400px panel height: the bottom-edge
+      // clamp would push `top` negative (under the top bar) without a final
+      // re-clamp.
+      return useAdaptivePosition(ref, { x: 500, y: 200 }, { width: 1000, height: 400 });
+    });
+    // topBarHeight (64) + padding (16) = 80
+    expect(result.current.top).toBeGreaterThanOrEqual(80);
+  });
+
   it('should accept custom options', () => {
     const { result } = renderHook(() => {
       const ref = useRef<HTMLDivElement | null>(null);

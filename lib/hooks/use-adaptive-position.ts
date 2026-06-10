@@ -85,6 +85,14 @@ export function useAdaptivePosition(
       top = containerBounds.height - panelSize.height - opts.bottomBarHeight - opts.padding;
     }
 
+    // Final top re-clamp: when the panel is taller than the available band, the
+    // bottom-edge adjustment above can push `top` back above the top bar. The
+    // top edge wins (a clipped bottom is preferable to hiding the panel header
+    // under the toolbar).
+    if (top < opts.topBarHeight + opts.padding) {
+      top = opts.topBarHeight + opts.padding;
+    }
+
     return { left, top };
   }, [clickPosition, containerBounds, panelSize, opts.padding, opts.offset, opts.rightPanelWidth, opts.topBarHeight, opts.bottomBarHeight, opts.defaultPosition]);
 
