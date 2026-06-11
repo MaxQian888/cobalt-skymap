@@ -1238,7 +1238,7 @@ export function ExposureCalculator({
         </Tabs>
         
         {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 pt-2 mt-2 border-t border-border/50 pb-[calc(var(--safe-area-bottom)+0.25rem)] sm:mt-0 sm:border-t-0 sm:pb-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon" className="shrink-0" onClick={handleReset}>
