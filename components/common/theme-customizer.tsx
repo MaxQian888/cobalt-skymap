@@ -7,13 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ThemeAnimationsSection,
@@ -72,18 +72,18 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>{trigger ?? defaultTrigger}</DialogTrigger>
-      <DialogContent className="max-w-lg max-h-[85vh] max-h-[85dvh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <ResponsiveDialog open={isOpen} onOpenChange={setIsOpen} tier="complex-editor">
+      <ResponsiveDialogTrigger asChild>{trigger ?? defaultTrigger}</ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="max-w-lg flex flex-col">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Palette className="h-5 w-5" />
             {t('theme.customizeTheme')}
-          </DialogTitle>
-          <DialogDescription>{t('theme.customizeDescription')}</DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>{t('theme.customizeDescription')}</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
-        <ScrollArea className="max-h-[60vh] max-h-[60dvh] pr-4">
+        <ScrollArea className="flex-1 min-h-0 px-4 sm:px-0 sm:pr-4">
           <Tabs defaultValue="presets" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="presets" className="gap-1">
@@ -168,14 +168,14 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
 
         <Separator className="my-2" />
 
-        <div className="flex justify-between">
+        <div className="flex justify-between px-4 pb-[calc(var(--safe-area-bottom)+0.5rem)] sm:px-0 sm:pb-0">
           <ThemeResetButton onReset={resetCustomization} />
           <Button size="sm" onClick={() => setIsOpen(false)}>
             {t('common.close')}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

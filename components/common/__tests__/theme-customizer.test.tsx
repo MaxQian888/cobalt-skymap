@@ -118,6 +118,7 @@ jest.mock('@/lib/stores/theme-store', () => ({
     return preset ? preset.colors[mode] : {};
   },
   isValidThemeColorValue: (value: string) => value !== 'not-a-valid-color',
+  cssColorToHex: (value: string) => (/^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : null),
   getAvailableThemePresets: (userPresets: Array<{ id: string; name: string; colors: { light: Record<string, string>; dark: Record<string, string> } }> = []) => ([
     {
       id: 'preset1',
