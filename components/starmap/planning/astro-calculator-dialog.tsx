@@ -9,6 +9,7 @@ import {
   ResponsiveDialogTitle,
   ResponsiveDialogTrigger,
 } from '@/components/starmap/dialogs/responsive-dialog-shell';
+import { STARMAP_DIALOG_ICON_TRIGGER_CLASS } from '@/components/starmap/dialogs/dialog-layout';
 import { Button } from '@/components/ui/button';
 import {
   Tabs,
@@ -54,6 +55,20 @@ export function AstroCalculatorDialog() {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('wut');
+  // Lazy-mount + keep-alive: a tab is mounted on first visit and stays mounted
+  // (rendered hidden) afterwards, so re-visiting it is instant — no recompute of
+  // its memos and no loss of in-tab selections. Tabs never opened stay unmounted,
+  // so opening the dialog does not eagerly run all 9 tabs' calculations.
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(() => new Set(['wut']));
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value);
+    setMountedTabs((prev) => {
+      if (prev.has(value)) return prev;
+      const next = new Set(prev);
+      next.add(value);
+      return next;
+    });
+  }, []);
   const [sharedDate, setSharedDate] = useState(() => {
     const now = new Date();
     const year = now.getFullYear();
@@ -67,7 +82,7 @@ export function AstroCalculatorDialog() {
     const minutes = String(now.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
   });
-  const [sharedConstraints] = useState(DEFAULT_ASTRO_CALCULATOR_OBSERVER_CONSTRAINTS);
+  const sharedConstraints = DEFAULT_ASTRO_CALCULATOR_OBSERVER_CONSTRAINTS;
 
   const profileInfo = useMountStore((state) => state.profileInfo);
   const setViewDirection = useStellariumStore((state) => state.setViewDirection);
@@ -107,7 +122,7 @@ export function AstroCalculatorDialog() {
       <Tooltip>
         <TooltipTrigger asChild>
           <ResponsiveDialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
+            <Button variant="ghost" size="icon" className={STARMAP_DIALOG_ICON_TRIGGER_CLASS}>
               <Calculator className="h-4 w-4" />
             </Button>
           </ResponsiveDialogTrigger>
@@ -117,7 +132,7 @@ export function AstroCalculatorDialog() {
         </TooltipContent>
       </Tooltip>
 
-      <ResponsiveDialogContent className="max-w-4xl max-h-[100vh] max-h-[100dvh] overflow-hidden flex flex-col">
+      <ResponsiveDialogContent className="max-w-4xl overflow-hidden flex flex-col">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -139,7 +154,7 @@ export function AstroCalculatorDialog() {
           </ResponsiveDialogTitle>
         </ResponsiveDialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 flex flex-col overflow-hidden min-h-0">
           <div className="overflow-x-auto pb-1" data-testid="astro-calculator-tab-nav">
             <TabsList className="inline-flex w-max min-w-full h-auto flex-nowrap gap-1 p-1 sm:grid sm:w-full sm:grid-cols-3 sm:grid-rows-3 lg:grid-cols-5 lg:grid-rows-2">
               {ASTRO_CALCULATOR_TAB_ORDER.map((tabId) => (
@@ -156,7 +171,7 @@ export function AstroCalculatorDialog() {
           </div>
 
           <div className="flex-1 mt-3 min-h-0 overflow-hidden">
-            <TabsContent value="wut" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="wut" forceMount={mountedTabs.has('wut') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <WUTTab
                 latitude={latitude}
                 longitude={longitude}
@@ -166,7 +181,7 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="positions" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="positions" forceMount={mountedTabs.has('positions') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <PositionsTab
                 latitude={latitude}
                 longitude={longitude}
@@ -176,7 +191,7 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="rts" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="rts" forceMount={mountedTabs.has('rts') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <RTSTab
                 latitude={latitude}
                 longitude={longitude}
@@ -186,7 +201,7 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="ephemeris" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="ephemeris" forceMount={mountedTabs.has('ephemeris') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <EphemerisTab
                 latitude={latitude}
                 longitude={longitude}
@@ -196,7 +211,7 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="almanac" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="almanac" forceMount={mountedTabs.has('almanac') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <AlmanacTab
                 latitude={latitude}
                 longitude={longitude}
@@ -208,11 +223,11 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="phenomena" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="phenomena" forceMount={mountedTabs.has('phenomena') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <PhenomenaTab latitude={latitude} longitude={longitude} observerContext={observerContext} />
             </TabsContent>
 
-            <TabsContent value="coordinate" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="coordinate" forceMount={mountedTabs.has('coordinate') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <CoordinateTab
                 latitude={latitude}
                 longitude={longitude}
@@ -224,7 +239,7 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="time" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="time" forceMount={mountedTabs.has('time') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <TimeTab
                 longitude={longitude}
                 observerContext={observerContext}
@@ -235,7 +250,7 @@ export function AstroCalculatorDialog() {
               />
             </TabsContent>
 
-            <TabsContent value="solar-system" className="mt-0 h-full overflow-hidden">
+            <TabsContent value="solar-system" forceMount={mountedTabs.has('solar-system') || undefined} className="mt-0 h-full overflow-hidden data-[state=inactive]:hidden">
               <SolarSystemTab
                 latitude={latitude}
                 longitude={longitude}
