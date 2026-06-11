@@ -346,6 +346,10 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
     setDetailDrawerOpen(true);
   }, [isMobileShell, openMobilePanel, selectedObject, setDetailDrawerOpen]);
 
+  // Stable identity so memo(InfoPanel) is not defeated by an inline closure
+  // on every StellariumView render (it polls view direction every 500ms).
+  const handleCloseInfoPanel = useCallback(() => setSelectedObject(null), [setSelectedObject]);
+
   const handleOpenSessionPlanner = useCallback(() => {
     if (isMobileShell) {
       openMobilePanel('planning');
@@ -574,14 +578,9 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
         {selectedObject && !isSearchOpen && !isMobileShell && (
           <InfoPanel
             selectedObject={selectedObject}
-            onClose={() => setSelectedObject(null)}
+            onClose={handleCloseInfoPanel}
             onSetFramingCoordinates={handleSetFramingCoordinates}
-            onViewDetails={() => {
-              setDetailDrawerOpen(true);
-              if (isMobileShell) {
-                openMobilePanel('details');
-              }
-            }}
+            onViewDetails={handleOpenDetails}
             clickPosition={clickPosition}
             containerBounds={containerBounds}
             className="pointer-events-auto info-panel-enter"
