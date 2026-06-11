@@ -428,6 +428,7 @@ jest.mock('@/lib/stores/theme-store', () => ({
     componentStyle: mockStoreState.customization.componentStyle,
   }),
   isValidThemeColorValue: (value: string) => /^#[0-9a-f]{6}$/i.test(value),
+  cssColorToHex: (value: string) => (/^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() : null),
 }));
 
 const renderPaletteEditor = () =>
@@ -589,6 +590,15 @@ describe('theme-customization-sections', () => {
     expect(screen.getByText('theme.warningPairForegroundBackground')).toBeInTheDocument();
     await user.click(screen.getByText('theme.previewDark'));
     expect(screen.getByText('theme.noAccessibilityWarnings')).toBeInTheDocument();
+  });
+
+  it('commits a hex color chosen from the native color picker', () => {
+    renderPaletteEditor();
+
+    const pickers = screen.getAllByLabelText('theme.pickColor');
+    fireEvent.change(pickers[0], { target: { value: '#abcdef' } });
+
+    expect(mockSetCustomColor).toHaveBeenCalledWith('light', 'primary', '#abcdef');
   });
 
   it('updates radius and animation settings from simple control sections', async () => {

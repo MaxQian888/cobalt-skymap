@@ -3,7 +3,7 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
-import { defaultComponentStyle, getResolvedThemeColors, useThemeStore, themePresets } from '../theme-store';
+import { cssColorToHex, defaultComponentStyle, getResolvedThemeColors, useThemeStore, themePresets } from '../theme-store';
 
 describe('useThemeStore', () => {
   // Mock requestAnimationFrame to execute callbacks synchronously
@@ -397,6 +397,31 @@ describe('useThemeStore', () => {
 
       expect(colors.primary).toBe('#fedcba');
       expect(colors.secondary).toBeUndefined();
+    });
+  });
+
+  describe('cssColorToHex', () => {
+    it('normalizes a full hex value', () => {
+      expect(cssColorToHex('#123456')).toBe('#123456');
+    });
+
+    it('expands a shorthand hex value', () => {
+      expect(cssColorToHex('#abc')).toBe('#aabbcc');
+    });
+
+    it('converts rgb() to hex', () => {
+      expect(cssColorToHex('rgb(255, 0, 0)')).toBe('#ff0000');
+    });
+
+    it('converts an oklch() value to a 6-digit hex string', () => {
+      const hex = cssColorToHex('oklch(0.4815 0.1178 263.3758)');
+      expect(hex).toMatch(/^#[0-9a-f]{6}$/);
+    });
+
+    it('returns null for an unparseable value', () => {
+      expect(cssColorToHex('not-a-color')).toBeNull();
+      expect(cssColorToHex('')).toBeNull();
+      expect(cssColorToHex('var(--primary)')).toBeNull();
     });
   });
 });

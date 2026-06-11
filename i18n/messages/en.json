@@ -2568,6 +2568,7 @@
     "destructive": "Destructive",
     "colorValuePlaceholder": "e.g. #1a1a1a / oklch(...)",
     "clearColor": "Clear",
+    "pickColor": "Pick {name} color",
     "invalidColor": "Invalid CSS color value",
     "customOverridesPreset": "Custom values override the active preset for the same color key.",
     "customPresets": "Custom Presets",

@@ -858,6 +858,23 @@ function parseCssColor(value: string): [number, number, number] | null {
     })();
 }
 
+function channelToHex(channel: number): string {
+  return Math.round(clampUnit(channel) * 255).toString(16).padStart(2, '0');
+}
+
+/**
+ * Converts any CSS color string (hex/rgb/hsl/oklch/named) to a `#rrggbb`
+ * hex string, suitable for seeding a native `<input type="color">`.
+ * Returns null when the value cannot be parsed.
+ */
+export function cssColorToHex(value: string): string | null {
+  const rgb = parseCssColor(value);
+  if (!rgb) {
+    return null;
+  }
+  return `#${channelToHex(rgb[0])}${channelToHex(rgb[1])}${channelToHex(rgb[2])}`;
+}
+
 function toRelativeLuminance([red, green, blue]: [number, number, number]): number {
   const linear = [red, green, blue].map((channel) => (
     channel <= 0.04045

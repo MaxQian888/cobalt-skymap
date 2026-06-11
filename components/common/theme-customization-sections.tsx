@@ -18,6 +18,7 @@ import {
   componentStylePresets,
   componentStyleTransparencyValues,
   componentStyleDensityValues,
+  cssColorToHex,
   getComponentStylePreviewData,
   customizableThemeColorKeys,
   getAvailableThemePresets,
@@ -411,6 +412,12 @@ export function ThemePaletteEditor({
     setInvalidKeys((current) => removeInvalidKey(current, editingMode, key));
   };
 
+  const applyPickedColor = (key: keyof ThemeColors, value: string) => {
+    setCustomColor(editingMode, key, value);
+    setDrafts((current) => removeDraftValue(current, editingMode, key));
+    setInvalidKeys((current) => removeInvalidKey(current, editingMode, key));
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -451,11 +458,24 @@ export function ThemePaletteEditor({
           const previewColor = modeCustomColors[key] ?? presetColors[key] ?? `var(--${key})`;
           const value = getCurrentInputValue(key);
           const isInvalid = Boolean(invalidKeys[editingMode][key]);
+          const swatchHex = cssColorToHex(value || previewColor) ?? '#000000';
 
           return (
             <div key={key} className="rounded-md border border-border/70 p-2">
               <div className="flex items-center gap-2">
-                <div className="h-6 w-6 rounded border border-border shrink-0" style={{ background: previewColor }} />
+                <label
+                  className="relative h-6 w-6 shrink-0 cursor-pointer overflow-hidden rounded border border-border"
+                  style={{ background: previewColor }}
+                  title={t('theme.pickColor', { name: t(`theme.${key}`) })}
+                >
+                  <input
+                    type="color"
+                    value={swatchHex}
+                    onChange={(event) => applyPickedColor(key, event.target.value)}
+                    aria-label={t('theme.pickColor', { name: t(`theme.${key}`) })}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
+                </label>
                 <Label className="w-24 shrink-0 text-xs capitalize">{t(`theme.${key}`)}</Label>
                 <Input
                   value={value}

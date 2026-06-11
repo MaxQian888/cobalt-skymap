@@ -2568,6 +2568,7 @@
     "destructive": "警示色",
     "colorValuePlaceholder": "例如 #1a1a1a / oklch(...)",
     "clearColor": "清除",
+    "pickColor": "选择{name}颜色",
     "invalidColor": "无效的 CSS 颜色值",
     "customOverridesPreset": "自定义颜色会覆盖当前预设中同名颜色。",
     "customPresets": "自定义预设",
