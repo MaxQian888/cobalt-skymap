@@ -3,7 +3,7 @@
  */
 
 import { act, renderHook } from '@testing-library/react';
-import { cssColorToHex, defaultComponentStyle, getResolvedThemeColors, useThemeStore, themePresets } from '../theme-store';
+import { cssColorToHex, defaultComponentStyle, getResolvedComponentStyleTokens, getResolvedThemeColors, useThemeStore, themePresets } from '../theme-store';
 
 describe('useThemeStore', () => {
   // Mock requestAnimationFrame to execute callbacks synchronously
@@ -357,9 +357,11 @@ describe('useThemeStore', () => {
           radius: 0.5,
           fontFamily: 'default',
           fontSize: 'default',
+          uiScale: 'default',
           letterSpacing: 'normal',
           lineHeight: 'normal',
           animationsEnabled: true,
+          scrollbarAccent: null,
           activePreset: 'ocean',
           componentStyle: defaultComponentStyle,
           customColors: {
@@ -382,9 +384,11 @@ describe('useThemeStore', () => {
           radius: 0.5,
           fontFamily: 'default',
           fontSize: 'default',
+          uiScale: 'default',
           letterSpacing: 'normal',
           lineHeight: 'normal',
           animationsEnabled: true,
+          scrollbarAccent: null,
           activePreset: null,
           componentStyle: defaultComponentStyle,
           customColors: {
@@ -440,7 +444,7 @@ describe('useThemeStore', () => {
       const json = useThemeStore.getState().exportTheme();
       const parsed = JSON.parse(json);
 
-      expect(parsed.version).toBe(3);
+      expect(parsed.version).toBe(4);
       expect(parsed.customization.radius).toBe(0.8);
       expect(parsed.customization.customColors.dark.primary).toBe('#abcdef');
       expect(Array.isArray(parsed.userPresets)).toBe(true);
@@ -503,6 +507,121 @@ describe('useThemeStore', () => {
       expect(cssColorToHex('not-a-color')).toBeNull();
       expect(cssColorToHex('')).toBeNull();
       expect(cssColorToHex('var(--primary)')).toBeNull();
+    });
+  });
+
+  describe('uiScale', () => {
+    it('defaults to "default" with a 1x scale', () => {
+      expect(useThemeStore.getState().customization.uiScale).toBe('default');
+    });
+
+    it('updates the ui scale and applies the --ui-scale variable', () => {
+      const { result } = renderHook(() => useThemeStore());
+
+      act(() => {
+        result.current.setUiScale('large');
+      });
+
+      expect(result.current.customization.uiScale).toBe('large');
+      expect(document.documentElement.style.getPropertyValue('--ui-scale')).toBe('1.1');
+    });
+
+    it('composes ui scale with font size into the root font-size', () => {
+      const { result } = renderHook(() => useThemeStore());
+
+      act(() => {
+        result.current.setUiScale('xlarge'); // 1.25
+        result.current.setFontSize('large'); // 1.125
+      });
+
+      // 1.25 * 1.125 * 16 = 22.5px
+      expect(document.documentElement.style.fontSize).toBe('22.5px');
+    });
+
+    it('falls back to default for an invalid value', () => {
+      const { result } = renderHook(() => useThemeStore());
+
+      act(() => {
+        result.current.setCustomization({ uiScale: 'enormous' as never });
+      });
+
+      expect(result.current.customization.uiScale).toBe('default');
+    });
+
+    it('is reset by resetCustomization', () => {
+      const { result } = renderHook(() => useThemeStore());
+
+      act(() => {
+        result.current.setUiScale('compact');
+        result.current.resetCustomization();
+      });
+
+      expect(result.current.customization.uiScale).toBe('default');
+      expect(document.documentElement.style.getPropertyValue('--ui-scale')).toBe('');
+    });
+  });
+
+  describe('focus ring color', () => {
+    it('treats ring as a customizable color token', () => {
+      const { result } = renderHook(() => useThemeStore());
+
+      act(() => {
+        result.current.setCustomColor('light', 'ring', '#ff8800');
+      });
+
+      expect(result.current.customization.customColors.light.ring).toBe('#ff8800');
+      expect(getResolvedThemeColors(result.current.customization, 'light').ring).toBe('#ff8800');
+      expect(document.documentElement.style.getPropertyValue('--ring')).toBe('#ff8800');
+    });
+  });
+
+  describe('component style density', () => {
+    it('supports a spacious density with larger tokens than comfortable', () => {
+      const { result } = renderHook(() => useThemeStore());
+
+      act(() => {
+        result.current.setComponentStyleDensity('spacious');
+      });
+
+      expect(result.current.customization.componentStyle.density).toBe('spacious');
+
+      const spacious = getResolvedComponentStyleTokens(result.current.customization);
+      const comfortable = getResolvedComponentStyleTokens({
+        componentStyle: { ...result.current.customization.componentStyle, density: 'comfortable' },
+      });
+
+      expect(parseFloat(spacious.controlHeight)).toBeGreaterThan(parseFloat(comfortable.controlHeight));
+      expect(parseFloat(spacious.sectionPadding)).toBeGreaterThan(parseFloat(comfortable.sectionPadding));
+    });
+  });
+
+  describe('scrollbar accent', () => {
+    it('defaults to null and applies no override', () => {
+      expect(useThemeStore.getState().customization.scrollbarAccent).toBeNull();
+      expect(document.documentElement.style.getPropertyValue('--scrollbar-accent')).toBe('');
+    });
+
+    it('applies the --scrollbar-accent variable when set', () => {
+      const { result } = renderHook(() => useThemeStore());
+
+      act(() => {
+        result.current.setScrollbarAccent('#22ccff');
+      });
+
+      expect(result.current.customization.scrollbarAccent).toBe('#22ccff');
+      expect(document.documentElement.style.getPropertyValue('--scrollbar-accent')).toBe('#22ccff');
+    });
+
+    it('removes the override when cleared', () => {
+      const { result } = renderHook(() => useThemeStore());
+
+      act(() => {
+        result.current.setScrollbarAccent('#22ccff');
+        result.current.setScrollbarAccent(null);
+      });
+
+      expect(result.current.customization.scrollbarAccent).toBeNull();
+      expect(document.documentElement.style.getPropertyValue('--scrollbar-accent')).toBe('');
     });
   });
 });

@@ -14,6 +14,8 @@ export interface ThemeColors {
   card: string;
   border: string;
   destructive: string;
+  /** Focus ring / outline color (maps to the --ring CSS variable). */
+  ring: string;
 }
 
 export interface ThemePreset {
@@ -26,7 +28,7 @@ export interface ThemePreset {
 }
 
 export type ComponentStylePreset = 'default' | 'observatory' | 'floating';
-export type ComponentStyleDensity = 'comfortable' | 'compact';
+export type ComponentStyleDensity = 'compact' | 'comfortable' | 'spacious';
 export type ComponentStyleTransparency = 'solid' | 'balanced' | 'high';
 export type ComponentStyleBorder = 'soft' | 'medium' | 'strong';
 export type ComponentStyleElevation = 'flat' | 'raised' | 'floating';
@@ -41,16 +43,21 @@ export interface ThemeComponentStyle {
 
 export type ThemeLetterSpacing = 'tight' | 'normal' | 'wide';
 export type ThemeLineHeight = 'compact' | 'normal' | 'relaxed';
+export type ThemeUiScale = 'compact' | 'default' | 'large' | 'xlarge';
 
 export interface ThemeCustomization {
   radius: number;
   fontFamily: 'default' | 'serif' | 'mono' | 'system';
   fontSize: 'small' | 'default' | 'large';
+  /** Overall interface zoom — composes with fontSize on the root font-size. */
+  uiScale: ThemeUiScale;
   letterSpacing: ThemeLetterSpacing;
   lineHeight: ThemeLineHeight;
   animationsEnabled: boolean;
   activePreset: string | null;
   componentStyle: ThemeComponentStyle;
+  /** Optional custom scrollbar accent color; null falls back to the theme accent. */
+  scrollbarAccent: string | null;
   customColors: {
     light: Partial<ThemeColors>;
     dark: Partial<ThemeColors>;
@@ -107,9 +114,11 @@ interface ThemeStore extends ThemeStorePersistedState {
   setRadius: (radius: number) => void;
   setFontFamily: (font: ThemeCustomization['fontFamily']) => void;
   setFontSize: (size: ThemeCustomization['fontSize']) => void;
+  setUiScale: (scale: ThemeUiScale) => void;
   setLetterSpacing: (spacing: ThemeLetterSpacing) => void;
   setLineHeight: (lineHeight: ThemeLineHeight) => void;
   setAnimationsEnabled: (enabled: boolean) => void;
+  setScrollbarAccent: (color: string | null) => void;
   setActivePreset: (presetId: string | null) => void;
   setCustomColor: (mode: ThemeMode, key: keyof ThemeColors, value: string) => void;
   clearCustomColor: (mode: ThemeMode, key: keyof ThemeColors) => void;
@@ -125,7 +134,7 @@ interface ThemeStore extends ThemeStorePersistedState {
   importTheme: (raw: string) => boolean;
 }
 
-export const THEME_EXPORT_VERSION = 3;
+export const THEME_EXPORT_VERSION = 4;
 
 export interface ThemeExportPayload {
   version: number;
@@ -145,11 +154,13 @@ const defaultCustomization: ThemeCustomization = {
   radius: 0.5,
   fontFamily: 'default',
   fontSize: 'default',
+  uiScale: 'default',
   letterSpacing: 'normal',
   lineHeight: 'normal',
   animationsEnabled: true,
   activePreset: null,
   componentStyle: defaultComponentStyle,
+  scrollbarAccent: null,
   customColors: {
     light: {},
     dark: {},
@@ -157,12 +168,13 @@ const defaultCustomization: ThemeCustomization = {
 };
 
 const componentStylePresetOptions = ['default', 'observatory', 'floating'] as const;
-const componentStyleDensityOptions = ['comfortable', 'compact'] as const;
+const componentStyleDensityOptions = ['compact', 'comfortable', 'spacious'] as const;
 const componentStyleTransparencyOptions = ['solid', 'balanced', 'high'] as const;
 const componentStyleBorderOptions = ['soft', 'medium', 'strong'] as const;
 const componentStyleElevationOptions = ['flat', 'raised', 'floating'] as const;
 const fontFamilyOptions = ['default', 'serif', 'mono', 'system'] as const;
 const fontSizeOptions = ['small', 'default', 'large'] as const;
+const uiScaleOptions = ['compact', 'default', 'large', 'xlarge'] as const;
 const letterSpacingOptions = ['tight', 'normal', 'wide'] as const;
 const lineHeightOptions = ['compact', 'normal', 'relaxed'] as const;
 const themeColorKeys: (keyof ThemeColors)[] = [
@@ -175,6 +187,7 @@ const themeColorKeys: (keyof ThemeColors)[] = [
   'card',
   'border',
   'destructive',
+  'ring',
 ];
 
 const previewContrastPairs: Array<{
@@ -200,6 +213,7 @@ const defaultThemeTokens: Record<ThemeMode, ThemeColors> = {
     accent: 'oklch(0.6896 0.0714 234.0387)',
     destructive: 'oklch(0.2611 0.0376 322.5267)',
     border: 'oklch(0.7791 0.0156 251.1926)',
+    ring: 'oklch(0.8567 0.1164 81.0092)',
   },
   dark: {
     background: 'oklch(0.2204 0.0198 275.8439)',
@@ -211,6 +225,7 @@ const defaultThemeTokens: Record<ThemeMode, ThemeColors> = {
     accent: 'oklch(0.8469 0.0524 264.7751)',
     destructive: 'oklch(0.5280 0.1200 357.1130)',
     border: 'oklch(0.3072 0.0287 281.7681)',
+    ring: 'oklch(0.9097 0.1440 95.1120)',
   },
 };
 
@@ -244,6 +259,12 @@ const componentDensityTokens: Record<ComponentStyleDensity, Pick<ResolvedCompone
     densityPadding: '0.25rem',
     sectionPadding: '0.625rem',
     controlHeight: '2rem',
+  },
+  spacious: {
+    densityGap: '0.5rem',
+    densityPadding: '0.5rem',
+    sectionPadding: '1rem',
+    controlHeight: '2.5rem',
   },
 };
 
@@ -291,6 +312,7 @@ const componentElevationTokens: Record<ComponentStyleElevation, Pick<ResolvedCom
 
 export const letterSpacingValues = [...letterSpacingOptions] as const;
 export const lineHeightValues = [...lineHeightOptions] as const;
+export const themeUiScaleValues = [...uiScaleOptions] as const;
 export const customizableThemeColorKeys = [...themeColorKeys] as const;
 export const componentStylePresets = [...componentStylePresetOptions] as const;
 export const componentStyleDensityValues = [...componentStyleDensityOptions] as const;
@@ -408,6 +430,13 @@ const fontSizeScale: Record<ThemeCustomization['fontSize'], number> = {
   small: 0.875,
   default: 1,
   large: 1.125,
+};
+
+const uiScaleValues: Record<ThemeUiScale, number> = {
+  compact: 0.9,
+  default: 1,
+  large: 1.1,
+  xlarge: 1.25,
 };
 
 const letterSpacingMap: Record<ThemeLetterSpacing, string> = {
@@ -605,6 +634,12 @@ function sanitizeThemeCustomization(
       : defaultCustomization.fontSize)
     : base.fontSize;
 
+  const uiScale = hasOwn(source, 'uiScale')
+    ? (uiScaleOptions.includes(source.uiScale as ThemeUiScale)
+      ? source.uiScale as ThemeUiScale
+      : defaultCustomization.uiScale)
+    : base.uiScale;
+
   const letterSpacing = hasOwn(source, 'letterSpacing')
     ? (letterSpacingOptions.includes(source.letterSpacing as ThemeLetterSpacing)
       ? source.letterSpacing as ThemeLetterSpacing
@@ -622,6 +657,12 @@ function sanitizeThemeCustomization(
       ? source.animationsEnabled
       : defaultCustomization.animationsEnabled)
     : base.animationsEnabled;
+
+  const scrollbarAccent = hasOwn(source, 'scrollbarAccent')
+    ? (typeof source.scrollbarAccent === 'string' && source.scrollbarAccent.trim()
+      ? source.scrollbarAccent.trim()
+      : null)
+    : base.scrollbarAccent;
 
   const activePreset = hasOwn(source, 'activePreset')
     ? sanitizeActivePreset(source.activePreset, null, userPresets)
@@ -654,11 +695,13 @@ function sanitizeThemeCustomization(
     radius,
     fontFamily,
     fontSize,
+    uiScale,
     letterSpacing,
     lineHeight,
     animationsEnabled,
     activePreset,
     componentStyle,
+    scrollbarAccent,
     customColors: {
       light: lightColors,
       dark: darkColors,
@@ -1015,6 +1058,7 @@ function applyThemeToDOM(customization: ThemeCustomization, userPresets: ThemePr
     styleUpdates.push(['--radius', `${customization.radius}rem`]);
     styleUpdates.push(['--font-sans', fontFamilyMap[customization.fontFamily]]);
     styleUpdates.push(['--font-size-scale', String(fontSizeScale[customization.fontSize])]);
+    styleUpdates.push(['--ui-scale', String(uiScaleValues[customization.uiScale])]);
 
     themeColorKeys.forEach((key) => {
       root.style.removeProperty(`--${key}`);
@@ -1047,7 +1091,15 @@ function applyThemeToDOM(customization: ThemeCustomization, userPresets: ThemePr
       root.style.setProperty(prop, value);
     });
 
-    root.style.fontSize = `${fontSizeScale[customization.fontSize] * 16}px`;
+    // Overall interface zoom multiplies the text-size preference; both are
+    // expressed through the root font-size since the UI is rem/em-based.
+    root.style.fontSize = `${uiScaleValues[customization.uiScale] * fontSizeScale[customization.fontSize] * 16}px`;
+
+    if (customization.scrollbarAccent) {
+      root.style.setProperty('--scrollbar-accent', customization.scrollbarAccent);
+    } else {
+      root.style.removeProperty('--scrollbar-accent');
+    }
 
     // Only override letter-spacing / line-height when the user picks a
     // non-default value, so untouched themes never shift the base layout.
@@ -1148,6 +1200,14 @@ export const useThemeStore = create<ThemeStore>()(
 
       setFontSize: (fontSize) => {
         get().setCustomization({ fontSize });
+      },
+
+      setUiScale: (uiScale) => {
+        get().setCustomization({ uiScale });
+      },
+
+      setScrollbarAccent: (scrollbarAccent) => {
+        get().setCustomization({ scrollbarAccent });
       },
 
       setLetterSpacing: (letterSpacing) => {
@@ -1306,6 +1366,8 @@ export const useThemeStore = create<ThemeStore>()(
         root.style.removeProperty('--radius');
         root.style.removeProperty('--font-sans');
         root.style.removeProperty('--font-size-scale');
+        root.style.removeProperty('--ui-scale');
+        root.style.removeProperty('--scrollbar-accent');
         root.style.fontSize = '';
         root.style.removeProperty('letter-spacing');
         root.style.removeProperty('line-height');
@@ -1368,7 +1430,7 @@ export const useThemeStore = create<ThemeStore>()(
     {
       name: 'theme-customization',
       storage: getZustandStorage(),
-      version: 3,
+      version: 4,
       migrate: migrateThemeStoreState,
       partialize: (state) => ({
         customization: state.customization,

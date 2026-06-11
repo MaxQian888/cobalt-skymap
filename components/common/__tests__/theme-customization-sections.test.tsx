@@ -36,6 +36,8 @@ const mockSetComponentStyleDensity = jest.fn();
 const mockSetComponentStyleTransparency = jest.fn();
 const mockSetComponentStyleBorder = jest.fn();
 const mockSetComponentStyleElevation = jest.fn();
+const mockSetScrollbarAccent = jest.fn();
+const mockSetUiScale = jest.fn();
 const mockResetCustomization = jest.fn();
 const mockSaveCurrentAsPreset = jest.fn();
 const mockDuplicatePreset = jest.fn();
@@ -49,9 +51,11 @@ const createCustomization = (): ThemeCustomization => ({
   radius: 0.5,
   fontFamily: 'default',
   fontSize: 'default',
+  uiScale: 'default',
   letterSpacing: 'normal',
   lineHeight: 'normal',
   animationsEnabled: true,
+  scrollbarAccent: null,
   activePreset: 'custom-night',
   componentStyle: {
     preset: 'default',
@@ -312,12 +316,13 @@ jest.mock('@/components/ui/select', () => {
 jest.mock('@/lib/stores/theme-store', () => ({
   useThemeStore: () => mockStoreState,
   componentStylePresets: ['default', 'observatory', 'floating'],
-  componentStyleDensityValues: ['comfortable', 'compact'],
+  componentStyleDensityValues: ['compact', 'comfortable', 'spacious'],
   componentStyleTransparencyValues: ['solid', 'balanced', 'high'],
   componentStyleBorderValues: ['soft', 'medium', 'strong'],
   componentStyleElevationValues: ['flat', 'raised', 'floating'],
   letterSpacingValues: ['tight', 'normal', 'wide'],
   lineHeightValues: ['compact', 'normal', 'relaxed'],
+  themeUiScaleValues: ['compact', 'default', 'large', 'xlarge'],
   customizableThemeColorKeys: ['primary', 'background'],
   getAvailableThemePresets: (userPresets: typeof mockStoreState.userPresets = []) => [
     {
@@ -656,6 +661,7 @@ describe('theme-customization-sections', () => {
         setComponentStyleTransparency={mockSetComponentStyleTransparency}
         setComponentStyleBorder={mockSetComponentStyleBorder}
         setComponentStyleElevation={mockSetComponentStyleElevation}
+        setScrollbarAccent={mockSetScrollbarAccent}
       />
     );
 
@@ -684,6 +690,7 @@ describe('theme-customization-sections', () => {
         customization={mockStoreState.customization}
         setFontFamily={mockSetFontFamily}
         setFontSize={mockSetFontSize}
+        setUiScale={mockSetUiScale}
         setLetterSpacing={mockSetLetterSpacing}
         setLineHeight={mockSetLineHeight}
         fontFamilyLabel="theme.fontFamily"
@@ -697,13 +704,16 @@ describe('theme-customization-sections', () => {
       fontFamily: 'Libre Baskerville, serif',
     });
 
+    // Order: fontFamily, fontSize, uiScale, letterSpacing, lineHeight
     await user.selectOptions(selects[0], 'serif');
     await user.selectOptions(selects[1], 'large');
-    await user.selectOptions(selects[2], 'wide');
-    await user.selectOptions(selects[3], 'relaxed');
+    await user.selectOptions(selects[2], 'xlarge');
+    await user.selectOptions(selects[3], 'wide');
+    await user.selectOptions(selects[4], 'relaxed');
 
     expect(mockSetFontFamily).toHaveBeenCalledWith('serif');
     expect(mockSetFontSize).toHaveBeenCalledWith('large');
+    expect(mockSetUiScale).toHaveBeenCalledWith('xlarge');
     expect(mockSetLetterSpacing).toHaveBeenCalledWith('wide');
     expect(mockSetLineHeight).toHaveBeenCalledWith('relaxed');
   });

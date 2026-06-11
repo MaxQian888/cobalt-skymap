@@ -144,14 +144,17 @@
   --component-surface-blur: 12px;
   --scrollbar-size: 0.8rem;
   --scrollbar-radius: 999px;
+  /* Single seam for theme-customizable scrollbar tint; falls back to --accent
+     unless the user overrides --scrollbar-accent via the theme store. */
+  --scrollbar-accent: var(--accent);
   --scrollbar-track: color-mix(in oklch, var(--card) 56%, transparent);
   --scrollbar-track-hover: color-mix(in oklch, var(--card) 72%, transparent);
   --scrollbar-track-border: color-mix(in oklch, var(--border) 54%, transparent);
-  --scrollbar-thumb: color-mix(in oklch, var(--accent) 58%, var(--border) 42%);
-  --scrollbar-thumb-hover: color-mix(in oklch, var(--primary) 52%, var(--accent) 48%);
-  --scrollbar-thumb-active: color-mix(in oklch, var(--primary) 68%, var(--accent) 32%);
+  --scrollbar-thumb: color-mix(in oklch, var(--scrollbar-accent) 58%, var(--border) 42%);
+  --scrollbar-thumb-hover: color-mix(in oklch, var(--primary) 52%, var(--scrollbar-accent) 48%);
+  --scrollbar-thumb-active: color-mix(in oklch, var(--primary) 68%, var(--scrollbar-accent) 32%);
   --scrollbar-thumb-shadow: inset 0 0 0 1px color-mix(in oklch, white 26%, transparent);
-  --scrollbar-thumb-glow: 0 0 0.8rem color-mix(in oklch, var(--accent) 20%, transparent);
+  --scrollbar-thumb-glow: 0 0 0.8rem color-mix(in oklch, var(--scrollbar-accent) 20%, transparent);
   --scrollbar-thumb-highlight: color-mix(in oklch, white 34%, transparent);
   --scrollbar-thumb-speck: color-mix(in oklch, white 58%, transparent);
 }
@@ -218,12 +221,13 @@
   --component-surface-border: color-mix(in oklch, var(--border) 46%, transparent);
   --component-surface-shadow: 0 12px 28px -16px rgb(0 0 0 / 0.45);
   --component-surface-blur: 12px;
+  --scrollbar-accent: var(--accent);
   --scrollbar-track: color-mix(in oklch, var(--card) 70%, transparent);
   --scrollbar-track-hover: color-mix(in oklch, var(--card) 84%, transparent);
   --scrollbar-track-border: color-mix(in oklch, var(--border) 72%, transparent);
-  --scrollbar-thumb: color-mix(in oklch, var(--accent) 38%, var(--muted) 62%);
-  --scrollbar-thumb-hover: color-mix(in oklch, var(--secondary) 55%, var(--accent) 45%);
-  --scrollbar-thumb-active: color-mix(in oklch, var(--secondary) 72%, var(--accent) 28%);
+  --scrollbar-thumb: color-mix(in oklch, var(--scrollbar-accent) 38%, var(--muted) 62%);
+  --scrollbar-thumb-hover: color-mix(in oklch, var(--secondary) 55%, var(--scrollbar-accent) 45%);
+  --scrollbar-thumb-active: color-mix(in oklch, var(--secondary) 72%, var(--scrollbar-accent) 28%);
   --scrollbar-thumb-shadow: inset 0 0 0 1px color-mix(in oklch, white 16%, transparent);
   --scrollbar-thumb-glow: 0 0 1rem color-mix(in oklch, var(--secondary) 18%, transparent);
   --scrollbar-thumb-highlight: color-mix(in oklch, white 24%, transparent);
@@ -387,11 +391,11 @@ html.no-transitions *::after {
   --scrollbar-size: 0.72rem;
   --scrollbar-track: color-mix(in oklch, var(--card) 42%, transparent);
   --scrollbar-track-hover: color-mix(in oklch, var(--card) 58%, transparent);
-  --scrollbar-track-border: color-mix(in oklch, var(--accent) 26%, transparent);
-  --scrollbar-thumb: color-mix(in oklch, var(--accent) 66%, var(--primary) 34%);
-  --scrollbar-thumb-hover: color-mix(in oklch, var(--secondary) 36%, var(--accent) 64%);
+  --scrollbar-track-border: color-mix(in oklch, var(--scrollbar-accent) 26%, transparent);
+  --scrollbar-thumb: color-mix(in oklch, var(--scrollbar-accent) 66%, var(--primary) 34%);
+  --scrollbar-thumb-hover: color-mix(in oklch, var(--secondary) 36%, var(--scrollbar-accent) 64%);
   --scrollbar-thumb-active: color-mix(in oklch, var(--secondary) 48%, var(--primary) 52%);
-  --scrollbar-thumb-glow: 0 0 1rem color-mix(in oklch, var(--accent) 26%, transparent);
+  --scrollbar-thumb-glow: 0 0 1rem color-mix(in oklch, var(--scrollbar-accent) 26%, transparent);
   --scrollbar-thumb-highlight: color-mix(in oklch, white 28%, transparent);
   --scrollbar-thumb-speck: color-mix(in oklch, white 60%, transparent);
 }

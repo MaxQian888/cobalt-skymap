@@ -53,6 +53,8 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
     setRadius,
     setFontFamily,
     setFontSize,
+    setUiScale,
+    setScrollbarAccent,
     setLetterSpacing,
     setLineHeight,
     setAnimationsEnabled,
@@ -143,6 +145,7 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
                 setComponentStyleTransparency={setComponentStyleTransparency}
                 setComponentStyleBorder={setComponentStyleBorder}
                 setComponentStyleElevation={setComponentStyleElevation}
+                setScrollbarAccent={setScrollbarAccent}
               />
               <Separator />
               <ThemeRadiusSection
@@ -166,6 +169,7 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
                 customization={customization}
                 setFontFamily={setFontFamily}
                 setFontSize={setFontSize}
+                setUiScale={setUiScale}
                 setLetterSpacing={setLetterSpacing}
                 setLineHeight={setLineHeight}
                 fontFamilyLabel={t('theme.fontFamily')}

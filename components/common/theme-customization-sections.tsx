@@ -29,6 +29,7 @@ import {
   isValidThemeColorValue,
   letterSpacingValues,
   lineHeightValues,
+  themeUiScaleValues,
   type ThemeColors,
   type ThemeCustomization,
   type ThemeMode,
@@ -93,6 +94,8 @@ export function useThemeCustomizationBindings() {
     setRadius,
     setFontFamily,
     setFontSize,
+    setUiScale,
+    setScrollbarAccent,
     setLetterSpacing,
     setLineHeight,
     setAnimationsEnabled,
@@ -123,6 +126,8 @@ export function useThemeCustomizationBindings() {
     setRadius,
     setFontFamily,
     setFontSize,
+    setUiScale,
+    setScrollbarAccent,
     setLetterSpacing,
     setLineHeight,
     setAnimationsEnabled,
@@ -706,6 +711,7 @@ interface ThemeComponentStyleSectionProps {
   setComponentStyleTransparency: (transparency: ThemeCustomization['componentStyle']['transparency']) => void;
   setComponentStyleBorder: (border: ThemeCustomization['componentStyle']['border']) => void;
   setComponentStyleElevation: (elevation: ThemeCustomization['componentStyle']['elevation']) => void;
+  setScrollbarAccent: (color: string | null) => void;
 }
 
 function buildPreviewThemeVars(preview: ReturnType<typeof getComponentStylePreviewData>): CSSProperties {
@@ -742,9 +748,13 @@ export function ThemeComponentStyleSection({
   setComponentStyleTransparency,
   setComponentStyleBorder,
   setComponentStyleElevation,
+  setScrollbarAccent,
 }: ThemeComponentStyleSectionProps) {
   const t = useTranslations();
   const [previewMode, setPreviewMode] = useState<ThemeMode>(initialPreviewMode);
+  const scrollbarAccentHex = customization.scrollbarAccent
+    ? cssColorToHex(customization.scrollbarAccent) ?? '#38bdf8'
+    : '#38bdf8';
   const preview = getComponentStylePreviewData(customization, previewMode, userPresets);
   const previewThemeVars = buildPreviewThemeVars(preview);
   const baseSurfaceStyle = buildSurfaceStyle(preview);
@@ -847,6 +857,42 @@ export function ThemeComponentStyleSection({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2 sm:col-span-2">
+          <Label>{t('theme.scrollbarAccent')}</Label>
+          <div className="flex items-center gap-2">
+            <label
+              className="relative h-8 w-8 shrink-0 cursor-pointer overflow-hidden rounded border border-border"
+              style={{ background: customization.scrollbarAccent ?? 'var(--scrollbar-thumb)' }}
+              title={t('theme.scrollbarAccent')}
+            >
+              <input
+                type="color"
+                value={scrollbarAccentHex}
+                onChange={(event) => setScrollbarAccent(event.target.value)}
+                aria-label={t('theme.scrollbarAccent')}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
+            <Input
+              value={customization.scrollbarAccent ?? ''}
+              onChange={(event) => setScrollbarAccent(event.target.value.trim() ? event.target.value : null)}
+              placeholder={t('theme.scrollbarAccentAuto')}
+              className="h-8 font-mono text-xs"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => setScrollbarAccent(null)}
+              disabled={!customization.scrollbarAccent}
+            >
+              {t('theme.clearColor')}
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">{t('theme.scrollbarAccentDescription')}</p>
         </div>
       </div>
 
@@ -1037,6 +1083,7 @@ interface ThemeTypographySectionProps {
   customization: ThemeCustomization;
   setFontFamily: (font: ThemeCustomization['fontFamily']) => void;
   setFontSize: (size: ThemeCustomization['fontSize']) => void;
+  setUiScale: (scale: ThemeCustomization['uiScale']) => void;
   setLetterSpacing: (spacing: ThemeCustomization['letterSpacing']) => void;
   setLineHeight: (lineHeight: ThemeCustomization['lineHeight']) => void;
   fontFamilyLabel: string;
@@ -1049,6 +1096,7 @@ export function ThemeTypographySection({
   customization,
   setFontFamily,
   setFontSize,
+  setUiScale,
   setLetterSpacing,
   setLineHeight,
   fontFamilyLabel,
@@ -1101,6 +1149,26 @@ export function ThemeTypographySection({
               <SelectItem value="large">{t('theme.fontSizeLarge')}</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-3">
+          <Label>{t('theme.uiScale')}</Label>
+          <Select
+            value={customization.uiScale}
+            onValueChange={(value) => setUiScale(value as ThemeCustomization['uiScale'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {themeUiScaleValues.map((scale) => (
+                <SelectItem key={scale} value={scale}>
+                  {t(`theme.uiScale${titleCase(scale)}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-[11px] text-muted-foreground">{t('theme.uiScaleDescription')}</p>
         </div>
 
         <div className="space-y-3">

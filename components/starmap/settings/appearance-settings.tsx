@@ -32,6 +32,8 @@ export function AppearanceSettings() {
     setRadius,
     setFontFamily,
     setFontSize,
+    setUiScale,
+    setScrollbarAccent,
     setLetterSpacing,
     setLineHeight,
     setAnimationsEnabled,
@@ -109,6 +111,7 @@ export function AppearanceSettings() {
           setComponentStyleTransparency={setComponentStyleTransparency}
           setComponentStyleBorder={setComponentStyleBorder}
           setComponentStyleElevation={setComponentStyleElevation}
+          setScrollbarAccent={setScrollbarAccent}
         />
       </SettingsSection>
 
@@ -154,6 +157,7 @@ export function AppearanceSettings() {
           customization={customization}
           setFontFamily={setFontFamily}
           setFontSize={setFontSize}
+          setUiScale={setUiScale}
           setLetterSpacing={setLetterSpacing}
           setLineHeight={setLineHeight}
           fontFamilyLabel={t('settingsNew.appearance.fontFamily')}
