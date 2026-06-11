@@ -172,8 +172,14 @@ export default function StarmapPage() {
     proxySettings.mode,
   ]);
 
+  // Full-bleed: `html` reserves `scrollbar-gutter: stable both-edges` (~10px per
+  // side), so the body content box is inset and a plain `w-screen` (100vw)
+  // container renders offset by that gutter — overflowing the right edge and
+  // dragging the absolutely-positioned mobile surfaces (action rail, zoom, tools)
+  // ~10px past the viewport on narrow phones. The negative margin pulls the 100vw
+  // container back to the true viewport origin.
   return (
-    <main className="relative w-screen h-screen h-dvh min-h-screen min-h-dvh bg-black overflow-hidden">
+    <main className="relative w-screen ml-[calc(50%-50vw)] h-screen h-dvh min-h-screen min-h-dvh bg-black overflow-hidden">
       {showSplash && (
         <SplashScreen
           onComplete={() => setSplashDismissed(true)}
