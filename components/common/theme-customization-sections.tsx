@@ -27,6 +27,8 @@ import {
   getThemeContrastWarnings,
   getThemePreviewData,
   isValidThemeColorValue,
+  letterSpacingValues,
+  lineHeightValues,
   type ThemeColors,
   type ThemeCustomization,
   type ThemeMode,
@@ -91,6 +93,8 @@ export function useThemeCustomizationBindings() {
     setRadius,
     setFontFamily,
     setFontSize,
+    setLetterSpacing,
+    setLineHeight,
     setAnimationsEnabled,
     setActivePreset,
     setCustomColor,
@@ -119,6 +123,8 @@ export function useThemeCustomizationBindings() {
     setRadius,
     setFontFamily,
     setFontSize,
+    setLetterSpacing,
+    setLineHeight,
     setAnimationsEnabled,
     setActivePreset,
     setCustomColor,
@@ -1031,14 +1037,20 @@ interface ThemeTypographySectionProps {
   customization: ThemeCustomization;
   setFontFamily: (font: ThemeCustomization['fontFamily']) => void;
   setFontSize: (size: ThemeCustomization['fontSize']) => void;
+  setLetterSpacing: (spacing: ThemeCustomization['letterSpacing']) => void;
+  setLineHeight: (lineHeight: ThemeCustomization['lineHeight']) => void;
   fontFamilyLabel: string;
   fontSizeLabel: string;
 }
+
+const titleCase = (value: string) => `${value[0].toUpperCase()}${value.slice(1)}`;
 
 export function ThemeTypographySection({
   customization,
   setFontFamily,
   setFontSize,
+  setLetterSpacing,
+  setLineHeight,
   fontFamilyLabel,
   fontSizeLabel,
 }: ThemeTypographySectionProps) {
@@ -1062,26 +1074,72 @@ export function ThemeTypographySection({
             <SelectItem value="system">{t('theme.fontSystem')}</SelectItem>
           </SelectContent>
         </Select>
-        <p className="text-sm text-muted-foreground" style={{ fontFamily: getFontPreview(customization.fontFamily) }}>
+        <p
+          className="text-sm text-muted-foreground"
+          style={{
+            fontFamily: getFontPreview(customization.fontFamily),
+            letterSpacing: customization.letterSpacing === 'tight' ? '-0.01em' : customization.letterSpacing === 'wide' ? '0.04em' : undefined,
+          }}
+        >
           {t('theme.fontPreviewText')}
         </p>
       </div>
 
-      <div className="space-y-3">
-        <Label>{fontSizeLabel}</Label>
-        <Select
-          value={customization.fontSize}
-          onValueChange={(value) => setFontSize(value as ThemeCustomization['fontSize'])}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="small">{t('theme.fontSizeSmall')}</SelectItem>
-            <SelectItem value="default">{t('theme.fontSizeDefault')}</SelectItem>
-            <SelectItem value="large">{t('theme.fontSizeLarge')}</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-3">
+          <Label>{fontSizeLabel}</Label>
+          <Select
+            value={customization.fontSize}
+            onValueChange={(value) => setFontSize(value as ThemeCustomization['fontSize'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="small">{t('theme.fontSizeSmall')}</SelectItem>
+              <SelectItem value="default">{t('theme.fontSizeDefault')}</SelectItem>
+              <SelectItem value="large">{t('theme.fontSizeLarge')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-3">
+          <Label>{t('theme.letterSpacing')}</Label>
+          <Select
+            value={customization.letterSpacing}
+            onValueChange={(value) => setLetterSpacing(value as ThemeCustomization['letterSpacing'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {letterSpacingValues.map((spacing) => (
+                <SelectItem key={spacing} value={spacing}>
+                  {t(`theme.letterSpacing${titleCase(spacing)}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-3">
+          <Label>{t('theme.lineHeight')}</Label>
+          <Select
+            value={customization.lineHeight}
+            onValueChange={(value) => setLineHeight(value as ThemeCustomization['lineHeight'])}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {lineHeightValues.map((lineHeight) => (
+                <SelectItem key={lineHeight} value={lineHeight}>
+                  {t(`theme.lineHeight${titleCase(lineHeight)}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   );

@@ -357,6 +357,8 @@ describe('useThemeStore', () => {
           radius: 0.5,
           fontFamily: 'default',
           fontSize: 'default',
+          letterSpacing: 'normal',
+          lineHeight: 'normal',
           animationsEnabled: true,
           activePreset: 'ocean',
           componentStyle: defaultComponentStyle,
@@ -380,6 +382,8 @@ describe('useThemeStore', () => {
           radius: 0.5,
           fontFamily: 'default',
           fontSize: 'default',
+          letterSpacing: 'normal',
+          lineHeight: 'normal',
           animationsEnabled: true,
           activePreset: null,
           componentStyle: defaultComponentStyle,
@@ -397,6 +401,32 @@ describe('useThemeStore', () => {
 
       expect(colors.primary).toBe('#fedcba');
       expect(colors.secondary).toBeUndefined();
+    });
+  });
+
+  describe('setLetterSpacing / setLineHeight', () => {
+    it('applies non-default letter spacing and line height to the root element', () => {
+      act(() => {
+        useThemeStore.getState().setLetterSpacing('wide');
+        useThemeStore.getState().setLineHeight('relaxed');
+      });
+
+      expect(useThemeStore.getState().customization.letterSpacing).toBe('wide');
+      expect(useThemeStore.getState().customization.lineHeight).toBe('relaxed');
+      expect(document.documentElement.style.letterSpacing).toBe('0.04em');
+      expect(document.documentElement.style.lineHeight).toBe('1.85');
+    });
+
+    it('removes the root overrides when reset to normal', () => {
+      act(() => {
+        useThemeStore.getState().setLetterSpacing('wide');
+        useThemeStore.getState().setLineHeight('compact');
+        useThemeStore.getState().setLetterSpacing('normal');
+        useThemeStore.getState().setLineHeight('normal');
+      });
+
+      expect(document.documentElement.style.letterSpacing).toBe('');
+      expect(document.documentElement.style.lineHeight).toBe('');
     });
   });
 

@@ -45,6 +45,8 @@ jest.mock('@/lib/stores/theme-store', () => ({
       radius: 0.5,
       fontFamily: 'default',
       fontSize: 'default',
+      letterSpacing: 'normal',
+      lineHeight: 'normal',
       animationsEnabled: true,
       activePreset: 'custom-night',
       componentStyle: {
@@ -72,6 +74,8 @@ jest.mock('@/lib/stores/theme-store', () => ({
     setRadius: mockSetRadius,
     setFontFamily: mockSetFontFamily,
     setFontSize: mockSetFontSize,
+    setLetterSpacing: jest.fn(),
+    setLineHeight: jest.fn(),
     setAnimationsEnabled: mockSetAnimationsEnabled,
     setActivePreset: mockSetActivePreset,
     setCustomColor: mockSetCustomColor,
@@ -95,6 +99,8 @@ jest.mock('@/lib/stores/theme-store', () => ({
   componentStyleTransparencyValues: ['solid', 'balanced', 'high'],
   componentStyleBorderValues: ['soft', 'medium', 'strong'],
   componentStyleElevationValues: ['flat', 'raised', 'floating'],
+  letterSpacingValues: ['tight', 'normal', 'wide'],
+  lineHeightValues: ['compact', 'normal', 'relaxed'],
   customizableThemeColorKeys: [
     'primary',
     'secondary',

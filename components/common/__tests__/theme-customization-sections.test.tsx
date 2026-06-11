@@ -25,6 +25,8 @@ let mockResolvedTheme = 'light';
 const mockSetRadius = jest.fn();
 const mockSetFontFamily = jest.fn();
 const mockSetFontSize = jest.fn();
+const mockSetLetterSpacing = jest.fn();
+const mockSetLineHeight = jest.fn();
 const mockSetAnimationsEnabled = jest.fn();
 const mockSetActivePreset = jest.fn();
 const mockSetCustomColor = jest.fn();
@@ -47,6 +49,8 @@ const createCustomization = (): ThemeCustomization => ({
   radius: 0.5,
   fontFamily: 'default',
   fontSize: 'default',
+  letterSpacing: 'normal',
+  lineHeight: 'normal',
   animationsEnabled: true,
   activePreset: 'custom-night',
   componentStyle: {
@@ -87,6 +91,8 @@ const mockStoreState = {
   setRadius: mockSetRadius,
   setFontFamily: mockSetFontFamily,
   setFontSize: mockSetFontSize,
+  setLetterSpacing: mockSetLetterSpacing,
+  setLineHeight: mockSetLineHeight,
   setAnimationsEnabled: mockSetAnimationsEnabled,
   setActivePreset: mockSetActivePreset,
   setCustomColor: mockSetCustomColor,
@@ -310,6 +316,8 @@ jest.mock('@/lib/stores/theme-store', () => ({
   componentStyleTransparencyValues: ['solid', 'balanced', 'high'],
   componentStyleBorderValues: ['soft', 'medium', 'strong'],
   componentStyleElevationValues: ['flat', 'raised', 'floating'],
+  letterSpacingValues: ['tight', 'normal', 'wide'],
+  lineHeightValues: ['compact', 'normal', 'relaxed'],
   customizableThemeColorKeys: ['primary', 'background'],
   getAvailableThemePresets: (userPresets: typeof mockStoreState.userPresets = []) => [
     {
@@ -676,6 +684,8 @@ describe('theme-customization-sections', () => {
         customization={mockStoreState.customization}
         setFontFamily={mockSetFontFamily}
         setFontSize={mockSetFontSize}
+        setLetterSpacing={mockSetLetterSpacing}
+        setLineHeight={mockSetLineHeight}
         fontFamilyLabel="theme.fontFamily"
         fontSizeLabel="theme.fontSize"
       />
@@ -689,9 +699,13 @@ describe('theme-customization-sections', () => {
 
     await user.selectOptions(selects[0], 'serif');
     await user.selectOptions(selects[1], 'large');
+    await user.selectOptions(selects[2], 'wide');
+    await user.selectOptions(selects[3], 'relaxed');
 
     expect(mockSetFontFamily).toHaveBeenCalledWith('serif');
     expect(mockSetFontSize).toHaveBeenCalledWith('large');
+    expect(mockSetLetterSpacing).toHaveBeenCalledWith('wide');
+    expect(mockSetLineHeight).toHaveBeenCalledWith('relaxed');
   });
 
   it('exports the theme to the clipboard and imports pasted JSON', async () => {

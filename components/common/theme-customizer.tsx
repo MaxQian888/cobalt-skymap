@@ -53,6 +53,8 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
     setRadius,
     setFontFamily,
     setFontSize,
+    setLetterSpacing,
+    setLineHeight,
     setAnimationsEnabled,
     setActivePreset,
     setCustomColor,
@@ -164,6 +166,8 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
                 customization={customization}
                 setFontFamily={setFontFamily}
                 setFontSize={setFontSize}
+                setLetterSpacing={setLetterSpacing}
+                setLineHeight={setLineHeight}
                 fontFamilyLabel={t('theme.fontFamily')}
                 fontSizeLabel={t('theme.fontSize')}
               />

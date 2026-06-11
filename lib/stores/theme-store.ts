@@ -39,10 +39,15 @@ export interface ThemeComponentStyle {
   elevation: ComponentStyleElevation;
 }
 
+export type ThemeLetterSpacing = 'tight' | 'normal' | 'wide';
+export type ThemeLineHeight = 'compact' | 'normal' | 'relaxed';
+
 export interface ThemeCustomization {
   radius: number;
   fontFamily: 'default' | 'serif' | 'mono' | 'system';
   fontSize: 'small' | 'default' | 'large';
+  letterSpacing: ThemeLetterSpacing;
+  lineHeight: ThemeLineHeight;
   animationsEnabled: boolean;
   activePreset: string | null;
   componentStyle: ThemeComponentStyle;
@@ -102,6 +107,8 @@ interface ThemeStore extends ThemeStorePersistedState {
   setRadius: (radius: number) => void;
   setFontFamily: (font: ThemeCustomization['fontFamily']) => void;
   setFontSize: (size: ThemeCustomization['fontSize']) => void;
+  setLetterSpacing: (spacing: ThemeLetterSpacing) => void;
+  setLineHeight: (lineHeight: ThemeLineHeight) => void;
   setAnimationsEnabled: (enabled: boolean) => void;
   setActivePreset: (presetId: string | null) => void;
   setCustomColor: (mode: ThemeMode, key: keyof ThemeColors, value: string) => void;
@@ -138,6 +145,8 @@ const defaultCustomization: ThemeCustomization = {
   radius: 0.5,
   fontFamily: 'default',
   fontSize: 'default',
+  letterSpacing: 'normal',
+  lineHeight: 'normal',
   animationsEnabled: true,
   activePreset: null,
   componentStyle: defaultComponentStyle,
@@ -154,6 +163,8 @@ const componentStyleBorderOptions = ['soft', 'medium', 'strong'] as const;
 const componentStyleElevationOptions = ['flat', 'raised', 'floating'] as const;
 const fontFamilyOptions = ['default', 'serif', 'mono', 'system'] as const;
 const fontSizeOptions = ['small', 'default', 'large'] as const;
+const letterSpacingOptions = ['tight', 'normal', 'wide'] as const;
+const lineHeightOptions = ['compact', 'normal', 'relaxed'] as const;
 const themeColorKeys: (keyof ThemeColors)[] = [
   'primary',
   'secondary',
@@ -278,6 +289,8 @@ const componentElevationTokens: Record<ComponentStyleElevation, Pick<ResolvedCom
   },
 };
 
+export const letterSpacingValues = [...letterSpacingOptions] as const;
+export const lineHeightValues = [...lineHeightOptions] as const;
 export const customizableThemeColorKeys = [...themeColorKeys] as const;
 export const componentStylePresets = [...componentStylePresetOptions] as const;
 export const componentStyleDensityValues = [...componentStyleDensityOptions] as const;
@@ -395,6 +408,18 @@ const fontSizeScale: Record<ThemeCustomization['fontSize'], number> = {
   small: 0.875,
   default: 1,
   large: 1.125,
+};
+
+const letterSpacingMap: Record<ThemeLetterSpacing, string> = {
+  tight: '-0.01em',
+  normal: 'normal',
+  wide: '0.04em',
+};
+
+const lineHeightMap: Record<ThemeLineHeight, string> = {
+  compact: '1.4',
+  normal: '1.6',
+  relaxed: '1.85',
 };
 
 function hasOwn<T extends object>(obj: T, key: string): boolean {
@@ -580,6 +605,18 @@ function sanitizeThemeCustomization(
       : defaultCustomization.fontSize)
     : base.fontSize;
 
+  const letterSpacing = hasOwn(source, 'letterSpacing')
+    ? (letterSpacingOptions.includes(source.letterSpacing as ThemeLetterSpacing)
+      ? source.letterSpacing as ThemeLetterSpacing
+      : defaultCustomization.letterSpacing)
+    : base.letterSpacing;
+
+  const lineHeight = hasOwn(source, 'lineHeight')
+    ? (lineHeightOptions.includes(source.lineHeight as ThemeLineHeight)
+      ? source.lineHeight as ThemeLineHeight
+      : defaultCustomization.lineHeight)
+    : base.lineHeight;
+
   const animationsEnabled = hasOwn(source, 'animationsEnabled')
     ? (typeof source.animationsEnabled === 'boolean'
       ? source.animationsEnabled
@@ -617,6 +654,8 @@ function sanitizeThemeCustomization(
     radius,
     fontFamily,
     fontSize,
+    letterSpacing,
+    lineHeight,
     animationsEnabled,
     activePreset,
     componentStyle,
@@ -1010,6 +1049,20 @@ function applyThemeToDOM(customization: ThemeCustomization, userPresets: ThemePr
 
     root.style.fontSize = `${fontSizeScale[customization.fontSize] * 16}px`;
 
+    // Only override letter-spacing / line-height when the user picks a
+    // non-default value, so untouched themes never shift the base layout.
+    if (customization.letterSpacing === 'normal') {
+      root.style.removeProperty('letter-spacing');
+    } else {
+      root.style.letterSpacing = letterSpacingMap[customization.letterSpacing];
+    }
+
+    if (customization.lineHeight === 'normal') {
+      root.style.removeProperty('line-height');
+    } else {
+      root.style.lineHeight = lineHeightMap[customization.lineHeight];
+    }
+
     if (!customization.animationsEnabled) {
       root.classList.add('reduce-motion');
     } else {
@@ -1095,6 +1148,14 @@ export const useThemeStore = create<ThemeStore>()(
 
       setFontSize: (fontSize) => {
         get().setCustomization({ fontSize });
+      },
+
+      setLetterSpacing: (letterSpacing) => {
+        get().setCustomization({ letterSpacing });
+      },
+
+      setLineHeight: (lineHeight) => {
+        get().setCustomization({ lineHeight });
       },
 
       setAnimationsEnabled: (animationsEnabled) => {
@@ -1246,6 +1307,8 @@ export const useThemeStore = create<ThemeStore>()(
         root.style.removeProperty('--font-sans');
         root.style.removeProperty('--font-size-scale');
         root.style.fontSize = '';
+        root.style.removeProperty('letter-spacing');
+        root.style.removeProperty('line-height');
         root.classList.remove('reduce-motion');
         componentStyleVariableNames.forEach((key) => {
           root.style.removeProperty(key);

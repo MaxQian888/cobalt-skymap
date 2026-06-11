@@ -32,6 +32,8 @@ export function AppearanceSettings() {
     setRadius,
     setFontFamily,
     setFontSize,
+    setLetterSpacing,
+    setLineHeight,
     setAnimationsEnabled,
     setActivePreset,
     setCustomColor,
@@ -152,6 +154,8 @@ export function AppearanceSettings() {
           customization={customization}
           setFontFamily={setFontFamily}
           setFontSize={setFontSize}
+          setLetterSpacing={setLetterSpacing}
+          setLineHeight={setLineHeight}
           fontFamilyLabel={t('settingsNew.appearance.fontFamily')}
           fontSizeLabel={t('settingsNew.appearance.fontSize')}
         />
