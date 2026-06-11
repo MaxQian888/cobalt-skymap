@@ -131,7 +131,7 @@ export function HeroSection() {
         variant="ghost"
         size="icon"
         onClick={scrollToFeatures}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 text-muted-foreground/50 hover:text-muted-foreground animate-float"
+        className="touch-target absolute bottom-8 left-1/2 -translate-x-1/2 text-muted-foreground/50 hover:text-muted-foreground animate-float"
         aria-label={t('hero.scrollToFeatures')}
       >
         <ChevronDown className="h-8 w-8" />

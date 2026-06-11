@@ -139,7 +139,7 @@ export function Footer() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-full"
+              className="touch-target rounded-full"
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
               aria-label={t('backToTop')}
             >

@@ -43,7 +43,7 @@ export function FeaturesSection() {
         <SectionHeader id="features-title" title={t('title')} subtitle={t('subtitle')} />
 
         {/* Features grid */}
-        <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div ref={gridRef} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {features.map((feature, index) => {
             const Icon = feature.icon;
             return (
