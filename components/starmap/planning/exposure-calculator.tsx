@@ -42,13 +42,13 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+  ResponsiveDialogDescription,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   Tooltip,
   TooltipContent,
@@ -468,10 +468,10 @@ export function ExposureCalculator({
   }, [exposureTime, frameCount, totalIntegrationMinutes, filter, gain, binning]);
   
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="complex-editor">
       <Tooltip>
         <TooltipTrigger asChild>
-          <DialogTrigger asChild>
+          <ResponsiveDialogTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
@@ -479,23 +479,26 @@ export function ExposureCalculator({
             >
               <Calculator className="h-5 w-5" />
             </Button>
-          </DialogTrigger>
+          </ResponsiveDialogTrigger>
         </TooltipTrigger>
         <TooltipContent side="left">
           <p>{t('exposure.exposureCalculator')}</p>
         </TooltipContent>
       </Tooltip>
-      
-      <DialogContent className="w-[95vw] max-w-[640px] max-h-[85vh] max-h-[85dvh] overflow-hidden flex flex-col p-4 sm:p-6">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+
+      <ResponsiveDialogContent
+        desktopClassName="w-[95vw] max-w-[640px]"
+        className="overflow-hidden flex flex-col p-4 sm:p-6"
+      >
+        <ResponsiveDialogHeader className="shrink-0">
+          <ResponsiveDialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Calculator className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             {t('exposure.exposureCalculator')}
-          </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="text-xs sm:text-sm">
             {t('exposure.calculatorDescription')}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         
         <Tabs defaultValue="exposure" className="flex-1 flex flex-col min-h-0 mt-2">
           <TabsList className="grid w-full grid-cols-3 shrink-0">
@@ -1255,8 +1258,8 @@ export function ExposureCalculator({
             </Button>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
