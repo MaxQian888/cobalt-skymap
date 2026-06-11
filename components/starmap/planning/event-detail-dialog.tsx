@@ -18,15 +18,9 @@ import {
 } from '@/components/ui/tooltip';
 import {
   Calendar,
-  Moon,
-  Sun,
   Star,
-  Orbit,
   Eye,
   Clock,
-  Sparkles,
-  CircleDot,
-  Eclipse,
   ExternalLink,
   MapPin,
   Crosshair,
@@ -34,56 +28,12 @@ import {
   Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  EVENT_ICON_MAP,
+  getEventColorClass,
+  getEventTypeLabelKey,
+} from './event-visuals';
 import type { AstroEvent, DailyAstroEvent } from '@/lib/services/astro-data-sources';
-
-// ============================================================================
-// Icon & Color Maps (shared with calendar)
-// ============================================================================
-
-const EVENT_ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  lunar_phase: Moon,
-  meteor_shower: Sparkles,
-  planet_conjunction: CircleDot,
-  eclipse: Eclipse,
-  planet_opposition: Orbit,
-  planet_elongation: Star,
-  equinox_solstice: Sun,
-  comet: Star,
-  asteroid: CircleDot,
-  supernova: Star,
-  aurora: Sparkles,
-  other: Star,
-};
-
-const EVENT_COLOR_MAP: Record<string, string> = {
-  lunar_phase: 'text-amber-400 bg-amber-400/10',
-  meteor_shower: 'text-purple-400 bg-purple-400/10',
-  planet_conjunction: 'text-blue-400 bg-blue-400/10',
-  eclipse: 'text-red-400 bg-red-400/10',
-  planet_opposition: 'text-orange-400 bg-orange-400/10',
-  planet_elongation: 'text-cyan-400 bg-cyan-400/10',
-  equinox_solstice: 'text-yellow-400 bg-yellow-400/10',
-  comet: 'text-green-400 bg-green-400/10',
-  asteroid: 'text-stone-400 bg-stone-400/10',
-  supernova: 'text-pink-400 bg-pink-400/10',
-  aurora: 'text-emerald-400 bg-emerald-400/10',
-  other: 'text-muted-foreground bg-muted',
-};
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  lunar_phase: 'Lunar Phase',
-  meteor_shower: 'Meteor Shower',
-  planet_conjunction: 'Planetary Conjunction',
-  eclipse: 'Eclipse',
-  planet_opposition: 'Planet at Opposition',
-  planet_elongation: 'Planet Elongation',
-  equinox_solstice: 'Equinox / Solstice',
-  comet: 'Comet',
-  asteroid: 'Asteroid',
-  supernova: 'Supernova',
-  aurora: 'Aurora',
-  other: 'Other',
-};
 
 // ============================================================================
 // Props
@@ -110,9 +60,9 @@ export function EventDetailDialog({
 
   if (!event) return null;
 
-  const Icon = EVENT_ICON_MAP[event.type] ?? Star;
-  const colorClass = EVENT_COLOR_MAP[event.type] ?? 'text-muted-foreground bg-muted';
-  const typeLabel = EVENT_TYPE_LABELS[event.type] ?? event.type;
+  const Icon = EVENT_ICON_MAP[event.type] ?? EVENT_ICON_MAP.other;
+  const colorClass = getEventColorClass(event.type);
+  const typeLabel = t(getEventTypeLabelKey(event.type));
 
   const formatFullDate = (date: Date) =>
     date.toLocaleDateString(undefined, {
@@ -151,7 +101,7 @@ export function EventDetailDialog({
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange} tier="standard-form">
-      <ResponsiveDialogContent className="sm:max-w-[480px] max-h-[92vh] max-h-[92dvh] overflow-hidden flex flex-col">
+      <ResponsiveDialogContent className="sm:max-w-[480px] overflow-hidden flex flex-col">
         <ResponsiveDialogHeader className="shrink-0">
           <ResponsiveDialogTitle className="flex items-center gap-3">
             <div className={cn('p-2.5 rounded-xl', colorClass)}>

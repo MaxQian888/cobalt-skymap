@@ -1557,7 +1557,21 @@
     "magnitude": "Magnitude",
     "source": "Data Source",
     "sourcePriority": "Priority",
-    "goToLocation": "Go to Location"
+    "goToLocation": "Go to Location",
+    "typeLabel": {
+      "lunar_phase": "Lunar Phase",
+      "meteor_shower": "Meteor Shower",
+      "planet_conjunction": "Planetary Conjunction",
+      "eclipse": "Eclipse",
+      "planet_opposition": "Planet at Opposition",
+      "planet_elongation": "Planet Elongation",
+      "equinox_solstice": "Equinox / Solstice",
+      "comet": "Comet",
+      "asteroid": "Asteroid",
+      "supernova": "Supernova",
+      "aurora": "Aurora",
+      "other": "Other"
+    }
   },
   "eventSources": {
     "title": "Event Data Sources",

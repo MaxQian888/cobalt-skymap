@@ -1557,7 +1557,21 @@
     "magnitude": "星等",
     "source": "数据来源",
     "sourcePriority": "优先级",
-    "goToLocation": "前往位置"
+    "goToLocation": "前往位置",
+    "typeLabel": {
+      "lunar_phase": "月相",
+      "meteor_shower": "流星雨",
+      "planet_conjunction": "行星合",
+      "eclipse": "食",
+      "planet_opposition": "行星冲",
+      "planet_elongation": "行星大距",
+      "equinox_solstice": "二分二至",
+      "comet": "彗星",
+      "asteroid": "小行星",
+      "supernova": "超新星",
+      "aurora": "极光",
+      "other": "其他"
+    }
   },
   "eventSources": {
     "title": "事件数据源",
