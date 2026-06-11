@@ -57,6 +57,7 @@ export const InfoPanel = memo(function InfoPanel({
   const [currentTime, setCurrentTime] = useState(new Date());
   const [objectExpanded, setObjectExpanded] = useState(true);
   const [chartExpanded, setChartExpanded] = useState(true);
+  const [advancedExpanded, setAdvancedExpanded] = useState(true);
   const [cachedObjectInfo, setCachedObjectInfo] = useState<ObjectDetailedInfo | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   
@@ -90,7 +91,7 @@ export const InfoPanel = memo(function InfoPanel({
     panelRef,
     clickPosition,
     containerBounds,
-    [selectedObject, objectExpanded, chartExpanded],
+    [selectedObject, objectExpanded, chartExpanded, advancedExpanded],
   );
 
   // Update time every 30 seconds
@@ -219,7 +220,7 @@ export const InfoPanel = memo(function InfoPanel({
           'bg-card/95 backdrop-blur-md border-border/60 shadow-2xl',
           'transition-all duration-300 ease-out',
           'animate-in fade-in zoom-in-95 slide-in-from-bottom-2',
-          hasCustomPosition ? 'fixed z-50 w-[280px] sm:w-[300px]' : 'w-full',
+          hasCustomPosition ? 'fixed z-50 w-[min(20rem,calc(100vw-1rem))]' : 'w-full',
           className
         )}
         style={hasCustomPosition ? {
@@ -228,7 +229,12 @@ export const InfoPanel = memo(function InfoPanel({
           maxHeight: 'min(calc(100vh - 80px), calc(100dvh - 80px))',
         } : undefined}
       >
-        <ScrollArea className="max-h-[calc(100vh-140px)] max-h-[calc(100dvh-140px)] sm:max-h-[calc(100vh-100px)] sm:max-h-[calc(100dvh-100px)]">
+        {/* InfoPanel renders on the desktop shell only (see stellarium-view:
+            `!isMobileShell` guard); the mobile shell uses ObjectDetailDrawer.
+            Because the panel never mounts below 900px, sm:(640px) variants were
+            always-on dead code — sizes/labels are written at their resolved
+            desktop value instead (ui-audit #34). */}
+        <ScrollArea className="max-h-[calc(100vh-100px)] max-h-[calc(100dvh-100px)]">
           <div className="p-3 space-y-2">
             {/* Selected Object Section */}
             {selectedObject && (
@@ -248,7 +254,7 @@ export const InfoPanel = memo(function InfoPanel({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 sm:h-6 sm:w-6 text-muted-foreground hover:text-foreground shrink-0 touch-target"
+                        className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0 touch-target"
                         onClick={onClose}
                         aria-label={t('common.close')}
                       >
@@ -452,14 +458,19 @@ export const InfoPanel = memo(function InfoPanel({
                       {(advancedMetadataSection || selectionMetadataSection) && (
                         <Card
                           data-testid="info-panel-section-advanced-metadata"
-                          className="hidden gap-2 border-border/70 bg-muted/20 py-3 text-[11px] shadow-none sm:block"
+                          className="gap-2 border-border/70 bg-muted/20 py-3 text-[11px] shadow-none"
                         >
+                          <Collapsible open={advancedExpanded} onOpenChange={setAdvancedExpanded}>
                           <CardHeader className="px-3 py-0">
-                            <CardTitle className="text-sm font-medium flex items-center gap-1 text-muted-foreground">
-                              <Info className="h-3 w-3" />
-                              <span>{t('objectDetail.systemMetadata')}</span>
-                            </CardTitle>
+                            <CollapsibleTrigger className="flex w-full items-center justify-between gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                              <span className="flex items-center gap-1">
+                                <Info className="h-3 w-3" />
+                                <span>{t('objectDetail.systemMetadata')}</span>
+                              </span>
+                              {advancedExpanded ? <ChevronUp className="h-3.5 w-3.5 shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 shrink-0" />}
+                            </CollapsibleTrigger>
                           </CardHeader>
+                          <CollapsibleContent>
                           <CardContent className="space-y-1 px-3">
                             <div className="flex items-center justify-between">
                             <span className="text-muted-foreground">{t('objectDetail.frameTimeScale')}</span>
@@ -509,29 +520,30 @@ export const InfoPanel = memo(function InfoPanel({
                             </span>
                             </div>
                           </CardContent>
+                          </CollapsibleContent>
+                          </Collapsible>
                         </Card>
                       )}
                     </>
                   )}
 
                   {/* Actions */}
-                  <div className="flex gap-1.5 sm:gap-2">
+                  <div className="flex gap-2">
                     {mountConnected && (
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex-1 h-8 sm:h-7 text-xs border-primary text-primary hover:bg-primary/20 touch-target"
+                        className="flex-1 h-7 text-xs border-primary text-primary hover:bg-primary/20 touch-target"
                         onClick={handleSlew}
                       >
                         <Crosshair className="h-3 w-3 mr-1" />
-                        <span className="hidden sm:inline">{t('actions.slewToObject')}</span>
-                        <span className="sm:hidden">{t('actions.slew')}</span>
+                        {t('actions.slewToObject')}
                       </Button>
                     )}
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1 h-8 sm:h-7 text-xs touch-target"
+                      className="flex-1 h-7 text-xs touch-target"
                       onClick={handleAddToList}
                     >
                       <Plus className="h-3 w-3 mr-1" />
@@ -544,7 +556,7 @@ export const InfoPanel = memo(function InfoPanel({
                     <Button
                       variant="default"
                       size="sm"
-                      className="w-full h-8 sm:h-7 text-xs mt-2 touch-target"
+                      className="w-full h-7 text-xs mt-2 touch-target"
                       onClick={onViewDetails}
                     >
                       <Info className="h-3 w-3 mr-1" />

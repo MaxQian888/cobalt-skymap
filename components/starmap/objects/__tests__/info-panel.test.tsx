@@ -648,11 +648,15 @@ describe('InfoPanel', () => {
   });
 
   describe('compact-priority behavior', () => {
-    it('de-prioritizes advanced metadata while keeping critical actions visible', () => {
+    it('makes advanced metadata collapsible on every viewport while keeping critical actions visible', () => {
       render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
 
       const advanced = screen.getByTestId('info-panel-section-advanced-metadata');
-      expect(advanced.className).toContain('hidden');
+      // Advanced metadata is no longer width-hidden on small screens; it is a
+      // de-prioritized collapsible (open by default, foldable to save space).
+      expect(advanced.className).not.toContain('hidden');
+      // The section title doubles as the collapsible toggle and stays present.
+      expect(screen.getByText('objectDetail.systemMetadata')).toBeInTheDocument();
       expect(screen.getByText('common.add')).toBeInTheDocument();
     });
   });

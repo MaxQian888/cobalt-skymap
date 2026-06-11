@@ -238,7 +238,7 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
         {/* Handle */}
         <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-muted" />
 
-        <DrawerHeader className="pb-2">
+        <DrawerHeader className="mx-auto w-full max-w-2xl pb-2">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0 pr-4">
               <DrawerTitle className="text-xl font-bold truncate flex items-center gap-2">
@@ -299,6 +299,7 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
         </DrawerHeader>
 
         <ScrollArea className="min-h-0 flex-1 overscroll-contain px-4 pb-3">
+          <div className="mx-auto w-full max-w-2xl">
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-9 w-full rounded-lg" />
@@ -766,11 +767,12 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
               </TabsContent>
             </Tabs>
           )}
+          </div>
         </ScrollArea>
 
         {/* Action Buttons - with safe area for mobile */}
         <DrawerFooter className="sticky bottom-0 border-t bg-background/95 p-4 pt-2 pb-[calc(var(--safe-area-bottom)+0.75rem)] backdrop-blur supports-backdrop-filter:bg-background/80">
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 sm:flex-row">
             {mountConnected && (
               <Button
                 variant="outline"
