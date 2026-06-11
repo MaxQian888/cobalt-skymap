@@ -1,33 +1,27 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Calendar,
   ChevronLeft,
   ChevronRight,
-  CircleDot,
   Clock,
-  Eclipse,
   Eye,
   MapPin,
-  Moon,
-  Orbit,
   RefreshCw,
   Settings,
-  Sparkles,
-  Star,
-  Sun,
   Wifi,
   WifiOff,
 } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
+import { STARMAP_DIALOG_ICON_TRIGGER_CLASS } from '@/components/starmap/dialogs/dialog-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -58,39 +52,10 @@ import { useAstroEvents } from '@/lib/tauri/hooks';
 import { isTauri } from '@/lib/storage/platform';
 import { convertTauriEvents } from '@/lib/astronomy/event-utils';
 import { createLogger } from '@/lib/logger';
+import { getEventColorClass, getEventIcon } from './event-visuals';
 import { EventDetailDialog } from './event-detail-dialog';
 
 const logger = createLogger('astro-events-calendar');
-
-const EVENT_ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
-  lunar_phase: Moon,
-  meteor_shower: Sparkles,
-  planet_conjunction: CircleDot,
-  eclipse: Eclipse,
-  planet_opposition: Orbit,
-  planet_elongation: Star,
-  equinox_solstice: Sun,
-  comet: Star,
-  asteroid: CircleDot,
-  supernova: Star,
-  aurora: Sparkles,
-  other: Star,
-};
-
-const EVENT_COLOR_MAP: Record<string, string> = {
-  lunar_phase: 'text-amber-400 bg-amber-400/10',
-  meteor_shower: 'text-purple-400 bg-purple-400/10',
-  planet_conjunction: 'text-blue-400 bg-blue-400/10',
-  eclipse: 'text-red-400 bg-red-400/10',
-  planet_opposition: 'text-orange-400 bg-orange-400/10',
-  planet_elongation: 'text-cyan-400 bg-cyan-400/10',
-  equinox_solstice: 'text-yellow-400 bg-yellow-400/10',
-  comet: 'text-green-400 bg-green-400/10',
-  asteroid: 'text-stone-400 bg-stone-400/10',
-  supernova: 'text-pink-400 bg-pink-400/10',
-  aurora: 'text-emerald-400 bg-emerald-400/10',
-  other: 'text-muted-foreground bg-muted',
-};
 
 function formatDateKeyInTimezone(date: Date, timezone: string): string {
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -131,15 +96,6 @@ function getVisibilityBadge(visibility: string, t: ReturnType<typeof useTranslat
     default:
       return null;
   }
-}
-
-function getEventIcon(type: EventType) {
-  const Icon = EVENT_ICON_MAP[type] ?? Star;
-  return <Icon className="h-4 w-4" />;
-}
-
-function getEventColor(type: EventType) {
-  return EVENT_COLOR_MAP[type] ?? 'text-muted-foreground bg-muted';
 }
 
 function mapToDailyEvents(
@@ -186,25 +142,25 @@ function mergeDailyEvents(events: DailyAstroEvent[]): DailyAstroEvent[] {
   return Array.from(deduped.values()).sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime());
 }
 
-function EventCard({
+const EventCard = memo(function EventCard({
   event,
   onGoTo,
-  onClick,
+  onSelect,
 }: {
   event: DailyAstroEvent;
   onGoTo?: (ra: number, dec: number) => void;
-  onClick?: () => void;
+  onSelect?: (event: DailyAstroEvent) => void;
 }) {
   const t = useTranslations();
 
   return (
     <Card
-      className={cn('border-border hover:border-primary/50 transition-colors', onClick && 'cursor-pointer')}
-      onClick={onClick}
+      className={cn('border-border hover:border-primary/50 transition-colors', onSelect && 'cursor-pointer')}
+      onClick={onSelect ? () => onSelect(event) : undefined}
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
-          <div className={cn('p-2 rounded-lg', getEventColor(event.type))}>
+          <div className={cn('p-2 rounded-lg', getEventColorClass(event.type))}>
             {getEventIcon(event.type)}
           </div>
           <div className="flex-1 min-w-0 space-y-1">
@@ -244,7 +200,7 @@ function EventCard({
       </CardContent>
     </Card>
   );
-}
+});
 
 export function AstroEventsCalendar() {
   const t = useTranslations();
@@ -371,19 +327,20 @@ export function AstroEventsCalendar() {
   }, [setViewDirection]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
+    <>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="standard-form">
+      <ResponsiveDialogTrigger asChild>
+        <Button variant="ghost" size="icon" className={STARMAP_DIALOG_ICON_TRIGGER_CLASS}>
           <Calendar className="h-4 w-4" />
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[640px] max-h-[80vh] max-h-[80dvh] overflow-hidden flex flex-col" data-testid="dialog-content">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="sm:max-w-[640px] overflow-hidden flex flex-col" data-testid="dialog-content">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
             <span>{t('events.astronomicalEvents')}</span>
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -481,7 +438,7 @@ export function AstroEventsCalendar() {
                         key={event.id}
                         event={event}
                         onGoTo={event.ra !== undefined ? handleGoTo : undefined}
-                        onClick={() => setSelectedEvent(event)}
+                        onSelect={setSelectedEvent}
                       />
                     ))}
                   </section>
@@ -494,7 +451,7 @@ export function AstroEventsCalendar() {
                         key={event.id}
                         event={event}
                         onGoTo={event.ra !== undefined ? handleGoTo : undefined}
-                        onClick={() => setSelectedEvent(event)}
+                        onSelect={setSelectedEvent}
                       />
                     ))}
                   </section>
@@ -526,14 +483,15 @@ export function AstroEventsCalendar() {
           </div>
           <span>{filteredDailyEvents.length} {t('events.eventsFound')}</span>
         </div>
-      </DialogContent>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
 
-      <EventDetailDialog
-        event={selectedEvent}
-        open={selectedEvent !== null}
-        onOpenChange={(isOpen) => { if (!isOpen) setSelectedEvent(null); }}
-        onGoTo={handleGoTo}
-      />
-    </Dialog>
+    <EventDetailDialog
+      event={selectedEvent}
+      open={selectedEvent !== null}
+      onOpenChange={(isOpen) => { if (!isOpen) setSelectedEvent(null); }}
+      onGoTo={handleGoTo}
+    />
+    </>
   );
 }
