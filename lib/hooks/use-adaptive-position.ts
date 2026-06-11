@@ -14,10 +14,21 @@ export interface AdaptivePositionResult {
   panelRef: RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * Width at/below which the app switches to the mobile shell (no right rail).
+ * Mirrors MOBILE_SHELL_MAX_WIDTH in use-mobile-shell.ts / ar-adaptation.ts —
+ * kept in sync so panel positioning reserves rail space on exactly the same
+ * viewports the desktop rail actually renders on.
+ */
+const DESKTOP_SHELL_MIN_WIDTH = 900;
+
 const DEFAULT_OPTIONS: Required<AdaptivePositionOptions> = {
   padding: 16,
+  // Footprint of the desktop right rail (--rail-width 52px + --rail-gap 12px +
+  // breathing room), not a full 320px panel — the floating tool panels open
+  // separately, so the InfoPanel only needs to clear the slim rail.
   offset: 20,
-  rightPanelWidth: 320,
+  rightPanelWidth: 72,
   topBarHeight: 64,
   bottomBarHeight: 48,
   defaultPosition: { left: 12, top: 64 },
@@ -52,7 +63,7 @@ export function useAdaptivePosition(
     }
 
     const inferredRightPanelWidth =
-      containerBounds.width < 1024
+      containerBounds.width <= DESKTOP_SHELL_MIN_WIDTH
         ? 0
         : opts.rightPanelWidth;
     const availableWidth = containerBounds.width - inferredRightPanelWidth;
