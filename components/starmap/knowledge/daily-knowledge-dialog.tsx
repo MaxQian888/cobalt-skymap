@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import {
@@ -42,6 +42,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type {
   DailyKnowledgeCategory,
   DailyKnowledgeDifficulty,
+  DailyKnowledgeItem,
   DailyKnowledgeSource,
 } from '@/lib/services/daily-knowledge';
 import { useDailyKnowledgeStore } from '@/lib/stores';
@@ -68,6 +69,110 @@ const SOURCE_OPTIONS: Array<{ value: DailyKnowledgeSource | 'all'; labelKey: str
   { value: 'nasa-photojournal', labelKey: 'dailyKnowledge.sourceNasaPhotojournal' },
   { value: 'esa-science', labelKey: 'dailyKnowledge.sourceEsaScience' },
 ];
+
+type TranslateFn = ReturnType<typeof useTranslations>;
+
+function normalizeMonths(months: number[] | undefined): number[] {
+  return Array.from(
+    new Set(
+      (months ?? [])
+        .map((value) => Math.trunc(value))
+        .filter((value) => value >= 1 && value <= 12)
+    )
+  ).sort((a, b) => a - b);
+}
+
+function getTodayDateKey(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = `${now.getMonth() + 1}`.padStart(2, '0');
+  const day = `${now.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatBestViewingMonths(
+  months: number[] | undefined,
+  t: TranslateFn,
+  monthFormatter: Intl.DateTimeFormat
+): string {
+  const normalized = normalizeMonths(months);
+  if (normalized.length === 0 || normalized.length >= 12) {
+    return t('dailyKnowledge.allYear');
+  }
+  return normalized
+    .map((month) => monthFormatter.format(new Date(Date.UTC(2020, month - 1, 1))))
+    .join(', ');
+}
+
+function formatDifficultyLabel(
+  difficulty: DailyKnowledgeDifficulty | undefined,
+  t: TranslateFn
+): string {
+  return t(`dailyKnowledge.difficultyBadge.${difficulty ?? 'intermediate'}`);
+}
+
+/**
+ * Memoized feed-mode card. Stable props (`item`/`onSelect`/`monthFormatter`) +
+ * `React.memo` keep non-current cards from re-rendering when the active item
+ * changes — only the previously- and newly-current cards update.
+ */
+const KnowledgeFeedCard = memo(function KnowledgeFeedCard({
+  item,
+  isCurrent,
+  monthFormatter,
+  onSelect,
+}: {
+  item: DailyKnowledgeItem;
+  isCurrent: boolean;
+  monthFormatter: Intl.DateTimeFormat;
+  onSelect: (id: string) => void;
+}) {
+  const t = useTranslations();
+  const itemTips = (item.observationTips ?? []).slice(0, 2);
+  return (
+    <Card className={cn(isCurrent && 'border-primary')} data-current={isCurrent}>
+      <CardHeader className="pb-2">
+        <button
+          type="button"
+          onClick={() => onSelect(item.id)}
+          className="text-left text-base font-semibold hover:underline"
+        >
+          {item.title}
+        </button>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-2">
+        <p className="text-sm text-muted-foreground">{item.summary}</p>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="secondary">{t(`dailyKnowledge.sourceBadge.${item.source}`)}</Badge>
+          <Badge variant="outline">{formatDifficultyLabel(item.difficulty, t)}</Badge>
+          <Badge variant="outline">
+            {t('dailyKnowledge.bestViewingMonthsLabel')}: {formatBestViewingMonths(item.bestViewingMonths, t, monthFormatter)}
+          </Badge>
+          {item.categories.map((category) => (
+            <Badge key={`${item.id}-${category}`} variant="outline">
+              {t(`dailyKnowledge.categoryBadge.${category}`)}
+            </Badge>
+          ))}
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs font-medium">{t('dailyKnowledge.observationTips')}</p>
+          {itemTips.length === 0 && (
+            <p className="text-xs text-muted-foreground">{t('dailyKnowledge.noObservationTips')}</p>
+          )}
+          {itemTips.length > 0 && (
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              {itemTips.map((tip, index) => (
+                <li key={`${item.id}-tip-${index}`} className="leading-5">
+                  {tip}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
 
 export function DailyKnowledgeDialog() {
   const WHEEL_THROTTLE_MS = 300;
@@ -122,38 +227,6 @@ export function DailyKnowledgeDialog() {
     []
   );
   const lastWheelAtRef = useRef(0);
-
-  function normalizeMonths(months: number[] | undefined): number[] {
-    return Array.from(
-      new Set(
-        (months ?? [])
-          .map((value) => Math.trunc(value))
-          .filter((value) => value >= 1 && value <= 12)
-      )
-    ).sort((a, b) => a - b);
-  }
-
-  function formatBestViewingMonths(months: number[] | undefined): string {
-    const normalized = normalizeMonths(months);
-    if (normalized.length === 0 || normalized.length >= 12) {
-      return t('dailyKnowledge.allYear');
-    }
-    return normalized
-      .map((month) => monthFormatter.format(new Date(Date.UTC(2020, month - 1, 1))))
-      .join(', ');
-  }
-
-  function formatDifficultyLabel(difficulty: DailyKnowledgeDifficulty | undefined): string {
-    return t(`dailyKnowledge.difficultyBadge.${difficulty ?? 'intermediate'}`);
-  }
-
-  function getTodayDateKey(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = `${now.getMonth() + 1}`.padStart(2, '0');
-    const day = `${now.getDate()}`.padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
 
   function formatActiveDate(dateKey: string): string {
     const [year, month, day] = dateKey.split('-').map((segment) => Number.parseInt(segment, 10));
@@ -314,7 +387,7 @@ export function DailyKnowledgeDialog() {
       onOpenChange={(nextOpen) => !nextOpen && closeDialog()}
       tier="complex-editor"
     >
-      <ResponsiveDialogContent className="max-w-4xl max-h-[100vh] max-h-[100dvh] overflow-hidden flex flex-col">
+      <ResponsiveDialogContent className="max-w-4xl overflow-hidden flex flex-col">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>{t('dailyKnowledge.title')}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>{t('dailyKnowledge.subtitle')}</ResponsiveDialogDescription>
@@ -568,53 +641,15 @@ export function DailyKnowledgeDialog() {
         {!loading && !error && effectiveItem && viewMode === 'feed' && (
           <ScrollArea className="h-[28rem] pr-2" data-testid="daily-knowledge-view-feed">
             <div className="space-y-3">
-              {filteredItems.map((item) => {
-                const isCurrent = currentItem?.id === item.id;
-                const itemTips = (item.observationTips ?? []).slice(0, 2);
-                return (
-                  <Card key={item.id} className={cn(isCurrent && 'border-primary')} data-current={isCurrent}>
-                    <CardHeader className="pb-2">
-                      <button
-                        type="button"
-                        onClick={() => setCurrentItemById(item.id)}
-                        className="text-left text-base font-semibold hover:underline"
-                      >
-                        {item.title}
-                      </button>
-                    </CardHeader>
-                    <CardContent className="pt-0 space-y-2">
-                      <p className="text-sm text-muted-foreground">{item.summary}</p>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant="secondary">{t(`dailyKnowledge.sourceBadge.${item.source}`)}</Badge>
-                        <Badge variant="outline">{formatDifficultyLabel(item.difficulty)}</Badge>
-                        <Badge variant="outline">
-                          {t('dailyKnowledge.bestViewingMonthsLabel')}: {formatBestViewingMonths(item.bestViewingMonths)}
-                        </Badge>
-                        {item.categories.map((category) => (
-                          <Badge key={`${item.id}-${category}`} variant="outline">
-                            {t(`dailyKnowledge.categoryBadge.${category}`)}
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium">{t('dailyKnowledge.observationTips')}</p>
-                        {itemTips.length === 0 && (
-                          <p className="text-xs text-muted-foreground">{t('dailyKnowledge.noObservationTips')}</p>
-                        )}
-                        {itemTips.length > 0 && (
-                          <ul className="space-y-1 text-xs text-muted-foreground">
-                            {itemTips.map((tip, index) => (
-                              <li key={`${item.id}-tip-${index}`} className="leading-5">
-                                {tip}
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              {filteredItems.map((item) => (
+                <KnowledgeFeedCard
+                  key={item.id}
+                  item={item}
+                  isCurrent={currentItem?.id === item.id}
+                  monthFormatter={monthFormatter}
+                  onSelect={setCurrentItemById}
+                />
+              ))}
             </div>
           </ScrollArea>
         )}
@@ -647,9 +682,9 @@ export function DailyKnowledgeDialog() {
                 </CardHeader>
                 <CardContent className="px-3 py-0 text-sm space-y-2">
                   <div className="flex flex-wrap gap-1">
-                    <Badge variant="outline">{formatDifficultyLabel(effectiveItem.difficulty)}</Badge>
+                    <Badge variant="outline">{formatDifficultyLabel(effectiveItem.difficulty, t)}</Badge>
                     <Badge variant="outline">
-                      {t('dailyKnowledge.bestViewingMonthsLabel')}: {formatBestViewingMonths(effectiveItem.bestViewingMonths)}
+                      {t('dailyKnowledge.bestViewingMonthsLabel')}: {formatBestViewingMonths(effectiveItem.bestViewingMonths, t, monthFormatter)}
                     </Badge>
                   </div>
                   <div className="space-y-1">
