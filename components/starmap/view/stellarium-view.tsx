@@ -350,6 +350,21 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
   // on every StellariumView render (it polls view direction every 500ms).
   const handleCloseInfoPanel = useCallback(() => setSelectedObject(null), [setSelectedObject]);
 
+  // Stable handler so memo(ObjectDetailDrawer) holds across frequent re-renders.
+  const handleDetailDrawerOpenChange = useCallback((open: boolean) => {
+    setDetailDrawerOpen(open);
+    if (!open && isMobileShell) {
+      closeMobilePanelContext('details');
+    }
+  }, [setDetailDrawerOpen, isMobileShell, closeMobilePanelContext]);
+
+  // Shared stable handler for memo(SearchPanel)'s close/select (both just
+  // dismiss the mobile search context).
+  const handleCloseSearchContext = useCallback(
+    () => closeMobilePanelContext('search'),
+    [closeMobilePanelContext],
+  );
+
   const handleOpenSessionPlanner = useCallback(() => {
     if (isMobileShell) {
       openMobilePanel('planning');
@@ -532,8 +547,8 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
           ref={searchRef}
           isOpen={isSearchOpen}
           isMobileShell={isMobileShell}
-          onClose={() => closeMobilePanelContext('search')}
-          onSelect={() => closeMobilePanelContext('search')}
+          onClose={handleCloseSearchContext}
+          onSelect={handleCloseSearchContext}
         />
 
         {/* Right Side Controls - Desktop shell only. Gated on the same
@@ -590,12 +605,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
         {/* Object Detail Drawer */}
         <ObjectDetailDrawer
           open={detailDrawerOpen}
-          onOpenChange={(open) => {
-            setDetailDrawerOpen(open);
-            if (!open) {
-              if (isMobileShell) closeMobilePanelContext('details');
-            }
-          }}
+          onOpenChange={handleDetailDrawerOpenChange}
           selectedObject={selectedObject}
           onSetFramingCoordinates={handleSetFramingCoordinates}
         />
