@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Camera, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,10 @@ export function CameraTab({ isTauriAvailable, rawCameras, onDeleteRequest, onRef
     activeCameraId: state.activeCameraId,
   })));
 
-  const cameraList = normalizeCameras(rawCameras as Parameters<typeof normalizeCameras>[0], isTauriAvailable);
+  const cameraList = useMemo(
+    () => normalizeCameras(rawCameras as Parameters<typeof normalizeCameras>[0], isTauriAvailable),
+    [rawCameras, isTauriAvailable]
+  );
 
   const resetForm = () => {
     setForm({ name: '', sensor_width: '', sensor_height: '', pixel_size: '', resolution_x: '', resolution_y: '', camera_type: 'cmos' });
@@ -233,7 +236,7 @@ export function CameraTab({ isTauriAvailable, rawCameras, onDeleteRequest, onRef
           <CardContent className="space-y-3 px-3">
             <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
             <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <Label>{t('equipment.name') || 'Name'}</Label>
                 <Input
@@ -264,7 +267,7 @@ export function CameraTab({ isTauriAvailable, rawCameras, onDeleteRequest, onRef
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <Label>{t('equipment.sensorWidth') || 'Sensor Width (mm)'}</Label>
                 <Input

@@ -965,7 +965,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                         placeholder={t('locations.namePlaceholder') || 'e.g. Backyard, Dark Site'}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <Label>{t('locations.latitude') || 'Latitude'}</Label>
                         <Input
@@ -987,7 +987,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <Label>{t('locations.altitude') || 'Altitude (m)'}</Label>
                         <Input
@@ -1080,7 +1080,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
                         onOpenProviderSettings={() => setMapSettingsOpen(true)}
                       />
                       
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
                           <Label>{t('locations.altitude') || 'Altitude (m)'}</Label>
                         <Input

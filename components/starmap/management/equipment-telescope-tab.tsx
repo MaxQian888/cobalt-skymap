@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Telescope, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,10 @@ export function TelescopeTab({ isTauriAvailable, rawTelescopes, onDeleteRequest,
     activeTelescopeId: state.activeTelescopeId,
   })));
 
-  const telescopeList = normalizeTelescopes(rawTelescopes as Parameters<typeof normalizeTelescopes>[0], isTauriAvailable);
+  const telescopeList = useMemo(
+    () => normalizeTelescopes(rawTelescopes as Parameters<typeof normalizeTelescopes>[0], isTauriAvailable),
+    [rawTelescopes, isTauriAvailable]
+  );
 
   const resetForm = () => {
     setForm({ name: '', aperture: '', focal_length: '', telescope_type: 'reflector' });
@@ -213,7 +216,7 @@ export function TelescopeTab({ isTauriAvailable, rawTelescopes, onDeleteRequest,
           <CardContent className="space-y-3 px-3">
             <form onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
             <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <Label>{t('equipment.name') || 'Name'}</Label>
                 <Input
@@ -243,7 +246,7 @@ export function TelescopeTab({ isTauriAvailable, rawTelescopes, onDeleteRequest,
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <Label>{t('equipment.aperture') || 'Aperture (mm)'}</Label>
                 <Input
