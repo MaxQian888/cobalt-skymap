@@ -149,11 +149,12 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
   const wasSessionPlannerOpenRef = useRef(sessionPlannerOpen);
   // Latch: once the user opens the planner the chunk is loaded; keep the
   // component mounted afterwards so exit animations and subsequent opens
-  // don't pay the chunk-fetch cost again.
+  // don't pay the chunk-fetch cost again. Adjust during render (the
+  // React-recommended pattern) rather than in an effect — no extra commit.
   const [sessionPlannerEverOpened, setSessionPlannerEverOpened] = useState(sessionPlannerOpen);
-  useEffect(() => {
-    if (sessionPlannerOpen) setSessionPlannerEverOpened(true);
-  }, [sessionPlannerOpen]);
+  if (sessionPlannerOpen && !sessionPlannerEverOpened) {
+    setSessionPlannerEverOpened(true);
+  }
   const wasSettingsDrawerOpenRef = useRef(settingsDrawerOpen);
   const handledCliSearchRef = useRef(0);
 
