@@ -58,15 +58,19 @@ import {
 } from '@/lib/constants/mobile-tools';
 import type { TopToolbarProps } from '@/types/starmap/view';
 
-// Desktop right-cluster groups that fold into the "More" overflow menu when the
-// row would otherwise clip. Lower priority folds first (Preferences → Display →
-// Instruments → Planning). Config / View-Help / Window are never folded. Stable
-// module-level reference so it can be a useToolbarOverflow dependency.
+// Toolbar groups that fold into the "More" overflow menu when the row would
+// otherwise clip. Lower priority folds first: the right-cluster secondary tools
+// (Preferences → Display → Instruments → Planning) collapse before the left
+// cluster (Navigation → Discovery), so the headline "what to observe" entries
+// stay inline longest. Search / Config / View-Help / Window are never folded.
+// Stable module-level reference so it can be a useToolbarOverflow dependency.
 const TOOLBAR_FOLDABLE_GROUPS: ToolbarOverflowGroup[] = [
   { id: 'preferences', priority: 1 },
   { id: 'display', priority: 2 },
   { id: 'instruments', priority: 3 },
   { id: 'planning', priority: 4 },
+  { id: 'navigation', priority: 5 },
+  { id: 'discovery', priority: 6 },
 ];
 
 export const TopToolbar = memo(function TopToolbar({
@@ -236,7 +240,43 @@ export const TopToolbar = memo(function TopToolbar({
       </div>
     </ToolbarGroup>
   );
+  // Left-cluster foldable groups — "what to observe" discovery + view navigation.
+  // Folded last (highest priority), so they stay inline until the right cluster
+  // is exhausted. Tour anchors stay mounted whether inline or inside the menu.
+  const discoveryGroup = (
+    <ToolbarGroup gap="none" className="p-0.5" data-tour-id="tonight-button">
+      <div data-tour-id="tonight">
+        <TonightRecommendations />
+      </div>
+      <div data-tour-id="daily-knowledge">
+        <DailyKnowledgeButton />
+      </div>
+      <div data-tour-id="sky-atlas">
+        <SkyAtlasPanel />
+      </div>
+    </ToolbarGroup>
+  );
+  const navigationGroup = (
+    <ToolbarGroup gap="none" className="p-0.5">
+      <div data-tour-id="quick-actions">
+        <QuickActionsPanel onZoomToFov={onSetFov} onResetView={onResetView} />
+      </div>
+      <div data-tour-id="navigation-history">
+        <NavigationHistory onNavigate={onNavigate} />
+      </div>
+      <div data-tour-id="view-bookmarks">
+        <ViewBookmarks
+          currentRa={viewCenterRaDec.ra}
+          currentDec={viewCenterRaDec.dec}
+          currentFov={currentFov}
+          onNavigate={onNavigate}
+        />
+      </div>
+    </ToolbarGroup>
+  );
   const foldableNodes: Record<string, ReactNode> = {
+    discovery: discoveryGroup,
+    navigation: navigationGroup,
     planning: planningGroup,
     instruments: instrumentsGroup,
     display: displayGroup,
@@ -294,46 +334,24 @@ export const TopToolbar = memo(function TopToolbar({
             />
           </div>
 
-          {/* Discovery + Navigation groups — desktop shell only */}
+          {/* Discovery ("what to observe") + Navigation ("where to look") groups —
+              desktop shell only. Foldable: they collapse into the "More" popover
+              after the right cluster is exhausted, so the narrow-desktop row
+              (~900–1100px) never clips. */}
           {!isMobileShell && (
           <div className="flex items-center gap-1.5">
-            <ToolbarGroup gap="none" className="p-0.5" data-tour-id="tonight-button">
-              <div data-tour-id="tonight">
-                <TonightRecommendations />
-              </div>
-              <div data-tour-id="daily-knowledge">
-                <DailyKnowledgeButton />
-              </div>
-              <div data-tour-id="sky-atlas">
-                <SkyAtlasPanel />
-              </div>
-            </ToolbarGroup>
-
-            {/* Navigation Group - "Where to look" */}
-            <ToolbarGroup gap="none" className="p-0.5">
-              <div data-tour-id="quick-actions">
-                <QuickActionsPanel
-                  onZoomToFov={onSetFov}
-                  onResetView={onResetView}
-                />
-              </div>
-              <div data-tour-id="navigation-history">
-                <NavigationHistory onNavigate={onNavigate} />
-              </div>
-              <div data-tour-id="view-bookmarks">
-                <ViewBookmarks
-                  currentRa={viewCenterRaDec.ra}
-                  currentDec={viewCenterRaDec.dec}
-                  currentFov={currentFov}
-                  onNavigate={onNavigate}
-                />
-              </div>
-            </ToolbarGroup>
+            {renderInline('discovery')}
+            {renderInline('navigation')}
           </div>
           )}
         </div>
 
-        {/* Center: Time Display — desktop shell only (mobile shows it in the drawer) */}
+        {/* Center: Time Display — desktop shell only (mobile shows it in the drawer).
+            Intentionally NOT flex-shrinkable: a shrink guard here engages on the
+            first pixel of overflow (immediately), pre-empting the rAF-measured
+            priority+ fold so groups would stop collapsing and the clock would
+            squeeze instead. The group fold (incl. the Tauri-inset case) is the
+            backstop; the clock must keep its natural width to drive that fold. */}
         {!isMobileShell && (
           <div className="pointer-events-auto animate-fade-in">
             {(stel || skyEngine === 'aladin') && <StellariumClock />}

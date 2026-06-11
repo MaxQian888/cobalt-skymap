@@ -35,6 +35,8 @@ async function measure(page: import('@playwright/test').Page) {
       clipped,
       more: !!document.querySelector('[data-testid="toolbar-overflow-trigger"]'),
       inline: {
+        discovery: present('tonight'),
+        navigation: present('quick-actions'),
         planning: present('session-planner'),
         instruments: present('plate-solver'),
         display: present('night-mode'),
@@ -75,12 +77,26 @@ test.describe('Desktop top-bar priority+ overflow', () => {
       expect(m.inline.preferences, 'preferences (lowest priority) folds first').toBe(false);
     }
 
-    // Narrow desktop: all four foldable groups collapse, still no clip.
+    // Narrow desktop: all four right-cluster groups collapse, still no clip.
     await page.setViewportSize({ width: 960, height: 900 });
     await expect
       .poll(async () => {
         const m = await measure(page);
         return m.more && m.clipped === 0 && !m.inline.planning && !m.inline.preferences;
+      }, { timeout: 5000 })
+      .toBe(true);
+
+    // Narrowest desktop (905px, just above the 900px mobile-shell floor): the
+    // four right-cluster groups are fully folded and the row STILL never clips.
+    // (The left Discovery/Navigation groups are also foldable — they fold last,
+    // only once even tighter content pressure exhausts the right cluster, e.g.
+    // the Tauri build's titlebar-inset padding. That path is covered
+    // deterministically in lib/hooks/__tests__/use-toolbar-overflow.test.ts.)
+    await page.setViewportSize({ width: 905, height: 900 });
+    await expect
+      .poll(async () => {
+        const m = await measure(page);
+        return m.clipped === 0 && !m.inline.planning && !m.inline.preferences;
       }, { timeout: 5000 })
       .toBe(true);
 
@@ -98,7 +114,14 @@ test.describe('Desktop top-bar priority+ overflow', () => {
     await expect
       .poll(async () => {
         const m = await measure(page);
-        return !m.more && m.clipped === 0 && m.inline.preferences && m.inline.planning;
+        return (
+          !m.more &&
+          m.clipped === 0 &&
+          m.inline.preferences &&
+          m.inline.planning &&
+          m.inline.discovery &&
+          m.inline.navigation
+        );
       }, { timeout: 5000 })
       .toBe(true);
   });
