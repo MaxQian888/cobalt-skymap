@@ -404,7 +404,7 @@ export const MobileLayout = memo(function MobileLayout({
                     <div
                       ref={drawerToolGridRef}
                       data-mobile-more-tools="true"
-                      className="grid grid-cols-4 gap-2 pb-4"
+                      className="grid grid-cols-4 gap-2 pb-[calc(var(--safe-area-bottom)+1rem)]"
                     >
                       {compactOverflowTools.map((tool) => (
                         <div
