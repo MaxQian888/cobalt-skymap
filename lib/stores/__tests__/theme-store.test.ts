@@ -400,6 +400,57 @@ describe('useThemeStore', () => {
     });
   });
 
+  describe('exportTheme / importTheme', () => {
+    it('exports the current customization and user presets as JSON', () => {
+      act(() => {
+        useThemeStore.getState().setRadius(0.8);
+        useThemeStore.getState().setCustomColor('dark', 'primary', '#abcdef');
+      });
+
+      const json = useThemeStore.getState().exportTheme();
+      const parsed = JSON.parse(json);
+
+      expect(parsed.version).toBe(3);
+      expect(parsed.customization.radius).toBe(0.8);
+      expect(parsed.customization.customColors.dark.primary).toBe('#abcdef');
+      expect(Array.isArray(parsed.userPresets)).toBe(true);
+    });
+
+    it('round-trips an exported theme back into the store', () => {
+      act(() => {
+        useThemeStore.getState().setFontSize('large');
+        useThemeStore.getState().setCustomColor('light', 'accent', '#112233');
+      });
+      const json = useThemeStore.getState().exportTheme();
+
+      act(() => {
+        useThemeStore.getState().resetCustomization();
+      });
+      expect(useThemeStore.getState().customization.fontSize).toBe('default');
+
+      let result = false;
+      act(() => {
+        result = useThemeStore.getState().importTheme(json);
+      });
+
+      expect(result).toBe(true);
+      expect(useThemeStore.getState().customization.fontSize).toBe('large');
+      expect(useThemeStore.getState().customization.customColors.light.accent).toBe('#112233');
+    });
+
+    it('rejects invalid JSON and unrelated objects', () => {
+      let badJson = true;
+      let unrelated = true;
+      act(() => {
+        badJson = useThemeStore.getState().importTheme('{not json');
+        unrelated = useThemeStore.getState().importTheme('{"foo":1}');
+      });
+
+      expect(badJson).toBe(false);
+      expect(unrelated).toBe(false);
+    });
+  });
+
   describe('cssColorToHex', () => {
     it('normalizes a full hex value', () => {
       expect(cssColorToHex('#123456')).toBe('#123456');

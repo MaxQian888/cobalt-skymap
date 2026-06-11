@@ -13,6 +13,7 @@ import {
   ThemePresetSection,
   ThemeRadiusSection,
   ThemeResetButton,
+  ThemeShareSection,
   ThemeTypographySection,
   useThemeCustomizationBindings,
 } from '../theme-customization-sections';
@@ -39,6 +40,8 @@ const mockDuplicatePreset = jest.fn();
 const mockRenameUserPreset = jest.fn();
 const mockSaveCurrentToUserPreset = jest.fn();
 const mockDeleteUserPreset = jest.fn();
+const mockExportTheme = jest.fn(() => '{"version":3}');
+const mockImportTheme = jest.fn(() => true);
 
 const createCustomization = (): ThemeCustomization => ({
   radius: 0.5,
@@ -99,6 +102,8 @@ const mockStoreState = {
   saveCurrentToUserPreset: mockSaveCurrentToUserPreset,
   deleteUserPreset: mockDeleteUserPreset,
   resetCustomization: mockResetCustomization,
+  exportTheme: mockExportTheme,
+  importTheme: mockImportTheme,
 };
 
 jest.mock('next-themes', () => ({
@@ -687,6 +692,44 @@ describe('theme-customization-sections', () => {
 
     expect(mockSetFontFamily).toHaveBeenCalledWith('serif');
     expect(mockSetFontSize).toHaveBeenCalledWith('large');
+  });
+
+  it('exports the theme to the clipboard and imports pasted JSON', async () => {
+    const user = userEvent.setup();
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const exportTheme = jest.fn(() => '{"version":3}');
+    const importTheme = jest.fn(() => true);
+
+    render(<ThemeShareSection exportTheme={exportTheme} importTheme={importTheme} />);
+
+    await user.click(screen.getByText('theme.exportTheme'));
+    expect(writeText).toHaveBeenCalledWith('{"version":3}');
+    expect(await screen.findByText('theme.exportCopied')).toBeInTheDocument();
+
+    const textarea = screen.getByPlaceholderText('theme.importPlaceholder');
+    fireEvent.change(textarea, { target: { value: '{"version":3}' } });
+    await user.click(screen.getByText('theme.importTheme'));
+
+    expect(importTheme).toHaveBeenCalledWith('{"version":3}');
+    expect(screen.getByText('theme.importSuccess')).toBeInTheDocument();
+  });
+
+  it('shows an error when an imported theme is rejected', async () => {
+    const user = userEvent.setup();
+    const importTheme = jest.fn(() => false);
+
+    render(<ThemeShareSection exportTheme={() => '{}'} importTheme={importTheme} />);
+
+    const textarea = screen.getByPlaceholderText('theme.importPlaceholder');
+    fireEvent.change(textarea, { target: { value: 'garbage' } });
+    await user.click(screen.getByText('theme.importTheme'));
+
+    expect(importTheme).toHaveBeenCalledWith('garbage');
+    expect(screen.getByText('theme.importInvalid')).toBeInTheDocument();
   });
 
   it('invokes reset handlers from the reset button section', async () => {

@@ -3,7 +3,7 @@
 import { useState, type CSSProperties } from 'react';
 import { useTheme } from 'next-themes';
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, Check, Copy, Layers3, Monitor, Moon, RotateCcw, Save, Sun, Trash2 } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Download, Layers3, Monitor, Moon, RotateCcw, Save, Sun, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -101,6 +101,8 @@ export function useThemeCustomizationBindings() {
     saveCurrentToUserPreset,
     deleteUserPreset,
     resetCustomization,
+    exportTheme,
+    importTheme,
   } = useThemeStore();
 
   return {
@@ -127,6 +129,8 @@ export function useThemeCustomizationBindings() {
     saveCurrentToUserPreset,
     deleteUserPreset,
     resetCustomization,
+    exportTheme,
+    importTheme,
   };
 }
 
@@ -330,6 +334,92 @@ export function ThemePresetSection({
             </>
           ) : null}
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface ThemeShareSectionProps {
+  exportTheme: () => string;
+  importTheme: (raw: string) => boolean;
+}
+
+export function ThemeShareSection({ exportTheme, importTheme }: ThemeShareSectionProps) {
+  const t = useTranslations();
+  const [importValue, setImportValue] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  const handleExport = async () => {
+    const json = exportTheme();
+    const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined;
+    if (clipboard?.writeText) {
+      try {
+        await clipboard.writeText(json);
+        setCopied(true);
+        return;
+      } catch {
+        // Clipboard write blocked — fall through to manual-copy fallback.
+      }
+    }
+    // No clipboard access: drop the JSON into the import box so it can be copied by hand.
+    setImportValue(json);
+  };
+
+  const handleImport = () => {
+    const ok = importTheme(importValue.trim());
+    setImportStatus(ok ? 'success' : 'error');
+    if (ok) {
+      setImportValue('');
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="space-y-0.5">
+        <Label>{t('theme.shareTheme')}</Label>
+        <p className="text-xs text-muted-foreground">{t('theme.shareDescription')}</p>
+      </div>
+
+      <Button type="button" size="sm" variant="outline" className="gap-2" onClick={handleExport}>
+        <Download className="h-4 w-4" />
+        {copied ? t('theme.exportCopied') : t('theme.exportTheme')}
+      </Button>
+
+      <textarea
+        value={importValue}
+        onChange={(event) => {
+          setImportValue(event.target.value);
+          setImportStatus('idle');
+        }}
+        placeholder={t('theme.importPlaceholder')}
+        rows={3}
+        className={cn(
+          'w-full resize-y rounded-md border border-border/70 bg-background p-2 font-mono text-xs',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          importStatus === 'error' && 'border-destructive',
+        )}
+        aria-invalid={importStatus === 'error'}
+      />
+
+      <div className="flex items-center gap-3">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="gap-2"
+          onClick={handleImport}
+          disabled={!importValue.trim()}
+        >
+          <Upload className="h-4 w-4" />
+          {t('theme.importTheme')}
+        </Button>
+        {importStatus === 'error' ? (
+          <span className="text-xs text-destructive">{t('theme.importInvalid')}</span>
+        ) : null}
+        {importStatus === 'success' ? (
+          <span className="text-xs text-muted-foreground">{t('theme.importSuccess')}</span>
+        ) : null}
       </div>
     </div>
   );

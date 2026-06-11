@@ -23,6 +23,7 @@ import {
   ThemePresetSection,
   ThemeRadiusSection,
   ThemeResetButton,
+  ThemeShareSection,
   ThemeTypographySection,
   useThemeCustomizationBindings,
 } from '@/components/common/theme-customization-sections';
@@ -62,6 +63,8 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
     saveCurrentToUserPreset,
     deleteUserPreset,
     resetCustomization,
+    exportTheme,
+    importTheme,
   } = useThemeCustomizationBindings();
 
   const defaultTrigger = (
@@ -112,6 +115,8 @@ export function ThemeCustomizer({ trigger, open, onOpenChange }: ThemeCustomizer
                 saveCurrentToUserPreset={saveCurrentToUserPreset}
                 deleteUserPreset={deleteUserPreset}
               />
+              <Separator />
+              <ThemeShareSection exportTheme={exportTheme} importTheme={importTheme} />
               <Separator />
               <div className="text-sm text-muted-foreground">{resolvedTheme === 'dark' ? t('common.darkMode') : t('common.lightMode')}</div>
             </TabsContent>

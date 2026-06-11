@@ -114,6 +114,16 @@ interface ThemeStore extends ThemeStorePersistedState {
   deleteUserPreset: (presetId: string) => void;
   resetCustomization: () => void;
   applyCustomization: () => void;
+  exportTheme: () => string;
+  importTheme: (raw: string) => boolean;
+}
+
+export const THEME_EXPORT_VERSION = 3;
+
+export interface ThemeExportPayload {
+  version: number;
+  customization: ThemeCustomization;
+  userPresets: ThemePreset[];
 }
 
 export const defaultComponentStyle: ThemeComponentStyle = {
@@ -1249,6 +1259,47 @@ export const useThemeStore = create<ThemeStore>()(
         if (typeof window !== 'undefined') {
           applyThemeToDOM(get().customization, get().userPresets);
         }
+      },
+
+      exportTheme: () => {
+        const state = get();
+        const payload: ThemeExportPayload = {
+          version: THEME_EXPORT_VERSION,
+          customization: state.customization,
+          userPresets: state.userPresets,
+        };
+        return JSON.stringify(payload, null, 2);
+      },
+
+      importTheme: (raw) => {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          return false;
+        }
+
+        if (!parsed || typeof parsed !== 'object') {
+          return false;
+        }
+
+        // Require at least one recognizable theme field so importing an
+        // unrelated JSON object does not silently wipe the user's theme.
+        if (!hasOwn(parsed, 'customization') && !hasOwn(parsed, 'userPresets')) {
+          return false;
+        }
+
+        const data = parsed as Partial<ThemeExportPayload>;
+        const userPresets = sanitizeThemePresets(data.userPresets);
+        const customization = sanitizeThemeCustomization(
+          data.customization,
+          defaultCustomization,
+          userPresets,
+        );
+
+        set({ customization, userPresets });
+        get().applyCustomization();
+        return true;
       },
     }),
     {

@@ -87,6 +87,8 @@ jest.mock('@/lib/stores/theme-store', () => ({
     renameUserPreset: mockRenameUserPreset,
     saveCurrentToUserPreset: mockSaveCurrentToUserPreset,
     deleteUserPreset: mockDeleteUserPreset,
+    exportTheme: jest.fn(() => '{"version":3}'),
+    importTheme: jest.fn(() => true),
   }),
   componentStylePresets: ['default', 'observatory', 'floating'],
   componentStyleDensityValues: ['comfortable', 'compact'],
