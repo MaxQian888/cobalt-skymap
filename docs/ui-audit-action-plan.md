@@ -51,3 +51,26 @@
 **Kept as-is (verified justified, do NOT "simplify"):** the request-id counter "event bus" (`onboarding-bridge-store`/`cli-bridge-store`) is the correct fire-once cross-tree command idiom. `MobileMenuDrawer` registry is NOT permanently mounted (vaul unmounts closed content) — only a per-render micro-alloc (just `useMemo` it).
 
 **Suggested order:** 1–7 first (highest impact, small/medium), then 8–16 (structural), then layout/best-practice cleanup. Rows 1/31/34 share the breakpoint contract.
+
+---
+
+## Popup Components Audit (2026-06-11)
+
+> Focused follow-up audit of the dialog/popup components (per goal: 每日事件 + 天文计算器 等弹窗 + 移动端自适应). Component-by-component read of `astro-calculator-dialog` (+11 tabs), `astro-events-calendar`, `event-detail-dialog`, `daily-knowledge-dialog` (810), `exposure-calculator` (1263) and the shared `ResponsiveDialog` shell. Status as of this commit: **all items below DONE; unit/tsc/lint green (203 suites / 3092 tests). Mobile-drawer + tab-cache benefit still need runtime verification.**
+
+| # | Status | Problem | Fix | Dim | Sev | Key files |
+|---|---|---|---|---|---|---|
+| X1 | ✅ | `max-h-[Xvh] max-h-[Xdvh]` double-class is dead (twMerge keeps last → vh stripped); worse, `astro-calculator`+`daily-knowledge` passed `max-h-[100vh]` which twMerge-**overrode the shell's 88vh desktop cap** → those two ran full-height on desktop | Removed the redundant/overriding `max-h-*` from the three ResponsiveDialog popups; desktop now inherits the shell's `max-h-[88vh]`, mobile keeps its tier height. (Same insight as row 27, extended to dialogs.) | layout/resp | high (bug) | astro-calculator-dialog, daily-knowledge-dialog, event-detail-dialog |
+| X2 | ✅ | Dialog trigger sizing inconsistent (`h-9 w-9` / bare `size=icon` / `h-10 w-10`) despite an unused `STARMAP_DIALOG_ICON_TRIGGER_CLASS` constant | astro-calculator + events triggers now use the shared constant. **Exposure trigger left as-is** — its `touch-target toolbar-btn` (44px) is load-bearing per the refuted #15. | architecture | medium | astro-calculator-dialog, astro-events-calendar, dialog-layout |
+| X3 | ✅ | `astro-events-calendar` + `exposure-calculator` used raw `Dialog` → cramped centered popup on mobile instead of a bottom drawer like their siblings | Converted both to `ResponsiveDialog` (events=`standard-form`, exposure=`complex-editor`; exposure width scoped via `desktopClassName` so the mobile drawer stays full-width) | architecture/resp | high/med | astro-events-calendar, exposure-calculator |
+| E-1 | ✅ | `event-detail-dialog` `EVENT_TYPE_LABELS` hardcoded English (not `t()`) → type labels untranslated in zh (new instance of row 17) | Added `eventDetail.typeLabel.*` (12 types, en+zh); label now `t(getEventTypeLabelKey(type))` | best-practice/i18n | high (bug) | event-detail-dialog, i18n/messages/{en,zh}.json |
+| E-2 | ✅ | `EVENT_ICON_MAP`/`EVENT_COLOR_MAP` copy-pasted verbatim in calendar + detail (detail even carried a false "shared with calendar" comment) | Extracted `event-visuals.tsx` (maps + `getEventIcon`/`getEventColorClass`/`getEventTypeLabelKey` + unit test) | architecture | medium | event-visuals.tsx (new), astro-events-calendar, event-detail-dialog |
+| E-3 | ✅ | `EventCard` not memoized + inline `onClick` closure → all cards re-render on any parent state change | `React.memo` + stable `onSelect(event)` prop (`setSelectedEvent` directly) | perf | medium | astro-events-calendar |
+| C-1 | ✅ | Astro-calculator's 9 tabs use Radix default unmount → every tab switch remounts + recomputes heavy memos and loses in-tab selections | Lazy-mount + keep-alive: `mountedTabs` set, `forceMount` on visited tabs + `data-[state=inactive]:hidden`. First visit mounts; re-visit is instant; unopened tabs never mount (no eager all-tab compute) | perf | medium | astro-calculator-dialog |
+| C-2 | ✅ | `sharedConstraints` held in `useState` with no setter | Plain module-const reference | best-practice | trivial | astro-calculator-dialog |
+| D-1 | ✅ | daily-knowledge declared pure helpers (`normalizeMonths`/`getTodayDateKey`/formatters) inside the component body each render | Hoisted to module scope (formatters parameterized by `t`/`monthFormatter`) | best-practice | low | daily-knowledge-dialog |
+| D-2 | ✅ | daily-knowledge feed cards rendered inline, not memoized → all re-render when the active item changes | Extracted memoized `KnowledgeFeedCard` (stable `item`/`onSelect`/`monthFormatter`) | perf | low | daily-knowledge-dialog |
+
+**Refuted / out of scope this pass:** exposure-calculator's 3 tabs already **share top-level memos** (switching tabs does not recompute) → no C-1-style caching needed there. `bortleInfo` `.find()` in render is trivial (small array), left as-is.
+
+**Still needs runtime verification (not yet done):** (a) mobile bottom-drawer rendering for `astro-events-calendar` + `exposure-calculator` at ≤640px (Playwright/visual); (b) the C-1 tab-cache benefit via React Profiler (switch away/back → no recompute); (c) desktop dialog height after X1 (should sit at 88vh with margin, was full-screen).
