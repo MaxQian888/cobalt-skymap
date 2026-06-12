@@ -18,6 +18,8 @@ pub enum PlateSolverError {
     Io(#[from] std::io::Error),
     #[error("Download failed: {0}")]
     DownloadFailed(String),
+    #[error("Extraction failed: {0}")]
+    ExtractionFailed(String),
     #[error("Local invocation failed: {0:?}")]
     LocalInvocation(Box<LocalInvocationDiagnostics>),
 }

@@ -39,6 +39,7 @@ tokio = { version = "1", features = ["sync", "time", "macros", "fs"] }
 time = { version = "0.3", features = ["formatting", "macros"] }
 keyring = "3"
 rand = "0.8"
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
 
 # Native disk space API
 [target.'cfg(unix)'.dependencies]
