@@ -25,8 +25,31 @@ import { pointAndLockTargetAt } from './target-object-pool';
 import type { StellariumEngine, SelectedObjectData } from '@/lib/core/types';
 import type { LoadingErrorCode, LoadingState } from '@/types/stellarium-canvas';
 import { useStarmapBootstrapStore } from '@/lib/stores/starmap-bootstrap-store';
+import { isTauri } from '@/lib/storage/platform';
 
 const logger = createLogger('stellarium-loader');
+
+/**
+ * Resolve the URL the engine should fetch comet/asteroid orbital elements from.
+ * Prefers a user-refreshed MPC override file (served via the Tauri asset
+ * protocol) when present; otherwise falls back to the bundled vendored file.
+ * Fully guarded so it can never break the default bundled load path.
+ */
+async function resolveOrbitalUrl(
+  dataset: 'comets' | 'asteroids',
+  fallbackUrl: string,
+): Promise<string> {
+  try {
+    if (!isTauri()) return fallbackUrl;
+    const { mpcApi } = await import('@/lib/tauri/mpc-api');
+    const path = await mpcApi.getOverridePath(dataset);
+    if (!path) return fallbackUrl;
+    const { convertFileSrc } = await import('@tauri-apps/api/core');
+    return convertFileSrc(path);
+  } catch {
+    return fallbackUrl;
+  }
+}
 const TWO_PI = 2 * Math.PI;
 const STELLARIUM_SCRIPT_SELECTOR =
   'script[data-stellarium-engine="true"], script[src*="stellarium-web-engine.js"]';
@@ -341,9 +364,13 @@ export function useStellariumLoader({
     setTimeout(loadSecondarySources, 0);
 
     // Tertiary data sources (loaded during idle time)
-    const loadTertiarySources = () => {
-      safeAdd(core.minor_planets, { url: baseUrl + 'mpcorb.dat', key: 'mpc_asteroids' }, 'minor_planets');
-      safeAdd(core.comets, { url: baseUrl + 'CometEls.txt', key: 'mpc_comets' }, 'comets');
+    const loadTertiarySources = async () => {
+      const [asteroidUrl, cometUrl] = await Promise.all([
+        resolveOrbitalUrl('asteroids', baseUrl + 'mpcorb.dat'),
+        resolveOrbitalUrl('comets', baseUrl + 'CometEls.txt'),
+      ]);
+      safeAdd(core.minor_planets, { url: asteroidUrl, key: 'mpc_asteroids' }, 'minor_planets');
+      safeAdd(core.comets, { url: cometUrl, key: 'mpc_comets' }, 'comets');
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/io', key: 'io' }, 'io');
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/europa', key: 'europa' }, 'europa');
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/ganymede', key: 'ganymede' }, 'ganymede');

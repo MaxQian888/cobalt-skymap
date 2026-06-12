@@ -26,6 +26,7 @@ import {
 import { formatBytes, unifiedCache } from '@/lib/offline';
 import { getCacheDiagnosticsSummary, getCacheIntegrationDiagnostics, getCacheProviderDiagnostics } from '@/lib/cache';
 import { EmptyState } from '@/components/ui/empty-state';
+import { OrbitalDataRefresh } from './orbital-data-refresh';
 import { unifiedCacheApi } from '@/lib/tauri';
 import { isTauri } from '@/lib/storage/platform';
 import { toast } from 'sonner';
@@ -196,6 +197,7 @@ export function CacheUnifiedTab({ isActive }: CacheUnifiedTabProps) {
 
   return (
     <div className="space-y-3">
+      <OrbitalDataRefresh />
       {loadingUnified ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin" />

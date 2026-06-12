@@ -11,6 +11,7 @@
 pub mod astronomy;
 pub mod cache;
 pub mod data;
+pub mod external_data;
 pub mod mount;
 pub mod network;
 pub mod utils;
@@ -660,6 +661,9 @@ pub fn run() {
             reset_paths_to_default,
             #[cfg(desktop)]
             validate_directory,
+            // External data: MPC orbital-element refresh
+            external_data::mpc::refresh_orbital_data,
+            external_data::mpc::get_orbital_override_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
