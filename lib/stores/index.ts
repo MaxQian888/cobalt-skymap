@@ -58,10 +58,13 @@ export {
 } from './marker-store';
 
 // Satellite store
-export { 
-  useSatelliteStore, 
-  type TrackedSatellite 
+export {
+  useSatelliteStore,
+  type TrackedSatellite
 } from './satellite-store';
+
+// HiPS survey selection / catalog discovery store
+export { useHipsSurveyStore } from './hips-survey-store';
 
 // Aladin layers/configuration store
 export {

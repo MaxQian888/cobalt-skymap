@@ -1363,6 +1363,9 @@
   "survey": {
     "builtinSurveys": "内置巡天",
     "onlineSearch": "在线搜索",
+    "catalogs": "目录",
+    "noCatalogs": "未找到目录巡天",
+    "toggleFavorite": "切换收藏",
     "searchPlaceholder": "搜索 DSS, PanSTARRS, WISE...",
     "searchForSurveys": "搜索巡天数据",
     "searchHint": "尝试 DSS, SDSS, 2MASS, WISE 等",

@@ -19,6 +19,16 @@ const logger = createLogger('hips-service');
 
 const ALADIN_REGISTRY_URL = 'https://aladin.cds.unistra.fr/hips/list';
 
+// CDS MocServer query for progressive catalog HiPS (Gaia, etc.).
+const MOCSERVER_CATALOG_URL =
+  'https://alasky.cds.unistra.fr/MocServer/query?' +
+  new URLSearchParams({
+    dataproduct_type: 'catalog',
+    get: 'record',
+    fmt: 'json',
+    fields: 'ID,obs_title,hips_service_url,obs_regime,client_category,dataproduct_type',
+  }).toString();
+
 // ============================================================================
 // Default Surveys
 // ============================================================================
@@ -77,13 +87,41 @@ export const DEFAULT_SURVEYS: HiPSSurvey[] = [
 ];
 
 // ============================================================================
+// Default Catalog HiPS (curated fallback)
+// ============================================================================
+
+/** Well-known progressive catalog HiPS, used when MocServer discovery is unavailable. */
+export const DEFAULT_CATALOG_HIPS: HiPSSurvey[] = [
+  {
+    id: 'CDS-I-355-gaiadr3',
+    name: 'Gaia DR3',
+    url: 'https://hipscat.cds.unistra.fr/HiPSCatService/I/355/gaiadr3',
+    catalogServiceUrl: 'https://hipscat.cds.unistra.fr/HiPSCatService/I/355/gaiadr3',
+    category: 'optical',
+    kind: 'catalog',
+    description: 'Gaia Data Release 3 source catalog (progressive)',
+  },
+  {
+    id: 'CDS-I-350-gaiaedr3',
+    name: 'Gaia EDR3',
+    url: 'https://hipscat.cds.unistra.fr/HiPSCatService/I/350/gaiaedr3',
+    catalogServiceUrl: 'https://hipscat.cds.unistra.fr/HiPSCatService/I/350/gaiaedr3',
+    category: 'optical',
+    kind: 'catalog',
+    description: 'Gaia Early Data Release 3 source catalog (progressive)',
+  },
+];
+
+// ============================================================================
 // Registry Cache
 // ============================================================================
 
 let registryCache: HiPSRegistry | null = null;
+let catalogCache: { surveys: HiPSSurvey[]; lastUpdated: number } | null = null;
 
 export function __resetRegistryCacheForTests(): void {
   registryCache = null;
+  catalogCache = null;
 }
 
 // ============================================================================
@@ -123,6 +161,36 @@ export async function fetchRegistry(): Promise<HiPSRegistry> {
       surveys: DEFAULT_SURVEYS,
       lastUpdated: new Date(),
     };
+  }
+}
+
+/**
+ * Discover progressive catalog HiPS (Gaia, etc.) from the CDS MocServer.
+ * Falls back to the curated DEFAULT_CATALOG_HIPS on failure. Cached for 1 day.
+ */
+export async function fetchCatalogHiPS(): Promise<HiPSSurvey[]> {
+  if (catalogCache && Date.now() - catalogCache.lastUpdated < 86400000) {
+    return catalogCache.surveys;
+  }
+
+  try {
+    const response = await smartFetch(MOCSERVER_CATALOG_URL, {
+      headers: { Accept: 'application/json' },
+      cachePolicy: 'hips-catalog-registry',
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data: HiPSRegistryEntry[] = await response.json();
+    const surveys = parseCatalogRegistryEntries(data);
+    const result = surveys.length > 0 ? surveys : DEFAULT_CATALOG_HIPS;
+    catalogCache = { surveys: result, lastUpdated: Date.now() };
+    return result;
+  } catch (error) {
+    logger.warn('Failed to fetch catalog HiPS from MocServer, using defaults', error);
+    return DEFAULT_CATALOG_HIPS;
   }
 }
 
@@ -198,6 +266,19 @@ function parseRegistryEntries(entries: HiPSRegistryEntry[]): HiPSSurvey[] {
       category: parseCategory(e.obs_regime || e.client_category),
       maxOrder: e.hips_order ? parseInt(e.hips_order) : undefined,
       tileFormat: parseTileFormat(e.hips_tile_format),
+    }));
+}
+
+export function parseCatalogRegistryEntries(entries: HiPSRegistryEntry[]): HiPSSurvey[] {
+  return entries
+    .filter((e) => e.hips_service_url && e.obs_title)
+    .map((e) => ({
+      id: e.ID.replace(/\//g, '-'),
+      name: e.obs_title,
+      url: e.hips_service_url,
+      catalogServiceUrl: e.hips_service_url,
+      category: parseCategory(e.obs_regime || e.client_category),
+      kind: 'catalog' as const,
     }));
 }
 

@@ -4,19 +4,23 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { SKY_SURVEYS } from '@/lib/core/constants';
 import { hipsService, type HiPSSurvey } from '@/lib/services/hips-service';
+import { fetchCatalogHiPS } from '@/lib/services/hips/service';
+import type { HiPSSurvey as CatalogHiPSSurvey } from '@/lib/services/hips/types';
+import { useHipsSurveyStore } from '@/lib/stores';
 import { offlineCacheManager, type HiPSCacheStatus } from '@/lib/offline';
-import { 
-  Map, 
-  Telescope, 
-  Search, 
-  Globe, 
-  Download, 
-  Check, 
-  Loader2, 
+import {
+  Map,
+  Telescope,
+  Search,
+  Globe,
+  Download,
+  Check,
+  Loader2,
   HardDrive,
   Wifi,
   WifiOff,
   Star,
+  Database,
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -73,7 +77,16 @@ export function StellariumSurveySelector({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [onlineSurveys, setOnlineSurveys] = useState<HiPSSurvey[]>([]);
-  const [activeTab, setActiveTab] = useState<'local' | 'online'>('local');
+  const [activeTab, setActiveTab] = useState<'local' | 'online' | 'catalogs'>('local');
+  const [isLoadingCatalogs, setIsLoadingCatalogs] = useState(false);
+
+  // Catalog HiPS discovery (Gaia, etc.) — managed in the dedicated survey store.
+  const discoveredCatalogs = useHipsSurveyStore((s) => s.discoveredCatalogs);
+  const setDiscoveredCatalogs = useHipsSurveyStore((s) => s.setDiscoveredCatalogs);
+  const selectedCatalogId = useHipsSurveyStore((s) => s.selectedSurveyId);
+  const setSelectedCatalog = useHipsSurveyStore((s) => s.setSelectedSurvey);
+  const favoriteSurveyIds = useHipsSurveyStore((s) => s.favoriteSurveyIds);
+  const toggleFavorite = useHipsSurveyStore((s) => s.toggleFavorite);
   const [isOnline, setIsOnline] = useState(true);
   
   // State for cache status
@@ -155,6 +168,25 @@ export function StellariumSurveySelector({
       loadRecommended();
     }
   }, [activeTab, onlineSurveys.length, isOnline]);
+
+  // Discover catalog HiPS (Gaia, etc.) when the catalogs tab is first opened
+  useEffect(() => {
+    if (activeTab === 'catalogs' && discoveredCatalogs.length === 0) {
+      let cancelled = false;
+      setIsLoadingCatalogs(true);
+      fetchCatalogHiPS()
+        .then((catalogs) => {
+          if (!cancelled) setDiscoveredCatalogs(catalogs);
+        })
+        .catch((error) => logger.error('Error loading catalog HiPS', error))
+        .finally(() => {
+          if (!cancelled) setIsLoadingCatalogs(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [activeTab, discoveredCatalogs.length, setDiscoveredCatalogs]);
 
   // Handle survey selection
   const handleSelectSurvey = useCallback((survey: HiPSSurvey) => {
@@ -291,8 +323,8 @@ export function StellariumSurveySelector({
         {/* Survey Selector */}
         {surveyEnabled && (
           <div className="space-y-2 overflow-hidden">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'local' | 'online')} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 h-8">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'local' | 'online' | 'catalogs')} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 h-8">
                 <TabsTrigger value="local" className="text-xs h-7 px-2">
                   <Star className="h-3 w-3 mr-1 shrink-0" />
                   <span className="truncate">{t('survey.builtinSurveys')}</span>
@@ -300,6 +332,10 @@ export function StellariumSurveySelector({
                 <TabsTrigger value="online" className="text-xs h-7 px-2" disabled={!isOnline}>
                   <Globe className="h-3 w-3 mr-1 shrink-0" />
                   <span className="truncate">{t('survey.onlineSearch')}</span>
+                </TabsTrigger>
+                <TabsTrigger value="catalogs" className="text-xs h-7 px-2" disabled={!isOnline}>
+                  <Database className="h-3 w-3 mr-1 shrink-0" />
+                  <span className="truncate">{t('survey.catalogs')}</span>
                 </TabsTrigger>
               </TabsList>
               
@@ -396,6 +432,62 @@ export function StellariumSurveySelector({
                     )}
                   </ScrollArea>
                 </div>
+              </TabsContent>
+
+              {/* Catalog HiPS (Gaia DR3, etc.) */}
+              <TabsContent value="catalogs" className="mt-2">
+                <ScrollArea className="h-[220px] pr-1">
+                  {isLoadingCatalogs ? (
+                    <div className="flex items-center justify-center h-[200px]">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : discoveredCatalogs.length > 0 ? (
+                    <div className="space-y-1">
+                      {discoveredCatalogs.map((catalog: CatalogHiPSSurvey) => {
+                        const isSelected = catalog.id === selectedCatalogId;
+                        const isFavorite = favoriteSurveyIds.includes(catalog.id);
+                        return (
+                          <div
+                            key={catalog.id}
+                            className={cn(
+                              'flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer hover:bg-accent',
+                              isSelected && 'bg-primary/10 ring-1 ring-primary/40'
+                            )}
+                            onClick={() => setSelectedCatalog(isSelected ? null : catalog.id)}
+                          >
+                            {isSelected ? (
+                              <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                            ) : (
+                              <Database className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            )}
+                            <span className="text-sm truncate flex-1">{catalog.name}</span>
+                            <Badge variant="outline" className="text-[10px] shrink-0">
+                              {catalog.category}
+                            </Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0"
+                              aria-label={t('survey.toggleFavorite')}
+                              aria-pressed={isFavorite}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(catalog.id);
+                              }}
+                            >
+                              <Star className={cn('h-3.5 w-3.5', isFavorite && 'fill-current text-yellow-500')} />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-[200px] text-muted-foreground">
+                      <Database className="h-8 w-8 mb-2 opacity-50" />
+                      <p className="text-sm">{t('survey.noCatalogs')}</p>
+                    </div>
+                  )}
+                </ScrollArea>
               </TabsContent>
             </Tabs>
 

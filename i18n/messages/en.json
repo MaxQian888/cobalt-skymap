@@ -1363,6 +1363,9 @@
   "survey": {
     "builtinSurveys": "Built-in Surveys",
     "onlineSearch": "Online Search",
+    "catalogs": "Catalogs",
+    "noCatalogs": "No catalog surveys found",
+    "toggleFavorite": "Toggle favorite",
     "searchPlaceholder": "Search DSS, PanSTARRS, WISE...",
     "searchForSurveys": "Search for sky surveys",
     "searchHint": "Try DSS, SDSS, 2MASS, WISE, etc.",

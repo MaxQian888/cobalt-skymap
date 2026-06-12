@@ -25,6 +25,10 @@ export interface HiPSSurvey {
   tileFormat?: 'jpg' | 'png' | 'webp';
   frame?: 'equatorial' | 'galactic';
   isDefault?: boolean;
+  /** Image survey (sky imagery) vs progressive catalog HiPS. Defaults to 'image'. */
+  kind?: 'image' | 'catalog';
+  /** For catalog HiPS: the HiPSCatService base URL fed to A.catalogHiPS(). */
+  catalogServiceUrl?: string;
 }
 
 // ============================================================================
@@ -39,6 +43,7 @@ export interface HiPSRegistryEntry {
   hips_tile_format?: string;
   obs_regime?: string;
   client_category?: string;
+  dataproduct_type?: string;
 }
 
 export interface HiPSRegistry {
