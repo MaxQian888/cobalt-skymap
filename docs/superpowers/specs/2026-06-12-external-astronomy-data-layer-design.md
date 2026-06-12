@@ -1,7 +1,22 @@
 # External Astronomy Data Layer (D2 + D3) — Design Spec
 
 > **Date:** 2026-06-12
-> **Status:** Design approved by user, pending spec review → writing-plans
+> **Status:** IMPLEMENTED (all 4 phases on branch `feat/external-astronomy-data-layer`).
+>
+> **⚠️ ARCHITECTURE REVISION (2026-06-12, during planning):** §3's per-source Rust
+> command design was **superseded** by a leaner architecture after exploration found
+> that `smartFetch` (`lib/services/http-fetch.ts`) already routes through the Rust HTTP
+> client in Tauri (bypassing CORS) and integrates the unified cache via named
+> **cachePolicy** ids (`lib/cache/integration-policy.ts`). The implemented design:
+> CelesTrak TLE / JPL Horizons / CDS catalog-HiPS go through **pure TS + smartFetch +
+> a new cachePolicy**; **Rust is used only for MPC** (gunzip + magnitude filter + writing
+> files the WASM engine re-fetches). What shipped: Phase 1 satellite TLE group select +
+> manual refresh + stale-if-error; Phase 2 `lib/services/horizons/` + `horizons-ephemeris`
+> policy + `useHorizonsEphemeris` + info-panel JPL line; Phase 3 `fetchCatalogHiPS` +
+> `hips-catalog-registry` policy + `hips-survey-store` + survey-selector Catalogs tab;
+> Phase 4 `external_data/mpc.rs` (`refresh_orbital_data`/`get_orbital_override_path`) +
+> assetProtocol + loader override + cache-tab refresh action. Read §3 below as historical
+> design intent; the authoritative record is the commits + the plan file.
 > **Slice:** First of four (D2+D3) in the "完善星图渲染 / 充分使用两套引擎 / 增加接口" goal.
 > **Next slices (later, each own spec→plan):** B (Aladin science: Gaia DR3 progressive catalog, displayFITS, colormap library) · A (Stellarium: comets/asteroids enumeration + Calendar events) · C (cross-engine: angular measurement, box-select).
 
