@@ -45,6 +45,13 @@ export interface AladinFitsLayer {
   mode: AladinFitsMode;
   enabled: boolean;
   opacity: number;
+  /** Colormap name applied to the FITS pixels ('native' / undefined = engine default). */
+  colormap?: string;
+  /** Stretch function for the colormap: linear | log | sqrt | asinh | pow. */
+  stretch?: string;
+  /** Pixel-value cut range for the stretch. */
+  minCut?: number;
+  maxCut?: number;
 }
 
 interface AddCatalogLayerInput extends Omit<AladinCatalogLayer, 'id'> {

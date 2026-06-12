@@ -131,6 +131,22 @@ export function useAladinFits({
       } catch {
         survey.setAlpha?.(layer.opacity);
       }
+
+      // Apply colormap + stretch and pixel cuts (FITS rendering controls).
+      if (layer.colormap && layer.colormap !== 'native') {
+        try {
+          survey.setColormap(layer.colormap, layer.stretch ? { stretch: layer.stretch } : undefined);
+        } catch (error) {
+          logger.debug('setColormap failed', error);
+        }
+      }
+      if (typeof layer.minCut === 'number' && typeof layer.maxCut === 'number') {
+        try {
+          survey.setCuts?.(layer.minCut, layer.maxCut);
+        } catch (error) {
+          logger.debug('setCuts failed', error);
+        }
+      }
     }
 
     for (const [id, handle] of active) {

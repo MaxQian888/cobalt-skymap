@@ -93,6 +93,7 @@ function createHiPS(name) {
     setAlpha: jest.fn(),
     setBlendingConfig: jest.fn(),
     setColormap: jest.fn(),
+    setCuts: jest.fn(),
     setGamma: jest.fn(),
     setSaturation: jest.fn(),
     setContrast: jest.fn(),

@@ -15,10 +15,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAladinStore, type AladinFitsMode } from '@/lib/stores/aladin-store';
+import { useAladinColormaps } from '@/lib/hooks/aladin';
 import { SettingsSection, ToggleItem } from './settings-shared';
+
+const FITS_STRETCHES = ['linear', 'log', 'sqrt', 'asinh', 'pow'] as const;
 
 export function AladinFitsSettings() {
   const t = useTranslations();
+  const colormaps = useAladinColormaps();
   const [fitsName, setFitsName] = useState('');
   const [fitsUrl, setFitsUrl] = useState('');
   const [fitsMode, setFitsMode] = useState<AladinFitsMode>('overlay');
@@ -131,6 +135,75 @@ export function AladinFitsSettings() {
                   step={0.01}
                   onValueChange={([value]) => updateFitsLayer(layer.id, { opacity: value })}
                 />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('settings.aladinColormap')}</Label>
+                <Select
+                  value={layer.colormap ?? 'native'}
+                  onValueChange={(value) => updateFitsLayer(layer.id, { colormap: value })}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {colormaps.map((cm) => (
+                      <SelectItem key={cm} value={cm}>
+                        {cm === 'native'
+                          ? t('settings.aladinColormapNative')
+                          : cm.charAt(0).toUpperCase() + cm.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('settings.aladinStretch')}</Label>
+                <Select
+                  value={layer.stretch ?? 'linear'}
+                  onValueChange={(value) => updateFitsLayer(layer.id, { stretch: value })}
+                >
+                  <SelectTrigger className="h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FITS_STRETCHES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">{t('settings.aladinMinCut')}</Label>
+                  <Input
+                    type="number"
+                    value={layer.minCut ?? ''}
+                    onChange={(e) =>
+                      updateFitsLayer(layer.id, {
+                        minCut: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                    className="h-8"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">{t('settings.aladinMaxCut')}</Label>
+                  <Input
+                    type="number"
+                    value={layer.maxCut ?? ''}
+                    onChange={(e) =>
+                      updateFitsLayer(layer.id, {
+                        maxCut: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                    className="h-8"
+                  />
+                </div>
               </div>
             </div>
           )}

@@ -123,6 +123,39 @@ describe('useAladinFits', () => {
     expect(aladinMock.imageHiPS).not.toHaveBeenCalled();
   });
 
+  it('applies colormap, stretch and cuts to the FITS survey', async () => {
+    const { useAladinFits } = await import('../use-aladin-fits');
+    const aladinRef = {
+      current: {
+        setOverlayImageLayer: jest.fn(),
+        setBaseImageLayer: jest.fn(),
+        newImageSurvey: jest.fn(),
+      },
+    };
+
+    useAladinStore.getState().addFitsLayer({
+      id: 'cm-fits',
+      url: 'https://example.com/fits',
+      name: 'CM',
+      enabled: true,
+      opacity: 1,
+      mode: 'overlay',
+      colormap: 'magma',
+      stretch: 'log',
+      minCut: 10,
+      maxCut: 1000,
+    });
+
+    renderHook(() => useAladinFits({ aladinRef: aladinRef as never, engineReady: true }));
+
+    await waitFor(() => expect(aladinMock.imageHiPS).toHaveBeenCalled());
+    const survey = aladinMock.imageHiPS.mock.results[0].value;
+    await waitFor(() =>
+      expect(survey.setColormap).toHaveBeenCalledWith('magma', { stretch: 'log' })
+    );
+    expect(survey.setCuts).toHaveBeenCalledWith(10, 1000);
+  });
+
   it('disables a FITS layer when mounting it fails', async () => {
     const { useAladinFits } = await import('../use-aladin-fits');
     const aladinRef = {
