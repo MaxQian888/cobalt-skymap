@@ -1675,6 +1675,7 @@
     "online": "Online",
     "offline": "Offline",
     "dataSources": "Data Sources",
+    "groups": "CelesTrak groups",
     "loading": "Loading satellites...",
     "satellitesFound": "satellites",
     "showOnMap": "Show satellites on map",

@@ -1,5 +1,14 @@
 import { act, renderHook } from '@testing-library/react';
 import { useSatelliteStore, type TrackedSatellite } from '../satellite-store';
+import { fetchSatellitesFromCelesTrak } from '@/lib/services/satellite/celestrak-service';
+
+jest.mock('@/lib/services/satellite/celestrak-service', () => ({
+  fetchSatellitesFromCelesTrak: jest.fn(),
+}));
+
+const mockFetch = fetchSatellitesFromCelesTrak as jest.MockedFunction<
+  typeof fetchSatellitesFromCelesTrak
+>;
 
 describe('useSatelliteStore', () => {
   const mockSatellite: TrackedSatellite = {
@@ -204,6 +213,54 @@ describe('useSatelliteStore', () => {
 
       expect(result.current.trackedSatellites).toHaveLength(0);
       expect(result.current.selectedSatelliteId).toBeNull();
+    });
+  });
+
+  describe('selectedGroups', () => {
+    it('defaults to stations/visual/active', () => {
+      const { result } = renderHook(() => useSatelliteStore());
+      expect(result.current.selectedGroups).toEqual(['stations', 'visual', 'active']);
+    });
+
+    it('setSelectedGroups replaces the selection', () => {
+      const { result } = renderHook(() => useSatelliteStore());
+
+      act(() => {
+        result.current.setSelectedGroups(['starlink']);
+      });
+
+      expect(result.current.selectedGroups).toEqual(['starlink']);
+    });
+  });
+
+  describe('refreshFromCelesTrak', () => {
+    it('loads satellites from the service and upserts them into the store', async () => {
+      mockFetch.mockResolvedValueOnce([
+        {
+          id: 'celestrak-25544',
+          name: 'ISS (ZARYA)',
+          noradId: 25544,
+          type: 'iss',
+          altitude: 420,
+          velocity: 7.66,
+          inclination: 51.6,
+          period: 92.9,
+          ra: 180,
+          dec: 45,
+          isVisible: true,
+          source: 'CelesTrak',
+        },
+      ]);
+
+      const { result } = renderHook(() => useSatelliteStore());
+
+      await act(async () => {
+        await result.current.refreshFromCelesTrak('stations');
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith('stations', undefined);
+      expect(result.current.trackedSatellites).toHaveLength(1);
+      expect(result.current.trackedSatellites[0].noradId).toBe(25544);
     });
   });
 

@@ -44,6 +44,23 @@ export const SATELLITE_SOURCES: DataSourceConfig[] = [
   { id: 'heavensabove', name: 'Heavens-Above', enabled: false, apiUrl: 'https://heavens-above.com' },
 ];
 
+/** CelesTrak GP `GROUP=` values the UI exposes for refresh. */
+const CELESTRAK_GROUPS = [
+  'stations',
+  'visual',
+  'active',
+  'gps-ops',
+  'starlink',
+  'noaa',
+  'science',
+  'amateur',
+] as const;
+
+/** Standard CelesTrak satellite groups available for refresh. */
+export function getAvailableGroups(): string[] {
+  return [...CELESTRAK_GROUPS];
+}
+
 // ============================================================================
 // In-memory cache
 // ============================================================================
@@ -180,8 +197,12 @@ export async function fetchSatellitesFromCelesTrak(
     cache.set(cacheKey, { data: satellites, timestamp: Date.now() });
     return satellites;
   } catch (error) {
+    // Stale-if-error: keep the last known catalog usable when offline / on a
+    // failed refresh instead of dropping satellites entirely. Only return [] when
+    // nothing was ever cached for this group.
     logger.warn('Failed to fetch from CelesTrak', error);
-    return [];
+    const stale = cache.get(cacheKey);
+    return stale ? stale.data : [];
   }
 }
 

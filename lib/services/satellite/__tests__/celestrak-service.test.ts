@@ -5,6 +5,7 @@ import {
   generateSamplePasses,
   SATELLITE_SOURCES,
   fetchSatellitesFromCelesTrak,
+  getAvailableGroups,
 } from '../celestrak-service';
 
 const mockSmartFetch = jest.fn();
@@ -202,6 +203,46 @@ describe('celestrak-service', () => {
           cacheTtl: 3600 * 1000,
         })
       );
+    });
+
+    it('returns the last cached data when a later refresh fails (stale-if-error)', async () => {
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+
+      // First successful fetch primes the in-memory cache for this group.
+      mockSmartFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            OBJECT_NAME: 'HUBBLE',
+            NORAD_CAT_ID: 20580,
+            MEAN_MOTION: 15.1,
+            INCLINATION: 28.5,
+            TLE_LINE1: '',
+            TLE_LINE2: '',
+          },
+        ],
+      });
+      const first = await fetchSatellitesFromCelesTrak('science');
+      expect(first).toHaveLength(1);
+
+      // Advance time past the TTL so the cache is stale and a re-fetch is attempted,
+      // then make that re-fetch fail. Stale data should be returned, not [].
+      nowSpy.mockReturnValue(1_000_000 + 3600 * 1000 + 1);
+      mockSmartFetch.mockRejectedValueOnce(new Error('Network error'));
+      const second = await fetchSatellitesFromCelesTrak('science');
+      expect(second).toHaveLength(1);
+      expect(second[0].noradId).toBe(20580);
+
+      nowSpy.mockRestore();
+    });
+  });
+
+  describe('getAvailableGroups', () => {
+    it('includes the standard CelesTrak groups', () => {
+      const groups = getAvailableGroups();
+      expect(groups).toContain('stations');
+      expect(groups).toContain('starlink');
+      expect(groups.length).toBeGreaterThanOrEqual(5);
     });
   });
 });

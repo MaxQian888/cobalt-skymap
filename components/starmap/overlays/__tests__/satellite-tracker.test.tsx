@@ -42,6 +42,9 @@ const mockUseSatelliteStore = jest.fn((selector) => {
     showOrbits: false,
     setShowOrbits: jest.fn(),
     setShowSatellites: mockSetShowSatellites,
+    selectedGroups: ['stations', 'visual', 'active'],
+    setSelectedGroups: jest.fn(),
+    refreshFromCelesTrak: jest.fn(),
   };
   return selector ? selector(state) : state;
 });
@@ -82,6 +85,7 @@ jest.mock('@/lib/services/satellite/celestrak-service', () => ({
   SATELLITE_SOURCES: [
     { id: 'celestrak', name: 'CelesTrak', enabled: true, apiUrl: 'https://celestrak.org' },
   ],
+  getAvailableGroups: () => ['stations', 'visual', 'active', 'starlink'],
 }));
 
 jest.mock('@/lib/utils', () => ({

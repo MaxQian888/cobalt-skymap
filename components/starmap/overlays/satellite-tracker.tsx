@@ -53,6 +53,7 @@ import {
   SAMPLE_SATELLITES,
   generateSamplePasses,
   SATELLITE_SOURCES,
+  getAvailableGroups,
 } from '@/lib/services/satellite/celestrak-service';
 import { createLogger } from '@/lib/logger';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -253,6 +254,9 @@ export function SatelliteTracker() {
   const showSatellitesOnMap = useSatelliteStore((state) => state.showSatellites);
   const setShowSatellitesOnMap = useSatelliteStore((state) => state.setShowSatellites);
   const addTrackedSatellite = useSatelliteStore((state) => state.addTrackedSatellite);
+  const selectedGroups = useSatelliteStore((state) => state.selectedGroups);
+  const setSelectedGroups = useSatelliteStore((state) => state.setSelectedGroups);
+  const availableGroups = useMemo(() => getAvailableGroups(), []);
   
   // Satellites state - start with sample data, fetch real data when online
   const [satellites, setSatellites] = useState<SatelliteData[]>(SAMPLE_SATELLITES);
@@ -278,8 +282,8 @@ export function SatelliteTracker() {
         
         for (const source of enabledSources) {
           if (source.id === 'celestrak') {
-            // Fetch multiple categories with observer location for SGP4
-            const categories = ['stations', 'visual', 'active'];
+            // Fetch the user-selected CelesTrak groups with observer location for SGP4.
+            const categories = selectedGroups.length > 0 ? selectedGroups : ['stations'];
             for (const cat of categories) {
               const sats = await fetchSatellitesFromCelesTrak(cat, observerLocation);
               allSatellites.push(...sats);
@@ -309,7 +313,7 @@ export function SatelliteTracker() {
     };
     
     fetchSatellites();
-  }, [open, dataSources, observerLocation]);
+  }, [open, dataSources, observerLocation, selectedGroups]);
   
   // Filter satellites
   const filteredSatellites = useMemo(() => {
@@ -339,10 +343,18 @@ export function SatelliteTracker() {
   
   // Toggle data source
   const toggleDataSource = useCallback((id: string) => {
-    setDataSources(prev => prev.map(s => 
+    setDataSources(prev => prev.map(s =>
       s.id === id ? { ...s, enabled: !s.enabled } : s
     ));
   }, []);
+
+  // Toggle a CelesTrak group in the refresh selection (keep at least one).
+  const toggleGroup = useCallback((group: string) => {
+    const next = selectedGroups.includes(group)
+      ? selectedGroups.filter(g => g !== group)
+      : [...selectedGroups, group];
+    if (next.length > 0) setSelectedGroups(next);
+  }, [selectedGroups, setSelectedGroups]);
   
   // Handle track satellite - jump to position and add to tracked list
   const handleTrack = useCallback((satellite: SatelliteData) => {
@@ -535,6 +547,36 @@ export function SatelliteTracker() {
                           />
                         </div>
                       ))}
+
+                      <Separator className="my-1" />
+
+                      <div className="text-xs font-medium text-muted-foreground mb-1">
+                        {t('satellites.groups')}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {availableGroups.map((group) => {
+                          const active = selectedGroups.includes(group);
+                          return (
+                            <Badge
+                              key={group}
+                              variant={active ? 'default' : 'outline'}
+                              role="button"
+                              tabIndex={0}
+                              aria-pressed={active}
+                              className="cursor-pointer select-none"
+                              onClick={() => toggleGroup(group)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  toggleGroup(group);
+                                }
+                              }}
+                            >
+                              {group}
+                            </Badge>
+                          );
+                        })}
+                      </div>
                     </CardContent>
                   </Card>
                 </CollapsibleContent>

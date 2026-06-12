@@ -1675,6 +1675,7 @@
     "online": "在线",
     "offline": "离线",
     "dataSources": "数据源",
+    "groups": "CelesTrak 分组",
     "loading": "加载卫星中...",
     "satellitesFound": "颗卫星",
     "showOnMap": "在星图上显示卫星",

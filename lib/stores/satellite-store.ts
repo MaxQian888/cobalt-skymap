@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { SatelliteType } from '@/lib/core/types';
+import { fetchSatellitesFromCelesTrak } from '@/lib/services/satellite/celestrak-service';
+import type { ObserverLocation } from '@/lib/services/satellite-propagator';
 
 // ============================================================================
 // Types
@@ -35,7 +37,10 @@ interface SatelliteState {
   
   // Selected satellite for tracking
   selectedSatelliteId: string | null;
-  
+
+  // CelesTrak groups to load on refresh
+  selectedGroups: string[];
+
   // Actions
   setShowSatellites: (show: boolean) => void;
   setShowLabels: (show: boolean) => void;
@@ -46,6 +51,8 @@ interface SatelliteState {
   setTrackedSatellites: (satellites: TrackedSatellite[]) => void;
   clearTrackedSatellites: () => void;
   setSelectedSatellite: (id: string | null) => void;
+  setSelectedGroups: (groups: string[]) => void;
+  refreshFromCelesTrak: (group: string, observer?: ObserverLocation) => Promise<void>;
 }
 
 // ============================================================================
@@ -61,7 +68,8 @@ export const useSatelliteStore = create<SatelliteState>()(
       showOrbits: false,
       trackedSatellites: [],
       selectedSatelliteId: null,
-      
+      selectedGroups: ['stations', 'visual', 'active'],
+
       // Actions
       setShowSatellites: (show) => set({ showSatellites: show }),
       setShowLabels: (show) => set({ showLabels: show }),
@@ -92,6 +100,36 @@ export const useSatelliteStore = create<SatelliteState>()(
       }),
       
       setSelectedSatellite: (id) => set({ selectedSatelliteId: id }),
+
+      setSelectedGroups: (groups) => set({ selectedGroups: groups }),
+
+      refreshFromCelesTrak: async (group, observer) => {
+        const satellites = await fetchSatellitesFromCelesTrak(group, observer);
+        const mapped: TrackedSatellite[] = satellites.map((s) => ({
+          id: s.id,
+          name: s.name,
+          noradId: s.noradId,
+          type: s.type,
+          altitude: s.altitude,
+          velocity: s.velocity,
+          inclination: s.inclination ?? 0,
+          period: s.period ?? 0,
+          ra: s.ra ?? 0,
+          dec: s.dec ?? 0,
+          azimuth: s.azimuth,
+          elevation: s.elevation,
+          magnitude: s.magnitude,
+          isVisible: s.isVisible,
+          source: s.source,
+        }));
+
+        // Upsert by id so refreshing one group does not wipe others.
+        set((state) => {
+          const byId = new Map(state.trackedSatellites.map((s) => [s.id, s]));
+          for (const sat of mapped) byId.set(sat.id, sat);
+          return { trackedSatellites: Array.from(byId.values()) };
+        });
+      },
     }),
     {
       name: 'satellite-settings',
@@ -99,6 +137,7 @@ export const useSatelliteStore = create<SatelliteState>()(
         showSatellites: state.showSatellites,
         showLabels: state.showLabels,
         showOrbits: state.showOrbits,
+        selectedGroups: state.selectedGroups,
       }),
     }
   )
