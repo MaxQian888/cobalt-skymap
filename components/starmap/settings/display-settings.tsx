@@ -31,6 +31,7 @@ import {
 } from '@/components/ui/select';
 import { useSatelliteStore, useSettingsStore } from '@/lib/stores';
 import { useARRuntimeStore } from '@/lib/stores/ar-runtime-store';
+import { useAladinColormaps } from '@/lib/hooks/aladin';
 import type { SkyCultureLanguage, StellariumProjection, SkyEngineType, AladinCooFrameSetting, AladinColormap } from '@/lib/core/types';
 import { cn } from '@/lib/utils';
 import { StellariumSurveySelector } from './stellarium-survey-selector';
@@ -80,6 +81,7 @@ const MOUNT_FRAME_OPTIONS = [
 
 export function DisplaySettings() {
   const t = useTranslations();
+  const aladinColormaps = useAladinColormaps();
   
   const skyEngine = useSettingsStore((state) => state.skyEngine);
   const setSkyEngine = useSettingsStore((state) => state.setSkyEngine);
@@ -959,15 +961,13 @@ export function DisplaySettings() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="native">{t('settings.aladinColormapNative')}</SelectItem>
-                  <SelectItem value="grayscale">Grayscale</SelectItem>
-                  <SelectItem value="viridis">Viridis</SelectItem>
-                  <SelectItem value="plasma">Plasma</SelectItem>
-                  <SelectItem value="inferno">Inferno</SelectItem>
-                  <SelectItem value="magma">Magma</SelectItem>
-                  <SelectItem value="cubehelix">Cubehelix</SelectItem>
-                  <SelectItem value="rainbow">Rainbow</SelectItem>
-                  <SelectItem value="rdbu">RdBu</SelectItem>
+                  {aladinColormaps.map((cm) => (
+                    <SelectItem key={cm} value={cm}>
+                      {cm === 'native'
+                        ? t('settings.aladinColormapNative')
+                        : cm.charAt(0).toUpperCase() + cm.slice(1)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
