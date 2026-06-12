@@ -26,6 +26,7 @@ jest.mock('@/lib/tauri/plate-solver-api', () => ({
   getAvailableIndexes: jest.fn(),
   getInstalledIndexes: jest.fn(),
   getAstapDatabases: jest.fn(),
+  downloadAstapDatabase: jest.fn(),
   analyseImage: jest.fn(),
   DEFAULT_SOLVER_CONFIG: {
     solver_type: 'astap',
@@ -59,6 +60,9 @@ const mockDetectPlateSolvers = jest.requireMock('@/lib/tauri/plate-solver-api').
 const mockLoadSolverConfig = jest.requireMock('@/lib/tauri/plate-solver-api').loadSolverConfig;
 const mockSaveSolverConfig = jest.requireMock('@/lib/tauri/plate-solver-api').saveSolverConfig;
 const mockGetAstapDatabases = jest.requireMock('@/lib/tauri/plate-solver-api').getAstapDatabases;
+const mockDownloadAstapDatabase = jest.requireMock(
+  '@/lib/tauri/plate-solver-api'
+).downloadAstapDatabase;
 const mockAnalyseImage = jest.requireMock('@/lib/tauri/plate-solver-api').analyseImage;
 
 describe('usePlateSolverStore', () => {
@@ -361,6 +365,50 @@ describe('usePlateSolverStore', () => {
 
       expect(result.current.astapDatabases).toEqual([]);
       expect(result.current.isLoadingAstapDatabases).toBe(false);
+    });
+  });
+
+  describe('downloadAstapDatabase', () => {
+    const db = {
+      name: 'D50',
+      abbreviation: 'd50',
+      installed: false,
+      path: null,
+      fov_min_deg: 0.3,
+      fov_max_deg: 10,
+      description: '',
+      size_mb: 901,
+      download_url: 'https://example/d50.zip/download',
+    };
+
+    it('invokes backend with database + destDir then reloads catalog', async () => {
+      mockDownloadAstapDatabase.mockResolvedValueOnce(undefined);
+      mockGetAstapDatabases.mockResolvedValueOnce([{ ...db, installed: true }]);
+
+      const { result } = renderHook(() => usePlateSolverStore());
+      await act(async () => {
+        await result.current.downloadAstapDatabase(db, '/data');
+      });
+
+      expect(mockDownloadAstapDatabase).toHaveBeenCalledWith(db, '/data');
+      // catalog refreshed after install
+      expect(mockGetAstapDatabases).toHaveBeenCalled();
+      // progress entry cleared on completion
+      expect(result.current.downloadingIndexes.has('D50')).toBe(false);
+    });
+
+    it('marks error and rethrows on failure', async () => {
+      mockDownloadAstapDatabase.mockRejectedValueOnce(new Error('boom'));
+
+      const { result } = renderHook(() => usePlateSolverStore());
+      await act(async () => {
+        await expect(
+          result.current.downloadAstapDatabase(db, '/data')
+        ).rejects.toThrow('boom');
+      });
+
+      // progress entry cleared in finally even on error
+      expect(result.current.downloadingIndexes.has('D50')).toBe(false);
     });
   });
 

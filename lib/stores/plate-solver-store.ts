@@ -37,6 +37,7 @@ import {
   getAvailableIndexes,
   getInstalledIndexes,
   getAstapDatabases,
+  downloadAstapDatabase as downloadAstapDatabaseApi,
   analyseImage as analyseImageApi,
   DEFAULT_SOLVER_CONFIG,
 } from '@/lib/tauri/plate-solver-api';
@@ -106,6 +107,7 @@ export interface PlateSolverState {
   setDownloadProgress: (fileName: string, progress: number, status: string) => void;
   clearDownloadProgress: (fileName: string) => void;
   loadAstapDatabases: () => Promise<void>;
+  downloadAstapDatabase: (database: AstapDatabaseInfo, destDir: string) => Promise<void>;
   analyseImage: (imagePath: string, snrMinimum?: number) => Promise<void>;
   setOnlineSolveProgress: (progress: OnlineSolveProgress | null) => void;
   setOnlineSession: (session: OnlineSolveSessionState | null) => void;
@@ -282,6 +284,32 @@ export const usePlateSolverStore = create<PlateSolverState>()(
         } catch (error) {
           logger.error('Failed to load ASTAP databases', error);
           set({ isLoadingAstapDatabases: false });
+        }
+      },
+
+      downloadAstapDatabase: async (database, destDir) => {
+        set((state) => {
+          const m = new Map(state.downloadingIndexes);
+          m.set(database.name, { progress: 0, status: 'downloading' });
+          return { downloadingIndexes: m };
+        });
+        try {
+          await downloadAstapDatabaseApi(database, destDir);
+          await get().loadAstapDatabases();
+        } catch (error) {
+          logger.error('Failed to download ASTAP database', error);
+          set((state) => {
+            const m = new Map(state.downloadingIndexes);
+            m.set(database.name, { progress: 0, status: 'error' });
+            return { downloadingIndexes: m };
+          });
+          throw error;
+        } finally {
+          set((state) => {
+            const m = new Map(state.downloadingIndexes);
+            m.delete(database.name);
+            return { downloadingIndexes: m };
+          });
         }
       },
 

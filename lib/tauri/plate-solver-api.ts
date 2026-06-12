@@ -443,6 +443,18 @@ export async function recommendAstapDatabase(
   return invoke<AstapDatabaseInfo[]>('recommend_astap_database', { fovDegrees });
 }
 
+/**
+ * Download + install an ASTAP star database (.zip) into destDir.
+ * Progress is emitted via the 'index-download-progress' event
+ * (payload.index_name === database.name).
+ */
+export async function downloadAstapDatabase(
+  database: AstapDatabaseInfo,
+  destDir: string
+): Promise<void> {
+  return invoke<void>('download_astap_database', { database, destDir });
+}
+
 // ============================================================================
 // Image Analysis API
 // ============================================================================
