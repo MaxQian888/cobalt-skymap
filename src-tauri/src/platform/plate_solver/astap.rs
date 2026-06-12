@@ -5,15 +5,17 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
+use tauri::{AppHandle, Emitter};
+
 use super::fits::{parse_fits_header_from_bytes, parse_ini_value, parse_value};
 use super::helpers::{
     cleanup_local_solve_workspace, command_succeeds, create_local_solve_workspace, excerpt_output,
     get_default_index_path_internal, resolve_preferred_executable,
 };
 use super::types::{
-    AstapDatabaseInfo, AstrometryIndex, ImageAnalysisResult, IndexInfo, LocalInvocationDiagnostics,
-    LocalSolverProfileId, PlateSolveResult, PlateSolverConfig, PlateSolverError, PlateSolverType,
-    ScaleRange, SolverConfig, SolverInfo, StarDetection,
+    AstapDatabaseInfo, AstrometryIndex, ImageAnalysisResult, IndexDownloadProgress, IndexInfo,
+    LocalInvocationDiagnostics, LocalSolverProfileId, PlateSolveResult, PlateSolverConfig,
+    PlateSolverError, PlateSolverType, ScaleRange, SolverConfig, SolverInfo, StarDetection,
 };
 use super::ACTIVE_SOLVE_PID;
 
@@ -634,105 +636,75 @@ fn get_astap_db_scale_range(name: &str) -> (f64, f64) {
 pub async fn get_astap_databases() -> Result<Vec<AstapDatabaseInfo>, PlateSolverError> {
     let data_path = get_default_index_path_internal("astap");
 
-    let db_definitions = vec![
+    // Real ASTAP star databases hosted on SourceForge. Only databases that ship a
+    // cross-platform `.zip` (raw database files) expose a download URL; the rest are
+    // listed as informational entries pointing users to the ASTAP website.
+    // Reference: https://sourceforge.net/projects/astap-program/files/star_databases/
+    const SF: &str = "https://sourceforge.net/projects/astap-program/files/star_databases";
+    let db_definitions: Vec<(&str, &str, f64, f64, &str, u64, Option<String>)> = vec![
         (
-            "D80",
-            "d80",
-            0.3,
+            "W08",
+            "w08",
+            20.0,
+            180.0,
+            "Very wide field (mag≤8), FOV 20°-180°, ~0.3MB",
+            1,
+            Some(format!("{SF}/w08_star_database_mag08_astap.zip/download")),
+        ),
+        (
+            "G05",
+            "g05",
+            3.0,
+            20.0,
+            "Galaxy/wide field (500 stars/deg²), FOV 3°-20°, ~102MB",
+            102,
+            Some(format!("{SF}/g05_star_database.zip/download")),
+        ),
+        (
+            "D05",
+            "d05",
+            0.1,
+            5.0,
+            "General 500 stars/deg², small FOV, ~102MB",
+            102,
+            Some(format!("{SF}/d05_star_database.zip/download")),
+        ),
+        (
+            "D20",
+            "d20",
+            0.2,
             10.0,
-            "Star database magnitude 18, FOV 0.3°-10°, ~1.2GB",
-            1200,
-            "https://github.com/han-k59/astap/releases/download/databases/d80_database.zip",
+            "General 2000 stars/deg², FOV 0.2°-10°, ~400MB",
+            400,
+            Some(format!("{SF}/d20_star_database.zip/download")),
         ),
         (
             "D50",
             "d50",
             0.3,
             10.0,
-            "Star database magnitude 17, FOV 0.3°-10°, ~400MB",
-            400,
-            "https://github.com/han-k59/astap/releases/download/databases/d50_database.zip",
+            "General 5000 stars/deg² (recommended), FOV 0.3°-10°, ~900MB",
+            901,
+            Some(format!("{SF}/d50_star_database.zip/download")),
         ),
+        // .exe/.pkg only (no .zip): informational entries, download from ASTAP website.
         (
-            "D20",
-            "d20",
-            0.3,
+            "D80",
+            "d80",
+            0.1,
             10.0,
-            "Star database magnitude 15, FOV 0.3°-10°, ~100MB",
-            100,
-            "https://github.com/han-k59/astap/releases/download/databases/d20_database.zip",
+            "General 8000 stars/deg² (largest, ~1.3GB) — download from ASTAP website",
+            1300,
+            None,
         ),
         (
-            "D05",
-            "d05",
-            0.2,
-            5.0,
-            "Star database magnitude 12, FOV 0.2°-5°, ~50MB",
-            50,
-            "https://github.com/han-k59/astap/releases/download/databases/d05_database.zip",
-        ),
-        (
-            "G05",
-            "g05",
-            0.1,
-            2.0,
-            "Gaia DR2 database, deep sky, FOV 0.1°-2°, ~5GB",
-            5000,
-            "https://github.com/han-k59/astap/releases/download/databases/g05_database.zip",
-        ),
-        (
-            "G17",
-            "g17",
-            0.1,
-            2.0,
-            "Gaia DR2 mag 17 database, ~2GB",
-            2000,
-            "https://github.com/han-k59/astap/releases/download/databases/g17_database.zip",
-        ),
-        (
-            "G18",
-            "g18",
-            0.1,
-            2.0,
-            "Gaia DR2 mag 18 database, ~4GB",
-            4000,
-            "https://github.com/han-k59/astap/releases/download/databases/g18_database.zip",
-        ),
-        (
-            "W08",
-            "w08",
-            0.5,
-            20.0,
-            "Wide field database, FOV 0.5°-20°, ~100MB",
-            100,
-            "https://github.com/han-k59/astap/releases/download/databases/w08_database.zip",
-        ),
-        (
-            "V17",
-            "v17",
-            0.5,
-            20.0,
-            "V17 UCAC4 database, FOV 0.5°-20°, ~200MB",
-            200,
-            "https://github.com/han-k59/astap/releases/download/databases/v17_database.zip",
-        ),
-        (
-            "H17",
-            "h17",
-            0.1,
-            5.0,
-            "H-alpha database mag 17, ~500MB",
-            500,
-            "https://github.com/han-k59/astap/releases/download/databases/h17_database.zip",
-        ),
-        (
-            "H18",
-            "h18",
-            0.1,
-            5.0,
-            "H-alpha database mag 18, ~1GB",
-            1000,
-            "https://github.com/han-k59/astap/releases/download/databases/h18_database.zip",
+            "V50",
+            "v50",
+            10.0,
+            180.0,
+            "Photometry (Johnson-V + Gaia color, ~1.1GB) — download from ASTAP website",
+            1100,
+            None,
         ),
     ];
 
@@ -768,7 +740,7 @@ pub async fn get_astap_databases() -> Result<Vec<AstapDatabaseInfo>, PlateSolver
             fov_max_deg: *fov_max,
             description: desc.to_string(),
             size_mb: *size,
-            download_url: Some(url.to_string()),
+            download_url: url.clone(),
         });
     }
 
@@ -1011,6 +983,115 @@ fn extract_int_after(text: &str, keyword: &str) -> Option<u32> {
         }
     }
     None
+}
+
+// ============================================================================
+// ASTAP Database Download
+// ============================================================================
+
+/// Extract an ASTAP database zip into `dest_dir`, flattening entries to their file
+/// name (ASTAP databases are a flat set of `.290`/`.1476` files). Synchronous; call
+/// inside `spawn_blocking`. Guards against zip-slip by using the file name only.
+fn extract_zip_to_dir(
+    zip_path: &std::path::Path,
+    dest_dir: &std::path::Path,
+) -> Result<(), PlateSolverError> {
+    std::fs::create_dir_all(dest_dir)?;
+    let file = std::fs::File::open(zip_path)?;
+    let mut archive =
+        zip::ZipArchive::new(file).map_err(|e| PlateSolverError::ExtractionFailed(e.to_string()))?;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| PlateSolverError::ExtractionFailed(e.to_string()))?;
+        if entry.is_dir() {
+            continue;
+        }
+        let name = match entry
+            .enclosed_name()
+            .and_then(|p| p.file_name().map(|f| f.to_owned()))
+        {
+            Some(n) => n,
+            None => continue,
+        };
+        let out_path = dest_dir.join(name);
+        let mut out = std::fs::File::create(&out_path)?;
+        std::io::copy(&mut entry, &mut out)?;
+    }
+    Ok(())
+}
+
+/// Download and install an ASTAP star database (`.zip` → extracted into `dest_dir`).
+/// Streams the download, reusing the `index-download-progress` event so the existing
+/// index-manager progress listener can render it (payload `index_name == database.name`).
+#[tauri::command]
+pub async fn download_astap_database(
+    app: AppHandle,
+    database: AstapDatabaseInfo,
+    dest_dir: String,
+) -> Result<(), PlateSolverError> {
+    let url = database.download_url.clone().ok_or_else(|| {
+        PlateSolverError::DownloadFailed(format!(
+            "Database {} has no downloadable .zip",
+            database.name
+        ))
+    })?;
+    log::info!("Downloading ASTAP database {} from {}", database.name, url);
+
+    let dest = PathBuf::from(&dest_dir);
+    std::fs::create_dir_all(&dest)?;
+    let tmp_zip = dest.join(format!(".{}.download.zip", database.abbreviation));
+
+    // 1) Stream download to a temp zip, emitting progress.
+    let client = reqwest::Client::new();
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| PlateSolverError::DownloadFailed(e.to_string()))?;
+    let total = response
+        .content_length()
+        .unwrap_or(database.size_mb * 1024 * 1024);
+    let mut downloaded = 0u64;
+    {
+        use futures_util::StreamExt;
+        use std::io::Write;
+        let mut file = std::fs::File::create(&tmp_zip)?;
+        let mut stream = response.bytes_stream();
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| PlateSolverError::DownloadFailed(e.to_string()))?;
+            file.write_all(&chunk)?;
+            downloaded += chunk.len() as u64;
+            let _ = app.emit(
+                "index-download-progress",
+                IndexDownloadProgress {
+                    index_name: database.name.clone(),
+                    downloaded,
+                    total,
+                    percent: if total > 0 {
+                        (downloaded as f64 / total as f64) * 100.0
+                    } else {
+                        0.0
+                    },
+                },
+            );
+        }
+    }
+
+    // 2) Extract (blocking) off the async runtime.
+    let tmp_zip2 = tmp_zip.clone();
+    let dest2 = dest.clone();
+    tokio::task::spawn_blocking(move || extract_zip_to_dir(&tmp_zip2, &dest2))
+        .await
+        .map_err(|e| PlateSolverError::SolveFailed(format!("Join error: {}", e)))??;
+
+    let _ = std::fs::remove_file(&tmp_zip);
+    log::info!(
+        "ASTAP database {} installed to {}",
+        database.name,
+        dest_dir
+    );
+    Ok(())
 }
 
 // ============================================================================
@@ -1308,5 +1389,66 @@ CDELT2  =       0.0001
         // is_astap_database_dir delegates to is_astap_database_file
         assert!(is_astap_database_dir("d50_data"));
         assert!(!is_astap_database_dir("random_dir"));
+    }
+
+    #[tokio::test]
+    async fn test_astap_databases_use_real_sourceforge_urls() {
+        let dbs = get_astap_databases().await.unwrap();
+        // Only databases with a real .zip are exposed as downloadable.
+        let downloadable: Vec<_> = dbs.iter().filter(|d| d.download_url.is_some()).collect();
+        let abbrs: Vec<&str> = downloadable.iter().map(|d| d.abbreviation.as_str()).collect();
+        assert!(abbrs.contains(&"w08"));
+        assert!(abbrs.contains(&"g05"));
+        assert!(abbrs.contains(&"d05"));
+        assert!(abbrs.contains(&"d20"));
+        assert!(abbrs.contains(&"d50"));
+        // Obsolete magnitude-based databases must no longer be downloadable.
+        assert!(!abbrs.contains(&"h17"));
+        assert!(!abbrs.contains(&"h18"));
+        assert!(!abbrs.contains(&"g17"));
+        for d in &downloadable {
+            let url = d.download_url.as_ref().unwrap();
+            assert!(
+                url.contains("sourceforge.net/projects/astap-program/files/star_databases/"),
+                "unexpected url: {url}"
+            );
+            assert!(url.ends_with(".zip/download"), "unexpected url: {url}");
+        }
+    }
+
+    #[test]
+    fn test_extract_zip_to_dir_writes_files() {
+        use std::io::Write;
+        let tmp = std::env::temp_dir().join(format!(
+            "skymap-ziptest-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(&tmp).unwrap();
+        let zip_path = tmp.join("test.zip");
+
+        // Build a zip containing a flat database file plus a nested dir entry.
+        {
+            let file = std::fs::File::create(&zip_path).unwrap();
+            let mut zw = zip::ZipWriter::new(file);
+            let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            zw.start_file("d50_star_database.290", opts).unwrap();
+            zw.write_all(b"DATA").unwrap();
+            // nested path must be flattened to file name
+            zw.start_file("nested/d50_star_database.1476", opts).unwrap();
+            zw.write_all(b"MORE").unwrap();
+            zw.finish().unwrap();
+        }
+
+        let out = tmp.join("data");
+        extract_zip_to_dir(&zip_path, &out).unwrap();
+        assert!(out.join("d50_star_database.290").exists());
+        assert!(out.join("d50_star_database.1476").exists());
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }
