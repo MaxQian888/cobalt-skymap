@@ -57,6 +57,7 @@ jest.mock('@/lib/hooks/aladin', () => ({
   }),
   useAladinSettingsSync: jest.fn(),
   useAladinCatalogs: jest.fn(),
+  useAladinCatalogHips: jest.fn(),
   useAladinLayers: jest.fn(),
   useAladinFits: jest.fn(),
   useAladinMOC: jest.fn(),

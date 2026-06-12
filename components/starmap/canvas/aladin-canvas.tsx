@@ -10,6 +10,7 @@ import type { SkyMapCanvasRef, SkyMapCanvasProps } from '@/lib/core/types/sky-en
 import { destroyAladinCompat, exportViewCompat, getFoVCompat, setFoVCompat } from '@/lib/aladin/aladin-compat';
 import {
   useAladinCatalogs,
+  useAladinCatalogHips,
   useAladinEvents,
   useAladinFits,
   useAladinLayers,
@@ -101,6 +102,9 @@ export const AladinCanvas = forwardRef<SkyMapCanvasRef, SkyMapCanvasProps>(
     // Catalog Overlays
     // ========================================================================
     useAladinCatalogs({ aladinRef, engineReady });
+
+    // Progressive catalog HiPS (Gaia DR3, etc.) selected via the survey store
+    useAladinCatalogHips({ aladinRef, engineReady });
 
     // HiPS/FITS image layers
     useAladinLayers({ aladinRef, engineReady });

@@ -123,6 +123,7 @@ const A = {
   catalogFromSimbad: jest.fn(() => createCatalog('simbad-catalog')),
   catalogFromSIMBAD: jest.fn(() => createCatalog('simbad-catalog')),
   catalogFromNED: jest.fn(() => createCatalog('ned-catalog')),
+  catalogHiPS: jest.fn(() => createCatalog('catalog-hips')),
   graphicOverlay: jest.fn(() => ({
     name: 'mock-overlay',
     add: jest.fn(),
