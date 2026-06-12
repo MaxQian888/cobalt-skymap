@@ -158,6 +158,7 @@
     "alt": "Alt",
     "az": "Az",
     "constellation": "Constellation",
+    "jplHorizons": "JPL",
     "clickPosition": "Click Position",
     "copyObjectCoordinates": "Copy Object Coordinates",
     "copyClickPosition": "Copy Click Position",

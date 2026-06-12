@@ -92,6 +92,7 @@ jest.mock('@/lib/hooks', () => ({
       warnings: [],
     },
   })),
+  useHorizonsEphemeris: jest.fn(() => ({ row: null, loading: false, error: null })),
 }));
 
 // Mock astro-utils

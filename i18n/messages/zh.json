@@ -158,6 +158,7 @@
     "alt": "高度",
     "constellation": "星座",
     "az": "方位",
+    "jplHorizons": "JPL",
     "clickPosition": "点击位置",
     "copyObjectCoordinates": "复制天体坐标",
     "copyClickPosition": "复制点击位置",

@@ -199,6 +199,12 @@ export {
   type ObjectAstroDataV2,
 } from './use-object-astro-data';
 
+// JPL Horizons high-precision ephemeris hook
+export {
+  useHorizonsEphemeris,
+  type HorizonsEphemerisState,
+} from './use-horizons-ephemeris';
+
 // Camera capture hook
 export {
   useCamera,

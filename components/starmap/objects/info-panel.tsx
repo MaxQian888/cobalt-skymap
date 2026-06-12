@@ -29,7 +29,8 @@ import { FeasibilityBadge } from '../planning/feasibility-badge';
 import { SlewConfirmDialog } from '../mount/slew-confirm-dialog';
 import { useMountStore } from '@/lib/stores';
 import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
-import { useCelestialName, useCelestialNames, useAdaptivePosition, useAstroEnvironment, useTargetAstroData, useObjectActions } from '@/lib/hooks';
+import { useCelestialName, useCelestialNames, useAdaptivePosition, useAstroEnvironment, useTargetAstroData, useObjectActions, useHorizonsEphemeris } from '@/lib/hooks';
+import { findHorizonsBody } from '@/lib/services/horizons/service';
 import { getCachedObjectInfo, type ObjectDetailedInfo } from '@/lib/services/object-info-service';
 import { cn } from '@/lib/utils';
 import { getObjectTypeIcon, getObjectTypeColor } from '@/lib/astronomy/object-type-utils';
@@ -178,6 +179,11 @@ export const InfoPanel = memo(function InfoPanel({
   // Calculate astronomical data using shared hooks
   const astroData = useAstroEnvironment(latitude, longitude, currentTime);
   const targetData = useTargetAstroData(selectedObject, latitude, longitude, astroData.moonRa, astroData.moonDec, currentTime);
+
+  // High-precision JPL Horizons position for major solar-system bodies (network-backed).
+  // findHorizonsBody returns a primitive (stable across renders), so no memo is needed.
+  const horizonsBody = selectedObject ? findHorizonsBody(selectedObject.names) : null;
+  const horizons = useHorizonsEphemeris(horizonsBody, Boolean(horizonsBody) && objectExpanded);
   const displayModel = buildTargetDisplayModel({
     selectedObject,
     targetData,
@@ -320,6 +326,18 @@ export const InfoPanel = memo(function InfoPanel({
                         <span className="font-mono text-foreground">{identitySection?.coordinates.dec ?? selectedObject.dec}</span>
                       </div>
                     </div>
+
+                    {/* JPL Horizons high-precision position (major solar-system bodies) */}
+                    {horizons.row && (
+                      <div className="flex items-center gap-1.5 text-[11px]">
+                        <Badge variant="outline" className="text-[10px] shrink-0">
+                          {t('coordinates.jplHorizons')}
+                        </Badge>
+                        <span className="font-mono text-muted-foreground">
+                          {horizons.row.raDeg.toFixed(4)}°, {horizons.row.decDeg.toFixed(4)}°
+                        </span>
+                      </div>
+                    )}
 
                     {selectionMetadataSection && (
                       <div className="flex flex-wrap gap-1 text-[10px]">
