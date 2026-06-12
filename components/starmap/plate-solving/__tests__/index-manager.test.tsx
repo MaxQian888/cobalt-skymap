@@ -35,6 +35,8 @@ jest.mock('@/lib/tauri/plate-solver-api', () => ({
   }),
   getAvailableIndexes: jest.fn(),
   getInstalledIndexes: jest.fn(),
+  getAstapDatabases: jest.fn(),
+  downloadAstapDatabase: jest.fn().mockResolvedValue(undefined),
   deleteIndex: jest.fn(),
   downloadIndex: jest.fn().mockResolvedValue(undefined),
   getDefaultIndexPath: jest.fn().mockResolvedValue('/default/index/path'),
@@ -71,6 +73,10 @@ jest.mock('@/lib/tauri/plate-solver-api', () => ({
 
 const mockGetAvailableIndexes = jest.requireMock('@/lib/tauri/plate-solver-api').getAvailableIndexes;
 const mockGetInstalledIndexes = jest.requireMock('@/lib/tauri/plate-solver-api').getInstalledIndexes;
+const mockGetAstapDatabases = jest.requireMock('@/lib/tauri/plate-solver-api').getAstapDatabases;
+const mockDownloadAstapDatabase = jest.requireMock(
+  '@/lib/tauri/plate-solver-api'
+).downloadAstapDatabase;
 const _mockDeleteIndex = jest.requireMock('@/lib/tauri/plate-solver-api').deleteIndex;
 const mockDownloadIndex = jest.requireMock('@/lib/tauri/plate-solver-api').downloadIndex;
 
@@ -83,6 +89,7 @@ const mockListen = jest.requireMock('@tauri-apps/api/event').listen;
 
 jest.mock('@tauri-apps/api/path', () => ({
   join: jest.fn((...args: string[]) => args.join('/')),
+  appDataDir: jest.fn(() => Promise.resolve('/appdata')),
 }));
 
 // Mock isTauri
@@ -205,6 +212,8 @@ describe('IndexManager', () => {
 
     // Setup default mocks (after clearAllMocks so they persist)
     mockGetInstalledIndexes.mockResolvedValue([]);
+    mockGetAstapDatabases.mockResolvedValue([]);
+    mockDownloadAstapDatabase.mockResolvedValue(undefined);
     mockGetAvailableIndexes.mockResolvedValue([
       {
         name: 'D50',
@@ -348,7 +357,7 @@ describe('IndexManager', () => {
   });
 
   it('should show available indexes in available tab', async () => {
-    render(<IndexManager />);
+    render(<IndexManager solverType="astrometry_net" />);
 
     const trigger = screen.getByTestId('dialog-trigger');
     fireEvent.click(trigger);
@@ -363,6 +372,44 @@ describe('IndexManager', () => {
 
     await waitFor(() => {
       expect(screen.getByText('D50')).toBeInTheDocument();
+    });
+  });
+
+  it('lists ASTAP databases and downloads one on click', async () => {
+    mockIsTauri.mockReturnValue(true);
+    const db = {
+      name: 'D50',
+      abbreviation: 'd50',
+      installed: false,
+      path: null,
+      fov_min_deg: 0.3,
+      fov_max_deg: 10,
+      description: 'recommended',
+      size_mb: 901,
+      download_url: 'https://sf/d50_star_database.zip/download',
+    };
+    mockGetAstapDatabases.mockResolvedValue([db]);
+
+    render(<IndexManager solverType="astap" />);
+    fireEvent.click(screen.getByTestId('dialog-trigger'));
+
+    await waitFor(() => {
+      expect(mockGetAstapDatabases).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getByTestId('tab-available'));
+
+    await waitFor(() => {
+      expect(screen.getByText('D50')).toBeInTheDocument();
+    });
+
+    const downloadBtn = screen.getByRole('button', { name: /common\.download/i });
+    await act(async () => {
+      fireEvent.click(downloadBtn);
+    });
+
+    await waitFor(() => {
+      expect(mockDownloadAstapDatabase).toHaveBeenCalledWith(db, '/appdata/astap_data');
     });
   });
 
@@ -651,7 +698,7 @@ describe('IndexManager', () => {
     const mockWindowOpen = jest.fn();
     window.open = mockWindowOpen;
 
-    render(<IndexManager />);
+    render(<IndexManager solverType="astrometry_net" />);
 
     const trigger = screen.getByTestId('dialog-trigger');
     fireEvent.click(trigger);
@@ -715,7 +762,7 @@ describe('IndexManager', () => {
     // Ensure no indexes are installed
     mockGetInstalledIndexes.mockResolvedValue([]);
 
-    render(<IndexManager />);
+    render(<IndexManager solverType="astrometry_net" />);
 
     const trigger = screen.getByTestId('dialog-trigger');
     fireEvent.click(trigger);
@@ -789,7 +836,7 @@ describe('IndexManager', () => {
   });
 
   it('should switch to available tab when "Download Indexes" button clicked', async () => {
-    render(<IndexManager />);
+    render(<IndexManager solverType="astrometry_net" />);
 
     const trigger = screen.getByTestId('dialog-trigger');
     fireEvent.click(trigger);
@@ -887,7 +934,7 @@ describe('IndexManager', () => {
       mockDownloadIndex.mockResolvedValue(undefined);
       mockGetInstalledIndexes.mockResolvedValue([]);
 
-      render(<IndexManager />);
+      render(<IndexManager solverType="astrometry_net" />);
 
       const trigger = screen.getByTestId('dialog-trigger');
       fireEvent.click(trigger);
@@ -918,7 +965,7 @@ describe('IndexManager', () => {
       mockDownloadIndex.mockImplementation(() => new Promise(() => {}));
       mockGetInstalledIndexes.mockResolvedValue([]);
 
-      render(<IndexManager />);
+      render(<IndexManager solverType="astrometry_net" />);
 
       const trigger = screen.getByTestId('dialog-trigger');
       fireEvent.click(trigger);
@@ -957,7 +1004,7 @@ describe('IndexManager', () => {
       }));
       mockGetInstalledIndexes.mockResolvedValue([]);
 
-      render(<IndexManager />);
+      render(<IndexManager solverType="astrometry_net" />);
 
       fireEvent.click(screen.getByTestId('dialog-trigger'));
 
@@ -991,7 +1038,7 @@ describe('IndexManager', () => {
       mockDownloadIndex.mockRejectedValueOnce(new Error('Disk full'));
       mockGetInstalledIndexes.mockResolvedValue([]);
 
-      render(<IndexManager />);
+      render(<IndexManager solverType="astrometry_net" />);
 
       fireEvent.click(screen.getByTestId('dialog-trigger'));
 

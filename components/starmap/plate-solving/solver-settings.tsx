@@ -93,6 +93,8 @@ export function SolverSettings({ onClose, className }: SolverSettingsProps) {
     saveConfig,
     loadConfig,
     setOnlineApiKey,
+    astapDatabases,
+    loadAstapDatabases,
   } = usePlateSolverStore();
   const detectedSolvers = usePlateSolverStore(selectDetectedSolversWithReadiness);
 
@@ -110,6 +112,15 @@ export function SolverSettings({ onClose, className }: SolverSettingsProps) {
     }
     void loadConfig();
   }, [detectedSolvers.length, detectSolvers, loadConfig]);
+
+  // Load the ASTAP database catalog so the selector can list installed databases.
+  useEffect(() => {
+    if (config.solver_type === 'astap') {
+      void loadAstapDatabases();
+    }
+  }, [config.solver_type, loadAstapDatabases]);
+
+  const installedAstapDatabases = astapDatabases.filter((db) => db.installed);
 
   // Validate custom path
   const handleValidatePath = useCallback(async () => {
@@ -400,6 +411,35 @@ export function SolverSettings({ onClose, className }: SolverSettingsProps) {
                   <Cpu className="h-4 w-4" />
                   {t('plateSolving.astapOptions')}
                 </h4>
+
+                {/* Star database selector (populated from installed databases) */}
+                <div className="space-y-2">
+                  <Label>{t('plateSolving.selectDatabase') || 'Star database'}</Label>
+                  {installedAstapDatabases.length > 0 ? (
+                    <select
+                      className={cn(
+                        'flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm',
+                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                      )}
+                      value={config.astap_database ?? ''}
+                      onChange={(e) =>
+                        setConfig({ astap_database: e.target.value || null })
+                      }
+                    >
+                      <option value="">{t('plateSolving.autoSelect') || 'Auto'}</option>
+                      {installedAstapDatabases.map((db) => (
+                        <option key={db.abbreviation} value={db.abbreviation}>
+                          {db.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {t('plateSolving.noDatabasesInstalled') ||
+                        'No databases installed yet — download one from the Index Manager.'}
+                    </p>
+                  )}
+                </div>
 
                 <SliderField
                   label={t('plateSolving.maxStars')}

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { join } from '@tauri-apps/api/path';
+import { appDataDir, join } from '@tauri-apps/api/path';
 import {
   Database,
   Download,
@@ -54,7 +54,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { usePlateSolverStore, selectActiveSolver } from '@/lib/stores/plate-solver-store';
 import type { IndexManagerProps, DownloadState } from '@/types/starmap/plate-solving';
-import type { IndexInfo, DownloadableIndex } from '@/lib/tauri/plate-solver-api';
+import type { IndexInfo, DownloadableIndex, AstapDatabaseInfo } from '@/lib/tauri/plate-solver-api';
 import {
   formatFileSize,
   getSolverDisplayName,
@@ -77,7 +77,15 @@ const MAX_CONCURRENT_DOWNLOADS = 2;
 
 export function IndexManager({ solverType, trigger, className }: IndexManagerProps) {
   const t = useTranslations();
-  const { config, detectSolvers } = usePlateSolverStore();
+  const {
+    config,
+    detectSolvers,
+    astapDatabases,
+    loadAstapDatabases,
+    downloadAstapDatabase,
+    setConfig,
+    saveConfig,
+  } = usePlateSolverStore();
   usePlateSolverStore(selectActiveSolver);
 
   const [open, setOpen] = useState(false);
@@ -239,6 +247,76 @@ export function IndexManager({ solverType, trigger, className }: IndexManagerPro
     }
   }, [open, loadIndexes]);
 
+  // ASTAP databases live in a separate catalog (not the astrometry index list).
+  useEffect(() => {
+    if (open && currentSolverType === 'astap') {
+      loadAstapDatabases();
+    }
+  }, [open, currentSolverType, loadAstapDatabases]);
+
+  // Download + install an ASTAP star database into the app's astap_data dir.
+  const handleDownloadDb = useCallback(
+    async (db: AstapDatabaseInfo) => {
+      // Databases that ship only as .exe/.pkg point users to the ASTAP website.
+      if (!db.download_url) {
+        window.open('https://www.hnsky.org/astap.htm', '_blank', 'noopener,noreferrer');
+        return;
+      }
+      if (!isDesktop) {
+        window.open(db.download_url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      let blocked = false;
+      setDownloads((prev) => {
+        const activeCount = Array.from(prev.values()).filter(
+          (d) => d.status === 'downloading'
+        ).length;
+        if (activeCount >= MAX_CONCURRENT_DOWNLOADS) {
+          blocked = true;
+          return prev;
+        }
+        const next = new Map(prev);
+        next.set(db.name, { fileName: db.name, progress: 0, status: 'downloading' });
+        return next;
+      });
+      if (blocked) return;
+
+      setError(null);
+
+      try {
+        const destDir = await join(await appDataDir(), 'astap_data');
+        await downloadAstapDatabase(db, destDir);
+
+        setDownloads((prev) => {
+          const next = new Map(prev);
+          next.set(db.name, { fileName: db.name, progress: 100, status: 'complete' });
+          return next;
+        });
+
+        // Point the solver at the downloaded database directory.
+        setConfig({ index_path: destDir });
+        await saveConfig();
+        await loadIndexes();
+        await detectSolvers();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : t('plateSolving.downloadFailed');
+        setDownloads((prev) => {
+          const next = new Map(prev);
+          next.set(db.name, {
+            fileName: db.name,
+            progress: 0,
+            status: 'error',
+            error: message,
+          });
+          return next;
+        });
+        setError(message);
+      }
+    },
+    [isDesktop, downloadAstapDatabase, setConfig, saveConfig, loadIndexes, detectSolvers, t]
+  );
+
 
   // Delete an index
   const handleDelete = useCallback(async (index: IndexInfo) => {
@@ -397,6 +475,89 @@ export function IndexManager({ solverType, trigger, className }: IndexManagerPro
     );
   };
 
+  // Render an ASTAP star database item (separate catalog from astrometry indexes)
+  const renderAstapDatabase = (db: AstapDatabaseInfo) => {
+    const installed = db.installed;
+    const downloadState = getDownloadState(db.name);
+    const websiteOnly = !db.download_url;
+
+    return (
+      <div
+        key={db.abbreviation}
+        className={cn(
+          'flex items-center justify-between p-3 rounded-lg border',
+          installed ? 'bg-muted/50' : 'bg-card'
+        )}
+      >
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <Database className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{db.name}</span>
+              {installed && (
+                <Badge variant="secondary" className="text-xs">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  {t('plateSolving.installed') || 'Installed'}
+                </Badge>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {formatFileSize(db.size_mb * 1024 * 1024)}
+              <span className="ml-2">
+                (FOV {db.fov_min_deg}–{db.fov_max_deg}°)
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground truncate">{db.description}</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 ml-2">
+          {downloadState && downloadState.status === 'downloading' ? (
+            <div className="w-32 space-y-1">
+              <Progress value={downloadState.progress} className="h-2" />
+              <div className="text-xs text-center text-muted-foreground">
+                {downloadState.progress.toFixed(0)}%
+              </div>
+            </div>
+          ) : installed ? (
+            <CheckCircle className="h-5 w-5 text-green-500" />
+          ) : websiteOnly ? (
+            <a
+              href="https://www.hnsky.org/astap.htm"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary flex items-center gap-1 hover:underline"
+            >
+              <ExternalLink className="h-3 w-3" />
+              {t('plateSolving.databaseWebsiteOnly') || 'Website'}
+            </a>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleDownloadDb(db)}
+              disabled={activeDownloadCount >= MAX_CONCURRENT_DOWNLOADS}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              {t('common.download') || 'Download'}
+            </Button>
+          )}
+          {downloadState && downloadState.status === 'error' && (
+            <Tooltip>
+              <TooltipTrigger>
+                <Badge variant="destructive">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {t('plateSolving.error') || 'Error'}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>{downloadState.error}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   if (currentSolverType === 'astrometry_net_online') {
     return null;
   }
@@ -517,7 +678,11 @@ export function IndexManager({ solverType, trigger, className }: IndexManagerPro
 
             <ScrollArea className="h-[350px] pr-4">
               <div className="space-y-2">
-                {availableIndexes.map((idx) => renderAvailableIndex(idx as DownloadableIndex & { _recommended?: boolean }))}
+                {currentSolverType === 'astap'
+                  ? astapDatabases.map(renderAstapDatabase)
+                  : availableIndexes.map((idx) =>
+                      renderAvailableIndex(idx as DownloadableIndex & { _recommended?: boolean })
+                    )}
               </div>
             </ScrollArea>
 
