@@ -206,6 +206,7 @@ use platform::{
     delete_map_api_key,
     detect_plate_solvers,
     download_and_install_update,
+    download_astap_database,
     download_index,
     download_update,
     extract_stars,
@@ -609,6 +610,8 @@ pub fn run() {
             get_downloadable_indexes,
             #[cfg(desktop)]
             download_index,
+            #[cfg(desktop)]
+            download_astap_database,
             #[cfg(desktop)]
             get_solver_info,
             #[cfg(desktop)]

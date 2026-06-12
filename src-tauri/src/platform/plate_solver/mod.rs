@@ -263,7 +263,10 @@ pub use types::{
 };
 
 // Re-export commands from submodules
-pub use astap::{analyse_image, extract_stars, get_astap_databases, recommend_astap_database};
+pub use astap::{
+    analyse_image, download_astap_database, extract_stars, get_astap_databases,
+    recommend_astap_database,
+};
 pub use config::{load_solver_config, save_solver_config};
 pub use helpers::{get_default_index_path, get_solver_info, validate_solver_path};
 pub use index::{
