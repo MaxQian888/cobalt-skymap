@@ -219,7 +219,8 @@ fn build_astap_command_args(
             args.push("n".to_string());
         }
         if sc.astap_equalise_background {
-            args.push("-check".to_string());
+            // -eqbg equalises the background prior to solving (ASTAP 2025-07+).
+            args.push("-eqbg".to_string());
             args.push("y".to_string());
         }
         if let Some(scale_low) = sc.astrometry_scale_low.filter(|value| *value > 0.0) {
@@ -1186,7 +1187,7 @@ mod tests {
         assert!(joined.contains("-m 2"));
         assert!(joined.contains("-speed slow"));
         assert!(joined.contains("-sip n"));
-        assert!(joined.contains("-check y"));
+        assert!(joined.contains("-eqbg y"));
         assert!(joined.contains("-fov 1.4"));
     }
 
