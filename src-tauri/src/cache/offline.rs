@@ -221,14 +221,18 @@ pub async fn get_cache_stats(app: AppHandle) -> Result<CacheStats, StorageError>
         .iter()
         .filter(|r| r.status == CacheStatus::Completed)
         .count();
-    let total_tiles: u64 = data.regions.iter().map(|r| r.tile_count).sum();
-    let total_size_bytes: u64 = data.regions.iter().map(|r| r.size_bytes).sum();
+
+    // Derive tile counts and per-survey breakdown from the actually-cached
+    // tiles (populated by `save_cached_tile`, including the tile-cache
+    // protocol), not from region metadata which may be empty.
+    let total_tiles: u64 = data.tiles.len() as u64;
+    let total_size_bytes: u64 = data.tiles.values().map(|t| t.size_bytes).sum();
 
     let mut survey_map: HashMap<String, (u64, u64)> = HashMap::new();
-    for region in &data.regions {
-        let entry = survey_map.entry(region.survey_id.clone()).or_insert((0, 0));
-        entry.0 += region.tile_count;
-        entry.1 += region.size_bytes;
+    for tile in data.tiles.values() {
+        let entry = survey_map.entry(tile.survey_id.clone()).or_insert((0, 0));
+        entry.0 += 1;
+        entry.1 += tile.size_bytes;
     }
     let surveys: Vec<SurveyCacheInfo> = survey_map
         .into_iter()

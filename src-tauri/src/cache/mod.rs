@@ -6,6 +6,7 @@
 //! - `unified`: Unified network resource caching
 
 pub mod offline;
+pub mod tile_protocol;
 pub mod unified;
 
 // Re-export types and commands from offline cache
@@ -14,6 +15,12 @@ pub use offline::{
     get_cache_directory, get_cache_stats, is_tile_cached, list_cache_regions, load_cached_tile,
     save_cached_tile, update_cache_region, CacheData, CacheRegion, CacheStats, CacheStatus,
     CreateRegionArgs, SurveyCacheInfo, TileMetadata,
+};
+
+// Re-export the HiPS tile cache protocol commands
+pub use tile_protocol::{
+    list_predownloaded_surveys, predownload_hips_to_dir, set_offline_tile_mode,
+    set_tile_survey_sources,
 };
 
 // Re-export types and commands from unified cache

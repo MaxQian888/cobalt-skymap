@@ -7,6 +7,10 @@ import { resolveCachePolicyForPrefetchResource } from '@/lib/cache/integration-p
 import { initializeCacheSystem } from '@/lib/cache/migration';
 import { smartFetch } from '@/lib/services/http-fetch';
 import { isTauri } from '@/lib/storage/platform';
+import { cacheApi } from '@/lib/tauri/cache-api';
+import { SKY_SURVEYS } from '@/lib/core/constants/sky-surveys';
+import { sanitizeSurveyId } from '@/lib/offline/tile-protocol-url';
+import { useSettingsStore } from '@/lib/stores/settings-store';
 import { createLogger } from '@/lib/logger';
 
 const logger = createLogger('cache-init');
@@ -96,6 +100,28 @@ export function useCacheInit(options: UseCacheInitOptions = {}) {
   } = options;
   const initialized = useRef(false);
   const providerDiagnostics: UnifiedCacheProviderDiagnostics | null = getUnifiedCacheProviderDiagnostics();
+  const offlineTileMode = useSettingsStore((state) => state.offlineTileMode);
+
+  // Register the survey id -> upstream HiPS base map once, so the Rust
+  // tile-cache protocol can resolve upstream URLs on a cache miss. Desktop only.
+  useEffect(() => {
+    if (!isTauri()) return;
+    const sources: Record<string, string> = {};
+    for (const survey of SKY_SURVEYS) {
+      sources[sanitizeSurveyId(survey.id)] = survey.url;
+    }
+    cacheApi.setTileSurveySources(sources).catch((error) => {
+      logger.warn('Failed to register tile survey sources', error);
+    });
+  }, []);
+
+  // Keep the Rust tile-cache protocol's offline mode in sync with the setting.
+  useEffect(() => {
+    if (!isTauri()) return;
+    cacheApi.setOfflineTileMode(offlineTileMode).catch((error) => {
+      logger.warn('Failed to sync offline tile mode', error);
+    });
+  }, [offlineTileMode]);
 
   useEffect(() => {
     if (initialized.current) return;

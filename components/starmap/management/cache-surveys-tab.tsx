@@ -29,7 +29,13 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 
-import { useOfflineStore, formatBytes, offlineCacheManager, convertToHiPSSurvey, type HiPSCacheStatus } from '@/lib/offline';
+import { useOfflineStore, formatBytes, type HiPSCacheStatus } from '@/lib/offline';
+import {
+  getRustHiPSCacheStatus,
+  downloadHiPSSurveyToRust,
+  clearRustHiPSCache,
+  clearAllRustHiPSCaches,
+} from '@/lib/offline/hips-tile-cache';
 import { SKY_SURVEYS } from '@/lib/core/constants';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -52,8 +58,7 @@ export function CacheSurveysTab({ isActive }: CacheSurveysTabProps) {
     try {
       const results = await Promise.all(
         SKY_SURVEYS.map(async (survey) => {
-          const hipsSurvey = convertToHiPSSurvey(survey);
-          const status = await offlineCacheManager.getHiPSCacheStatus(hipsSurvey);
+          const status = await getRustHiPSCacheStatus(survey);
           return [survey.id, status] as const;
         })
       );
@@ -77,11 +82,10 @@ export function CacheSurveysTab({ isActive }: CacheSurveysTabProps) {
     setDownloadingSurveys(prev => [...prev, surveyId]);
 
     try {
-      const hipsSurvey = convertToHiPSSurvey(survey);
       toast.loading(t('survey.downloadingTiles'), { id: `survey-${surveyId}` });
 
-      const success = await offlineCacheManager.downloadHiPSSurvey(
-        hipsSurvey,
+      const success = await downloadHiPSSurveyToRust(
+        survey,
         3,
         (progress) => {
           const percent = Math.round((progress.downloadedFiles / progress.totalFiles) * 100);
@@ -107,7 +111,7 @@ export function CacheSurveysTab({ isActive }: CacheSurveysTabProps) {
   }, [downloadingSurveys, t, refreshSurveyStatuses]);
 
   const handleClearSurveyCache = useCallback(async (surveyId: string) => {
-    const success = await offlineCacheManager.clearHiPSCache(surveyId);
+    const success = await clearRustHiPSCache(surveyId);
     if (success) {
       toast.success(t('survey.cacheCleared'));
       await refreshSurveyStatuses();
@@ -115,7 +119,7 @@ export function CacheSurveysTab({ isActive }: CacheSurveysTabProps) {
   }, [t, refreshSurveyStatuses]);
 
   const handleClearAllSurveyCaches = useCallback(async () => {
-    const success = await offlineCacheManager.clearAllHiPSCaches();
+    const success = await clearAllRustHiPSCaches();
     if (success) {
       toast.success(t('survey.cacheCleared'));
       await refreshSurveyStatuses();

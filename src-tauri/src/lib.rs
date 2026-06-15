@@ -171,8 +171,13 @@ use cache::{
     load_cached_tile,
     prefetch_url,
     prefetch_urls,
+    list_predownloaded_surveys,
+    predownload_hips_to_dir,
     put_unified_cache_entry,
     save_cached_tile,
+    // HiPS tile cache protocol
+    set_offline_tile_mode,
+    set_tile_survey_sources,
     update_cache_region,
 };
 
@@ -298,10 +303,15 @@ pub fn run() {
     #[cfg(not(desktop))]
     let builder = tauri::Builder::default();
 
-    builder
+    let builder = builder
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_opener::init());
+
+    // Serve Aladin HiPS tiles through the offline cache via a custom protocol.
+    let builder = cache::tile_protocol::register(builder);
+
+    builder
         .setup(|app| {
             // Geolocation plugin (mobile only)
             #[cfg(mobile)]
@@ -451,6 +461,11 @@ pub fn run() {
             clear_survey_cache,
             clear_all_cache,
             get_cache_directory,
+            // HiPS tile cache protocol
+            set_tile_survey_sources,
+            set_offline_tile_mode,
+            predownload_hips_to_dir,
+            list_predownloaded_surveys,
             // Unified cache
             get_unified_cache_entry,
             put_unified_cache_entry,

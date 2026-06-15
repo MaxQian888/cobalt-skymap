@@ -6,6 +6,8 @@ import { useSettingsStore } from '@/lib/stores/settings-store';
 import { STELLARIUM_TO_ALADIN_PROJECTION } from '@/lib/core/constants/aladin-canvas';
 import { getSurveyById } from '@/lib/core/constants/sky-surveys';
 import { updateReticleCompat } from '@/lib/aladin/aladin-compat';
+import { toHipsCacheBase } from '@/lib/offline/tile-protocol-url';
+import { isTauri } from '@/lib/storage/platform';
 import { createLogger } from '@/lib/logger';
 
 type AladinInstance = ReturnType<typeof A.aladin>;
@@ -63,12 +65,16 @@ export function useAladinSettingsSync(
         // aladin.newImageSurvey() expects a CDS registry ID or full URL, not our
         // local IDs like 'dss', 'panstarrs', etc.
         const surveyDef = getSurveyById(surveyId);
-        const surveyUrl = surveyDef?.url;
-        if (!surveyUrl) {
+        if (!surveyDef) {
           logger.warn(`Unknown survey ID: ${surveyId}, skipping`);
           prevSurveyRef.current = surveyId;
           return;
         }
+        // On desktop, always route the base survey through the local cache
+        // protocol so tiles flow through the Rust offline cache transparently
+        // (the offlineTileMode setting only controls whether a cache miss hits
+        // the network). On web there is no protocol, so use the CDS URL.
+        const surveyUrl = isTauri() ? toHipsCacheBase(surveyDef.id) : surveyDef.url;
         const survey = aladin.newImageSurvey(surveyUrl);
         aladin.setBaseImageLayer(survey);
         logger.debug(`Survey synced: ${surveyId} → ${surveyUrl}`);

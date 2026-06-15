@@ -101,7 +101,10 @@ export interface SettingsState {
   
   // Sky engine selection
   skyEngine: SkyEngineType;
-  
+
+  // Offline tile cache mode: serve survey tiles from the local Rust cache only
+  offlineTileMode: boolean;
+
   // Stellarium display settings
   stellarium: StellariumSettings;
   
@@ -136,6 +139,7 @@ export interface SettingsState {
   
   // Actions - Sky Engine
   setSkyEngine: (engine: SkyEngineType) => void;
+  setOfflineTileMode: (enabled: boolean) => void;
   
   // Actions - Stellarium
   setStellariumSetting: <K extends keyof StellariumSettings>(key: K, value: StellariumSettings[K]) => void;
@@ -280,6 +284,7 @@ export const useSettingsStore = create<SettingsState>()(
       backendProtocol: DEFAULT_BACKEND_PROTOCOL,
       proxy: DEFAULT_PROXY,
       skyEngine: 'stellarium' as SkyEngineType,
+      offlineTileMode: false,
       stellarium: DEFAULT_STELLARIUM,
       preferences: DEFAULT_PREFERENCES,
       performance: DEFAULT_PERFORMANCE,
@@ -310,6 +315,7 @@ export const useSettingsStore = create<SettingsState>()(
       
       // Actions - Sky Engine
       setSkyEngine: (skyEngine) => set({ skyEngine }),
+      setOfflineTileMode: (offlineTileMode) => set({ offlineTileMode }),
       
       // Actions - Stellarium
       setStellariumSetting: (key, value) => set((state) => ({
@@ -406,6 +412,7 @@ export const useSettingsStore = create<SettingsState>()(
       // Actions - Reset
       resetToDefaults: () => set({
         skyEngine: 'stellarium' as SkyEngineType,
+        offlineTileMode: false,
         proxy: DEFAULT_PROXY,
         stellarium: DEFAULT_STELLARIUM,
         preferences: DEFAULT_PREFERENCES,
@@ -425,7 +432,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'starmap-settings',
       storage: getZustandStorage(),
-      version: 19, // v19: network proxy settings
+      version: 20, // v20: offline tile cache mode
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<SettingsState>;
         
@@ -643,8 +650,15 @@ export const useSettingsStore = create<SettingsState>()(
             },
           };
         }
-        
-        
+
+        if (version < 20) {
+          return {
+            ...state,
+            offlineTileMode: state.offlineTileMode ?? false,
+          };
+        }
+
+
         return state;
       },
       merge: (persistedState, currentState) => {
@@ -709,6 +723,7 @@ export const useSettingsStore = create<SettingsState>()(
         backendProtocol: state.backendProtocol,
         proxy: state.proxy,
         skyEngine: state.skyEngine,
+        offlineTileMode: state.offlineTileMode,
         stellarium: state.stellarium,
         preferences: state.preferences,
         performance: state.performance,

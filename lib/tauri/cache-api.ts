@@ -206,6 +206,24 @@ export const cacheApi = {
     return invoke('get_cache_directory');
   },
 
+  /**
+   * Register the survey id -> upstream HiPS base URL map so the tile-cache
+   * protocol can resolve the upstream URL on a cache miss.
+   */
+  async setTileSurveySources(sources: Record<string, string>): Promise<void> {
+    const invoke = await getInvoke();
+    return invoke('set_tile_survey_sources', { sources });
+  },
+
+  /**
+   * Toggle offline mode for the tile-cache protocol. When enabled the handler
+   * serves only from cache (404 on miss) and never hits the network.
+   */
+  async setOfflineTileMode(enabled: boolean): Promise<void> {
+    const invoke = await getInvoke();
+    return invoke('set_offline_tile_mode', { enabled });
+  },
+
   /** Check if cache API is available */
   isAvailable: isTauri,
 };
