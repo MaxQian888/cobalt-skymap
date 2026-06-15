@@ -39,6 +39,7 @@ const createMockSettings = (overrides?: Partial<StellariumSettings>): Stellarium
   skyCultureLanguage: 'en',
   surveyEnabled: true,
   surveyId: 'DSS',
+  skyCulture: 'western',
   nightMode: false,
   sensorControl: false,
   sensorAbsolutePreferred: true,

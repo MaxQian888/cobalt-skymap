@@ -161,6 +161,12 @@ function applySurvey(core: StellariumEngine['core'], settings: StellariumSetting
   }
 }
 
+function applySkyCulture(core: StellariumEngine['core'], settings: StellariumSettings): void {
+  // Cultures are registered as data sources at engine init; switching is just
+  // setting the current id (the key passed to add_data_source).
+  setIfSupported(core, 'skycultures.current_id', settings.skyCulture || 'western');
+}
+
 function applyLocalization(settings: StellariumSettings): void {
   if (settings.skyCultureLanguage) {
     updateStellariumTranslation(settings.skyCultureLanguage);
@@ -334,6 +340,7 @@ export const useStellariumStore = create<StellariumState>((set, get) => ({
       applyGridLines(core, settings);
       applyLandscapeAndFog(core, settings, baseUrl);
       applySurvey(core, settings);
+      applySkyCulture(core, settings);
       applyLocalization(settings);
 
       logger.debug('Stellarium settings updated successfully');

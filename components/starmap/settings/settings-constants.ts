@@ -111,6 +111,7 @@ export const DEFAULT_STELLARIUM_SETTINGS = {
   surveyEnabled: true,
   surveyId: 'dss',
   surveyUrl: undefined,
+  skyCulture: 'western',
   skyCultureLanguage: 'native' as const,
   nightMode: false,
   sensorControl: false,

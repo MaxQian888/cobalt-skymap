@@ -33,6 +33,7 @@ describe('PreferencesStep', () => {
         surveyEnabled: true,
         surveyId: 'dss',
         surveyUrl: undefined,
+        skyCulture: 'western',
         skyCultureLanguage: 'native',
         nightMode: false,
         sensorControl: false,

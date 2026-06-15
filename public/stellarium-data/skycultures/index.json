@@ -1,5 +1,20 @@
 {
   "western": {
     "type": "skyculture"
+  },
+  "chinese": {
+    "type": "skyculture"
+  },
+  "inuit": {
+    "type": "skyculture"
+  },
+  "maori": {
+    "type": "skyculture"
+  },
+  "egyptian": {
+    "type": "skyculture"
+  },
+  "norse": {
+    "type": "skyculture"
   }
 }

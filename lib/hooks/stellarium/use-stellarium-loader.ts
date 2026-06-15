@@ -7,6 +7,7 @@ import { degreesToHMS, degreesToDMS, rad2deg } from '@/lib/astronomy/starmap-uti
 import { createStellariumTranslator } from '@/lib/translations';
 import { createLogger } from '@/lib/logger';
 import { DEFAULT_FOV } from '@/lib/core/constants/fov';
+import { SECONDARY_SKY_CULTURE_IDS } from '@/lib/core/constants/sky-cultures';
 import { deriveStarmapTierReadiness } from '@/lib/core/starmap-data-tier';
 import { getEffectiveDpr } from '@/lib/core/stellarium-canvas-utils';
 import {
@@ -346,6 +347,15 @@ export function useStellariumLoader({
 
     // Secondary data sources (deferred via microtask to unblock initStellarium return)
     const loadSecondarySources = () => {
+      // Register the additional bundled sky cultures so they can be switched at
+      // runtime via core.skycultures.current_id (data loads lazily on select).
+      for (const culture of SECONDARY_SKY_CULTURE_IDS) {
+        safeAdd(
+          core.skycultures,
+          { url: `${baseUrl}skycultures/${culture}`, key: culture },
+          `skyculture-${culture}`
+        );
+      }
       safeAdd(core.dsos, { url: baseUrl + 'dso' }, 'dsos');
       safeAdd(core.dss, { url: baseUrl + 'surveys/dss' }, 'dss');
       safeAdd(core.milkyway, { url: baseUrl + 'surveys/milkyway' }, 'milkyway');

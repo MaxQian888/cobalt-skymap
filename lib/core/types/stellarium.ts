@@ -229,6 +229,8 @@ export interface StellariumSettings {
   surveyEnabled: boolean;
   surveyId: string;
   surveyUrl?: string;
+  /** Active sky culture id (constellation set), e.g. 'western', 'chinese'. */
+  skyCulture: string;
   skyCultureLanguage: SkyCultureLanguage;
   nightMode: boolean;
   sensorControl: boolean;

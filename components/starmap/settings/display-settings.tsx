@@ -38,6 +38,7 @@ import { StellariumSurveySelector } from './stellarium-survey-selector';
 import { ObjectInfoSourcesConfig } from '../objects/object-info-sources-config';
 import { SettingsSection, ToggleItem } from './settings-shared';
 import { DISPLAY_SETTINGS, GRID_SETTINGS } from './settings-constants';
+import { SKY_CULTURES } from '@/lib/core/constants/sky-cultures';
 import { DEFAULT_AR_CAMERA_PROFILE_BY_PRESET } from '@/lib/core/ar-camera-profile';
 import {
   applyARAdaptiveLearnerEvent,
@@ -445,6 +446,29 @@ export function DisplaySettings() {
                 </SelectContent>
               </Select>
             </div>
+          </SettingsSection>
+
+          <Separator />
+
+          <SettingsSection
+            title={t('settings.skyCulture')}
+            icon={<Globe className="h-4 w-4" />}
+            defaultOpen={false}
+          >
+            <Select
+              value={stellarium.skyCulture}
+              onValueChange={(v) => setStellariumSetting('skyCulture', v)}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SKY_CULTURES.map(({ id, labelKey }) => (
+                  <SelectItem key={id} value={id}>{t(labelKey)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground px-1">{t('settings.skyCultureDescription')}</p>
           </SettingsSection>
 
           <Separator />
