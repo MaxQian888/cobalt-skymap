@@ -20,4 +20,4 @@ export {
   platformIconMap,
 } from './brand-icons';
 
-export { SkyMapLogo } from './skymap-logo';
+export { CobaltSkymapLogo } from './cobalt-skymap-logo';

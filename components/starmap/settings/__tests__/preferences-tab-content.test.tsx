@@ -14,10 +14,6 @@ jest.mock('@/components/ui/separator', () => ({
   Separator: () => <hr data-testid="separator" />,
 }));
 
-jest.mock('@/lib/utils', () => ({
-  cn: (...args: (string | undefined)[]) => args.filter(Boolean).join(' '),
-}));
-
 jest.mock('@/components/starmap/settings/general-settings', () => ({
   GeneralSettings: () => <div data-testid="general-settings">GeneralSettings</div>,
 }));
@@ -56,6 +52,10 @@ jest.mock('@/components/starmap/settings/mobile-settings', () => ({
   MobileSettings: () => <div data-testid="mobile-settings">MobileSettings</div>,
 }));
 
+jest.mock('@/components/starmap/settings/advanced-settings', () => ({
+  AdvancedSettings: () => <div data-testid="advanced-settings">AdvancedSettings</div>,
+}));
+
 import { PreferencesTabContent } from '../preferences-tab-content';
 
 describe('PreferencesTabContent', () => {
@@ -68,7 +68,7 @@ describe('PreferencesTabContent', () => {
     expect(screen.getByTestId('scroll-area')).toBeInTheDocument();
   });
 
-  it('renders all 9 settings sub-components', () => {
+  it('renders all 10 settings sub-components', () => {
     render(<PreferencesTabContent />);
     expect(screen.getByTestId('general-settings')).toBeInTheDocument();
     expect(screen.getByTestId('appearance-settings')).toBeInTheDocument();
@@ -79,17 +79,18 @@ describe('PreferencesTabContent', () => {
     expect(screen.getByTestId('keyboard-settings')).toBeInTheDocument();
     expect(screen.getByTestId('global-shortcut-settings')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-settings')).toBeInTheDocument();
+    expect(screen.getByTestId('advanced-settings')).toBeInTheDocument();
   });
 
   it('renders separators between sections', () => {
     render(<PreferencesTabContent />);
     const separators = screen.getAllByTestId('separator');
-    expect(separators.length).toBe(8);
+    expect(separators.length).toBe(9);
   });
 
-  it('renders section quick-nav buttons', () => {
+  it('does not render the removed in-tab secondary nav', () => {
     render(<PreferencesTabContent />);
-    const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(9);
+    expect(screen.queryByTestId('pref-nav-select')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

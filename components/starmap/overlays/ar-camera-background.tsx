@@ -282,10 +282,20 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
     stopCamera,
   ]);
 
+  // Keep the latest applyProfileLayers callback without letting its identity churn
+  // re-fire the apply effect below. That callback closes over `effectiveProfile`,
+  // which it sets itself (apply -> setEffectiveProfile). Depending on its identity
+  // here created an infinite setState loop: apply -> setEffectiveProfile -> new
+  // callback identity -> effect re-runs -> apply -> ... ("Maximum update depth").
+  const applyCameraProfileLayersRef = useRef(applyCameraProfileLayers);
+  useEffect(() => {
+    applyCameraProfileLayersRef.current = applyCameraProfileLayers;
+  }, [applyCameraProfileLayers]);
+
   useEffect(() => {
     if (!enabled || !cameraStream) return;
-    void applyCameraProfileLayers(profileLayers);
-  }, [applyCameraProfileLayers, cameraStream, enabled, profileSignature, profileLayers]);
+    void applyCameraProfileLayersRef.current(profileLayers);
+  }, [cameraStream, enabled, profileSignature, profileLayers]);
 
   useEffect(() => {
     if (!enabled) {

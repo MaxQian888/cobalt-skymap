@@ -1,4 +1,4 @@
-//! SkyMap Tauri Backend
+//! Cobalt Skymap Tauri Backend
 //!
 //! Organized into the following modules:
 //! - `astronomy`: Astronomical calculations and events

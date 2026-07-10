@@ -107,16 +107,61 @@ describe('MarkerEditDialog', () => {
     expect(saveBtn).toBeDisabled();
   });
 
-  it('shows coordinates for new markers', () => {
+  it('shows editable coordinates for new markers', () => {
     render(<MarkerEditDialog {...defaultProps} />);
-    expect(screen.getByText(/12h 30m/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('12h 30m')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('+45° 00\'')).toBeInTheDocument();
   });
 
-  // 不显示坐标 when editing existing marker
-  it('hides coordinates when editing existing marker', () => {
+  it('shows editable coordinates when editing an existing marker too', () => {
     const marker = { id: '1', name: 'M', ra: 0, dec: 0, raString: '12h', decString: '+45', icon: 'star' as const, color: '#fff', visible: true, createdAt: Date.now(), updatedAt: Date.now() };
-    render(<MarkerEditDialog {...defaultProps} editingMarker={marker} />);
-    expect(screen.queryByText('coordinates.coordinates')).not.toBeInTheDocument();
+    render(<MarkerEditDialog {...defaultProps} editingMarker={marker} formData={{ ...defaultFormData, raString: '12h', decString: '+45' }} />);
+    expect(screen.getByDisplayValue('12h')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('+45')).toBeInTheDocument();
+  });
+
+  describe('coordinate editing', () => {
+    const raInput = () => screen.getByPlaceholderText('00h 42m 44s');
+    const decInput = () => screen.getByPlaceholderText('+41° 16\' 09"');
+
+    it('accepts decimal-degree input and propagates parsed values', () => {
+      render(<MarkerEditDialog {...defaultProps} />);
+      fireEvent.change(raInput(), { target: { value: '83.8221' } });
+
+      expect(defaultProps.onFormDataChange).toHaveBeenCalledWith(
+        expect.objectContaining({ ra: 83.8221, raString: expect.any(String) }),
+      );
+      expect(screen.queryByTestId('marker-coords-error')).not.toBeInTheDocument();
+    });
+
+    it('accepts sexagesimal input', () => {
+      render(<MarkerEditDialog {...defaultProps} />);
+      fireEvent.change(raInput(), { target: { value: '00h42m44s' } });
+      fireEvent.change(decInput(), { target: { value: "+41°16'09\"" } });
+
+      expect(screen.queryByTestId('marker-coords-error')).not.toBeInTheDocument();
+      const raCall = (defaultProps.onFormDataChange as jest.Mock).mock.calls
+        .map((c) => c[0])
+        .find((data) => typeof data.ra === 'number' && Math.abs(data.ra - 10.68) < 0.1);
+      expect(raCall).toBeDefined();
+    });
+
+    it('shows an error and disables Save on invalid coordinates', () => {
+      render(<MarkerEditDialog {...defaultProps} />);
+      fireEvent.change(decInput(), { target: { value: 'not-a-coordinate' } });
+
+      expect(screen.getByTestId('marker-coords-error')).toBeInTheDocument();
+      expect(screen.getByText('common.save')).toBeDisabled();
+    });
+
+    it('re-enables Save when the invalid value is corrected', () => {
+      render(<MarkerEditDialog {...defaultProps} />);
+      fireEvent.change(decInput(), { target: { value: '999' } }); // out of range
+      expect(screen.getByText('common.save')).toBeDisabled();
+
+      fireEvent.change(decInput(), { target: { value: '41.27' } });
+      expect(screen.getByText('common.save')).toBeEnabled();
+    });
   });
 
   // 测试 name 输入回调

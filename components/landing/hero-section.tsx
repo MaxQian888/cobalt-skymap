@@ -60,7 +60,7 @@ export function HeroSection() {
         {/* Title */}
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-bold text-foreground mb-6 splash-logo-enter">
           <span className="bg-gradient-to-r from-foreground via-primary to-secondary bg-clip-text text-transparent">
-            SkyMap
+            Cobalt Skymap
           </span>
         </h1>
 

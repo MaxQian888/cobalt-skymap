@@ -676,8 +676,12 @@ html.no-transitions *::after {
   --ring: color-mix(in oklch, var(--primary) 72%, white 28%);
 }
 
-.settings-large-text body {
-  font-size: 1.125rem;
+/* Graded global font scaling (WCAG 1.4.4). Scales the root rem unit so the
+   whole rem-based UI grows/shrinks together. SettingsSyncProvider applies the
+   scale as an inline root font-size (which wins the cascade); this rule is a
+   fallback for any context where only the CSS var is set. */
+:root {
+  font-size: calc(100% * var(--a11y-font-scale, 1));
 }
 
 .settings-reduce-transparency .glass,
@@ -690,6 +694,48 @@ html.no-transitions *::after {
 .settings-hide-focus-indicators :focus-visible {
   outline: none !important;
   box-shadow: none !important;
+}
+
+/* Screen-reader-optimized mode: make the UI more legible to assistive tech and
+   keyboard users. Previously this attribute was set but had no effect. */
+[data-screen-reader-optimized="true"] :focus-visible {
+  outline: 2px solid var(--ring) !important;
+  outline-offset: 2px !important;
+}
+
+/* Always honor focus rings in SR mode, even if the user disabled indicators. */
+[data-screen-reader-optimized="true"].settings-hide-focus-indicators :focus-visible {
+  outline: 2px solid var(--ring) !important;
+  box-shadow: none !important;
+}
+
+/* Reveal visually-hidden helper text so screen-reader hints become visible. */
+[data-screen-reader-optimized="true"] .sr-only.sr-only-reveal {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Color-vision (color blindness) daltonization. The feColorMatrix filters live
+   in the ColorBlindFilters SVG (mounted once in the app root); applying the
+   filter to the root <html> element recolors the entire rendered output —
+   including the WebGL star-map canvas — while remaining safe for
+   position:fixed descendants (html is the initial containing block). */
+[data-color-blind-mode="protanopia"] {
+  filter: url('#cb-protanopia');
+}
+[data-color-blind-mode="deuteranopia"] {
+  filter: url('#cb-deuteranopia');
+}
+[data-color-blind-mode="tritanopia"] {
+  filter: url('#cb-tritanopia');
+}
+[data-color-blind-mode="achromatopsia"] {
+  filter: url('#cb-achromatopsia');
 }
 
 /* ============================================================================
@@ -856,6 +902,51 @@ html.no-transitions *::after {
   animation: pulse-subtle 2s ease-in-out infinite;
 }
 
+/* One-shot selection acknowledgement ring (SelectionPulse overlay) */
+@keyframes selection-pulse-ring {
+  0% {
+    scale: 1;
+    opacity: 0.9;
+  }
+  100% {
+    scale: 3.25;
+    opacity: 0;
+  }
+}
+
+.selection-pulse-ring {
+  animation: selection-pulse-ring 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Long-press progress ring (mobile context-menu feedback) */
+@keyframes long-press-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes long-press-progress {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.long-press-indicator {
+  color: var(--primary);
+  /* Delay ~100ms so quick taps never flash the ring. */
+  animation: long-press-fade-in 0.15s ease-out 0.1s both;
+}
+
+.long-press-indicator-progress {
+  /* Duration is set inline to LONG_PRESS_DURATION. */
+  animation-name: long-press-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
 /* ============================================================================
    Onboarding Tour Animations
    ============================================================================ */
@@ -968,7 +1059,8 @@ html.no-transitions *::after {
   .tour-glow-ring,
   .tour-welcome-star,
   .tour-progress-dot-active,
-  .tour-feature-card {
+  .tour-feature-card,
+  .selection-pulse-ring {
     animation-duration: 0.01s !important;
     animation-iteration-count: 1 !important;
   }

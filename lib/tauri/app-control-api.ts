@@ -189,6 +189,39 @@ export async function startWindowDragging(): Promise<void> {
 }
 
 /**
+ * Resize-drag directions for frameless window edge/corner handles.
+ * Mirrors Tauri's `ResizeDirection` enum keys.
+ */
+export type WindowResizeDirection =
+  | 'North'
+  | 'NorthEast'
+  | 'East'
+  | 'SouthEast'
+  | 'South'
+  | 'SouthWest'
+  | 'West'
+  | 'NorthWest';
+
+/**
+ * Begin an interactive OS-level resize drag from a frameless window edge/corner.
+ * Frameless windows (`decorations: false`) lose the native resize border, so the
+ * custom shell paints invisible handles that call this on mousedown.
+ */
+export async function startWindowResizeDragging(
+  direction: WindowResizeDirection
+): Promise<void> {
+  if (!isTauri()) {
+    logger.warn('startWindowResizeDragging is only available in Tauri environment');
+    return;
+  }
+
+  // `ResizeDirection` is a string-literal union in @tauri-apps/api, so the
+  // direction key is passed through directly.
+  const { getCurrentWindow } = await import('@tauri-apps/api/window');
+  await getCurrentWindow().startResizeDragging(direction);
+}
+
+/**
  * Check whether the current window is visible.
  */
 export async function isWindowVisible(): Promise<boolean> {

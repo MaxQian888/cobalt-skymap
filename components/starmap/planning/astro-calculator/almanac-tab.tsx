@@ -46,8 +46,12 @@ export function AlmanacTab({
   onSharedTimeChange,
 }: AlmanacTabProps) {
   const t = useTranslations();
-  const [selectedDate, setSelectedDate] = useState(sharedDate ?? toDateInputString(new Date()));
-  const [selectedTime, setSelectedTime] = useState(sharedTime ?? '22:00');
+  // Controlled by the dialog's shared date/time when provided; local state is
+  // only the fallback for standalone usage. No sync effect needed.
+  const [localDate, setLocalDate] = useState(() => sharedDate ?? toDateInputString(new Date()));
+  const [localTime, setLocalTime] = useState(sharedTime ?? '22:00');
+  const selectedDate = sharedDate ?? localDate;
+  const selectedTime = sharedTime ?? localTime;
   const [almanac, setAlmanac] = useState<Awaited<ReturnType<typeof runCalculatorAlmanac>>['response'] | null>(null);
   const [sunTransit, setSunTransit] = useState<Date | null>(null);
   const [metaSummary, setMetaSummary] = useState<CalculatorMetaSummary | null>(null);
@@ -55,18 +59,6 @@ export function AlmanacTab({
   const [isLoading, setIsLoading] = useState(false);
 
   const date = useMemo(() => new Date(`${selectedDate}T${selectedTime}:00`), [selectedDate, selectedTime]);
-
-  useEffect(() => {
-    if (sharedDate && sharedDate !== selectedDate) {
-      setSelectedDate(sharedDate);
-    }
-  }, [sharedDate, selectedDate]);
-
-  useEffect(() => {
-    if (sharedTime && sharedTime !== selectedTime) {
-      setSelectedTime(sharedTime);
-    }
-  }, [sharedTime, selectedTime]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,8 +107,8 @@ export function AlmanacTab({
   }, [date, latitude, longitude, observerContext?.contextKey, t]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between gap-3">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 shrink-0">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">{t('astroCalc.date')}</Label>
@@ -125,7 +117,7 @@ export function AlmanacTab({
               value={selectedDate}
               onChange={(event) => {
                 const value = event.target.value;
-                setSelectedDate(value);
+                setLocalDate(value);
                 onSharedDateChange?.(value);
               }}
               className="h-8 w-44"
@@ -139,7 +131,7 @@ export function AlmanacTab({
               value={selectedTime}
               onChange={(event) => {
                 const value = event.target.value;
-                setSelectedTime(value);
+                setLocalTime(value);
                 onSharedTimeChange?.(value);
               }}
               className="h-8 w-32"
@@ -147,7 +139,7 @@ export function AlmanacTab({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {metaSummary && (
             <Badge variant="secondary" className="text-[10px]" data-testid="almanac-meta">
               {`src:${metaSummary.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${metaSummary.cacheHits}/${metaSummary.total}`}
@@ -161,15 +153,15 @@ export function AlmanacTab({
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+        <div className="shrink-0 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="h-3.5 w-3.5" />
           {error}
         </div>
       )}
 
       {almanac && (
-        <>
-          <div className="grid grid-cols-2 gap-4">
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-lg border bg-card">
               <div className="flex items-center gap-2 mb-3">
                 <Sun className="h-5 w-5 text-amber-500" />
@@ -255,7 +247,7 @@ export function AlmanacTab({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-lg border bg-card">
               <div className="flex items-center gap-2 mb-3">
                 <Calendar className="h-5 w-5 text-primary" />
@@ -324,7 +316,7 @@ export function AlmanacTab({
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

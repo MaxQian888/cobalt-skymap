@@ -182,7 +182,7 @@ export function AboutSettings() {
           {t('about.poweredBy')}
         </p>
         <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} SkyMap. {t('about.allRightsReserved')}
+          © {new Date().getFullYear()} Cobalt Skymap. {t('about.allRightsReserved')}
         </p>
       </div>
 

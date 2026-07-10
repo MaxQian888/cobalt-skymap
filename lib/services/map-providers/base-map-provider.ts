@@ -93,7 +93,7 @@ export abstract class BaseMapProvider {
       retryAttempts: 3,
       timeout: 10000,
       rateLimit: 1000,
-      userAgent: 'SkyMap/1.0',
+      userAgent: 'CobaltSkymap/1.0',
       ...config,
     };
     
@@ -127,7 +127,7 @@ export abstract class BaseMapProvider {
         method: 'GET',
         signal: controller.signal,
         headers: {
-          'User-Agent': this.config.userAgent || 'SkyMap/1.0',
+          'User-Agent': this.config.userAgent || 'CobaltSkymap/1.0',
         },
       });
 
@@ -196,7 +196,7 @@ export abstract class BaseMapProvider {
       ...options,
       signal: controller.signal,
       headers: {
-        'User-Agent': this.config.userAgent || 'SkyMap/1.0',
+        'User-Agent': this.config.userAgent || 'CobaltSkymap/1.0',
         ...options.headers,
       },
     };

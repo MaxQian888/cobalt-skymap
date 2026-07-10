@@ -56,9 +56,18 @@ export interface PerformanceSettings {
   showFPS: boolean;
 }
 
+export type ColorBlindMode =
+  | 'none'
+  | 'protanopia'
+  | 'deuteranopia'
+  | 'tritanopia'
+  | 'achromatopsia';
+
 export interface AccessibilitySettings {
   highContrast: boolean;
-  largeText: boolean;
+  /** Global UI font scale multiplier (1.0 = 100%). Range 0.9–2.0. */
+  fontScale: number;
+  colorBlindMode: ColorBlindMode;
   screenReaderOptimized: boolean;
   reduceTransparency: boolean;
   focusIndicators: boolean;
@@ -226,11 +235,17 @@ export const DEFAULT_PERFORMANCE: PerformanceSettings = {
 
 export const DEFAULT_ACCESSIBILITY: AccessibilitySettings = {
   highContrast: false,
-  largeText: false,
+  fontScale: 1.0,
+  colorBlindMode: 'none',
   screenReaderOptimized: false,
   reduceTransparency: false,
   focusIndicators: true,
 };
+
+/** Allowed UI font-scale steps (multiplier of base size). */
+export const FONT_SCALE_STEPS = [0.9, 1.0, 1.125, 1.25, 1.5, 2.0] as const;
+export const FONT_SCALE_MIN = 0.9;
+export const FONT_SCALE_MAX = 2.0;
 
 export const DEFAULT_NOTIFICATIONS: NotificationSettings = {
   enableSounds: false,
@@ -432,7 +447,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'starmap-settings',
       storage: getZustandStorage(),
-      version: 20, // v20: offline tile cache mode
+      version: 21, // v21: a11y fontScale + colorBlindMode (replaces largeText)
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<SettingsState>;
         
@@ -655,6 +670,24 @@ export const useSettingsStore = create<SettingsState>()(
           return {
             ...state,
             offlineTileMode: state.offlineTileMode ?? false,
+          };
+        }
+
+        // Migration from v20 to v21: replace boolean largeText with graded
+        // fontScale and add colorBlindMode.
+        if (version < 21) {
+          const legacy = (state.accessibility ?? {}) as Partial<AccessibilitySettings> & {
+            largeText?: boolean;
+          };
+          const { largeText, ...restAccessibility } = legacy;
+          return {
+            ...state,
+            accessibility: {
+              ...DEFAULT_ACCESSIBILITY,
+              ...restAccessibility,
+              fontScale: legacy.fontScale ?? (largeText ? 1.125 : 1.0),
+              colorBlindMode: legacy.colorBlindMode ?? 'none',
+            },
           };
         }
 

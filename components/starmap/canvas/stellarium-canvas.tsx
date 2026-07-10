@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import { useStellariumStore, useSettingsStore } from '@/lib/stores';
 import type { StellariumEngine } from '@/lib/core/types';
 
@@ -19,6 +19,7 @@ import {
   useStellariumFonts,
 } from '@/lib/hooks/stellarium';
 import { LoadingOverlay } from './components';
+import { LongPressIndicator } from './components/long-press-indicator';
 
 // Re-export types for external consumers
 export type { StellariumCanvasRef, StellariumCanvasProps } from '@/types/stellarium-canvas';
@@ -57,6 +58,13 @@ export const StellariumCanvas = forwardRef<StellariumCanvasRef, StellariumCanvas
     // ============================================================================
     const setStel = useStellariumStore((state) => state.setStel);
     const setActiveEngine = useStellariumStore((state) => state.setActiveEngine);
+    const setCanvasEl = useStellariumStore((state) => state.setCanvasEl);
+
+    // Expose the engine canvas so overlays can forward drags into the engine.
+    useEffect(() => {
+      setCanvasEl(canvasRef.current);
+      return () => setCanvasEl(null);
+    }, [setCanvasEl]);
 
     // ============================================================================
     // Hooks
@@ -92,14 +100,21 @@ export const StellariumCanvas = forwardRef<StellariumCanvasRef, StellariumCanvas
     } = useStellariumZoom({
       stelRef,
       canvasRef,
+      // Container-level wheel handling: also works over DOM overlays (markers)
+      // and suppresses the engine's legacy double-zoom.
+      containerRef,
       onFovChange,
     });
+
+    // Long-press progress feedback (mobile context menu affordance)
+    const [longPressPosition, setLongPressPosition] = useState<{ x: number; y: number } | null>(null);
 
     // Right-click context menu and touch events
     useStellariumEvents({
       containerRef,
       getClickCoordinates,
       onContextMenu,
+      onLongPressStateChange: setLongPressPosition,
     });
 
     // Observer location sync from profile
@@ -256,6 +271,11 @@ export const StellariumCanvas = forwardRef<StellariumCanvasRef, StellariumCanvas
           const rect = container.getBoundingClientRect();
           const renderQuality = useSettingsStore.getState().performance?.renderQuality ?? 'high';
           const dpr = getEffectiveDpr(renderQuality);
+          // Keep the engine's per-frame resize check on the same DPR, or the
+          // two would resize the canvas back and forth every frame.
+          if (stelRef.current) {
+            stelRef.current.__skymapDpr = dpr;
+          }
           const newWidth = Math.round(rect.width * dpr);
           const newHeight = Math.round(rect.height * dpr);
           if (canvas.width !== newWidth || canvas.height !== newHeight) {
@@ -268,8 +288,17 @@ export const StellariumCanvas = forwardRef<StellariumCanvasRef, StellariumCanvas
 
       observer.observe(container);
 
+      // Render-quality changes must reach the engine immediately (the
+      // ResizeObserver only fires on container size changes).
+      const unsubscribeQuality = useSettingsStore.subscribe((state) => {
+        const stel = stelRef.current;
+        if (!stel) return;
+        stel.__skymapDpr = getEffectiveDpr(state.performance?.renderQuality ?? 'high');
+      });
+
       return () => {
         observer.disconnect();
+        unsubscribeQuality();
         if (rafId !== null) cancelAnimationFrame(rafId);
       };
     }, []);
@@ -283,7 +312,10 @@ export const StellariumCanvas = forwardRef<StellariumCanvasRef, StellariumCanvas
           ref={canvasRef}
           className="w-full h-full block touch-none"
         />
-        
+
+        {/* Long-press progress ring (touch context-menu feedback) */}
+        <LongPressIndicator position={longPressPosition} />
+
         {/* Loading Overlay */}
         <LoadingOverlay
           loadingState={loadingState}

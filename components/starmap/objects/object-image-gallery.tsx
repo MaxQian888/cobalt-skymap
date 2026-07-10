@@ -5,14 +5,16 @@ import { useTranslations } from 'next-intl';
 import { 
   ChevronLeft, 
   ChevronRight, 
-  Maximize2, 
+  Maximize2,
   ExternalLink,
   ImageOff,
   Loader2,
+  RotateCw,
   X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -41,14 +43,14 @@ function DotsPagination({
   if (count <= 1) return null;
 
   return (
-    <div className={cn('absolute left-1/2 -translate-x-1/2 flex gap-2', variant === 'default' && 'sm:gap-1.5', className)}>
+    <div className={cn('absolute left-1/2 -translate-x-1/2 flex gap-2', variant === 'default' && 'shell-desktop:gap-1.5', className)}>
       {Array.from({ length: count }, (_, index) => (
         <button
           key={index}
           aria-label={t('objectDetail.goToImage', { index: index + 1 })}
           className={cn(
             'rounded-full transition-all',
-            variant === 'default' ? 'w-3 h-3 sm:w-2 sm:h-2 touch-target' : 'w-3 h-3',
+            variant === 'default' ? 'w-3 h-3 shell-desktop:w-2 shell-desktop:h-2 touch-target' : 'w-3 h-3',
             index === currentIndex
               ? 'bg-white scale-110'
               : variant === 'default' ? 'bg-white/50 hover:bg-white/70' : 'bg-white/40 hover:bg-white/60',
@@ -74,8 +76,8 @@ function NavigationArrows({
   const isFullscreen = variant === 'fullscreen';
   const buttonClass = isFullscreen
     ? 'absolute top-1/2 -translate-y-1/2 z-10 h-12 w-12 bg-black/50 hover:bg-black/70 text-white'
-    : 'absolute top-1/2 -translate-y-1/2 h-10 w-10 sm:h-8 sm:w-8 bg-black/50 hover:bg-black/70 text-white sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-target';
-  const iconClass = isFullscreen ? 'h-8 w-8' : 'h-6 w-6 sm:h-5 sm:w-5';
+    : 'absolute top-1/2 -translate-y-1/2 h-10 w-10 shell-desktop:h-8 shell-desktop:w-8 bg-black/50 hover:bg-black/70 text-white shell-desktop:opacity-0 shell-desktop:group-hover:opacity-100 transition-opacity touch-target';
+  const iconClass = isFullscreen ? 'h-8 w-8' : 'h-6 w-6 shell-desktop:h-5 shell-desktop:w-5';
   const leftPos = isFullscreen ? 'left-2' : 'left-1';
   const rightPos = isFullscreen ? 'right-2' : 'right-1';
 
@@ -111,6 +113,9 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
   const t = useTranslations();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [imageStates, setImageStates] = useState<Record<number, ImageState>>({});
+  // Per-image retry counter — bumping it cache-busts the <img> src to force a
+  // fresh load attempt after a failure.
+  const [retryKeys, setRetryKeys] = useState<Record<number, number>>({});
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [startX, setStartX] = useState(0);
@@ -133,6 +138,7 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
       queueMicrotask(() => {
         setCurrentIndex(0);
         setImageStates({});
+        setRetryKeys({});
       });
     }
   }, [imagesKey]);
@@ -150,6 +156,23 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
       [index]: { loaded: true, error: true }
     }));
   }, []);
+
+  const handleRetry = useCallback((index: number) => {
+    // Reset to the loading state and bump the retry key so the src changes.
+    setImageStates(prev => {
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+    setRetryKeys(prev => ({ ...prev, [index]: (prev[index] ?? 0) + 1 }));
+  }, []);
+
+  // Cache-busted src for a given image when a retry has been requested.
+  const srcFor = useCallback((index: number, url: string) => {
+    const retry = retryKeys[index];
+    if (!retry) return url;
+    return url + (url.includes('?') ? '&' : '?') + `retry=${retry}`;
+  }, [retryKeys]);
 
   const goToNext = useCallback(() => {
     setCurrentIndex(prev => (prev + 1) % images.length);
@@ -279,9 +302,23 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
         {/* Main Image Container */}
         <Card data-testid="object-image-gallery-frame" className="relative group gap-0 overflow-hidden border-border/70 bg-black/50 py-0 shadow-none">
           <CardContent className="p-0">
-            <div 
+            <div
               ref={containerRef}
-              className="relative h-48 cursor-grab select-none overflow-hidden rounded-lg active:cursor-grabbing touch-pan-x sm:h-56 md:h-64"
+              className="relative h-48 cursor-grab select-none overflow-hidden rounded-lg active:cursor-grabbing touch-pan-x shell-desktop:h-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              tabIndex={0}
+              role="group"
+              aria-roledescription="carousel"
+              aria-label={t('objectDetail.imageGalleryLabel', { name: objectName })}
+              onKeyDown={(e) => {
+                if (images.length <= 1) return;
+                if (e.key === 'ArrowLeft') {
+                  e.preventDefault();
+                  goToPrev();
+                } else if (e.key === 'ArrowRight') {
+                  e.preventDefault();
+                  goToNext();
+                }
+              }}
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -297,21 +334,28 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
                   transform: isDragging ? `translateX(${translateX}px)` : 'translateX(0)',
                 }}
               >
-                {isLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-muted/20">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
+                {isLoading && !hasError && (
+                  <Skeleton className="absolute inset-0 rounded-lg" />
                 )}
-                
+
                 {hasError ? (
                   <div className="flex flex-col items-center text-muted-foreground">
                     <ImageOff className="mb-2 h-12 w-12 opacity-50" />
                     <p className="text-xs">{t('objectDetail.imageLoadError')}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 h-7 text-xs"
+                      onClick={(e) => { e.stopPropagation(); handleRetry(currentIndex); }}
+                    >
+                      <RotateCw className="mr-1 h-3 w-3" />
+                      {t('common.retry')}
+                    </Button>
                   </div>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={currentImage.url}
+                    src={srcFor(currentIndex, currentImage.url)}
                     alt={currentImage.title || objectName}
                     className={cn(
                       'max-h-full max-w-full object-contain transition-opacity duration-300',
@@ -335,10 +379,10 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-2 right-2 h-9 w-9 bg-black/50 text-white transition-opacity hover:bg-black/70 touch-target sm:h-7 sm:w-7 sm:opacity-0 sm:group-hover:opacity-100"
+                    className="absolute top-2 right-2 h-9 w-9 bg-black/50 text-white transition-opacity hover:bg-black/70 touch-target shell-desktop:h-7 shell-desktop:w-7 shell-desktop:opacity-0 shell-desktop:group-hover:opacity-100"
                     onClick={() => setFullscreenOpen(true)}
                   >
-                    <Maximize2 className="h-5 w-5 sm:h-4 sm:w-4" />
+                    <Maximize2 className="h-5 w-5 shell-desktop:h-4 shell-desktop:w-4" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>{t('objectDetail.fullscreen')}</TooltipContent>
@@ -361,6 +405,16 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
                 {currentIndex + 1} / {images.length}
               </span>
             </div>
+            {currentImage.title && (
+              <p className="truncate text-xs font-medium text-foreground" data-testid="object-image-title">
+                {currentImage.title}
+              </p>
+            )}
+            {currentImage.width && currentImage.height && (
+              <p className="text-[10px] text-muted-foreground/70" data-testid="object-image-dimensions">
+                {currentImage.width} × {currentImage.height} px
+              </p>
+            )}
             {currentImage.credit && (
               <p className="mt-0.5 truncate text-[10px] text-muted-foreground/70">
                 {currentImage.credit}
@@ -400,6 +454,15 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
               <div className="flex flex-col items-center text-white/70">
                 <ImageOff className="h-16 w-16 mb-4" />
                 <p>{t('objectDetail.imageLoadError')}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 border-white/30 bg-white/10 text-white hover:bg-white/20"
+                  onClick={(e) => { e.stopPropagation(); handleRetry(currentIndex); }}
+                >
+                  <RotateCw className="mr-1 h-4 w-4" />
+                  {t('common.retry')}
+                </Button>
               </div>
             ) : (
               <>
@@ -411,7 +474,7 @@ export const ObjectImageGallery = memo(function ObjectImageGallery({
                 )}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={currentImage.url}
+                  src={srcFor(currentIndex, currentImage.url)}
                   alt={currentImage.title || objectName}
                   className={cn(
                     "max-w-full max-h-full object-contain transition-opacity",

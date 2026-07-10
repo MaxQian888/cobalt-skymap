@@ -40,6 +40,7 @@ const DEFAULT_STELLARIUM = {
   surveyId: 'dss',
   surveyUrl: undefined,
   skyCulture: 'western',
+  satellitesVisible: false,
   skyCultureLanguage: 'native' as const,
   nightMode: false,
   sensorControl: false,
@@ -99,7 +100,8 @@ const DEFAULT_PERFORMANCE = {
 
 const DEFAULT_ACCESSIBILITY = {
   highContrast: false,
-  largeText: false,
+  fontScale: 1.0,
+  colorBlindMode: 'none' as const,
   screenReaderOptimized: false,
   reduceTransparency: false,
   focusIndicators: true,
@@ -351,6 +353,7 @@ describe('Settings Store', () => {
         surveyId: 'mellinger',
         surveyUrl: 'https://example.com',
         skyCulture: 'western',
+        satellitesVisible: false,
         skyCultureLanguage: 'en' as const,
         nightMode: true,
         sensorControl: true,
@@ -494,7 +497,8 @@ describe('Settings Store', () => {
     it('has default accessibility settings', () => {
       const state = useSettingsStore.getState();
       expect(state.accessibility.highContrast).toBe(false);
-      expect(state.accessibility.largeText).toBe(false);
+      expect(state.accessibility.fontScale).toBe(1.0);
+      expect(state.accessibility.colorBlindMode).toBe('none');
       expect(state.accessibility.focusIndicators).toBe(true);
     });
 
@@ -503,15 +507,23 @@ describe('Settings Store', () => {
       expect(useSettingsStore.getState().accessibility.highContrast).toBe(true);
     });
 
+    it('setAccessibilitySetting updates fontScale and colorBlindMode', () => {
+      useSettingsStore.getState().setAccessibilitySetting('fontScale', 1.25);
+      useSettingsStore.getState().setAccessibilitySetting('colorBlindMode', 'deuteranopia');
+      const state = useSettingsStore.getState();
+      expect(state.accessibility.fontScale).toBe(1.25);
+      expect(state.accessibility.colorBlindMode).toBe('deuteranopia');
+    });
+
     it('setAccessibilitySettings updates multiple settings', () => {
       useSettingsStore.getState().setAccessibilitySettings({
         highContrast: true,
-        largeText: true,
+        fontScale: 1.5,
         reduceTransparency: true,
       });
       const state = useSettingsStore.getState();
       expect(state.accessibility.highContrast).toBe(true);
-      expect(state.accessibility.largeText).toBe(true);
+      expect(state.accessibility.fontScale).toBe(1.5);
       expect(state.accessibility.reduceTransparency).toBe(true);
       expect(state.accessibility.focusIndicators).toBe(true);
     });

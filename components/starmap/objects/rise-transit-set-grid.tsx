@@ -32,7 +32,9 @@ export const RiseTransitSetGrid = memo(function RiseTransitSetGrid({
   return (
     <div className={cn(
       'grid grid-cols-3',
-      isCompact ? 'gap-0.5 sm:gap-1 text-xs' : 'gap-2',
+      // shell-desktop: (not sm:) — this grid renders inside the mobile-shell
+      // drawer up to 900px, where sm:(640px) would re-open the dead zone.
+      isCompact ? 'gap-0.5 shell-desktop:gap-1 text-xs' : 'gap-2',
       className,
     )}>
       <Card className={cardClass}>

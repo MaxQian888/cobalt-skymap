@@ -63,11 +63,15 @@ jest.mock('@/lib/astronomy/astro-utils', () => ({
 // Capture the CustomTooltip component passed to Recharts Tooltip
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let capturedTooltipContent: any = null;
+// Capture the XAxis props so the tickFormatter can be exercised directly.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let capturedXAxisProps: any = null;
 
 jest.mock('recharts', () => ({
   AreaChart: ({ children }: React.PropsWithChildren) => <svg data-testid="area-chart">{children}</svg>,
   Area: () => <g data-testid="area" />,
-  XAxis: () => <g />,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  XAxis: (props: any) => { capturedXAxisProps = props; return <g />; },
   YAxis: () => <g />,
   ReferenceLine: () => <g data-testid="reference-line" />,
   ResponsiveContainer: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
@@ -111,6 +115,21 @@ describe('AltitudeChartCompact', () => {
     render(<AltitudeChartCompact {...defaultProps} />);
     expect(screen.getByText(/chart\.timeRange/)).toBeInTheDocument();
     expect(screen.getByText(/12h/)).toBeInTheDocument();
+  });
+
+  it('annotates the current altitude (hour=0 sample)', () => {
+    render(<AltitudeChartCompact {...defaultProps} />);
+    // mockGetAltitudeOverTime seeds hour=0 at 30°.
+    expect(screen.getByText(/chart\.nowAltitude/)).toBeInTheDocument();
+    expect(screen.getByText('30.0°')).toBeInTheDocument();
+  });
+
+  it('formats the x-axis as local clock time, not a "+Xh" offset', () => {
+    render(<AltitudeChartCompact {...defaultProps} />);
+    const formatted = capturedXAxisProps.tickFormatter(0);
+    // Local clock time like "08:00" / "12:00 AM" — never the old "+0h" form.
+    expect(formatted).toMatch(/\d{1,2}:\d{2}/);
+    expect(formatted).not.toMatch(/\+\d+h/);
   });
 
   it('renders zoom-out button that decreases time range', async () => {

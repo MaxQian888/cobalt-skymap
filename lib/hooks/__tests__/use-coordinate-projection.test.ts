@@ -1,7 +1,11 @@
 /**
  * @jest-environment jsdom
  */
-import { createCoordinateProjector } from '../use-coordinate-projection';
+import { renderHook, act } from '@testing-library/react';
+import { createCoordinateProjector, useBatchProjection } from '../use-coordinate-projection';
+import { useGlobalAnimationLoop } from '../use-animation-frame';
+import { useStellariumStore } from '@/lib/stores';
+import { useSettingsStore } from '@/lib/stores/settings-store';
 
 // Mock logger
 jest.mock('@/lib/logger', () => ({
@@ -165,5 +169,87 @@ describe('createCoordinateProjector', () => {
       expect(aladin.world2pix).not.toHaveBeenCalled();
       expect(result).toBeNull();
     });
+  });
+});
+
+describe('useBatchProjection adaptive mode', () => {
+  const mockUseGlobalAnimationLoop = useGlobalAnimationLoop as jest.Mock;
+  const mockUseStellariumStore = useStellariumStore as unknown as jest.Mock;
+  const mockUseSettingsStore = useSettingsStore as unknown as jest.Mock;
+
+  // Distinguish item projections (ICRF→VIEW) from view probes (VIEW→ICRF).
+  function createInstrumentedStel() {
+    const calls = { itemProjection: 0, probe: 0 };
+    const stel = {
+      D2R: Math.PI / 180,
+      observer: {},
+      core: { fov: Math.PI / 3 },
+      s2c: () => [0, 0, -1],
+      convertFrame: (_obs: unknown, from: string, to: string, vec: number[]) => {
+        if (from === 'VIEW' && to === 'ICRF') calls.probe += 1;
+        else calls.itemProjection += 1;
+        return from === 'VIEW' ? [0.1, 0.2, -0.97] : [0, 0, -1];
+      },
+    };
+    return { stel, calls };
+  }
+
+  function renderAdaptive(stel: unknown) {
+    mockUseStellariumStore.mockImplementation((selector: (s: unknown) => unknown) =>
+      selector({ stel, aladin: null }),
+    );
+    mockUseSettingsStore.mockImplementation((selector: (s: unknown) => unknown) =>
+      selector({ skyEngine: 'stellarium' }),
+    );
+
+    // Stable identity, like the memoized marker arrays in production — a new
+    // array each render would legitimately force a reprojection.
+    const items = [{ ra: 0, dec: 0 }];
+
+    const hook = renderHook(() =>
+      useBatchProjection({
+        containerWidth: 800,
+        containerHeight: 600,
+        items,
+        getRa: (i: { ra: number }) => i.ra,
+        getDec: (i: { dec: number }) => i.dec,
+        enabled: true,
+        intervalMs: 0,
+        adaptive: true,
+        loopId: 'test-adaptive',
+      }),
+    );
+
+    const tick = (timestamp: number) => {
+      const cb = mockUseGlobalAnimationLoop.mock.calls.at(-1)![1] as (d: number, t: number) => void;
+      act(() => cb(16, timestamp));
+    };
+
+    return { hook, tick };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('skips reprojection while the view is unchanged and recomputes on FOV change', () => {
+    const { stel, calls } = createInstrumentedStel();
+    const { hook, tick } = renderAdaptive(stel);
+
+    tick(100);
+    expect(calls.probe).toBe(1);
+    expect(calls.itemProjection).toBe(1);
+    expect(hook.result.current).toHaveLength(1);
+
+    // Static view: probe runs every frame, item projection does not.
+    tick(116);
+    tick(132);
+    expect(calls.probe).toBe(3);
+    expect(calls.itemProjection).toBe(1);
+
+    // View change (zoom) triggers a full reprojection.
+    stel.core.fov = Math.PI / 4;
+    tick(148);
+    expect(calls.itemProjection).toBe(2);
   });
 });

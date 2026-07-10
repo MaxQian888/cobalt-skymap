@@ -32,11 +32,26 @@ export interface StellariumEngine {
     onEvent: (event: unknown) => void;
     iterator?: boolean;
   }) => unknown;
+  /**
+   * Cobalt Skymap glue extension: setting this stops the instance's render loop on the
+   * next frame. Engine instances cannot be truly disposed (the WASM runtime has
+   * no teardown), so this is how stale/replaced instances are neutralized.
+   */
+  __skymapDestroyed?: boolean;
+  /** Cobalt Skymap glue extension: overrides window.devicePixelRatio in the render loop
+   *  so the render-quality DPR cap actually applies to the drawing buffer. */
+  __skymapDpr?: number;
 }
 
 export interface StellariumHipsModule {
   visible: boolean;
   url: string;
+  addDataSource?: (options: { url: string; key?: string }) => void;
+}
+
+export interface StellariumSatellitesModule {
+  visible?: boolean;
+  hints_visible?: boolean;
   addDataSource?: (options: { url: string; key?: string }) => void;
 }
 
@@ -67,6 +82,7 @@ export interface StellariumCore {
   hips: StellariumHipsModule;
   milkyway: StellariumDataModule;
   minor_planets: StellariumDataModule;
+  satellites?: StellariumSatellitesModule;
   planets: StellariumHintsModule;
   comets: StellariumCometsModule;
   landscapes: StellariumLandscapeModule;
@@ -225,6 +241,8 @@ export interface StellariumSettings {
   landscapesVisible: boolean;
   dsosVisible: boolean;
   milkyWayVisible: boolean;
+  /** Render satellites from bundled TLE data (engine `core.satellites`). */
+  satellitesVisible: boolean;
   fogVisible: boolean;
   surveyEnabled: boolean;
   surveyId: string;

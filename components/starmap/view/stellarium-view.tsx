@@ -21,6 +21,7 @@ import { CloseConfirmDialog } from './close-confirm-dialog';
 import { OverlaysContainer } from './overlays-container';
 import { CenterCrosshair } from './center-crosshair';
 import { BottomStatusBar } from './bottom-status-bar';
+import { WindowResizeHandles } from './window-resize-handles';
 import { useStellariumViewState } from './use-stellarium-view-state';
 import { UpdateBanner } from '../management/updater/update-banner';
 import { UpdateDialog } from '../management/updater/update-dialog';
@@ -32,6 +33,7 @@ import { useOnboardingBridgeStore, usePlanningUiStore, useStarmapMobileUiStore }
 import { useCliBridgeStore } from '@/lib/stores/cli-bridge-store';
 import { ARCameraBackground } from '../overlays/ar-camera-background';
 import { ARCompassOverlay } from '../overlays/ar-compass-overlay';
+import { SelectionPulse } from '../overlays/selection-pulse';
 import { ARRecoveryPanel } from './ar-recovery-panel';
 import { ARLaunchAssistant } from './ar-launch-assistant';
 import { useMobileShell } from './use-mobile-shell';
@@ -58,12 +60,11 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
     isSearchOpen,
     setIsSearchOpen,
     selectedObject,
-    setSelectedObject,
     currentFov,
     showSessionPanel,
     toggleSessionPanel,
     contextMenuCoords,
-    clickPosition,
+    infoPanelAnchor,
     containerBounds,
 
     // Context menu state
@@ -102,6 +103,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
 
     // Handlers
     handleSelectionChange,
+    handleDeselectObject,
     handleFovChange,
     handleSetFramingCoordinates,
     handleZoomIn,
@@ -349,7 +351,9 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
 
   // Stable identity so memo(InfoPanel) is not defeated by an inline closure
   // on every StellariumView render (it polls view direction every 500ms).
-  const handleCloseInfoPanel = useCallback(() => setSelectedObject(null), [setSelectedObject]);
+  // Routes through handleDeselectObject so the engine's own selection reticle
+  // and the continuity target context are cleared along with the React state.
+  const handleCloseInfoPanel = handleDeselectObject;
 
   // Stable handler so memo(ObjectDetailDrawer) holds across frequent re-renders.
   const handleDetailDrawerOpenChange = useCallback((open: boolean) => {
@@ -432,7 +436,7 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
               setDetailDrawerOpen(false);
               return;
             }
-            if (selectedObject) setSelectedObject(null);
+            if (selectedObject) handleDeselectObject();
           }}
           enabled={!!stel || skyEngine === 'aladin'}
         />
@@ -525,6 +529,16 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
           onMarkerNavigate={handleMarkerNavigate}
         />
 
+        {/* One-shot selection acknowledgement ring (kept outside
+            OverlaysContainer to avoid widening its memo props) */}
+        {containerBounds && (
+          <SelectionPulse
+            selectedObject={selectedObject}
+            containerWidth={containerBounds.width}
+            containerHeight={containerBounds.height}
+          />
+        )}
+
         {/* Top Toolbar */}
         <TopToolbar
           stel={!!stel || skyEngine === 'aladin'}
@@ -597,7 +611,9 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
             onClose={handleCloseInfoPanel}
             onSetFramingCoordinates={handleSetFramingCoordinates}
             onViewDetails={handleOpenDetails}
-            clickPosition={clickPosition}
+            // Frozen selection anchor: the click point for click-driven
+            // selections, the projected object position for search/toolbar ones.
+            clickPosition={infoPanelAnchor}
             containerBounds={containerBounds}
             className="pointer-events-auto info-panel-enter"
           />
@@ -623,6 +639,9 @@ export function StellariumView({ showSplash = false }: StellariumViewProps) {
 
         {/* Center Crosshair */}
         <CenterCrosshair />
+
+        {/* Frameless-window resize affordance (custom shell only) */}
+        <WindowResizeHandles />
 
         {/* Update Banner & Dialog (Tauri desktop only) */}
         {isTauri() && (

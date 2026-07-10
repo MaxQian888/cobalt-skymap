@@ -19,6 +19,9 @@ export const LONG_PRESS_DURATION = 500; // ms
 export const TOUCH_MOVE_THRESHOLD = 10; // pixels
 export const RIGHT_CLICK_THRESHOLD = 5; // pixels - if moved more than this, it's a drag
 export const RIGHT_CLICK_TIME_THRESHOLD = 300; // ms - max time for a click
+// A pointer that moves further than this after going down on a marker is a
+// sky-pan gesture and gets forwarded to the engine canvas.
+export const MARKER_DRAG_FORWARD_THRESHOLD = 5; // pixels
 
 // Engine initialization delays
 export const ENGINE_FOV_INIT_DELAY = 100;      // ms - delay before setting initial FOV after engine ready

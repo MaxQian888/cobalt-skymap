@@ -91,7 +91,7 @@ jest.mock('@/components/icons', () => {
     React.createElement('svg', { className, 'data-testid': 'mock-icon' });
 
   return {
-    SkyMapLogo: MockIcon,
+    CobaltSkymapLogo: MockIcon,
     GitHubIcon: MockIcon,
     WindowsIcon: MockIcon,
     AppleIcon: MockIcon,

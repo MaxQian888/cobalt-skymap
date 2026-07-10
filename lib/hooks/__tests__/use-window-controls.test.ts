@@ -31,6 +31,7 @@ jest.mock('@/lib/tauri/app-control-api', () => ({
   isTrayPositioningReady: jest.fn(() => Promise.resolve(false)),
   listenForTrayActivation: jest.fn(() => Promise.resolve(() => {})),
   startWindowDragging: jest.fn(() => Promise.resolve()),
+  startWindowResizeDragging: jest.fn(() => Promise.resolve()),
   getDesktopShell: jest.fn(() =>
     Promise.resolve({
       platform: 'web',
@@ -63,6 +64,7 @@ import {
   saveWindowState,
   showWindow,
   startWindowDragging,
+  startWindowResizeDragging,
   unminimizeWindow,
 } from '@/lib/tauri/app-control-api';
 
@@ -73,6 +75,7 @@ const mockFocusWindow = focusWindow as jest.Mock;
 const mockIsTrayPositioningReady = isTrayPositioningReady as jest.Mock;
 const mockListenForTrayActivation = listenForTrayActivation as jest.Mock;
 const mockStartWindowDragging = startWindowDragging as jest.Mock;
+const mockStartWindowResizeDragging = startWindowResizeDragging as jest.Mock;
 const mockGetDesktopShell = getDesktopShell as jest.Mock;
 const mockRestartApp = restartApp as jest.Mock;
 const mockSaveWindowState = saveWindowState as jest.Mock;
@@ -121,6 +124,33 @@ describe('useWindowControls', () => {
     expect(typeof result.current.handleRevealFromTray).toBe('function');
     expect(typeof result.current.handleWebReload).toBe('function');
     expect(typeof result.current.handleStartWindowDrag).toBe('function');
+    expect(typeof result.current.handleStartWindowResize).toBe('function');
+  });
+
+  it('starts window resize dragging through the desktop control API', async () => {
+    mockIsTauri.mockReturnValue(true);
+    mockStartWindowResizeDragging.mockResolvedValue(undefined);
+    mockGetDesktopShell.mockResolvedValue({
+      platform: 'windows',
+      mode: 'custom-frameless',
+      dragStrategy: 'manual',
+      showsNativeWindowControls: false,
+      supportsManualDragging: true,
+      supportsDoubleClickMaximize: true,
+      titlebarInsets: { left: 0, right: 0, top: 0 },
+    });
+
+    const { result } = renderHook(() => useWindowControls());
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await result.current.handleStartWindowResize('SouthEast');
+    });
+
+    expect(mockStartWindowResizeDragging).toHaveBeenCalledWith('SouthEast');
   });
 
   it('should route move window actions through positionerApi', async () => {

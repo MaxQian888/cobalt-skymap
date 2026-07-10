@@ -44,6 +44,19 @@ export interface InfoPanelProps {
 export interface AltitudeChartCompactProps {
   ra: number;
   dec: number;
+  /**
+   * Per-time position provider for moving bodies (planets, Moon). When set,
+   * the curve tracks the body instead of freezing the selection-time RA/Dec.
+   * Must be referentially stable across renders (the chart is memoized).
+   */
+  positionAt?: (date: Date) => { raDeg: number; decDeg: number };
+  /**
+   * Pre-computed visibility for moving bodies (rise/set/transit markers).
+   * When omitted the chart computes fixed-target visibility internally.
+   */
+  visibility?: import('@/lib/core/types').TargetVisibility | null;
+  /** Show the "position is a selection-time snapshot" footnote (comets/asteroids). */
+  isSnapshot?: boolean;
 }
 
 export interface ChartTooltipPayload {

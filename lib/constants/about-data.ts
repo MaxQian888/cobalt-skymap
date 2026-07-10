@@ -15,7 +15,7 @@ import { ABOUT_DEPENDENCIES } from './generated/about-dependencies';
 // ============================================================================
 
 export const APP_INFO: AppInfo = {
-  name: 'SkyMap',
+  name: 'Cobalt Skymap',
   version: process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0',
   repository: EXTERNAL_LINKS.repository,
   author: 'AstroAir Team',

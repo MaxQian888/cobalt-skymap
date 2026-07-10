@@ -34,6 +34,7 @@ jest.mock('@/lib/stores', () => ({
         setHelpers: mockSetHelpers,
         updateStellariumCore: jest.fn(),
         setActiveEngine: mockSetActiveEngine,
+        setCanvasEl: jest.fn(),
       };
       return selector(state);
     }),
@@ -49,6 +50,7 @@ jest.mock('@/lib/stores', () => ({
         stellarium: { skyCultureLanguage: 'native' },
         performance: { renderQuality: 'high' },
       }),
+      subscribe: jest.fn(() => jest.fn()),
     }
   ),
   useMountStore: Object.assign(

@@ -182,18 +182,20 @@ describe('AstroCalculatorDialog', () => {
     expect(screen.getByText('35.12°, 117.99°')).toBeInTheDocument();
     expect(screen.getByText('Mountain Base')).toBeInTheDocument();
     expect(screen.getByText('America/Los_Angeles')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.wut')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.positions')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.rts')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.ephemeris')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.almanac')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.phenomena')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.coordinate')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.timeCalc')).toBeInTheDocument();
-    expect(screen.getByText('astroCalc.solarSystem')).toBeInTheDocument();
+    // The single-row tab bar shows compact short labels (full label is kept
+    // for a11y via title/aria-label on each trigger).
+    expect(screen.getByText('astroCalc.tabShort.wut')).toBeInTheDocument();
+    expect(screen.getByText('astroCalc.tabShort.positions')).toBeInTheDocument();
+    expect(screen.getByText('astroCalc.tabShort.rts')).toBeInTheDocument();
+    expect(screen.getByText('astroCalc.tabShort.ephemeris')).toBeInTheDocument();
+    expect(screen.getByText('astroCalc.tabShort.almanac')).toBeInTheDocument();
+    expect(screen.getByText('astroCalc.tabShort.phenomena')).toBeInTheDocument();
+    expect(screen.getByText('astroCalc.tabShort.coordinate')).toBeInTheDocument();
+    expect(screen.getByText('astroCalc.tabShort.time')).toBeInTheDocument();
+    expect(screen.getByText('astroCalc.tabShort.solarSystem')).toBeInTheDocument();
   });
 
-  it('keeps the responsive tab navigation shell and renders all tab panels', () => {
+  it('keeps the single-row scrollable tab navigation shell and renders all tab panels', () => {
     render(<AstroCalculatorDialog />);
 
     const nav = screen.getByTestId('astro-calculator-tab-nav');
@@ -201,8 +203,9 @@ describe('AstroCalculatorDialog', () => {
 
     const tabsList = screen.getByTestId('tabs').querySelector('[data-slot="tabs-list"]');
     expect(tabsList).not.toBeNull();
-    expect(tabsList?.className).toContain('inline-flex');
-    expect(tabsList?.className).toContain('sm:grid');
+    // Single horizontal row that scrolls when it overflows (no multi-row grid).
+    expect(tabsList?.className).toContain('flex-nowrap');
+    expect(tabsList?.className).not.toContain('sm:grid');
     expect(screen.getByTestId('tab-coordinate')).toBeInTheDocument();
     expect(screen.getByTestId('tab-time')).toBeInTheDocument();
     expect(screen.getByTestId('tab-solar-system')).toBeInTheDocument();

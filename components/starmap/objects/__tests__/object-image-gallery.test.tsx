@@ -328,6 +328,44 @@ describe('ObjectImageGallery', () => {
 
       expect(screen.getByText('objectDetail.imageLoadError')).toBeInTheDocument();
     });
+
+    it('offers a retry that cache-busts the failed image and clears the error', async () => {
+      render(<ObjectImageGallery images={mockImages} objectName="M31" />);
+
+      await act(async () => {
+        fireEvent.error(screen.getByRole('img'));
+      });
+      expect(screen.getByText('objectDetail.imageLoadError')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('common.retry'));
+      });
+
+      // Error cleared → image element is back, now with a cache-busting param.
+      expect(screen.queryByText('objectDetail.imageLoadError')).not.toBeInTheDocument();
+      const img = screen.getByRole('img') as HTMLImageElement;
+      expect(img.getAttribute('src')).toContain('retry=1');
+    });
+  });
+
+  describe('Metadata', () => {
+    it('renders the image title in the metadata card', () => {
+      render(<ObjectImageGallery images={mockImages} objectName="M31" />);
+      expect(screen.getByTestId('object-image-title')).toHaveTextContent('M31 Image 1');
+    });
+
+    it('renders pixel dimensions when width and height are present', () => {
+      const sized: ObjectImage[] = [
+        { url: 'https://example.com/sized.jpg', source: 'DSS', credit: 'STScI', width: 1024, height: 768 },
+      ];
+      render(<ObjectImageGallery images={sized} objectName="M31" />);
+      expect(screen.getByTestId('object-image-dimensions')).toHaveTextContent('1024 × 768 px');
+    });
+
+    it('omits dimensions when not provided', () => {
+      render(<ObjectImageGallery images={mockImages} objectName="M31" />);
+      expect(screen.queryByTestId('object-image-dimensions')).not.toBeInTheDocument();
+    });
   });
 
   describe('Fullscreen Mode', () => {
@@ -691,6 +729,35 @@ describe('ObjectImageGallery', () => {
 
       // Should still be on image 1 since not in fullscreen
       expect(screen.getByText('1 / 3')).toBeInTheDocument();
+    });
+
+    it('exposes the inline gallery as a focusable carousel with arrow-key navigation', async () => {
+      render(<ObjectImageGallery images={mockImages} objectName="M31" />);
+
+      const carousel = screen.getByRole('group');
+      expect(carousel).toHaveAttribute('aria-roledescription', 'carousel');
+      expect(carousel).toHaveAttribute('tabindex', '0');
+
+      await act(async () => {
+        fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+      });
+      expect(screen.getByText('2 / 3')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.keyDown(carousel, { key: 'ArrowLeft' });
+      });
+      expect(screen.getByText('1 / 3')).toBeInTheDocument();
+    });
+
+    it('ignores arrow keys on the inline carousel with a single image', async () => {
+      render(<ObjectImageGallery images={[mockImages[0]]} objectName="M31" />);
+
+      const carousel = screen.getByRole('group');
+      await act(async () => {
+        fireEvent.keyDown(carousel, { key: 'ArrowRight' });
+      });
+      // Single image — no counter change, no crash.
+      expect(screen.queryByText('2 / 3')).not.toBeInTheDocument();
     });
   });
 

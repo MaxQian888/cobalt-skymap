@@ -132,6 +132,7 @@ jest.mock('@/lib/hooks', () => ({
     handleAddToList: jest.fn(),
     mountConnected: false,
   })),
+  useHorizonsEphemeris: jest.fn(() => ({ row: null, loading: false, error: null })),
 }));
 
 // Mock stores
@@ -189,13 +190,31 @@ jest.mock('@/components/ui/drawer', () => ({
     children,
     open,
     onOpenChange,
+    direction,
+    snapPoints,
+    activeSnapPoint,
+    modal,
+    snapToSequentialPoint,
   }: {
     children: React.ReactNode;
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    direction?: string;
+    snapPoints?: (number | string)[];
+    activeSnapPoint?: number | string | null;
+    modal?: boolean;
+    snapToSequentialPoint?: boolean;
   }) => (
     open ? (
-      <div data-testid="drawer" data-open={open}>
+      <div
+        data-testid="drawer"
+        data-open={open}
+        data-direction={direction}
+        data-snap-points={snapPoints ? JSON.stringify(snapPoints) : undefined}
+        data-active-snap={activeSnapPoint ?? undefined}
+        data-modal={modal === undefined ? undefined : String(modal)}
+        data-snap-sequential={snapToSequentialPoint ? 'true' : undefined}
+      >
         <button data-testid="drawer-close-btn" onClick={() => onOpenChange?.(false)}>
           Close
         </button>
@@ -203,8 +222,15 @@ jest.mock('@/components/ui/drawer', () => ({
       </div>
     ) : null
   ),
-  DrawerContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="drawer-content" className={className}>{children}</div>
+  DrawerContent: ({ children, className, ...props }: { children: React.ReactNode; className?: string } & Record<string, unknown>) => (
+    <div
+      data-testid="drawer-content"
+      className={className}
+      data-shell={props['data-shell'] as string | undefined}
+      data-peeking={props['data-peeking'] as string | undefined}
+    >
+      {children}
+    </div>
   ),
   DrawerHeader: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="drawer-header" className={className}>{children}</div>
@@ -221,6 +247,31 @@ jest.mock('@/components/ui/drawer', () => ({
   DrawerClose: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) => (
     asChild ? <>{children}</> : <div data-testid="drawer-close">{children}</div>
   ),
+}));
+
+// Controllable shell decision — defaults to the mobile (bottom-sheet) shell.
+let mockIsMobileShell = true;
+jest.mock('@/components/starmap/view/use-mobile-shell', () => ({
+  useMobileShell: () => ({
+    isMobileShell: mockIsMobileShell,
+    isLandscape: false,
+    viewportWidth: mockIsMobileShell ? 390 : 1440,
+    viewportHeight: mockIsMobileShell ? 844 : 900,
+  }),
+}));
+
+// Render the dropdown menu inline so its items are directly queryable.
+jest.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div data-testid="dropdown-menu">{children}</div>,
+  DropdownMenuTrigger: ({ children, asChild }: { children: React.ReactNode; asChild?: boolean }) => (
+    asChild ? <>{children}</> : <div>{children}</div>
+  ),
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div data-testid="dropdown-content">{children}</div>,
+  DropdownMenuItem: ({ children, onSelect }: { children: React.ReactNode; onSelect?: () => void }) => (
+    <button data-testid="dropdown-item" onClick={() => onSelect?.()}>{children}</button>
+  ),
+  DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuSeparator: () => <hr />,
 }));
 
 jest.mock('@/components/ui/separator', () => ({
@@ -348,8 +399,15 @@ jest.mock('../altitude-chart-compact', () => ({
   ),
 }));
 
+jest.mock('../satellite-info-notice', () => ({
+  SatelliteInfoNotice: ({ noradId }: { noradId: number | null }) => (
+    <div data-testid="satellite-info-notice" data-norad={noradId ?? ''} />
+  ),
+}));
+
 import { ObjectDetailDrawer } from '../object-detail-drawer';
 import type { SelectedObjectData } from '@/lib/core/types';
+import { formatRA, formatDec } from '@/lib/astronomy/coordinates/formats';
 
 const mockSelectedObject: SelectedObjectData = {
   names: ['M31', 'NGC 224', 'Andromeda Galaxy'],
@@ -415,6 +473,7 @@ describe('ObjectDetailDrawer', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockIsMobileShell = true;
     useMapInteractionStore.getState().reset();
     getDrawerLogger().warn.mockClear();
     getDrawerLogger().error.mockClear();
@@ -578,6 +637,58 @@ describe('ObjectDetailDrawer', () => {
         'max-h-[calc(100dvh-var(--safe-area-top)-0.5rem)]'
       );
       expect(screen.getByTestId('scroll-area')).toHaveClass('min-h-0', 'overscroll-contain');
+    });
+
+    it('docks to the right as a side panel on the desktop shell', async () => {
+      mockIsMobileShell = false;
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      // Right-docked side panel: full height + comfortable max width, not the
+      // bottom-sheet max-height clamp.
+      const content = screen.getByTestId('drawer-content');
+      expect(content).toHaveClass('h-full', 'sm:max-w-md');
+      expect(content).not.toHaveClass('max-h-[calc(100dvh-var(--safe-area-top)-0.5rem)]');
+
+      // Desktop dock is modal with no snap points.
+      const drawer = screen.getByTestId('drawer');
+      expect(drawer).not.toHaveAttribute('data-snap-points');
+      expect(drawer).not.toHaveAttribute('data-modal');
+    });
+
+    it('opens the mobile sheet at the peek detent with the sky interactive', async () => {
+      mockIsMobileShell = true;
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      const drawer = screen.getByTestId('drawer');
+      expect(drawer).toHaveAttribute('data-snap-points', JSON.stringify([0.45, 1]));
+      expect(drawer).toHaveAttribute('data-active-snap', '0.45');
+      expect(drawer).toHaveAttribute('data-modal', 'false');
+      expect(drawer).toHaveAttribute('data-snap-sequential', 'true');
+
+      // While peeking, the inner scroll is locked so drags move the sheet.
+      const content = screen.getByTestId('drawer-content');
+      expect(content).toHaveAttribute('data-peeking', 'true');
+      expect(content).toHaveClass('h-full');
     });
   });
 
@@ -1171,7 +1282,7 @@ describe('ObjectDetailDrawer', () => {
       );
 
       const addButton = screen.getByText(/actions\.addToTargetList/);
-      expect(addButton).toHaveClass('w-full', 'sm:flex-1');
+      expect(addButton).toHaveClass('w-full', 'shell-desktop:flex-1');
     });
 
     it('renders add to target list button', async () => {
@@ -1370,13 +1481,14 @@ describe('ObjectDetailDrawer', () => {
         expect(screen.getByText('common.copy')).toBeInTheDocument();
       });
 
+      // Pick the sexagesimal (HMS/DMS) format from the copy menu.
       await act(async () => {
-        fireEvent.click(screen.getByText('common.copy'));
+        fireEvent.click(screen.getByText('coordinates.formatHms'));
       });
 
-      expect(writeTextSpy).toHaveBeenCalledWith(
-        `RA: ${mockSelectedObject.ra}\nDec: ${mockSelectedObject.dec}`
-      );
+      const expectedRa = formatRA(mockSelectedObject.raDeg);
+      const expectedDec = formatDec(mockSelectedObject.decDeg);
+      expect(writeTextSpy).toHaveBeenCalledWith(`RA: ${expectedRa}\nDec: ${expectedDec}`);
 
       writeTextSpy.mockRestore();
     });
@@ -1397,7 +1509,7 @@ describe('ObjectDetailDrawer', () => {
       });
 
       await act(async () => {
-        fireEvent.click(screen.getByText('common.copy'));
+        fireEvent.click(screen.getByText('coordinates.formatHms'));
       });
 
       expect(writeTextSpy).toHaveBeenCalled();
@@ -1592,6 +1704,118 @@ describe('ObjectDetailDrawer', () => {
 
       // Should not call onOpenChange when drawer is already closed
       expect(mockOnOpenChange).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Load Errors and Images States', () => {
+    it('surfaces a load-error banner and retries on demand', async () => {
+      mockGetCachedObjectInfo.mockRejectedValueOnce(new Error('network down'));
+
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('object-drawer-load-error')).toBeInTheDocument();
+      });
+      expect(getDrawerLogger().error).toHaveBeenCalled();
+
+      // Retry re-runs the load effect (fresh fetch).
+      const initialCalls = mockGetCachedObjectInfo.mock.calls.length;
+      const banner = screen.getByTestId('object-drawer-load-error');
+      fireEvent.click(banner.querySelector('button')!);
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo.mock.calls.length).toBeGreaterThan(initialCalls);
+      });
+      await waitFor(() => {
+        expect(screen.queryByTestId('object-drawer-load-error')).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows an error state with retry in the images tab when info failed', async () => {
+      mockGetCachedObjectInfo.mockRejectedValueOnce(new Error('network down'));
+
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('object-drawer-images-error')).toBeInTheDocument();
+      });
+      expect(screen.queryByTestId('object-image-gallery')).not.toBeInTheDocument();
+    });
+
+    it('describes the object in the accessible drawer description', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={mockSelectedObject}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      expect(screen.getByTestId('drawer-description')).toHaveTextContent('objectDetail.drawerDescription');
+    });
+  });
+
+  describe('Satellite Selections', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useTargetAstroData } = require('@/lib/hooks');
+    const mockUseTargetAstroData = useTargetAstroData as jest.Mock;
+    let originalImpl: (() => unknown) | undefined;
+
+    beforeEach(() => {
+      originalImpl = mockUseTargetAstroData.getMockImplementation();
+      mockUseTargetAstroData.mockReturnValue({
+        altitude: 45,
+        azimuth: 180,
+        moonDistance: 60,
+        visibility: null,
+        feasibility: null,
+        targetKind: 'satellite',
+        positionIsSnapshot: true,
+        noradId: 25544,
+        positionAt: () => ({ raDeg: 0, decDeg: 0 }),
+        riskHints: [],
+      });
+    });
+
+    afterEach(() => {
+      mockUseTargetAstroData.mockImplementation(originalImpl);
+    });
+
+    it('replaces position/planning cards with the satellite notice', async () => {
+      render(
+        <ObjectDetailDrawer
+          open={true}
+          onOpenChange={mockOnOpenChange}
+          selectedObject={{ ...mockSelectedObject, names: ['NORAD 25544', 'NAME ISS (ZARYA)'] }}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockGetCachedObjectInfo).toHaveBeenCalled();
+      });
+
+      const notices = screen.getAllByTestId('satellite-info-notice');
+      expect(notices.length).toBeGreaterThan(0);
+      expect(notices[0]).toHaveAttribute('data-norad', '25544');
+      expect(screen.queryByTestId('object-drawer-section-live-status')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('object-drawer-section-planning')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('altitude-chart-compact')).not.toBeInTheDocument();
     });
   });
 });

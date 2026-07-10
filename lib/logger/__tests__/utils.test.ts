@@ -520,7 +520,7 @@ describe('export helpers', () => {
       filters: { module: 'api' },
     });
 
-    expect(text).toContain('SkyMap Application Logs');
+    expect(text).toContain('Cobalt Skymap Application Logs');
     expect(text).toContain('Runtime:');
     expect(text).toContain('Event: REQ_FAIL');
     expect(text).toContain('Correlation: operationId=op-9, sessionId=sess-9');

@@ -9,7 +9,7 @@ describe('Footer', () => {
   it('renders brand copy, footer links and credits', () => {
     render(<Footer />);
 
-    expect(screen.getByText('SkyMap')).toBeInTheDocument();
+    expect(screen.getByText('Cobalt Skymap')).toBeInTheDocument();
     expect(screen.getByText('description')).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Footer links' })).toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Community links' })).toBeInTheDocument();

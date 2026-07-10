@@ -59,6 +59,7 @@ jest.mock('@/lib/stores', () => ({
         setHelpers: mockSetHelpers,
         updateStellariumCore: mockUpdateStellariumCore,
         setActiveEngine: mockSetActiveEngine,
+        setCanvasEl: jest.fn(),
       };
       return selector(state);
     }),
@@ -74,6 +75,7 @@ jest.mock('@/lib/stores', () => ({
     }),
     {
       getState: () => mockSettingsState,
+      subscribe: jest.fn(() => jest.fn()),
     }
   ),
   useMountStore: Object.assign(

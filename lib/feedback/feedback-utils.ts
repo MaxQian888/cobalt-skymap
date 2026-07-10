@@ -18,7 +18,7 @@ import type {
   FeedbackPriority,
 } from '@/types/feedback';
 
-const APP_NAME = 'SkyMap';
+const APP_NAME = 'Cobalt Skymap';
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || '0.1.0';
 const BUILD_DATE = process.env.NEXT_PUBLIC_BUILD_DATE || '';
 const URL_LENGTH_THRESHOLD = 7000;

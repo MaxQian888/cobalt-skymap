@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import {
@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Moon, Star, Plus, ChevronUp, ChevronDown, Telescope } from 'lucide-react';
+import { Moon, Star, Plus, ChevronUp, ChevronDown, Telescope, Download } from 'lucide-react';
 import {
   calculateTwilightTimes,
   calculateTargetVisibility,
@@ -36,9 +36,16 @@ import {
 import { TranslatedName } from '../../objects/translated-name';
 import {
   useSkyAtlasStore,
+  initializeSkyAtlas,
   DSO_TYPE_LABELS,
   CONSTELLATION_NAMES,
 } from '@/lib/catalogs';
+import {
+  AstroCalculatorResultActionsBar,
+  ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME,
+  ASTRO_CALCULATOR_ROW_ACTION_BUTTON_CLASSNAME,
+} from './result-action-layout';
+import { useAstroCalculatorResultActions } from './result-actions';
 import type { AstroCalculatorObserverContext, WUTObject } from './types';
 
 interface WUTTabProps {
@@ -56,8 +63,9 @@ function isHourInWindow(hour: number, startHour: number, endHour: number): boole
   return hour >= startHour || hour <= endHour;
 }
 
-export function WUTTab({ latitude, longitude, observerContext: _observerContext, onSelectObject, onAddToList }: WUTTabProps) {
+export function WUTTab({ latitude, longitude, observerContext, onSelectObject, onAddToList }: WUTTabProps) {
   const t = useTranslations();
+  const { copyResults, exportResults } = useAstroCalculatorResultActions(observerContext);
   const [objectType, setObjectType] = useState<'all' | 'galaxy' | 'nebula' | 'cluster' | 'planetary'>('all');
   const [magnitudeRange, setMagnitudeRange] = useState<[number, number]>([0, 12]);
   const [minAltitude, setMinAltitude] = useState(30);
@@ -67,6 +75,15 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
   const [showAdvanced, setShowAdvanced] = useState(false);
   
   const { catalog: dsoCatalog } = useSkyAtlasStore();
+
+  // WUT is the calculator's default tab, so it must bootstrap the DSO catalog
+  // itself — otherwise it shows "no objects" until the Positions tab is visited.
+  useEffect(() => {
+    if (dsoCatalog.length === 0) {
+      initializeSkyAtlas(latitude, longitude);
+    }
+  }, [dsoCatalog.length, latitude, longitude]);
+
   const twilight = useMemo(() => calculateTwilightTimes(latitude, longitude), [latitude, longitude]);
   
   // Get WUT objects
@@ -165,12 +182,33 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
     
     return filtered.slice(0, 100);
   }, [dsoCatalog, objectType, magnitudeRange, minAltitude, minSize, timeWindow, sortBy, latitude, longitude, twilight]);
-  
+
+  const exportLines = useMemo(() => {
+    return [
+      `Object type: ${objectType}`,
+      `Magnitude: ${magnitudeRange[0]}-${magnitudeRange[1]}`,
+      `Min altitude: ${minAltitude}`,
+      `Time window: ${timeWindow}`,
+      `Sort by: ${sortBy}`,
+      '',
+      ...wutObjects.map((obj) => [
+        obj.name,
+        `Type=${obj.type}`,
+        `Mag=${obj.magnitude !== undefined ? obj.magnitude.toFixed(1) : '--'}`,
+        `Rise=${formatTimeShort(obj.riseTime)}`,
+        `Transit=${formatTimeShort(obj.transitTime)}`,
+        `Set=${formatTimeShort(obj.setTime)}`,
+        `MaxEl=${obj.maxElevation.toFixed(0)}`,
+        `Score=${obj.score}`,
+      ].join(' | ')),
+    ];
+  }, [magnitudeRange, minAltitude, objectType, sortBy, timeWindow, wutObjects]);
+
   return (
-    <div className="space-y-4">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
       {/* Night Info */}
-      <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-        <div className="flex items-center gap-4 text-xs">
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-muted/50">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           <div className="flex items-center gap-1.5">
             <Moon className="h-4 w-4 text-amber-400" />
             <span>{getMoonPhaseName(getMoonPhase())}</span>
@@ -187,8 +225,8 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
         </Badge>
       </div>
       
-      {/* Filters Row 1: Dropdowns */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Filters Row 1: Dropdowns (two-up on phones so the results area keeps room) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 shrink-0">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.objectType')}</Label>
           <Select value={objectType} onValueChange={(v) => setObjectType(v as typeof objectType)}>
@@ -237,7 +275,7 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
       </div>
       
       {/* Filters Row 2: Sliders */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 shrink-0">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs">{t('astroCalc.magnitude')}</Label>
@@ -272,7 +310,7 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
       </div>
       
       {/* Advanced Filters + Count */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <Button 
           variant="ghost" 
           size="sm" 
@@ -288,7 +326,7 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
       </div>
       
       {showAdvanced && (
-        <div className="p-3 rounded-lg bg-muted/30">
+        <div className="shrink-0 p-3 rounded-lg bg-muted/30">
           <div className="max-w-xs space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-xs">{t('astroCalc.minSize')}</Label>
@@ -308,7 +346,7 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
       )}
       
       {/* Results Table */}
-      <ScrollArea className="h-[350px] border rounded-lg">
+      <ScrollArea className="min-h-0 flex-1 border rounded-lg">
         {wutObjects.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
             <Telescope className="h-10 w-10 mb-3 opacity-40" />
@@ -362,7 +400,8 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className={ASTRO_CALCULATOR_ROW_ACTION_BUTTON_CLASSNAME}
+                      aria-label={`${t('astroCalc.addToList')}: ${obj.name}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onAddToList(obj.name, obj.ra, obj.dec);
@@ -376,7 +415,46 @@ export function WUTTab({ latitude, longitude, observerContext: _observerContext,
             </TableBody>
           </Table>
         )}
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
+
+      {wutObjects.length > 0 && (
+        <AstroCalculatorResultActionsBar className="shrink-0 border-t pt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.copyResults')}
+            onClick={() => void copyResults({
+              title: t('astroCalc.wut'),
+              fileStem: 'astro-calculator-wut',
+              observerContext,
+              diagnostics: [],
+              contentLines: exportLines,
+            })}
+          >
+            {t('astroCalc.copyResults')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.exportResults')}
+            onClick={() => exportResults({
+              title: t('astroCalc.wut'),
+              fileStem: 'astro-calculator-wut',
+              observerContext,
+              diagnostics: [],
+              contentLines: exportLines,
+            })}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {t('astroCalc.exportResults')}
+          </Button>
+        </AstroCalculatorResultActionsBar>
+      )}
     </div>
   );
 }

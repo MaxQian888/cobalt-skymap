@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type RefObject } from 'react';
+import { useState, useLayoutEffect, useMemo, type RefObject } from 'react';
 
 export interface AdaptivePositionOptions {
   padding?: number;
@@ -7,12 +7,43 @@ export interface AdaptivePositionOptions {
   topBarHeight?: number;
   bottomBarHeight?: number;
   defaultPosition?: { left: number; top: number };
+  /**
+   * Radius (px) of a keep-out circle around the click/anchor point that the
+   * panel must not cover — keeps the just-selected object (engine reticle +
+   * selection pulse) visible next to the panel. 0 disables (legacy behavior).
+   */
+  keepOutRadius?: number;
+}
+
+/**
+ * Default keep-out radius for the InfoPanel: clears the ~44px selection pulse
+ * ring and the engine reticle around the selected object.
+ */
+export const DEFAULT_KEEP_OUT_RADIUS = 48;
+
+/** True when a circle (center cx/cy, radius r) intersects an axis-aligned rect. */
+export function circleIntersectsRect(
+  cx: number,
+  cy: number,
+  r: number,
+  rect: { left: number; top: number; width: number; height: number },
+): boolean {
+  const closestX = Math.max(rect.left, Math.min(cx, rect.left + rect.width));
+  const closestY = Math.max(rect.top, Math.min(cy, rect.top + rect.height));
+  return Math.hypot(cx - closestX, cy - closestY) < r;
 }
 
 export interface AdaptivePositionResult {
-  position: { left: number; top: number };
+  position: { left: number; top: number; maxHeight?: number };
   panelRef: RefObject<HTMLDivElement | null>;
 }
+
+/**
+ * Fixed render width of the InfoPanel (`w-[min(20rem,…)]` → 20rem = 320px).
+ * Seeding panelSize.width with the real value avoids a first-frame horizontal
+ * jump before the layout-effect measurement runs.
+ */
+const PANEL_WIDTH = 320;
 
 /**
  * Width at/below which the app switches to the mobile shell (no right rail).
@@ -32,6 +63,7 @@ const DEFAULT_OPTIONS: Required<AdaptivePositionOptions> = {
   topBarHeight: 64,
   bottomBarHeight: 48,
   defaultPosition: { left: 12, top: 64 },
+  keepOutRadius: 0,
 };
 
 /**
@@ -46,10 +78,11 @@ export function useAdaptivePosition(
   options: AdaptivePositionOptions = {}
 ) {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const [panelSize, setPanelSize] = useState({ width: 300, height: 400 });
+  const [panelSize, setPanelSize] = useState({ width: PANEL_WIDTH, height: 400 });
 
-  // Measure panel size when deps change
-  useEffect(() => {
+  // Measure panel size when deps change. useLayoutEffect runs before paint, so
+  // the re-position happens in the same frame and is never visible to the user.
+  useLayoutEffect(() => {
     if (panelRef.current) {
       const rect = panelRef.current.getBoundingClientRect();
       setPanelSize({ width: rect.width, height: rect.height });
@@ -59,7 +92,7 @@ export function useAdaptivePosition(
 
   const position = useMemo(() => {
     if (!clickPosition || !containerBounds) {
-      return opts.defaultPosition;
+      return { ...opts.defaultPosition, maxHeight: undefined as number | undefined };
     }
 
     const inferredRightPanelWidth =
@@ -68,12 +101,15 @@ export function useAdaptivePosition(
         : opts.rightPanelWidth;
     const availableWidth = containerBounds.width - inferredRightPanelWidth;
 
-    let left = clickPosition.x + opts.offset;
+    // Horizontal offset must clear the keep-out circle around the anchor.
+    const clearance = Math.max(opts.offset, opts.keepOutRadius > 0 ? opts.keepOutRadius + 8 : 0);
+
+    let left = clickPosition.x + clearance;
     let top = clickPosition.y - panelSize.height / 2;
 
     // Check right edge
     if (left + panelSize.width + opts.padding > availableWidth) {
-      left = clickPosition.x - panelSize.width - opts.offset;
+      left = clickPosition.x - panelSize.width - clearance;
     }
 
     // Clamp to available area
@@ -104,8 +140,41 @@ export function useAdaptivePosition(
       top = opts.topBarHeight + opts.padding;
     }
 
-    return { left, top };
-  }, [clickPosition, containerBounds, panelSize, opts.padding, opts.offset, opts.rightPanelWidth, opts.topBarHeight, opts.bottomBarHeight, opts.defaultPosition]);
+    // Keep-out escape: the edge clamps above can push the panel back over the
+    // anchor. If it now covers the keep-out circle, escape vertically to
+    // whichever side of the anchor has room, then re-clamp. If it still
+    // overlaps (degenerate small container), accept — panel visibility wins.
+    if (
+      opts.keepOutRadius > 0 &&
+      circleIntersectsRect(clickPosition.x, clickPosition.y, opts.keepOutRadius, {
+        left,
+        top,
+        width: panelSize.width,
+        height: panelSize.height,
+      })
+    ) {
+      const rectCenterY = top + panelSize.height / 2;
+      if (clickPosition.y <= rectCenterY) {
+        top = clickPosition.y + opts.keepOutRadius + opts.padding;
+      } else {
+        top = clickPosition.y - opts.keepOutRadius - opts.padding - panelSize.height;
+      }
+      if (top + panelSize.height + opts.padding > containerBounds.height - opts.bottomBarHeight) {
+        top = containerBounds.height - panelSize.height - opts.bottomBarHeight - opts.padding;
+      }
+      if (top < opts.topBarHeight + opts.padding) {
+        top = opts.topBarHeight + opts.padding;
+      }
+    }
+
+    // Cap the panel height to the space actually available below its final
+    // `top`, so the scrollable body shrinks instead of clipping off-screen when
+    // the panel is pushed down near the bottom edge.
+    const maxHeight =
+      containerBounds.height - top - opts.bottomBarHeight - opts.padding;
+
+    return { left, top, maxHeight };
+  }, [clickPosition, containerBounds, panelSize, opts.padding, opts.offset, opts.rightPanelWidth, opts.topBarHeight, opts.bottomBarHeight, opts.defaultPosition, opts.keepOutRadius]);
 
   return position;
 }

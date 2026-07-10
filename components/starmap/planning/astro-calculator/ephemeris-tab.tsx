@@ -6,7 +6,7 @@ import { AlertTriangle, Download, ListPlus, MapPinned, NotebookPen } from 'lucid
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -103,7 +103,10 @@ export function EphemerisTab({
   const [targetRA, setTargetRA] = useState(selectedTarget?.ra ? degreesToHMS(selectedTarget.ra) : '');
   const [targetDec, setTargetDec] = useState(selectedTarget?.dec ? degreesToDMS(selectedTarget.dec) : '');
   const [minorObjectQuery, setMinorObjectQuery] = useState('');
-  const [startDate, setStartDate] = useState(sharedDate ?? toDateInputString(new Date()));
+  // Controlled by the dialog's shared date when provided; local state is only
+  // the fallback for standalone usage. No sync effect needed.
+  const [localStartDate, setLocalStartDate] = useState(() => sharedDate ?? toDateInputString(new Date()));
+  const startDate = sharedDate ?? localStartDate;
   const [stepHours, setStepHours] = useState(1);
   const [numSteps, setNumSteps] = useState(24);
   const [coordinateMode, setCoordinateMode] = useState<CoordinateOutputMode>('equatorial');
@@ -185,12 +188,6 @@ export function EphemerisTab({
     }
     return null;
   }, [explicitMinorObjectQuery, parsedDec, parsedRa, targetDec, targetMode, targetRA, t]);
-
-  useEffect(() => {
-    if (sharedDate && sharedDate !== startDate) {
-      setStartDate(sharedDate);
-    }
-  }, [sharedDate, startDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -304,8 +301,8 @@ export function EphemerisTab({
   }, [customCoordinateError, explicitMinorObjectQuery, latitude, longitude, numSteps, observerContext?.contextKey, observerContext?.elevation, parsedDec, parsedRa, startDate, stepHours, t, targetMode]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.targetType')}</Label>
           <Select value={targetMode} onValueChange={(value) => setTargetMode(value as EngineBody)}>
@@ -328,7 +325,7 @@ export function EphemerisTab({
             value={startDate}
             onChange={(event) => {
               const value = event.target.value;
-              setStartDate(value);
+              setLocalStartDate(value);
               onSharedDateChange?.(value);
             }}
             className="h-8"
@@ -366,7 +363,7 @@ export function EphemerisTab({
         </div>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 shrink-0">
         <Label className="text-xs">{t('astroCalc.minorObjectQuery')}</Label>
         <Input
           value={minorObjectQuery}
@@ -378,7 +375,7 @@ export function EphemerisTab({
       </div>
 
       {targetMode === 'Custom' && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 shrink-0">
           <div className="space-y-1.5">
             <Label className="text-xs">{t('astroCalc.raLabel')}</Label>
             <Input
@@ -400,7 +397,7 @@ export function EphemerisTab({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-2 shrink-0">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.coordinateOutput')}</Label>
           <Select value={coordinateMode} onValueChange={(value) => setCoordinateMode(value as CoordinateOutputMode)}>
@@ -415,7 +412,7 @@ export function EphemerisTab({
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge variant="outline">{ephemeris.length} {t('astroCalc.entries')}</Badge>
           {metaSummary && (
             <Badge variant="secondary" className="text-[10px]" data-testid="ephemeris-meta">
@@ -428,89 +425,21 @@ export function EphemerisTab({
         </div>
       </div>
 
-      {ephemeris.length > 0 && (
-        <AstroCalculatorResultActionsBar>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
-            aria-label={t('astroCalc.copyResults')}
-            onClick={() => void copyResults({
-              title: t('astroCalc.ephemeris'),
-              fileStem: 'astro-calculator-ephemeris',
-              targetName: resolvedTargetName,
-              observerContext,
-              metaSummary,
-              diagnostics: sourceDiagnostics,
-              contentLines: exportLines,
-            })}
-          >
-            {t('astroCalc.copyResults')}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
-            aria-label={t('astroCalc.exportResults')}
-            onClick={() => exportResults({
-              title: t('astroCalc.ephemeris'),
-              fileStem: 'astro-calculator-ephemeris',
-              targetName: resolvedTargetName,
-              observerContext,
-              metaSummary,
-              diagnostics: sourceDiagnostics,
-              contentLines: exportLines,
-            })}
-          >
-            <Download className="h-3.5 w-3.5" />
-            {t('astroCalc.exportResults')}
-          </Button>
-          {handoffTarget && (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
-                aria-label={t('astroCalc.addToList')}
-                onClick={() => addTargetToList(handoffTarget)}
-              >
-                <ListPlus className="h-3.5 w-3.5" />
-                {t('astroCalc.addToList')}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
-                aria-label={t('astroCalc.openPlanner')}
-                onClick={() => openPlannerForTarget(handoffTarget)}
-              >
-                <NotebookPen className="h-3.5 w-3.5" />
-                {t('astroCalc.openPlanner')}
-              </Button>
-            </>
-          )}
-        </AstroCalculatorResultActionsBar>
-      )}
-
       {customCoordinateError && (
-        <div className="flex items-center gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-2 text-xs text-yellow-600">
+        <div className="shrink-0 flex items-center gap-2 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-2 text-xs text-yellow-600">
           <AlertTriangle className="h-3.5 w-3.5" />
           {customCoordinateError}
         </div>
       )}
 
       {error && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+        <div className="shrink-0 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="h-3.5 w-3.5" />
           {error}
         </div>
       )}
 
-      <ScrollArea className="h-[330px] border rounded-lg">
+      <ScrollArea className="min-h-0 flex-1 border rounded-lg">
         {ephemeris.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
             <MapPinned className="h-10 w-10 mb-3 opacity-40" />
@@ -601,7 +530,76 @@ export function EphemerisTab({
             </TableBody>
           </Table>
         )}
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
+
+      {ephemeris.length > 0 && (
+        <AstroCalculatorResultActionsBar className="shrink-0 border-t pt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.copyResults')}
+            onClick={() => void copyResults({
+              title: t('astroCalc.ephemeris'),
+              fileStem: 'astro-calculator-ephemeris',
+              targetName: resolvedTargetName,
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            {t('astroCalc.copyResults')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.exportResults')}
+            onClick={() => exportResults({
+              title: t('astroCalc.ephemeris'),
+              fileStem: 'astro-calculator-ephemeris',
+              targetName: resolvedTargetName,
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {t('astroCalc.exportResults')}
+          </Button>
+          {handoffTarget && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+                aria-label={t('astroCalc.addToList')}
+                onClick={() => addTargetToList(handoffTarget)}
+              >
+                <ListPlus className="h-3.5 w-3.5" />
+                {t('astroCalc.addToList')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+                aria-label={t('astroCalc.openPlanner')}
+                onClick={() => openPlannerForTarget(handoffTarget)}
+              >
+                <NotebookPen className="h-3.5 w-3.5" />
+                {t('astroCalc.openPlanner')}
+              </Button>
+            </>
+          )}
+        </AstroCalculatorResultActionsBar>
+      )}
     </div>
   );
 }

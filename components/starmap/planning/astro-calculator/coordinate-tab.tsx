@@ -15,6 +15,7 @@ import {
   raDecToGalactic,
 } from '@/lib/astronomy/coordinates/transforms';
 import { degreesToDMS, degreesToHMS } from '@/lib/astronomy/starmap-utils';
+import { parseDecCoordinate, parseRACoordinate } from '@/lib/astronomy/coordinates/conversions';
 import { runCalculatorCoordinates, type CalculatorMetaSummary } from './orchestrator';
 import type { AstroCalculatorObserverContext } from './types';
 
@@ -55,8 +56,12 @@ export function CoordinateTab({
   const [source, setSource] = useState<SourceSystem>('equatorial');
   const [coord1, setCoord1] = useState('10.684708');
   const [coord2, setCoord2] = useState('41.26875');
-  const [date, setDate] = useState(sharedDate ?? toDateInput(new Date()));
-  const [time, setTime] = useState(sharedTime ?? '22:00');
+  // Controlled by the dialog's shared date/time when provided; local state is
+  // only the fallback for standalone usage. No sync effect needed.
+  const [localDate, setLocalDate] = useState(() => sharedDate ?? toDateInput(new Date()));
+  const [localTime, setLocalTime] = useState(sharedTime ?? '22:00');
+  const date = sharedDate ?? localDate;
+  const time = sharedTime ?? localTime;
   const [observerLat, setObserverLat] = useState(latitude.toFixed(4));
   const [observerLon, setObserverLon] = useState(longitude.toFixed(4));
   const [useRefraction, setUseRefraction] = useState(true);
@@ -68,24 +73,19 @@ export function CoordinateTab({
 
   const dateTime = useMemo(() => new Date(`${date}T${time}:00`), [date, time]);
 
-  useEffect(() => {
-    if (sharedDate && sharedDate !== date) {
-      setDate(sharedDate);
-    }
-  }, [sharedDate, date]);
-
-  useEffect(() => {
-    if (sharedTime && sharedTime !== time) {
-      setTime(sharedTime);
-    }
-  }, [sharedTime, time]);
 
   useEffect(() => {
     let cancelled = false;
 
     async function run() {
-      const value1 = Number.parseFloat(coord1);
-      const value2 = Number.parseFloat(coord2);
+      // Equatorial input also accepts HMS/DMS ("00:42:44" / "+41:16:09"),
+      // matching the ephemeris and RTS tabs; bare decimals stay degrees.
+      const value1 = source === 'equatorial'
+        ? parseRACoordinate(coord1) ?? Number.NaN
+        : Number.parseFloat(coord1);
+      const value2 = source === 'equatorial'
+        ? parseDecCoordinate(coord2) ?? Number.NaN
+        : Number.parseFloat(coord2);
       const lat = Number.parseFloat(observerLat);
       const lon = Number.parseFloat(observerLon);
 
@@ -205,8 +205,8 @@ export function CoordinateTab({
         : t('astroCalc.decLabel');
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.sourceSystem')}</Label>
           <select
@@ -239,7 +239,7 @@ export function CoordinateTab({
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.date')}</Label>
           <Input
@@ -247,7 +247,7 @@ export function CoordinateTab({
             value={date}
             onChange={(event) => {
               const value = event.target.value;
-              setDate(value);
+              setLocalDate(value);
               onSharedDateChange?.(value);
             }}
             className="h-8"
@@ -260,7 +260,7 @@ export function CoordinateTab({
             value={time}
             onChange={(event) => {
               const value = event.target.value;
-              setTime(value);
+              setLocalTime(value);
               onSharedTimeChange?.(value);
             }}
             className="h-8"
@@ -276,7 +276,7 @@ export function CoordinateTab({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
         {isLoading && <Badge variant="secondary">{t('astroCalc.calculating')}</Badge>}
         {roundTripArcsec !== null && (
           <Badge variant="outline">{t('astroCalc.roundTripError')}: {roundTripArcsec.toFixed(2)} arcsec</Badge>
@@ -289,14 +289,15 @@ export function CoordinateTab({
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+        <div className="shrink-0 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="h-3.5 w-3.5" />
           {error}
         </div>
       )}
 
       {result && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="rounded-lg border p-3 bg-card">
             <div className="flex items-center gap-2 mb-2">
               <Compass className="h-4 w-4 text-primary" />
@@ -329,6 +330,7 @@ export function CoordinateTab({
               <div>λ: {result.ecliptic.longitude.toFixed(6)}°</div>
               <div>β: {result.ecliptic.latitude.toFixed(6)}°</div>
             </div>
+          </div>
           </div>
         </div>
       )}

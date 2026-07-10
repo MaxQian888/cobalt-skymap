@@ -23,7 +23,7 @@ const messages = {
     steps: {
       welcome: {
         title: 'Welcome',
-        subtitle: "Let's set up your SkyMap",
+        subtitle: "Let's set up your Cobalt Skymap",
         description: 'Complete a few quick steps.',
         whatWellConfigure: "What we'll configure:",
         timeEstimate: 'Estimated time: ~2 minutes',

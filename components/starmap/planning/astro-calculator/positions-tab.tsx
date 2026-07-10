@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SearchInput } from '@/components/ui/search-input';
@@ -24,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Telescope } from 'lucide-react';
+import { Plus, Telescope, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { degreesToHMS, degreesToDMS } from '@/lib/astronomy/starmap-utils';
 import {
@@ -41,6 +41,12 @@ import {
   CONSTELLATION_NAMES,
 } from '@/lib/catalogs';
 import { SortableHeader } from './sortable-header';
+import {
+  AstroCalculatorResultActionsBar,
+  ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME,
+  ASTRO_CALCULATOR_ROW_ACTION_BUTTON_CLASSNAME,
+} from './result-action-layout';
+import { useAstroCalculatorResultActions } from './result-actions';
 import type { AstroCalculatorObserverContext, CelestialPosition } from './types';
 import { runCalculatorEphemerisBatch, summarizeCalculatorMeta, type CalculatorMetaSummary } from './orchestrator';
 
@@ -54,6 +60,7 @@ interface PositionsTabProps {
 
 export function PositionsTab({ latitude, longitude, observerContext, onSelectObject, onAddToList }: PositionsTabProps) {
   const t = useTranslations();
+  const { copyResults, exportResults } = useAstroCalculatorResultActions(observerContext);
   const [catalog, setCatalog] = useState<'messier' | 'ngc' | 'caldwell' | 'planets' | 'all'>('messier');
   const [magnitudeLimit, setMagnitudeLimit] = useState(12);
   const [minAltitude, setMinAltitude] = useState(0);
@@ -254,7 +261,27 @@ export function PositionsTab({ latitude, longitude, observerContext, onSelectObj
     
     return filtered.slice(0, 200); // Limit for performance
   }, [dsoCatalog, catalog, magnitudeLimit, minAltitude, showAboveHorizon, searchQuery, sortConfig, latitude, longitude, solarReference]);
-  
+
+  const exportLines = useMemo(() => {
+    return [
+      `Catalog: ${catalog}`,
+      `Magnitude limit: ${magnitudeLimit}`,
+      `Min altitude: ${minAltitude}`,
+      `Above horizon only: ${showAboveHorizon}`,
+      '',
+      ...positions.map((obj) => [
+        obj.name,
+        `Type=${obj.type}`,
+        `RA=${degreesToHMS(obj.ra)}`,
+        `Dec=${degreesToDMS(obj.dec)}`,
+        `Mag=${obj.magnitude !== undefined ? obj.magnitude.toFixed(1) : '--'}`,
+        `Alt=${obj.altitude.toFixed(1)}`,
+        `Transit=${formatTimeShort(obj.transitTime)}`,
+        `MaxEl=${obj.maxElevation.toFixed(1)}`,
+      ].join(' | ')),
+    ];
+  }, [catalog, magnitudeLimit, minAltitude, positions, showAboveHorizon]);
+
   const handleSort = (key: string) => {
     setSortConfig(prev => ({
       key,
@@ -263,9 +290,9 @@ export function PositionsTab({ latitude, longitude, observerContext, onSelectObj
   };
   
   return (
-    <div className="space-y-4">
-      {/* Filters Row 1: Catalog + Search */}
-      <div className="grid grid-cols-2 gap-3">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      {/* Filters Row 1: Catalog + Search (two-up on phones so the results area keeps room) */}
+      <div className="grid grid-cols-2 gap-3 shrink-0">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.catalog')}</Label>
           <Select value={catalog} onValueChange={(v) => setCatalog(v as typeof catalog)}>
@@ -293,7 +320,7 @@ export function PositionsTab({ latitude, longitude, observerContext, onSelectObj
       </div>
       
       {/* Filters Row 2: Sliders */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-4 shrink-0">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs">{t('astroCalc.magnitudeLimit')}</Label>
@@ -327,16 +354,18 @@ export function PositionsTab({ latitude, longitude, observerContext, onSelectObj
         </div>
       </div>
       
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Checkbox
-            id="aboveHorizon"
-            checked={showAboveHorizon}
-            onCheckedChange={(checked) => setShowAboveHorizon(!!checked)}
-          />
-          <Label htmlFor="aboveHorizon" className="text-xs">
-            {t('astroCalc.showAboveHorizonOnly')}
-          </Label>
+      <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="flex items-center gap-1.5">
+            <Checkbox
+              id="aboveHorizon"
+              checked={showAboveHorizon}
+              onCheckedChange={(checked) => setShowAboveHorizon(!!checked)}
+            />
+            <Label htmlFor="aboveHorizon" className="text-xs">
+              {t('astroCalc.showAboveHorizonOnly')}
+            </Label>
+          </div>
           <div className="flex items-center gap-1.5">
             <Checkbox
               id="showGalactic"
@@ -371,7 +400,7 @@ export function PositionsTab({ latitude, longitude, observerContext, onSelectObj
       </div>
       
       {/* Results Table */}
-      <ScrollArea className="h-[350px] border rounded-lg">
+      <ScrollArea className="min-h-0 flex-1 border rounded-lg">
         {positions.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
             <Telescope className="h-10 w-10 mb-3 opacity-40" />
@@ -445,7 +474,8 @@ export function PositionsTab({ latitude, longitude, observerContext, onSelectObj
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
+                      className={ASTRO_CALCULATOR_ROW_ACTION_BUTTON_CLASSNAME}
+                      aria-label={`${t('astroCalc.addToList')}: ${obj.name}`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onAddToList(obj.name, obj.ra, obj.dec);
@@ -459,7 +489,46 @@ export function PositionsTab({ latitude, longitude, observerContext, onSelectObj
             </TableBody>
           </Table>
         )}
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
+
+      {positions.length > 0 && (
+        <AstroCalculatorResultActionsBar className="shrink-0 border-t pt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.copyResults')}
+            onClick={() => void copyResults({
+              title: t('astroCalc.positions'),
+              fileStem: 'astro-calculator-positions',
+              observerContext,
+              diagnostics: [],
+              contentLines: exportLines,
+            })}
+          >
+            {t('astroCalc.copyResults')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.exportResults')}
+            onClick={() => exportResults({
+              title: t('astroCalc.positions'),
+              fileStem: 'astro-calculator-positions',
+              observerContext,
+              diagnostics: [],
+              contentLines: exportLines,
+            })}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {t('astroCalc.exportResults')}
+          </Button>
+        </AstroCalculatorResultActionsBar>
+      )}
     </div>
   );
 }

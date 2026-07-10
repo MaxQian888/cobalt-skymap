@@ -387,7 +387,9 @@ export function DailyKnowledgeDialog() {
       onOpenChange={(nextOpen) => !nextOpen && closeDialog()}
       tier="complex-editor"
     >
-      <ResponsiveDialogContent className="max-w-4xl overflow-hidden flex flex-col">
+      {/* sm: prefix required — the DialogContent base sm:max-w-lg otherwise
+          wins over an unprefixed max-w-* in the cascade. */}
+      <ResponsiveDialogContent className="sm:max-w-4xl overflow-hidden flex flex-col">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>{t('dailyKnowledge.title')}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>{t('dailyKnowledge.subtitle')}</ResponsiveDialogDescription>

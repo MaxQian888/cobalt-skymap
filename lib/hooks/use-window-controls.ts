@@ -25,9 +25,11 @@ import {
   listenForTrayActivation,
   saveWindowState,
   startWindowDragging,
+  startWindowResizeDragging,
   showWindow,
   centerWindow,
   unminimizeWindow,
+  type WindowResizeDirection,
 } from '@/lib/tauri/app-control-api';
 import {
   positionerApi,
@@ -62,6 +64,7 @@ export interface WindowControlsActions {
   handleMoveWindow: (preset: WindowPositionPreset) => Promise<void>;
   handleRevealFromTray: () => Promise<void>;
   handleStartWindowDrag: () => Promise<void>;
+  handleStartWindowResize: (direction: WindowResizeDirection) => Promise<void>;
   handleWebReload: () => void;
 }
 
@@ -262,6 +265,18 @@ export function useWindowControls(): UseWindowControlsReturn {
     }
   }, [shell.supportsManualDragging]);
 
+  const handleStartWindowResize = useCallback(async (direction: WindowResizeDirection) => {
+    if (!shell.supportsManualDragging) {
+      return;
+    }
+
+    try {
+      await startWindowResizeDragging(direction);
+    } catch (error) {
+      logger.error('Failed to start window resize dragging', error);
+    }
+  }, [shell.supportsManualDragging]);
+
   useEffect(() => {
     if (!isTauriEnv) return;
 
@@ -333,6 +348,7 @@ export function useWindowControls(): UseWindowControlsReturn {
     handleMoveWindow,
     handleRevealFromTray,
     handleStartWindowDrag,
+    handleStartWindowResize,
     handleWebReload,
   };
 }

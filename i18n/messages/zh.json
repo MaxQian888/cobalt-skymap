@@ -171,7 +171,11 @@
     "invalidCoordinates": "坐标格式无效",
     "goTo": "前往",
     "goToDescription": "输入赤经和赤纬以导航到指定天球坐标",
-    "qualityMetadata": "参考系: {frame} / 时标: {timeScale} / 质量: {quality} / 新鲜度: {freshness}"
+    "qualityMetadata": "参考系: {frame} / 时标: {timeScale} / 质量: {quality} / 新鲜度: {freshness}",
+    "copyAs": "复制为",
+    "formatHms": "时分秒 (HMS/DMS)",
+    "formatDegrees": "十进制度",
+    "formatDecimalPair": "十进制数对 (赤经 赤纬)"
   },
   "objects": {
     "comet": "彗星",
@@ -514,7 +518,7 @@
     "dataTab": "数据",
     "dataTabShort": "数据",
     "help": "帮助与教程",
-    "restartTourDescription": "查看交互式引导，了解 SkyMap 的功能",
+    "restartTourDescription": "查看交互式引导，了解 Cobalt Skymap 的功能",
     "nightMode": "夜视模式",
     "nightModeDescription": "红色滤镜保护暗适应",
     "sensorControl": "传感器控制",
@@ -604,11 +608,15 @@
     "autoSaveHint": "此标签页的更改会自动保存",
     "resetAll": "全部重置",
     "resetAllDescription": "这将重置所有设置（显示、设备、偏好、主题）为默认值。此操作无法撤销。",
+    "resetCurrentTab": "重置此标签页",
+    "resetCurrentTabDescription": "这将把当前标签页的设置重置为默认值。此操作无法撤销。",
+    "moreActions": "更多操作",
     "instantEffectHint": "更改立即生效",
     "locationInstantHint": "位置更改立即生效",
     "currentSiteSyncHint": "保存这些坐标会更新当前观测地点：{name}。",
     "createFirstSiteHint": "保存这些坐标会创建您的第一个已保存观测地点。",
     "milkyWay": "银河",
+    "satellites": "卫星",
     "fog": "雾气",
     "rendering": "渲染设置",
     "bortleIndex": "光污染等级 (Bortle)",
@@ -760,6 +768,7 @@
   },
   "chart": {
     "now": "现在",
+    "nowAltitude": "当前高度",
     "transit": "中天",
     "rise": "升起",
     "set": "落下",
@@ -1506,6 +1515,10 @@
     "groupPlaceholder": "输入或选择分组",
     "allGroups": "全部",
     "goTo": "前往标注",
+    "moveMarker": "移动标注",
+    "movingHint": "拖动或点按以放置标注，按 Esc 取消",
+    "markerMoved": "标注已移动",
+    "offscreenIndicators": "屏幕外方向指示",
     "show": "显示",
     "hide": "隐藏",
     "hideGroup": "隐藏分组",
@@ -2072,6 +2085,14 @@
       "images": "图像",
       "observation": "观测",
     "viewDetails": "查看详情",
+    "positionRecomputed": "位置已按每个时间点重新计算",
+    "positionSnapshot": "位置为选中时刻的快照，彗星/小行星会随时间漂移",
+    "satelliteNoForecast": "升落与高度预测不适用于人造卫星，其位置在数分钟内即会改变",
+    "loadError": "无法加载天体详情",
+    "infoLoading": "正在加载天体信息…",
+    "imagesLoading": "正在加载图片…",
+    "drawerDescription": "{name} 的详细信息与观测数据",
+    "imageGalleryLabel": "{name} 的图片库，使用左右方向键浏览",
     "properties": "物理属性",
     "morphology": "形态类型",
     "spectralType": "光谱类型",
@@ -2235,7 +2256,7 @@
       "skipTour": "自行探索"
     },
     "welcome": {
-      "title": "欢迎使用 SkyMap",
+      "title": "欢迎使用 Cobalt Skymap",
       "subtitle": "您的专属宇宙之窗，让我们带您快速了解！",
       "startTour": "开始引导",
       "startSetup": "开始设置",
@@ -2458,8 +2479,8 @@
     "steps": {
       "welcome": {
         "title": "欢迎设置",
-        "subtitle": "让我们快速配置您的 SkyMap",
-        "description": "只需几步即可完成基本设置，让 SkyMap 更好地为您服务。您可以随时在设置中修改这些选项。",
+        "subtitle": "让我们快速配置您的 Cobalt Skymap",
+        "description": "只需几步即可完成基本设置，让 Cobalt Skymap 更好地为您服务。您可以随时在设置中修改这些选项。",
         "whatWellConfigure": "我们将配置以下内容：",
         "timeEstimate": "预计用时：约 2 分钟",
         "features": {
@@ -2961,6 +2982,11 @@
       "showSplashDesc": "启动时显示加载动画",
       "autoConnect": "自动连接后端",
       "autoConnectDesc": "启动时自动连接后端服务",
+      "launchOnStartup": "开机自启动",
+      "launchOnStartupDesc": "登录电脑后自动打开 Cobalt Skymap",
+      "launchOnStartupEnabled": "登录电脑后将自动打开 Cobalt Skymap",
+      "launchOnStartupChecking": "正在检查自启动设置…",
+      "launchOnStartupError": "更新自启动设置失败：{message}",
       "behavior": "行为",
       "skipCloseConfirmation": "跳过关闭确认",
       "skipCloseConfirmationDesc": "关闭应用时不弹出确认对话框",
@@ -2993,6 +3019,7 @@
       "enableAnimationsDesc": "在整个应用程序中启用平滑过渡和动画效果"
     },
     "performance": {
+      "title": "性能",
       "renderQuality": "渲染质量",
       "qualityLow": "低",
       "qualityMedium": "中",
@@ -3017,20 +3044,74 @@
       "reducedMotionDesc": "减少非必要的动画效果"
     },
     "accessibility": {
+      "title": "无障碍",
       "visual": "视觉",
       "highContrast": "高对比度",
       "highContrastDesc": "增加对比度以提高可见性",
       "reduceTransparency": "降低透明度",
       "reduceTransparencyDesc": "使背景更加不透明",
       "text": "文本",
-      "largeText": "大字体",
-      "largeTextDesc": "增加整个应用程序的文字大小",
+      "fontScale": "文字大小",
+      "fontScaleDesc": "将界面文字大小从 90% 缩放到 200%",
+      "colorVision": "色觉",
+      "colorBlindMode": "色盲模式",
+      "colorBlindModeDesc": "对整个界面（含星图）重新着色，以模拟或补偿色觉障碍",
+      "colorBlind_none": "关闭",
+      "colorBlind_protanopia": "红色盲（Protanopia）",
+      "colorBlind_deuteranopia": "绿色盲（Deuteranopia）",
+      "colorBlind_tritanopia": "蓝色盲（Tritanopia）",
+      "colorBlind_achromatopsia": "全色盲（单色）",
       "navigation": "导航",
       "focusIndicators": "焦点指示器",
       "focusIndicatorsDesc": "显示清晰的焦点指示器以便键盘导航",
       "screenReader": "屏幕阅读器",
       "screenReaderOptimized": "屏幕阅读器优化",
-      "screenReaderOptimizedDesc": "为屏幕阅读器优化界面"
+      "screenReaderOptimizedDesc": "强制始终显示焦点轮廓，并为辅助技术提供更清晰的语义"
+    },
+    "advanced": {
+      "title": "高级",
+      "observationProfile": "观测模式",
+      "observationProfileDesc": "影响目标推荐与规划计算的偏好",
+      "observationProfile_imaging": "摄影",
+      "observationProfile_visual": "目视",
+      "observationProfile_hybrid": "混合",
+      "precisionMode": "精度模式",
+      "precisionModeDesc": "在计算精度与实时响应之间权衡",
+      "precisionMode_core_high_precision": "高精度",
+      "precisionMode_realtime_lightweight": "实时（轻量）",
+      "eopUpdatePolicy": "地球定向数据",
+      "eopUpdatePolicyDesc": "地球定向参数（用于精确坐标）的更新方式",
+      "eopUpdatePolicy_auto_with_offline_fallback": "自动（离线回退）",
+      "eopUpdatePolicy_embedded_only": "仅内置",
+      "eopUpdatePolicy_strict_offline": "严格离线"
+    },
+    "globalShortcuts": {
+      "title": "全局快捷键",
+      "description": "即使应用未获得焦点也能生效的系统级快捷键。",
+      "mappingTitle": "快捷键映射",
+      "enabled": "启用",
+      "disabledHint": "全局快捷键当前已禁用。启用后方可录制和使用快捷键。",
+      "recording": "请按键…",
+      "resetAll": "全部重置",
+      "resetAllDesc": "将所有全局快捷键恢复为默认值",
+      "resetToDefault": "恢复默认",
+      "actions": {
+        "focusMainWindow": "聚焦主窗口",
+        "toggleSearch": "切换搜索",
+        "toggleSessionPanel": "切换观测计划面板",
+        "mountAbortSlew": "中止赤道仪转动"
+      },
+      "descriptions": {
+        "focusMainWindow": "将应用窗口置于前台",
+        "toggleSearch": "打开或关闭天体搜索",
+        "toggleSessionPanel": "打开或关闭观测计划面板",
+        "mountAbortSlew": "立即停止赤道仪的任何转动（安全）"
+      },
+      "errors": {
+        "invalidShortcut": "无效快捷键。请至少使用一个修饰键（如 Ctrl、Alt）。",
+        "localConflict": "与应用内快捷键冲突：{action}",
+        "globalConflict": "与全局快捷键冲突：{action}"
+      }
     },
     "notifications": {
       "title": "通知",
@@ -3719,6 +3800,17 @@
   },
   "astroCalc": {
     "title": "天文计算器",
+    "tabShort": {
+      "wut": "今夜",
+      "positions": "位置",
+      "rts": "升落",
+      "ephemeris": "星历",
+      "almanac": "年历",
+      "phenomena": "天象",
+      "coordinate": "坐标",
+      "time": "时间",
+      "solarSystem": "太阳系"
+    },
     "wut": "今夜可见",
     "positions": "位置",
     "rts": "升落时间",
@@ -3761,6 +3853,7 @@
     "minorObjectPlaceholder": "1P/Halley、(433)、C/2023 A3...",
     "copyResults": "复制结果",
     "exportResults": "导出结果",
+    "addToList": "添加到列表",
     "openPlanner": "打开规划器",
     "actions": "操作",
     "copySuccess": "已复制到剪贴板。",
@@ -3779,6 +3872,7 @@
     "moon": "月球",
     "sunrise": "日出",
     "sunset": "日落",
+    "twilight": "晨昏蒙影",
     "civilDusk": "民用昏影",
     "nauticalDusk": "航海昏影",
     "astroDusk": "天文昏影",
@@ -4141,7 +4235,7 @@
       "subtitle": "三个简单步骤开启你的天文之旅",
       "launch": {
         "title": "启动应用",
-        "description": "在浏览器中打开 SkyMap，或下载 Windows、macOS 或 Linux 桌面应用。"
+        "description": "在浏览器中打开 Cobalt Skymap，或下载 Windows、macOS 或 Linux 桌面应用。"
       },
       "setup": {
         "title": "设置位置",
@@ -4191,11 +4285,11 @@
     },
     "testimonials": {
       "title": "深受天文爱好者喜爱",
-      "subtitle": "看看我们的社区对 SkyMap 的评价",
+      "subtitle": "看看我们的社区对 Cobalt Skymap 的评价",
       "astronomer": {
         "name": "陈明",
         "role": "业余天文爱好者",
-        "quote": "SkyMap 彻底改变了我的观测体验。规划工具和实时星空渲染让寻找和跟踪天体变得如此简单。"
+        "quote": "Cobalt Skymap 彻底改变了我的观测体验。规划工具和实时星空渲染让寻找和跟踪天体变得如此简单。"
       },
       "photographer": {
         "name": "林雪",
@@ -4205,12 +4299,12 @@
       "beginner": {
         "name": "王浩",
         "role": "观星爱好者",
-        "quote": "作为初学者，SkyMap 让天文学变得触手可及。今晚推荐功能总能给我带来令人惊叹的观测目标。"
+        "quote": "作为初学者，Cobalt Skymap 让天文学变得触手可及。今晚推荐功能总能给我带来令人惊叹的观测目标。"
       }
     },
     "cta": {
       "title": "开启你的天文之旅",
-      "description": "无论你是初学者还是经验丰富的天文爱好者，SkyMap 都能满足你探索星空的一切需求。",
+      "description": "无论你是初学者还是经验丰富的天文爱好者，Cobalt Skymap 都能满足你探索星空的一切需求。",
       "launchButton": "启动星图",
       "downloadButton": "下载桌面版",
       "githubButton": "查看源码"

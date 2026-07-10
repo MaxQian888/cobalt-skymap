@@ -113,11 +113,17 @@ interface MarkerState {
   sortBy: MarkerSortBy;
   pendingCoords: PendingMarkerCoords | null;
   editingMarkerId: string | null;
+  /** Marker currently in explicit move mode (session-only, never persisted). */
+  movingMarkerId: string | null;
+  /** Persisted toggle: show edge chevrons pointing to off-screen markers. */
+  showOffscreenIndicators: boolean;
 
   // CRUD operations
   addMarker: (marker: MarkerInput) => string | null;
   setPendingCoords: (coords: PendingMarkerCoords | null) => void;
   setEditingMarkerId: (id: string | null) => void;
+  setMovingMarker: (id: string | null) => void;
+  setShowOffscreenIndicators: (show: boolean) => void;
   removeMarker: (id: string) => void;
   updateMarker: (id: string, updates: MarkerUpdate) => void;
   setActiveMarker: (id: string | null) => void;
@@ -481,10 +487,14 @@ export const useMarkerStore = create<MarkerState>()(
         sortBy: 'date' as MarkerSortBy,
         pendingCoords: null,
         editingMarkerId: null,
+        movingMarkerId: null,
+        showOffscreenIndicators: false,
 
         // ========== CRUD operations ==========
         setPendingCoords: (coords) => set({ pendingCoords: coords }),
         setEditingMarkerId: (id) => set({ editingMarkerId: id }),
+        setMovingMarker: (id) => set({ movingMarkerId: id }),
+        setShowOffscreenIndicators: (show) => set({ showOffscreenIndicators: show }),
 
         addMarker: (marker) => {
           if (get().markers.length >= MAX_MARKERS) {
@@ -906,6 +916,8 @@ export const useMarkerStore = create<MarkerState>()(
         showLabels: state.showLabels,
         globalMarkerSize: state.globalMarkerSize,
         sortBy: state.sortBy,
+        showOffscreenIndicators: state.showOffscreenIndicators,
+        // movingMarkerId is deliberately session-only.
       }),
     }
   )

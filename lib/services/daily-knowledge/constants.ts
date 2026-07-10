@@ -27,7 +27,7 @@ export const DAILY_KNOWLEDGE_DIFFICULTY_LEVELS = [
 
 export const RETRY_DELAYS_MS = [1000, 2000, 4000] as const;
 export const WIKIMEDIA_MIN_REQUEST_INTERVAL_MS = 250;
-export const DAILY_KNOWLEDGE_USER_AGENT = 'SkyMap/0.1.0 (daily-knowledge; contact: skymap-app)';
+export const DAILY_KNOWLEDGE_USER_AGENT = 'CobaltSkymap/0.1.0 (daily-knowledge; contact: cobalt-skymap-app)';
 export const APOD_REQUEST_TIMEOUT_MS = 10_000;
 export const WIKIMEDIA_REQUEST_TIMEOUT_MS = 10_000;
 export const NASA_IMAGE_LIBRARY_REQUEST_TIMEOUT_MS = 10_000;

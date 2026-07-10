@@ -111,6 +111,13 @@ function applyGridLines(core: StellariumEngine['core'], settings: StellariumSett
   setIfSupported(core, 'lines.galactic.visible', settings.galacticLinesVisible);
 }
 
+// updateStellariumCore re-applies ALL settings on any change (50ms debounce),
+// but addDataSource registers a new engine data source every call — repeat
+// registrations accumulate engine-side work and re-throw on broken sources.
+// Remember what was last registered per engine instance and skip repeats.
+const appliedLandscapeKey = new WeakMap<object, string>();
+const appliedSurveyUrl = new WeakMap<object, string>();
+
 function applyLandscapeAndFog(
   core: StellariumEngine['core'],
   settings: StellariumSettings,
@@ -126,14 +133,22 @@ function applyLandscapeAndFog(
 
   const landscapeKey = settings.landscapesVisible ? 'guereins' : 'gray';
   const landscapeUrl = `${baseUrl}landscapes/${landscapeKey}`;
+  if (appliedLandscapeKey.get(core) === landscapeKey) {
+    setIfSupported(core, 'landscapes.fog_visible', settings.fogVisible);
+    return;
+  }
   try {
     (addDataSource as (options: { url: string; key?: string }) => void)({
       url: landscapeUrl,
       key: landscapeKey,
     });
+    appliedLandscapeKey.set(core, landscapeKey);
     setIfSupported(core, 'landscapes.visible', true);
     setIfSupported(core, 'landscapes.fog_visible', settings.fogVisible);
   } catch (error) {
+    // Remember the failure too — retrying the same broken source on every
+    // settings sync just re-throws inside the engine.
+    appliedLandscapeKey.set(core, landscapeKey);
     logger.warn('Failed to load Stellarium landscape data source, disabling landscape overlay', {
       landscapeKey,
       landscapeUrl,
@@ -155,8 +170,9 @@ function applySurvey(core: StellariumEngine['core'], settings: StellariumSetting
   if (!setIfSupported(core, 'hips.url', surveyUrl)) {
     const hips = asRecord(core.hips);
     const addDataSource = hips?.addDataSource;
-    if (typeof addDataSource === 'function') {
+    if (typeof addDataSource === 'function' && appliedSurveyUrl.get(core) !== surveyUrl) {
       (addDataSource as (options: { url: string; key?: string }) => void)({ url: surveyUrl });
+      appliedSurveyUrl.set(core, surveyUrl);
     }
   }
 }
@@ -165,6 +181,11 @@ function applySkyCulture(core: StellariumEngine['core'], settings: StellariumSet
   // Cultures are registered as data sources at engine init; switching is just
   // setting the current id (the key passed to add_data_source).
   setIfSupported(core, 'skycultures.current_id', settings.skyCulture || 'western');
+}
+
+function applySatellites(core: StellariumEngine['core'], settings: StellariumSettings): void {
+  setIfSupported(core, 'satellites.visible', settings.satellitesVisible);
+  setIfSupported(core, 'satellites.hints_visible', settings.satellitesVisible);
 }
 
 function applyLocalization(settings: StellariumSettings): void {
@@ -179,6 +200,12 @@ interface StellariumState {
   aladin: AladinInstance | null;
   activeEngine: SkyEngineType;
   baseUrl: string;
+  /**
+   * The engine's <canvas> element (session-only). Overlays that must forward
+   * synthetic pointer events into the engine (marker drag → sky pan) dispatch
+   * against this element.
+   */
+  canvasEl: HTMLCanvasElement | null;
   
   // Search state
   search: {
@@ -219,6 +246,7 @@ interface StellariumState {
   // Actions
   setStel: (stel: StellariumEngine | null) => void;
   setAladin: (aladin: AladinInstance | null) => void;
+  setCanvasEl: (canvasEl: HTMLCanvasElement | null) => void;
   setActiveEngine: (engine: SkyEngineType) => void;
   setBaseUrl: (url: string) => void;
   setSearch: (search: Partial<StellariumState['search']>) => void;
@@ -256,6 +284,7 @@ function isSameViewDirection(
 export const useStellariumStore = create<StellariumState>((set, get) => ({
   stel: null,
   aladin: null,
+  canvasEl: null,
   activeEngine: 'stellarium' as SkyEngineType,
   baseUrl: '',
   search: {
@@ -271,6 +300,7 @@ export const useStellariumStore = create<StellariumState>((set, get) => ({
   
   setStel: (stel) => set({ stel }),
   setAladin: (aladin) => set({ aladin }),
+  setCanvasEl: (canvasEl) => set({ canvasEl }),
   setActiveEngine: (activeEngine) => set({ activeEngine }),
   setBaseUrl: (baseUrl) => set({ baseUrl }),
   setSearch: (search) => set((state) => ({ 
@@ -341,6 +371,7 @@ export const useStellariumStore = create<StellariumState>((set, get) => ({
       applyLandscapeAndFog(core, settings, baseUrl);
       applySurvey(core, settings);
       applySkyCulture(core, settings);
+      applySatellites(core, settings);
       applyLocalization(settings);
 
       logger.debug('Stellarium settings updated successfully');

@@ -9,7 +9,7 @@ jest.mock('next-intl', () => ({
     const translations: Record<string, string> = {
       'onboarding.restartTour': 'Restart Guide',
       'onboarding.restartAll': 'Restart Guide',
-      'onboarding.welcome.title': 'Welcome to SkyMap',
+      'onboarding.welcome.title': 'Welcome to Cobalt Skymap',
       'onboarding.welcome.subtitle': 'Your personal window to the universe',
       'onboarding.welcome.startTour': 'Start Tour',
       'onboarding.welcome.startSetup': 'Start Setup',
@@ -48,14 +48,14 @@ describe('WelcomeDialog', () => {
   it('should show dialog for first-time users after delay', async () => {
     render(<WelcomeDialog />);
     
-    expect(screen.queryByText('Welcome to SkyMap')).not.toBeInTheDocument();
+    expect(screen.queryByText('Welcome to Cobalt Skymap')).not.toBeInTheDocument();
     
     act(() => {
       jest.advanceTimersByTime(600);
     });
     
     await waitFor(() => {
-      expect(screen.getByText('Welcome to SkyMap')).toBeInTheDocument();
+      expect(screen.getByText('Welcome to Cobalt Skymap')).toBeInTheDocument();
     });
   });
 
@@ -70,7 +70,7 @@ describe('WelcomeDialog', () => {
       jest.advanceTimersByTime(600);
     });
     
-    expect(screen.queryByText('Welcome to SkyMap')).not.toBeInTheDocument();
+    expect(screen.queryByText('Welcome to Cobalt Skymap')).not.toBeInTheDocument();
   });
 
   it('should not show dialog if showOnNextVisit is false', async () => {
@@ -84,7 +84,7 @@ describe('WelcomeDialog', () => {
       jest.advanceTimersByTime(600);
     });
     
-    expect(screen.queryByText('Welcome to SkyMap')).not.toBeInTheDocument();
+    expect(screen.queryByText('Welcome to Cobalt Skymap')).not.toBeInTheDocument();
   });
 
   it('should display all feature cards', async () => {
@@ -215,7 +215,7 @@ describe('WelcomeDialog', () => {
       jest.advanceTimersByTime(600);
     });
 
-    expect(screen.queryByText('Welcome to SkyMap')).not.toBeInTheDocument();
+    expect(screen.queryByText('Welcome to Cobalt Skymap')).not.toBeInTheDocument();
   });
 
   it('should handle dont show again checkbox', async () => {
@@ -262,7 +262,7 @@ describe('WelcomeDialog', () => {
       jest.advanceTimersByTime(600);
     });
 
-    expect(screen.queryByText('Welcome to SkyMap')).not.toBeInTheDocument();
+    expect(screen.queryByText('Welcome to Cobalt Skymap')).not.toBeInTheDocument();
   });
 
   it('should not show dialog when isSetupOpen is true', async () => {
@@ -276,7 +276,7 @@ describe('WelcomeDialog', () => {
       jest.advanceTimersByTime(600);
     });
 
-    expect(screen.queryByText('Welcome to SkyMap')).not.toBeInTheDocument();
+    expect(screen.queryByText('Welcome to Cobalt Skymap')).not.toBeInTheDocument();
   });
 });
 

@@ -215,7 +215,7 @@ export function DisplaySettings() {
               variant="outline"
               onClick={() => setSkyEngine(engine)}
               className={cn(
-                'flex flex-col items-center gap-1.5 p-3 h-auto rounded-lg border text-xs transition-all',
+                'flex flex-col items-center gap-1.5 p-3 h-auto min-w-0 rounded-lg border text-xs whitespace-normal transition-all',
                 skyEngine === engine
                   ? 'border-primary bg-primary/10 text-primary'
                   : 'border-muted bg-muted/30 text-muted-foreground hover:bg-muted/50'

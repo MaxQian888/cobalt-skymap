@@ -10,7 +10,8 @@ const settingsState = {
   preferences: { locale: 'zh' as 'en' | 'zh' },
   accessibility: {
     highContrast: true,
-    largeText: true,
+    fontScale: 1.5,
+    colorBlindMode: 'deuteranopia' as const,
     screenReaderOptimized: true,
     reduceTransparency: true,
     focusIndicators: false,
@@ -44,6 +45,9 @@ describe('SettingsSyncProvider', () => {
     localeState.locale = 'en';
     document.documentElement.className = '';
     document.documentElement.removeAttribute('data-screen-reader-optimized');
+    document.documentElement.removeAttribute('data-color-blind-mode');
+    document.documentElement.style.removeProperty('--a11y-font-scale');
+    document.documentElement.style.removeProperty('font-size');
   });
 
   it('syncs locale from settings store to locale store', async () => {
@@ -69,7 +73,10 @@ describe('SettingsSyncProvider', () => {
 
     expect(screen.getByTestId('content')).toBeInTheDocument();
     expect(document.documentElement.classList.contains('settings-high-contrast')).toBe(true);
-    expect(document.documentElement.classList.contains('settings-large-text')).toBe(true);
+    expect(document.documentElement.style.getPropertyValue('--a11y-font-scale')).toBe('1.5');
+    // Note: the inline root font-size is a calc() value the real browser computes
+    // (verified live); jsdom does not parse calc font-size, so it is not asserted here.
+    expect(document.documentElement.getAttribute('data-color-blind-mode')).toBe('deuteranopia');
     expect(document.documentElement.classList.contains('settings-reduce-transparency')).toBe(true);
     expect(document.documentElement.classList.contains('settings-hide-focus-indicators')).toBe(true);
     expect(document.documentElement.classList.contains('settings-reduce-motion')).toBe(true);
@@ -89,7 +96,8 @@ describe('SettingsSyncProvider', () => {
     unmount();
 
     expect(document.documentElement.classList.contains('settings-high-contrast')).toBe(false);
-    expect(document.documentElement.classList.contains('settings-large-text')).toBe(false);
+    expect(document.documentElement.style.getPropertyValue('--a11y-font-scale')).toBe('');
+    expect(document.documentElement.hasAttribute('data-color-blind-mode')).toBe(false);
     expect(document.documentElement.classList.contains('settings-reduce-transparency')).toBe(false);
     expect(document.documentElement.classList.contains('settings-hide-focus-indicators')).toBe(false);
     expect(document.documentElement.classList.contains('settings-reduce-motion')).toBe(false);

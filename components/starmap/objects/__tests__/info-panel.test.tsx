@@ -7,6 +7,8 @@ import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 
 jest.mock('@/lib/services/object-info-service', () => ({
   getCachedObjectInfo: jest.fn(),
+  enhanceObjectInfo: jest.fn(),
+  updateCachedObjectInfo: jest.fn(),
 }));
 
 // Mock stores
@@ -48,7 +50,7 @@ jest.mock('@/lib/stores', () => ({
 jest.mock('@/lib/hooks', () => ({
   useCelestialName: jest.fn((name: string) => name),
   useCelestialNames: jest.fn((names: string[]) => names || []),
-  useAdaptivePosition: jest.fn(() => ({ left: 12, top: 64 })),
+  useAdaptivePosition: jest.fn(() => ({ left: 12, top: 64, maxHeight: 500 })),
   useObjectActions: jest.fn(() => ({
     handleSlew: jest.fn(),
     handleAddToList: jest.fn(),
@@ -200,6 +202,12 @@ jest.mock('@/components/ui/collapsible', () => ({
   CollapsibleTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+jest.mock('../satellite-info-notice', () => ({
+  SatelliteInfoNotice: ({ noradId }: { noradId: number | null }) => (
+    <div data-testid="satellite-info-notice" data-norad={noradId ?? ''} />
+  ),
+}));
+
 jest.mock('../altitude-chart-compact', () => ({
   AltitudeChartCompact: ({ ra, dec }: { ra: number; dec: number }) => (
     <div data-testid="altitude-chart-compact" data-ra={ra} data-dec={dec} />
@@ -217,13 +225,14 @@ jest.mock('recharts', () => ({
   Tooltip: () => <div />,
 }));
 
-import { useObjectActions } from '@/lib/hooks';
+import { useObjectActions, useTargetAstroData } from '@/lib/hooks';
 import * as targetDisplayModel from '@/lib/astronomy/target-display-model';
 import type { SelectedObjectData } from '@/lib/core/types';
-import { getCachedObjectInfo } from '@/lib/services/object-info-service';
+import { getCachedObjectInfo, enhanceObjectInfo } from '@/lib/services/object-info-service';
 
 const mockUseObjectActions = useObjectActions as jest.Mock;
 const mockGetCachedObjectInfo = getCachedObjectInfo as jest.Mock;
+const mockEnhanceObjectInfo = enhanceObjectInfo as jest.Mock;
 const defaultCachedObjectInfo = {
   names: ['M31', 'NGC 224'],
   type: 'Galaxy',
@@ -277,6 +286,8 @@ describe('InfoPanel', () => {
     jest.clearAllMocks();
     useMapInteractionStore.getState().reset();
     mockGetCachedObjectInfo.mockImplementation(() => new Promise(() => undefined));
+    // Enhancement resolves to the cached info unchanged unless a test overrides it.
+    mockEnhanceObjectInfo.mockImplementation((info: unknown) => Promise.resolve(info));
     // Reset useObjectActions to default (disconnected) state after each test
     mockUseObjectActions.mockReturnValue({
       handleSlew: jest.fn(),
@@ -582,7 +593,9 @@ describe('InfoPanel', () => {
   describe('risk hint mapping', () => {
     it('maps known risk keys and falls back for unknown risk key', () => {
       const mockedBuildTargetDisplayModel = targetDisplayModel.buildTargetDisplayModel as unknown as jest.Mock;
-      mockedBuildTargetDisplayModel.mockReturnValueOnce({
+      // mockReturnValue (not Once): the load effect re-renders the panel and
+      // every render calls buildTargetDisplayModel again.
+      mockedBuildTargetDisplayModel.mockReturnValue({
           sections: {
             identity: {
               primaryName: 'M31',
@@ -645,6 +658,11 @@ describe('InfoPanel', () => {
       expect(screen.getByText('objectDetail.riskHintsMap.moon-interference')).toBeInTheDocument();
       expect(screen.getByText('objectDetail.riskHintsMap.low-feasibility')).toBeInTheDocument();
       expect(screen.getByText('custom-risk')).toBeInTheDocument();
+
+      // Restore the pass-through implementation for subsequent tests.
+      mockedBuildTargetDisplayModel.mockImplementation(
+        jest.requireActual('@/lib/astronomy/target-display-model').buildTargetDisplayModel,
+      );
     });
   });
 
@@ -719,6 +737,23 @@ describe('InfoPanel', () => {
       expect(card.className).toContain('fixed');
     });
 
+    it('applies the adaptive maxHeight and a flex column so the body scrolls within bounds', () => {
+      render(
+        <InfoPanel
+          {...defaultProps}
+          selectedObject={mockSelectedObject}
+          clickPosition={{ x: 100, y: 200 }}
+          containerBounds={{ width: 800, height: 600 }}
+        />
+      );
+      const card = screen.getAllByTestId('card')[0];
+      // maxHeight comes from useAdaptivePosition (mocked at 500), tying scroll
+      // height to the available space rather than a static viewport clamp.
+      expect(card.style.maxHeight).toBe('500px');
+      expect(card.className).toContain('flex');
+      expect(card.className).toContain('flex-col');
+    });
+
     it('does not use fixed positioning without clickPosition', () => {
       render(
         <InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />
@@ -751,6 +786,142 @@ describe('InfoPanel', () => {
       const obj = { ...mockSelectedObject, names: ['M31'] };
       render(<InfoPanel {...defaultProps} selectedObject={obj} />);
       expect(screen.getByText('M31')).toBeInTheDocument();
+    });
+  });
+
+  describe('loading and enhancement', () => {
+    it('shows the identity skeleton while object info is pending', () => {
+      // Default mockGetCachedObjectInfo never resolves.
+      render(<InfoPanel {...defaultProps} selectedObject={mockSelectedObject} />);
+      const skeleton = screen.getByTestId('info-panel-identity-skeleton');
+      expect(skeleton).toBeInTheDocument();
+      expect(skeleton).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('hides the skeleton and calls enhanceObjectInfo after the cached info resolves', async () => {
+      await renderSelectedInfoPanel();
+      expect(screen.queryByTestId('info-panel-identity-skeleton')).not.toBeInTheDocument();
+      expect(mockEnhanceObjectInfo).toHaveBeenCalledWith(
+        defaultCachedObjectInfo,
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('renders the enriched description (clamped) and distance', async () => {
+      mockEnhanceObjectInfo.mockImplementation((info: Record<string, unknown>) =>
+        Promise.resolve({
+          ...info,
+          description: 'A grand spiral galaxy in the Local Group.',
+          distance: '2.5 Mly',
+        }),
+      );
+
+      await renderSelectedInfoPanel();
+
+      const description = screen.getByTestId('info-panel-description');
+      expect(description).toHaveTextContent('A grand spiral galaxy in the Local Group.');
+      expect(description).toHaveClass('line-clamp-3');
+      expect(screen.getByTestId('info-panel-distance')).toHaveTextContent('2.5 Mly');
+    });
+
+    it('aborts the enhancement when the selection changes or unmounts', async () => {
+      let capturedSignal: AbortSignal | undefined;
+      mockEnhanceObjectInfo.mockImplementation((info: unknown, signal: AbortSignal) => {
+        capturedSignal = signal;
+        return new Promise(() => undefined);
+      });
+
+      const view = await renderSelectedInfoPanel();
+      expect(capturedSignal).toBeDefined();
+      expect(capturedSignal!.aborted).toBe(false);
+
+      view.unmount();
+      expect(capturedSignal!.aborted).toBe(true);
+    });
+  });
+
+  describe('satellite selections', () => {
+    const mockUseTargetAstroData = useTargetAstroData as jest.Mock;
+    let originalImpl: (() => unknown) | undefined;
+
+    beforeEach(() => {
+      originalImpl = mockUseTargetAstroData.getMockImplementation();
+      mockUseTargetAstroData.mockReturnValue({
+        altitude: 45,
+        azimuth: 180,
+        moonDistance: 90,
+        visibility: null,
+        feasibility: null,
+        targetKind: 'satellite',
+        positionIsSnapshot: true,
+        noradId: 25544,
+        positionAt: () => ({ raDeg: 0, decDeg: 0 }),
+        riskHints: [],
+      });
+    });
+
+    afterEach(() => {
+      mockUseTargetAstroData.mockImplementation(originalImpl);
+    });
+
+    it('replaces forecast sections with the satellite notice and hides the chart', async () => {
+      await renderSelectedInfoPanel({
+        selectedObject: { ...mockSelectedObject, names: ['NORAD 25544', 'NAME ISS (ZARYA)'], type: undefined },
+      });
+
+      const notice = screen.getByTestId('satellite-info-notice');
+      expect(notice).toBeInTheDocument();
+      expect(notice).toHaveAttribute('data-norad', '25544');
+      expect(screen.queryByTestId('info-panel-section-planning-metrics')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('info-panel-section-live-status')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('altitude-chart-compact')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('moving-body captions', () => {
+    const mockUseTargetAstroData = useTargetAstroData as jest.Mock;
+    let originalImpl: (() => unknown) | undefined;
+
+    beforeEach(() => {
+      originalImpl = mockUseTargetAstroData.getMockImplementation();
+    });
+
+    afterEach(() => {
+      mockUseTargetAstroData.mockImplementation(originalImpl);
+    });
+
+    it('shows the recomputed-positions caption for solar-system bodies', async () => {
+      const base = originalImpl?.() as Record<string, unknown>;
+      mockUseTargetAstroData.mockReturnValue({
+        ...base,
+        targetKind: 'solar_system',
+        positionIsSnapshot: false,
+        noradId: null,
+        positionAt: () => ({ raDeg: 0, decDeg: 0 }),
+      });
+
+      await renderSelectedInfoPanel({
+        selectedObject: { ...mockSelectedObject, names: ['NAME Jupiter'] },
+      });
+
+      expect(screen.getByTestId('info-panel-position-recomputed')).toBeInTheDocument();
+    });
+
+    it('shows the snapshot caption for minor bodies', async () => {
+      const base = originalImpl?.() as Record<string, unknown>;
+      mockUseTargetAstroData.mockReturnValue({
+        ...base,
+        targetKind: 'minor_body',
+        positionIsSnapshot: true,
+        noradId: null,
+        positionAt: () => ({ raDeg: 0, decDeg: 0 }),
+      });
+
+      await renderSelectedInfoPanel({
+        selectedObject: { ...mockSelectedObject, names: ['NAME C/2020 F3 (NEOWISE)'] },
+      });
+
+      expect(screen.getByTestId('info-panel-position-snapshot')).toBeInTheDocument();
     });
   });
 });

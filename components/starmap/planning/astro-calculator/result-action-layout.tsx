@@ -19,7 +19,7 @@ export function AstroCalculatorResultActionsBar({
     <div
       data-testid="astro-calculator-result-actions"
       className={cn(
-        'grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end',
+        'grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end',
         className,
       )}
     >

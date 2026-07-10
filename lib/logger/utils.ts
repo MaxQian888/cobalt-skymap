@@ -439,7 +439,7 @@ export function buildLogDiagnosticsBundle(
 export function exportLogsAsText(logs: LogEntry[], options: LogExportOptions = {}): string {
   const bundle = buildLogDiagnosticsBundle(logs, options);
   const header = [
-    'SkyMap Application Logs',
+    'Cobalt Skymap Application Logs',
     `Bundle Version: ${bundle.bundleVersion}`,
     `Generated: ${bundle.generatedAt}`,
     `Runtime: ${bundle.runtime.environment}`,

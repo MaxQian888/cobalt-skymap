@@ -49,6 +49,9 @@ export function getAltitudeAtTime(
  * @param longitude - Observer longitude
  * @param hoursAhead - How many hours to calculate
  * @param intervalMinutes - Time step in minutes
+ * @param positionAt - Optional per-time position for moving bodies (planets,
+ *   Moon). When provided it overrides `ra`/`dec` at every sample so the curve
+ *   tracks the body instead of freezing its selection-time coordinates.
  * @returns Array of altitude points
  */
 export function getAltitudeOverTime(
@@ -57,45 +60,50 @@ export function getAltitudeOverTime(
   latitude: number,
   longitude: number,
   hoursAhead: number = 24,
-  intervalMinutes: number = 30
+  intervalMinutes: number = 30,
+  positionAt?: (date: Date) => { raDeg: number; decDeg: number }
 ): Array<{ hour: number; altitude: number; azimuth: number }> {
   const result: Array<{ hour: number; altitude: number; azimuth: number }> = [];
   const now = new Date();
   const stepsPerHour = 60 / intervalMinutes;
   const totalSteps = hoursAhead * stepsPerHour;
-  
+
   for (let i = 0; i <= totalSteps; i++) {
     const futureTime = new Date(now.getTime() + i * intervalMinutes * 60 * 1000);
     const hour = i / stepsPerHour;
-    
+
+    const samplePos = positionAt ? positionAt(futureTime) : null;
+    const sampleRa = samplePos ? samplePos.raDeg : ra;
+    const sampleDec = samplePos ? samplePos.decDeg : dec;
+
     // Calculate LST at future time
     const futureJD = futureTime.getTime() / 86400000 + 2440587.5;
     const S = futureJD - 2451545.0;
     const T = S / 36525.0;
     const GST = 280.46061837 + 360.98564736629 * S + T ** 2 * (0.000387933 - T / 38710000);
     const LST = (GST + longitude) % 360;
-    
+
     // Calculate hour angle
-    const HA = LST - ra;
+    const HA = LST - sampleRa;
     const HARad = deg2rad(HA);
-    const decRad = deg2rad(dec);
+    const decRad = deg2rad(sampleDec);
     const latRad = deg2rad(latitude);
-    
+
     // Calculate altitude
     const sinAlt = Math.sin(decRad) * Math.sin(latRad) +
                    Math.cos(decRad) * Math.cos(latRad) * Math.cos(HARad);
     const altitude = rad2deg(Math.asin(sinAlt));
-    
+
     // Calculate azimuth
     const y = -Math.cos(decRad) * Math.sin(HARad);
-    const x = Math.sin(decRad) * Math.cos(latRad) - 
+    const x = Math.sin(decRad) * Math.cos(latRad) -
               Math.cos(decRad) * Math.sin(latRad) * Math.cos(HARad);
     let azimuth = rad2deg(Math.atan2(y, x));
     if (azimuth < 0) azimuth += 360;
-    
+
     result.push({ hour, altitude, azimuth });
   }
-  
+
   return result;
 }
 

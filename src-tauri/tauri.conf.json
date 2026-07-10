@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "SkyMap",
+  "productName": "Cobalt Skymap",
   "version": "0.1.0",
   "identifier": "com.skymap.desktop",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "SkyMap - Astronomy Planning",
+        "title": "Cobalt Skymap - Astronomy Planning",
         "width": 1280,
         "height": 800,
         "minWidth": 800,
@@ -51,7 +51,7 @@
   },
   "plugins": {
     "cli": {
-      "description": "SkyMap desktop command line interface.",
+      "description": "Cobalt Skymap desktop command line interface.",
       "args": [
         { "name": "focus", "description": "Focus the main window before executing the CLI workflow." },
         { "name": "settings", "description": "Open settings after launch." },
@@ -59,7 +59,7 @@
       ],
       "subcommands": {
         "open": {
-          "description": "Open a SkyMap destination.",
+          "description": "Open a Cobalt Skymap destination.",
           "subcommands": {
             "object": {
               "description": "Open the search experience with a query.",
@@ -83,7 +83,7 @@
           }
         },
         "import": {
-          "description": "Import supported files into SkyMap.",
+          "description": "Import supported files into Cobalt Skymap.",
           "subcommands": {
             "targets": {
               "description": "Import a target list file.",

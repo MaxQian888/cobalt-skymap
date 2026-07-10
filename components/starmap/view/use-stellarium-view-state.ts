@@ -8,6 +8,7 @@ import { buildContinuityTargetSummary, useMapInteractionStore } from '@/lib/stor
 import { useTargetListStore } from '@/lib/stores/target-list-store';
 import { useSettingsStore } from '@/lib/stores/settings-store';
 import { useNavigationHistoryStore } from '@/lib/hooks';
+import { useSelectionAnchor } from './use-selection-anchor';
 import { rad2deg } from '@/lib/astronomy/starmap-utils';
 import type { SelectedObjectData, ClickCoords } from '@/lib/core/types';
 import type { SkyMapCanvasRef } from '@/lib/core/types/sky-engine';
@@ -79,6 +80,7 @@ export function useStellariumViewState() {
   const fovChangeRafRef = useRef<number | null>(null);
   const lastFovRef = useRef(currentFov);
   const containerBoundsRef = useRef<{ left: number; top: number } | null>(null);
+  const lastCanvasPointerDownAtRef = useRef(0);
 
   // Equipment store — only subscribe to setters needed in handlers
   // Display values (fovSimEnabled, sensorWidth, etc.) are subscribed directly by child components
@@ -186,6 +188,11 @@ export function useStellariumViewState() {
       // to prevent repositioning the panel mid-click and breaking button interactions.
       if (!(e.target instanceof HTMLCanvasElement)) return;
 
+      // Timestamp lets useSelectionAnchor tell click-driven selections apart
+      // from programmatic ones (search/toolbar) that must not reuse a stale
+      // click position.
+      lastCanvasPointerDownAtRef.current = performance.now();
+
       const rect = containerBoundsRef.current;
       if (rect) {
         setClickPosition({
@@ -223,6 +230,30 @@ export function useStellariumViewState() {
     }
     setSelectedObject(selection);
   }, [clearTargetContext, pushNavigationHistory, setTargetContext]);
+
+  // Frozen anchor for the floating InfoPanel — click position for click-driven
+  // selections, projected object position for programmatic ones.
+  const infoPanelAnchor = useSelectionAnchor({
+    selectedObject,
+    clickPosition,
+    lastCanvasPointerDownAtRef,
+    containerBounds,
+  });
+
+  // Canonical deselect. Clearing only the React state leaves the engine's own
+  // selection reticle drawn on the sky and the continuity targetContext stale,
+  // so every close path must also null the engine selection. The engine write
+  // re-fires the selection watcher with null → handleSelectionChange(null);
+  // the local clears keep the UI synchronous and cover the Aladin engine
+  // (stel === null). Double-clearing is idempotent.
+  const handleDeselectObject = useCallback(() => {
+    const engine = useStellariumStore.getState().stel;
+    if (engine?.core?.selection) {
+      engine.core.selection = null;
+    }
+    clearTargetContext();
+    setSelectedObject(null);
+  }, [clearTargetContext]);
 
   // Handle FOV change with rAF throttling
   const handleFovChange = useCallback((fov: number) => {
@@ -381,7 +412,7 @@ export function useStellariumViewState() {
   const toggleSearch = useCallback(() => {
     setIsSearchOpen(prev => {
       if (!prev) {
-        setSelectedObject(null);
+        handleDeselectObject();
         // Use rAF to focus after DOM update + CSS transition start
         requestAnimationFrame(() => {
           searchRef.current?.focusSearchInput();
@@ -389,7 +420,7 @@ export function useStellariumViewState() {
       }
       return !prev;
     });
-  }, []);
+  }, [handleDeselectObject]);
 
   // Stable session-panel toggle — passed to memo'd TopToolbar and the keyboard
   // shortcut manager. Inlining `() => setShowSessionPanel(p => !p)` at the call
@@ -442,6 +473,7 @@ export function useStellariumViewState() {
     toggleSessionPanel,
     contextMenuCoords,
     clickPosition,
+    infoPanelAnchor,
     containerBounds,
 
     // Context menu state
@@ -481,6 +513,7 @@ export function useStellariumViewState() {
 
     // Handlers
     handleSelectionChange,
+    handleDeselectObject,
     handleFovChange,
     handleSetFramingCoordinates,
     handleZoomIn,

@@ -42,7 +42,7 @@ describe('Home Page', () => {
     expect(script).toBeInTheDocument();
     const data = JSON.parse(script!.textContent || '');
     expect(data['@type']).toBe('SoftwareApplication');
-    expect(data.name).toBe('SkyMap');
+    expect(data.name).toBe('Cobalt Skymap');
     expect(data.applicationCategory).toBe('EducationalApplication');
   });
 

@@ -22,6 +22,7 @@ export { SearchBehaviorSettings } from './search-settings';
 export { KeyboardSettings } from './keyboard-settings';
 export { GlobalShortcutSettings } from './global-shortcut-settings';
 export { MobileSettings } from './mobile-settings';
+export { AdvancedSettings } from './advanced-settings';
 export { EventSourcesSettings } from './event-sources-settings';
 export { SettingsExportImport } from './settings-export-import';
 export { StoragePathSettings } from './storage-path-settings';

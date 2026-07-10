@@ -3,13 +3,14 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  X, ChevronDown, ChevronUp, Crosshair, Plus,
+  X, ChevronDown, ChevronUp, Crosshair, Plus, Loader2,
   Compass, TrendingUp, ArrowUp, Info, Sun, Ruler, ShieldAlert, Clock3,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Collapsible,
@@ -25,13 +26,20 @@ import {
 
 import { AltitudeChartCompact } from './altitude-chart-compact';
 import { RiseTransitSetGrid } from './rise-transit-set-grid';
+import { SatelliteInfoNotice } from './satellite-info-notice';
 import { FeasibilityBadge } from '../planning/feasibility-badge';
 import { SlewConfirmDialog } from '../mount/slew-confirm-dialog';
 import { useMountStore } from '@/lib/stores';
 import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
 import { useCelestialName, useCelestialNames, useAdaptivePosition, useAstroEnvironment, useTargetAstroData, useObjectActions, useHorizonsEphemeris } from '@/lib/hooks';
+import { DEFAULT_KEEP_OUT_RADIUS } from '@/lib/hooks/use-adaptive-position';
 import { findHorizonsBody } from '@/lib/services/horizons/service';
-import { getCachedObjectInfo, type ObjectDetailedInfo } from '@/lib/services/object-info-service';
+import {
+  getCachedObjectInfo,
+  enhanceObjectInfo,
+  updateCachedObjectInfo,
+  type ObjectDetailedInfo,
+} from '@/lib/services/object-info-service';
 import { cn } from '@/lib/utils';
 import { getObjectTypeIcon, getObjectTypeColor } from '@/lib/astronomy/object-type-utils';
 import {
@@ -60,6 +68,8 @@ export const InfoPanel = memo(function InfoPanel({
   const [chartExpanded, setChartExpanded] = useState(true);
   const [advancedExpanded, setAdvancedExpanded] = useState(true);
   const [cachedObjectInfo, setCachedObjectInfo] = useState<ObjectDetailedInfo | null>(null);
+  const [infoStatus, setInfoStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   
   const profileInfo = useMountStore((state) => state.profileInfo);
@@ -87,12 +97,14 @@ export const InfoPanel = memo(function InfoPanel({
   const primaryName = useCelestialName(selectedObject?.names[0]);
   const secondaryNames = useCelestialNames(selectedObject?.names.slice(1, 3));
 
-  // Calculate adaptive position using shared hook
+  // Calculate adaptive position using shared hook. The keep-out radius stops
+  // the panel from covering the just-selected object (reticle + pulse ring).
   const position = useAdaptivePosition(
     panelRef,
     clickPosition,
     containerBounds,
     [selectedObject, objectExpanded, chartExpanded, advancedExpanded],
+    { keepOutRadius: DEFAULT_KEEP_OUT_RADIUS },
   );
 
   // Update time every 30 seconds
@@ -103,40 +115,62 @@ export const InfoPanel = memo(function InfoPanel({
     return () => clearInterval(interval);
   }, []);
 
+  // Load + enhance object info with the same AbortController pattern as the
+  // detail drawer: local/cached data first (skeleton until then), then the
+  // network enhancement (SIMBAD/Wikipedia) streams in behind a spinner.
   useEffect(() => {
     if (!selectedObject) {
+      setInfoStatus('idle');
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
+    setInfoStatus('loading');
 
-    void getCachedObjectInfo(
-      selectedObject.names,
-      selectedObject.raDeg,
-      selectedObject.decDeg,
-      selectedObject.ra,
-      selectedObject.dec,
-      {
-        type: selectedObject.type,
-        magnitude: selectedObject.magnitude,
-        size: selectedObject.size,
-        constellation: selectedObject.constellation,
-      }
-    ).then((info) => {
-      if (!cancelled) {
+    async function loadInfo() {
+      try {
+        const info = await getCachedObjectInfo(
+          selectedObject!.names,
+          selectedObject!.raDeg,
+          selectedObject!.decDeg,
+          selectedObject!.ra,
+          selectedObject!.dec,
+          {
+            type: selectedObject!.type,
+            magnitude: selectedObject!.magnitude,
+            size: selectedObject!.size,
+            constellation: selectedObject!.constellation,
+          }
+        );
+        if (controller.signal.aborted) return;
         setCachedObjectInfo(info);
+        setInfoStatus('ready');
+
+        setIsEnhancing(true);
+        const enhanced = await enhanceObjectInfo(info, controller.signal);
+        if (controller.signal.aborted) return;
+        setCachedObjectInfo(enhanced);
+        updateCachedObjectInfo(enhanced);
+        setIsEnhancing(false);
+      } catch {
+        if (controller.signal.aborted) return;
+        // Identity still renders from the selection itself — degrade quietly.
+        setInfoStatus('ready');
+        setIsEnhancing(false);
       }
-    }).catch(() => {
-      void cancelled;
-    });
+    }
+
+    void loadInfo();
 
     return () => {
-      cancelled = true;
+      controller.abort();
+      setIsEnhancing(false);
     };
   }, [selectedObject]);
   const objectInfo = selectedObject && cachedObjectInfo?.names.some((name) => selectedObject.names.includes(name))
     ? cachedObjectInfo
     : null;
+  const infoLoading = infoStatus === 'loading';
 
   // Escape key to close panel
   useEffect(() => {
@@ -176,9 +210,19 @@ export const InfoPanel = memo(function InfoPanel({
     };
   }, []);
 
-  // Calculate astronomical data using shared hooks
+  // Calculate astronomical data using shared hooks. typeCategory (async) is a
+  // secondary kind-detection signal for comets/asteroids/satellites.
   const astroData = useAstroEnvironment(latitude, longitude, currentTime);
-  const targetData = useTargetAstroData(selectedObject, latitude, longitude, astroData.moonRa, astroData.moonDec, currentTime);
+  const targetData = useTargetAstroData(
+    selectedObject,
+    latitude,
+    longitude,
+    astroData.moonRa,
+    astroData.moonDec,
+    currentTime,
+    objectInfo?.typeCategory,
+  );
+  const isSatellite = targetData?.targetKind === 'satellite';
 
   // High-precision JPL Horizons position for major solar-system bodies (network-backed).
   // findHorizonsBody returns a primitive (stable across renders), so no memo is needed.
@@ -226,13 +270,15 @@ export const InfoPanel = memo(function InfoPanel({
           'bg-card/95 backdrop-blur-md border-border/60 shadow-2xl',
           'transition-all duration-300 ease-out',
           'animate-in fade-in zoom-in-95 slide-in-from-bottom-2',
-          hasCustomPosition ? 'fixed z-50 w-[min(20rem,calc(100vw-1rem))]' : 'w-full',
+          hasCustomPosition ? 'fixed z-50 flex flex-col overflow-hidden w-[min(20rem,calc(100vw-1rem))]' : 'w-full',
           className
         )}
         style={hasCustomPosition ? {
           left: position.left,
           top: position.top,
-          maxHeight: 'min(calc(100vh - 80px), calc(100dvh - 80px))',
+          // Height is bounded to the space below `top` (see useAdaptivePosition),
+          // so the body scrolls rather than clipping off the bottom edge.
+          maxHeight: position.maxHeight,
         } : undefined}
       >
         {/* InfoPanel renders on the desktop shell only (see stellarium-view:
@@ -240,7 +286,7 @@ export const InfoPanel = memo(function InfoPanel({
             Because the panel never mounts below 900px, sm:(640px) variants were
             always-on dead code — sizes/labels are written at their resolved
             desktop value instead (ui-audit #34). */}
-        <ScrollArea className="max-h-[calc(100vh-100px)] max-h-[calc(100dvh-100px)]">
+        <ScrollArea className="min-h-0 flex-1">
           <div className="p-3 space-y-2">
             {/* Selected Object Section */}
             {selectedObject && (
@@ -253,6 +299,9 @@ export const InfoPanel = memo(function InfoPanel({
                       return <TypeIcon className={cn('h-4 w-4 shrink-0', typeColor)} />;
                     })()}
                     <span className="text-sm font-medium truncate">{identitySection?.primaryName ?? selectedObject.names[0]}</span>
+                    {isEnhancing && (
+                      <Loader2 className="h-3 w-3 shrink-0 animate-spin text-muted-foreground" data-testid="info-panel-enhancing" />
+                    )}
                     {objectExpanded ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
                   </CollapsibleTrigger>
                   <Tooltip>
@@ -274,6 +323,20 @@ export const InfoPanel = memo(function InfoPanel({
                 <CollapsibleContent className="mt-2 space-y-2">
                   <Card data-testid="info-panel-section-identity" className="gap-2 border-border/70 bg-muted/20 py-3 shadow-none">
                     <CardContent className="space-y-2 px-3">
+                    {/* Skeleton for the async object-info fields (type,
+                        description, distance) — identity data from the
+                        selection itself renders immediately below. */}
+                    {infoLoading && (
+                      <div className="space-y-2" data-testid="info-panel-identity-skeleton" aria-busy="true">
+                        <span className="sr-only">{t('objectDetail.infoLoading')}</span>
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-4 w-14" />
+                          <Skeleton className="h-3 w-28" />
+                        </div>
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-4/5" />
+                      </div>
+                    )}
                     {/* Names and Type Badge */}
                     <div className="flex items-center gap-2 flex-wrap">
                       {identitySection?.type && (
@@ -315,6 +378,21 @@ export const InfoPanel = memo(function InfoPanel({
                       </div>
                     )}
 
+                    {/* Enriched description (clamped — full text in details) */}
+                    {objectInfo?.description && (
+                      <p className="text-xs text-foreground/90 leading-relaxed line-clamp-3" data-testid="info-panel-description">
+                        {objectInfo.description}
+                      </p>
+                    )}
+
+                    {/* Distance (enriched) */}
+                    {objectInfo?.distance && (
+                      <div className="text-xs" data-testid="info-panel-distance">
+                        <span className="text-muted-foreground">{t('objectDetail.distance')}: </span>
+                        <span className="text-foreground">{objectInfo.distance}</span>
+                      </div>
+                    )}
+
                     {/* Coordinates */}
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
@@ -337,6 +415,18 @@ export const InfoPanel = memo(function InfoPanel({
                           {horizons.row.raDeg.toFixed(4)}°, {horizons.row.decDeg.toFixed(4)}°
                         </span>
                       </div>
+                    )}
+
+                    {/* How positions evolve for this object */}
+                    {targetData?.targetKind === 'solar_system' && (
+                      <p className="text-[10px] text-muted-foreground/80" data-testid="info-panel-position-recomputed">
+                        {t('objectDetail.positionRecomputed')}
+                      </p>
+                    )}
+                    {targetData?.targetKind === 'minor_body' && (
+                      <p className="text-[10px] text-amber-400/80" data-testid="info-panel-position-snapshot">
+                        {t('objectDetail.positionSnapshot')}
+                      </p>
                     )}
 
                     {selectionMetadataSection && (
@@ -371,6 +461,16 @@ export const InfoPanel = memo(function InfoPanel({
                     )}
                     </CardContent>
                   </Card>
+
+                  {/* Satellites: fixed-RA/Dec forecasts are meaningless — show
+                      pass predictions instead of observation/planning cards. */}
+                  {isSatellite && targetData && (
+                    <SatelliteInfoNotice
+                      noradId={targetData.noradId}
+                      latitude={latitude}
+                      longitude={longitude}
+                    />
+                  )}
 
                   {targetData && liveStatusSection && planningSection && (
                     <>
@@ -588,8 +688,9 @@ export const InfoPanel = memo(function InfoPanel({
             )}
 
 
-            {/* Altitude Chart Section */}
-            {selectedObject && (
+            {/* Altitude Chart Section (hidden for satellites — a fixed-RA/Dec
+                curve would be wrong within minutes) */}
+            {selectedObject && !isSatellite && (
               <Collapsible open={chartExpanded} onOpenChange={setChartExpanded}>
                 <CollapsibleTrigger className="flex items-center justify-between w-full hover:text-primary transition-colors">
                   <div className="flex items-center gap-2">
@@ -598,12 +699,15 @@ export const InfoPanel = memo(function InfoPanel({
                   </div>
                   {chartExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 </CollapsibleTrigger>
-                
+
                 <CollapsibleContent className="mt-2">
-                  <div className="-mx-1">
+                  <div className="-mx-1 overflow-hidden">
                     <AltitudeChartCompact
                       ra={selectedObject.raDeg}
                       dec={selectedObject.decDeg}
+                      positionAt={targetData?.targetKind === 'solar_system' ? targetData.positionAt : undefined}
+                      visibility={targetData?.targetKind === 'solar_system' ? targetData.visibility : undefined}
+                      isSnapshot={targetData?.positionIsSnapshot}
                     />
                   </div>
                 </CollapsibleContent>

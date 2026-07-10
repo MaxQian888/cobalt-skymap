@@ -458,14 +458,21 @@ function WindowDragHandle({ onStartDrag, onToggleMaximize }: WindowDragHandlePro
     void onToggleMaximize();
   };
 
+  // Full-bar drag region: spans the whole top toolbar so any empty space moves
+  // the frameless window (double-click maximizes), matching native title-bar UX.
+  // It sits beneath the toolbar row (which carries `zIndex: 1`), so the
+  // pointer-events-auto button clusters still receive their own clicks while the
+  // pointer-events-none gaps fall through to this layer.
   return (
     <div
       data-testid="window-drag-handle"
-      className="pointer-events-auto absolute left-1/2 top-2 z-10 flex h-5 w-20 -translate-x-1/2 items-center justify-center rounded-full bg-card/55 backdrop-blur-md sm:w-28"
+      aria-hidden="true"
+      className="pointer-events-auto absolute inset-0"
       onMouseDown={handleMouseDown}
       onDoubleClick={handleDoubleClick}
     >
-      <div className="h-1.5 w-8 rounded-full bg-foreground/35 sm:w-10" />
+      {/* Subtle centered grip as a discoverability hint. */}
+      <div className="absolute left-1/2 top-1.5 h-1 w-10 -translate-x-1/2 rounded-full bg-foreground/15" />
     </div>
   );
 }

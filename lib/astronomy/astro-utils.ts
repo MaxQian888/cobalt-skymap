@@ -75,7 +75,8 @@ export { calculateTwilightTimes } from './twilight/calculator';
 // Target visibility
 // ============================================================================
 
-export { calculateTargetVisibility, getTransitTime } from './visibility/target';
+export { calculateTargetVisibility, getTransitTime, intersectDarkWindow } from './visibility/target';
+export { calculateSolarSystemVisibility } from './visibility/solar-system';
 export { getAltitudeOverTime, getMaxAltitude, calculateImagingHours } from './visibility/altitude';
 export { isCircumpolar, neverRises } from './visibility/circumpolar';
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Switch } from '@/components/ui/switch';
 import {
   Table,
@@ -109,8 +109,12 @@ export function SolarSystemTab({
   onSharedTimeChange,
 }: SolarSystemTabProps) {
   const t = useTranslations();
-  const [date, setDate] = useState(sharedDate ?? toDateInput(new Date()));
-  const [time, setTime] = useState(sharedTime ?? '22:00');
+  // Controlled by the dialog's shared date/time when provided; local state is
+  // only the fallback for standalone usage. No sync effect needed.
+  const [localDate, setLocalDate] = useState(() => sharedDate ?? toDateInput(new Date()));
+  const [localTime, setLocalTime] = useState(sharedTime ?? '22:00');
+  const date = sharedDate ?? localDate;
+  const time = sharedTime ?? localTime;
   const [minorObjectQuery, setMinorObjectQuery] = useState('');
   const [includePluto, setIncludePluto] = useState(true);
   const [rows, setRows] = useState<SolarSystemRow[]>([]);
@@ -148,18 +152,6 @@ export function SolarSystemTab({
       ].join(' | ')),
     ];
   }, [date, includePluto, rows, time]);
-
-  useEffect(() => {
-    if (sharedDate && sharedDate !== date) {
-      setDate(sharedDate);
-    }
-  }, [sharedDate, date]);
-
-  useEffect(() => {
-    if (sharedTime && sharedTime !== time) {
-      setTime(sharedTime);
-    }
-  }, [sharedTime, time]);
 
   useEffect(() => {
     let cancelled = false;
@@ -297,8 +289,8 @@ export function SolarSystemTab({
   }, [bodies, dateTime, explicitMinorObjectQuery, latitude, longitude, observerContext?.contextKey, observerContext?.elevation, t]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.date')}</Label>
           <Input
@@ -306,7 +298,7 @@ export function SolarSystemTab({
             value={date}
             onChange={(event) => {
               const value = event.target.value;
-              setDate(value);
+              setLocalDate(value);
               onSharedDateChange?.(value);
             }}
             className="h-8"
@@ -319,7 +311,7 @@ export function SolarSystemTab({
             value={time}
             onChange={(event) => {
               const value = event.target.value;
-              setTime(value);
+              setLocalTime(value);
               onSharedTimeChange?.(value);
             }}
             className="h-8"
@@ -332,7 +324,7 @@ export function SolarSystemTab({
             <span className="text-xs">Pluto</span>
           </div>
         </div>
-        <div className="flex items-end justify-end gap-2">
+        <div className="flex flex-wrap items-end justify-end gap-2">
           {metaSummary && (
             <Badge variant="secondary" className="text-[10px]" data-testid="solar-system-meta">
               {`src:${metaSummary.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${metaSummary.cacheHits}/${metaSummary.total}`}
@@ -343,7 +335,7 @@ export function SolarSystemTab({
         </div>
       </div>
 
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 shrink-0">
         <Label className="text-xs">{t('astroCalc.minorObjectQuery')}</Label>
         <Input
           value={minorObjectQuery}
@@ -354,54 +346,14 @@ export function SolarSystemTab({
         />
       </div>
 
-      {rows.length > 0 && (
-        <AstroCalculatorResultActionsBar>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
-            aria-label={t('astroCalc.copyResults')}
-            onClick={() => void copyResults({
-              title: t('astroCalc.solarSystem'),
-              fileStem: 'astro-calculator-solar-system',
-              observerContext,
-              metaSummary,
-              diagnostics: sourceDiagnostics,
-              contentLines: exportLines,
-            })}
-          >
-            {t('astroCalc.copyResults')}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
-            aria-label={t('astroCalc.exportResults')}
-            onClick={() => exportResults({
-              title: t('astroCalc.solarSystem'),
-              fileStem: 'astro-calculator-solar-system',
-              observerContext,
-              metaSummary,
-              diagnostics: sourceDiagnostics,
-              contentLines: exportLines,
-            })}
-          >
-            <Download className="h-3.5 w-3.5" />
-            {t('astroCalc.exportResults')}
-          </Button>
-        </AstroCalculatorResultActionsBar>
-      )}
-
       {error && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+        <div className="shrink-0 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="h-3.5 w-3.5" />
           {error}
         </div>
       )}
 
-      <ScrollArea className="h-[360px] border rounded-lg">
+      <ScrollArea className="min-h-0 flex-1 border rounded-lg">
         {rows.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
             <Orbit className="h-10 w-10 mb-3 opacity-40" />
@@ -480,7 +432,48 @@ export function SolarSystemTab({
             </TableBody>
           </Table>
         )}
+        <ScrollBar orientation="horizontal" />
       </ScrollArea>
+
+      {rows.length > 0 && (
+        <AstroCalculatorResultActionsBar className="shrink-0 border-t pt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.copyResults')}
+            onClick={() => void copyResults({
+              title: t('astroCalc.solarSystem'),
+              fileStem: 'astro-calculator-solar-system',
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            {t('astroCalc.copyResults')}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={ASTRO_CALCULATOR_RESULT_ACTION_BUTTON_CLASSNAME}
+            aria-label={t('astroCalc.exportResults')}
+            onClick={() => exportResults({
+              title: t('astroCalc.solarSystem'),
+              fileStem: 'astro-calculator-solar-system',
+              observerContext,
+              metaSummary,
+              diagnostics: sourceDiagnostics,
+              contentLines: exportLines,
+            })}
+          >
+            <Download className="h-3.5 w-3.5" />
+            {t('astroCalc.exportResults')}
+          </Button>
+        </AstroCalculatorResultActionsBar>
+      )}
     </div>
   );
 }

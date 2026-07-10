@@ -105,7 +105,7 @@ describe('BaseMapProvider', () => {
       expect(config.retryAttempts).toBe(3);
       expect(config.timeout).toBe(10000);
       expect(config.rateLimit).toBe(1000);
-      expect(config.userAgent).toBe('SkyMap/1.0');
+      expect(config.userAgent).toBe('CobaltSkymap/1.0');
     });
 
     it('should merge custom config with defaults', () => {

@@ -39,8 +39,10 @@ export interface TargetAstroDisplayData {
   altitude: number;
   azimuth: number;
   moonDistance: number;
-  visibility: TargetVisibility;
-  feasibility: ImagingFeasibility;
+  /** Null when no time-based forecast applies (artificial satellites). */
+  visibility: TargetVisibility | null;
+  /** Null when no time-based forecast applies (artificial satellites). */
+  feasibility: ImagingFeasibility | null;
   frame: AstronomicalFrame;
   timeScale: TimeScale;
   qualityFlag: CoordinateQualityFlag;
@@ -287,13 +289,18 @@ export function buildTargetDisplayModel({
     riskHints: targetData.riskHints ?? [],
   };
 
-  const planningMetrics: TargetDisplayPlanningMetricsSection = {
-    moonDistance: formatMoonDistance(targetData.moonDistance),
-    maxAltitude: formatAngle(targetData.visibility.transitAltitude),
-    feasibilityScore: targetData.feasibility.score,
-    visibility: targetData.visibility,
-    feasibility: targetData.feasibility,
-  };
+  // No planning section without a forecast (satellites) — panels replace it
+  // with satellite-specific messaging instead.
+  const planningMetrics: TargetDisplayPlanningMetricsSection | null =
+    targetData.visibility && targetData.feasibility
+      ? {
+          moonDistance: formatMoonDistance(targetData.moonDistance),
+          maxAltitude: formatAngle(targetData.visibility.transitAltitude),
+          feasibilityScore: targetData.feasibility.score,
+          visibility: targetData.visibility,
+          feasibility: targetData.feasibility,
+        }
+      : null;
 
   const advancedMetadata: TargetDisplayAdvancedMetadataSection = {
     frame: targetData.frame,

@@ -53,7 +53,7 @@ function normalizeSignedDegrees(value: number): number {
   return normalized;
 }
 
-function bodyFromName(body: EngineBody): Body {
+export function bodyFromName(body: EngineBody): Body {
   switch (body) {
     case 'Sun':
       return Body.Sun;

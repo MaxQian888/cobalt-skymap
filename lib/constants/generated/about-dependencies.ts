@@ -8,7 +8,7 @@ import type { DependencyInfo } from '@/types/about';
 export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   {
     name: 'next',
-    version: '^16.2.3',
+    version: '^16.2.10',
     type: 'framework',
     source: 'npm',
     runtime: 'shared',
@@ -56,7 +56,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-accordion',
-    version: '^1.2.12',
+    version: '^1.2.16',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -64,7 +64,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-alert-dialog',
-    version: '^1.1.15',
+    version: '^1.1.19',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -72,7 +72,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-checkbox',
-    version: '^1.3.3',
+    version: '^1.3.7',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -80,7 +80,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-collapsible',
-    version: '^1.1.12',
+    version: '^1.1.16',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -88,7 +88,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-context-menu',
-    version: '^2.2.16',
+    version: '^2.3.3',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -96,7 +96,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-dialog',
-    version: '^1.1.15',
+    version: '^1.1.19',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -104,7 +104,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-dropdown-menu',
-    version: '^2.1.16',
+    version: '^2.1.20',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -112,7 +112,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-label',
-    version: '^2.1.8',
+    version: '^2.1.11',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -120,7 +120,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-popover',
-    version: '^1.1.15',
+    version: '^1.1.19',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -128,7 +128,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-progress',
-    version: '^1.1.8',
+    version: '^1.1.12',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -136,7 +136,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-scroll-area',
-    version: '^1.2.10',
+    version: '^1.2.14',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -144,7 +144,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-select',
-    version: '^2.2.6',
+    version: '^2.3.3',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -152,54 +152,6 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@radix-ui/react-separator',
-    version: '^1.1.8',
-    type: 'ui',
-    source: 'npm',
-    runtime: 'shared',
-    manifestSection: 'dependencies',
-  },
-  {
-    name: '@radix-ui/react-slider',
-    version: '^1.3.6',
-    type: 'ui',
-    source: 'npm',
-    runtime: 'shared',
-    manifestSection: 'dependencies',
-  },
-  {
-    name: '@radix-ui/react-slot',
-    version: '^1.2.4',
-    type: 'ui',
-    source: 'npm',
-    runtime: 'shared',
-    manifestSection: 'dependencies',
-  },
-  {
-    name: '@radix-ui/react-switch',
-    version: '^1.2.6',
-    type: 'ui',
-    source: 'npm',
-    runtime: 'shared',
-    manifestSection: 'dependencies',
-  },
-  {
-    name: '@radix-ui/react-tabs',
-    version: '^1.1.13',
-    type: 'ui',
-    source: 'npm',
-    runtime: 'shared',
-    manifestSection: 'dependencies',
-  },
-  {
-    name: '@radix-ui/react-toggle',
-    version: '^1.1.10',
-    type: 'ui',
-    source: 'npm',
-    runtime: 'shared',
-    manifestSection: 'dependencies',
-  },
-  {
-    name: '@radix-ui/react-toggle-group',
     version: '^1.1.11',
     type: 'ui',
     source: 'npm',
@@ -207,8 +159,56 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
     manifestSection: 'dependencies',
   },
   {
+    name: '@radix-ui/react-slider',
+    version: '^1.4.3',
+    type: 'ui',
+    source: 'npm',
+    runtime: 'shared',
+    manifestSection: 'dependencies',
+  },
+  {
+    name: '@radix-ui/react-slot',
+    version: '^1.3.0',
+    type: 'ui',
+    source: 'npm',
+    runtime: 'shared',
+    manifestSection: 'dependencies',
+  },
+  {
+    name: '@radix-ui/react-switch',
+    version: '^1.3.3',
+    type: 'ui',
+    source: 'npm',
+    runtime: 'shared',
+    manifestSection: 'dependencies',
+  },
+  {
+    name: '@radix-ui/react-tabs',
+    version: '^1.1.17',
+    type: 'ui',
+    source: 'npm',
+    runtime: 'shared',
+    manifestSection: 'dependencies',
+  },
+  {
+    name: '@radix-ui/react-toggle',
+    version: '^1.1.14',
+    type: 'ui',
+    source: 'npm',
+    runtime: 'shared',
+    manifestSection: 'dependencies',
+  },
+  {
+    name: '@radix-ui/react-toggle-group',
+    version: '^1.1.15',
+    type: 'ui',
+    source: 'npm',
+    runtime: 'shared',
+    manifestSection: 'dependencies',
+  },
+  {
     name: '@radix-ui/react-tooltip',
-    version: '^1.2.8',
+    version: '^1.2.12',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -232,7 +232,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'lucide-react',
-    version: '^1.8.0',
+    version: '^1.24.0',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -240,7 +240,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'recharts',
-    version: '^3.8.1',
+    version: '^3.9.2',
     type: 'ui',
     source: 'npm',
     runtime: 'shared',
@@ -264,7 +264,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tailwindcss/postcss',
-    version: '^4.2.2',
+    version: '^4.3.2',
     type: 'style',
     source: 'npm',
     runtime: 'shared',
@@ -280,7 +280,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'tailwind-merge',
-    version: '^3.5.0',
+    version: '^3.6.0',
     type: 'style',
     source: 'npm',
     runtime: 'shared',
@@ -288,7 +288,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'tailwindcss',
-    version: '^4.2.2',
+    version: '^4.3.2',
     type: 'style',
     source: 'npm',
     runtime: 'shared',
@@ -304,7 +304,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'zustand',
-    version: '^5.0.12',
+    version: '^5.0.14',
     type: 'state',
     source: 'npm',
     runtime: 'shared',
@@ -312,7 +312,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'next-intl',
-    version: '^4.9.1',
+    version: '^4.13.2',
     type: 'i18n',
     source: 'npm',
     runtime: 'shared',
@@ -344,7 +344,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'satellite.js',
-    version: '^7.0.0',
+    version: '^7.0.1',
     type: 'astronomy',
     source: 'npm',
     runtime: 'shared',
@@ -384,7 +384,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@playwright/test',
-    version: '^1.59.1',
+    version: '^1.61.1',
     type: 'testing',
     source: 'npm',
     runtime: 'shared',
@@ -432,7 +432,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'jest',
-    version: '^30.3.0',
+    version: '^30.4.2',
     type: 'testing',
     source: 'npm',
     runtime: 'shared',
@@ -440,7 +440,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'jest-environment-jsdom',
-    version: '^30.3.0',
+    version: '^30.4.1',
     type: 'testing',
     source: 'npm',
     runtime: 'shared',
@@ -464,7 +464,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@types/node',
-    version: '^25.6.0',
+    version: '^25.9.5',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -472,7 +472,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@types/react',
-    version: '^19.2.14',
+    version: '^19.2.17',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -496,7 +496,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'baseline-browser-mapping',
-    version: '^2.10.19',
+    version: '^2.10.42',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -512,7 +512,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'eslint',
-    version: '^10.2.0',
+    version: '^10.6.0',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -536,7 +536,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'typescript',
-    version: '^6.0.2',
+    version: '^6.0.3',
     type: 'tooling',
     source: 'npm',
     runtime: 'shared',
@@ -552,7 +552,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'date-fns',
-    version: '^4.1.0',
+    version: '^4.4.0',
     type: 'util',
     source: 'npm',
     runtime: 'shared',
@@ -560,7 +560,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'framer-motion',
-    version: '^12.38.0',
+    version: '^12.42.2',
     type: 'util',
     source: 'npm',
     runtime: 'shared',
@@ -576,7 +576,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tanstack/react-virtual',
-    version: '^3.13.23',
+    version: '^3.14.5',
     type: 'other',
     source: 'npm',
     runtime: 'shared',
@@ -592,7 +592,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: 'radix-ui',
-    version: '^1.4.3',
+    version: '^1.6.2',
     type: 'other',
     source: 'npm',
     runtime: 'shared',
@@ -616,7 +616,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/api',
-    version: '^2.10.1',
+    version: '^2.11.1',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -624,7 +624,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/cli',
-    version: '^2.10.1',
+    version: '^2.11.4',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -656,7 +656,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-dialog',
-    version: '^2.7.0',
+    version: '^2.7.1',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -664,7 +664,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-fs',
-    version: '^2.5.0',
+    version: '^2.5.1',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -680,7 +680,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-global-shortcut',
-    version: '^2.3.1',
+    version: '^2.3.2',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -696,7 +696,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-opener',
-    version: '^2.5.3',
+    version: '^2.5.4',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -704,7 +704,7 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
   },
   {
     name: '@tauri-apps/plugin-positioner',
-    version: '^2.3.1',
+    version: '^2.3.2',
     type: 'desktop',
     source: 'npm',
     runtime: 'desktop',
@@ -951,6 +951,14 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
     manifestSection: 'dependencies',
   },
   {
+    name: 'flate2',
+    version: '1.0',
+    type: 'other',
+    source: 'cargo',
+    runtime: 'desktop',
+    manifestSection: 'dependencies',
+  },
+  {
     name: 'futures-util',
     version: '0.3',
     type: 'other',
@@ -1021,5 +1029,13 @@ export const ABOUT_DEPENDENCIES: DependencyInfo[] = [
     source: 'cargo',
     runtime: 'desktop',
     manifestSection: 'target.\'cfg(windows)\'.dependencies',
+  },
+  {
+    name: 'zip',
+    version: '2.2',
+    type: 'other',
+    source: 'cargo',
+    runtime: 'desktop',
+    manifestSection: 'dependencies',
   },
 ];

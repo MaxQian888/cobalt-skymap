@@ -50,7 +50,9 @@ export function resolveHorizonsCommand(body: string): string {
  */
 export function findHorizonsBody(names: string[]): string | null {
   for (const name of names) {
-    const key = name.trim().toLowerCase();
+    // Engine designations prefix common names ("NAME Jupiter") — strip it so
+    // canvas-clicked planets resolve, not just typed searches.
+    const key = name.trim().replace(/^NAME\s+/i, '').toLowerCase();
     if (key in BODY_COMMANDS) {
       return key.charAt(0).toUpperCase() + key.slice(1);
     }

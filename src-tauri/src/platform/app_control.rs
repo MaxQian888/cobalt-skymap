@@ -61,7 +61,7 @@ pub fn initialize_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     TrayIconBuilder::with_id(MAIN_TRAY_ID)
         .icon(icon)
         .menu(&menu)
-        .tooltip("SkyMap")
+        .tooltip("Cobalt Skymap")
         .show_menu_on_left_click(false)
         .build(app)
         .map_err(|error| format!("Failed to build tray icon: {error}"))?;

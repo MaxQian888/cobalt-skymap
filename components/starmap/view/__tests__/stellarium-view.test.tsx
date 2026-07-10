@@ -101,6 +101,7 @@ const mockViewState = {
   toggleStellariumSetting: jest.fn(),
   setPendingMarkerCoords: jest.fn(),
   handleSelectionChange: jest.fn(),
+  handleDeselectObject: jest.fn(),
   handleFovChange: jest.fn(),
   handleSetFramingCoordinates: jest.fn(),
   handleZoomIn: jest.fn(),
@@ -417,6 +418,7 @@ function resetViewState() {
     toggleStellariumSetting: jest.fn(),
     setPendingMarkerCoords: jest.fn(),
     handleSelectionChange: jest.fn(),
+    handleDeselectObject: jest.fn(),
     handleFovChange: jest.fn(),
     handleSetFramingCoordinates: jest.fn(),
     handleZoomIn: jest.fn(),
@@ -504,7 +506,7 @@ describe('StellariumView', () => {
     };
     render(<StellariumView />);
     fireEvent.click(screen.getByTestId('ks-close-panel'));
-    expect(mockViewState.setSelectedObject).toHaveBeenCalledWith(null);
+    expect(mockViewState.handleDeselectObject).toHaveBeenCalled();
   });
 
   it('synchronizes mobile panel state through effects and child callbacks', () => {
@@ -586,7 +588,7 @@ describe('StellariumView', () => {
     fireEvent.click(screen.getByTestId('info-close'));
     fireEvent.click(screen.getByTestId('info-view-details'));
 
-    expect(mockViewState.setSelectedObject).toHaveBeenCalledWith(null);
+    expect(mockViewState.handleDeselectObject).toHaveBeenCalled();
     expect(mockViewState.setDetailDrawerOpen).toHaveBeenCalledWith(true);
     desktopView.unmount();
 

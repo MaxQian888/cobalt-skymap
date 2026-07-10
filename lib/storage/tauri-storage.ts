@@ -54,7 +54,7 @@ export class TauriStorageAdapter implements StorageAdapter {
     if (!exportPath) {
       // Open save dialog
       const selectedPath = await save({
-        title: 'Export SkyMap Data',
+        title: 'Export Cobalt Skymap Data',
         defaultPath: `skymap-backup-${new Date().toISOString().split('T')[0]}.json`,
         filters: [
           {
@@ -83,7 +83,7 @@ export class TauriStorageAdapter implements StorageAdapter {
     if (!importPath) {
       // Open file dialog
       const selectedPath = await open({
-        title: 'Import SkyMap Data',
+        title: 'Import Cobalt Skymap Data',
         multiple: false,
         filters: [
           {

@@ -52,6 +52,9 @@ function CustomTooltip({ active, payload, altLabel }: { active?: boolean; payloa
 export const AltitudeChartCompact = memo(function AltitudeChartCompact({
   ra,
   dec,
+  positionAt,
+  visibility: visibilityProp,
+  isSnapshot = false,
 }: AltitudeChartCompactProps) {
   const t = useTranslations();
   const profileInfo = useMountStore((state) => state.profileInfo);
@@ -146,10 +149,14 @@ export const AltitudeChartCompact = memo(function AltitudeChartCompact({
   }, [hoursAhead]);
 
   const chartData = useMemo(() => {
-    const data = getAltitudeOverTime(ra, dec, latitude, longitude, hoursAhead, 30);
-    const transit = getTransitTime(ra, longitude);
-    const visibility = calculateTargetVisibility(ra, dec, latitude, longitude, 30);
+    const data = getAltitudeOverTime(ra, dec, latitude, longitude, hoursAhead, 30, positionAt);
+    // Moving bodies get their pre-computed visibility injected (fixed-RA
+    // transit math is wrong for them); fixed targets compute it as before.
+    const visibility = visibilityProp ?? calculateTargetVisibility(ra, dec, latitude, longitude, 30);
     const now = new Date();
+    const transitIn = visibilityProp
+      ? (visibility.transitTime ? (visibility.transitTime.getTime() - now.getTime()) / 3600000 : Number.POSITIVE_INFINITY)
+      : getTransitTime(ra, longitude).hoursUntilTransit;
     
     // Find max altitude
     const maxPoint = data.reduce(
@@ -181,48 +188,69 @@ export const AltitudeChartCompact = memo(function AltitudeChartCompact({
       if (setMs > 0 && setMs < hoursAhead * 3600000) setHour = setMs / 3600000;
     }
     
-    return { 
-      points: transformedData, 
-      maxAlt: maxPoint.alt, 
+    return {
+      points: transformedData,
+      maxAlt: maxPoint.alt,
       maxAltHour: maxPoint.hour,
-      transitIn: transit.hoursUntilTransit, 
-      visibility, 
-      riseHour, 
+      transitIn,
+      visibility,
+      riseHour,
       setHour,
       darkImagingHours: visibility.darkImagingHours,
+      // hour=0 sample is the current altitude; base timestamp anchors the
+      // x-axis to local clock time.
+      currentAltitude: transformedData[0]?.altitude ?? null,
+      baseTime: now.getTime(),
     };
-  }, [ra, dec, latitude, longitude, hoursAhead]);
+  }, [ra, dec, latitude, longitude, hoursAhead, positionAt, visibilityProp]);
+
+  // Format an "hours from now" x-axis value as local clock time (HH:MM).
+  const formatAxisTime = (hour: number) =>
+    new Date(chartData.baseTime + hour * 3600000).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
   return (
     <div ref={chartRef} className="p-2 cursor-ns-resize touch-pan-y select-none" title={t('chart.zoomHint')} role="img" aria-label={t('chart.altitudeChartLabel')}>
       {/* Zoom indicator with larger touch targets */}
       <div className="flex items-center justify-between mb-2 transition-opacity duration-200">
-        <span className="text-[10px] sm:text-[9px] text-muted-foreground transition-all duration-300">
-          {t('chart.timeRange')}: <span className="font-mono font-medium text-foreground">{hoursAhead}h</span>
+        <span className="flex items-center gap-2 text-[10px] shell-desktop:text-[9px] text-muted-foreground transition-all duration-300">
+          <span>
+            {t('chart.timeRange')}: <span className="font-mono font-medium text-foreground">{hoursAhead}h</span>
+          </span>
+          {chartData.currentAltitude !== null && (
+            <span className="flex items-center gap-1">
+              <span className="inline-block h-1 w-3 rounded-full bg-amber-400" aria-hidden />
+              {t('chart.nowAltitude')}: <span className="font-mono font-medium text-foreground">{chartData.currentAltitude.toFixed(1)}°</span>
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
+              <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 sm:h-5 sm:w-5 text-muted-foreground hover:text-foreground touch-target"
+                className="h-7 w-7 shell-desktop:h-5 shell-desktop:w-5 text-muted-foreground hover:text-foreground touch-target"
                 onClick={() => setHoursAhead(prev => Math.max(minHours, prev - 2))}
+                aria-label={t('zoom.zoomOut')}
               >
-                <span className="text-sm sm:text-xs">−</span>
+                <span className="text-sm shell-desktop:text-xs" aria-hidden>−</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>{t('zoom.zoomOut')}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button 
+              <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 sm:h-5 sm:w-5 text-muted-foreground hover:text-foreground touch-target"
+                className="h-7 w-7 shell-desktop:h-5 shell-desktop:w-5 text-muted-foreground hover:text-foreground touch-target"
                 onClick={() => setHoursAhead(prev => Math.min(maxHours, prev + 2))}
+                aria-label={t('zoom.zoomIn')}
               >
-                <span className="text-sm sm:text-xs">+</span>
+                <span className="text-sm shell-desktop:text-xs" aria-hidden>+</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>{t('zoom.zoomIn')}</TooltipContent>
@@ -230,7 +258,7 @@ export const AltitudeChartCompact = memo(function AltitudeChartCompact({
         </div>
       </div>
       {/* Chart - taller on mobile for better touch interaction */}
-      <div className="transition-all duration-300 ease-out h-[120px] sm:h-[100px]">
+      <div className="transition-all duration-300 ease-out h-[120px] shell-desktop:h-[100px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
             data={chartData.points}
@@ -246,7 +274,7 @@ export const AltitudeChartCompact = memo(function AltitudeChartCompact({
           <XAxis 
             dataKey="hour" 
             tick={{ fontSize: 9, fill: CHART_COLORS.axis.tick }}
-            tickFormatter={(v) => `+${v}h`}
+            tickFormatter={formatAxisTime}
             axisLine={{ stroke: CHART_COLORS.axis.line }}
             tickLine={{ stroke: CHART_COLORS.axis.line }}
             domain={[0, hoursAhead]}
@@ -301,34 +329,41 @@ export const AltitudeChartCompact = memo(function AltitudeChartCompact({
       </div>
 
       {/* Legend - larger on mobile */}
-      <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-2 gap-y-1 mt-2 sm:mt-1 text-[11px] sm:text-[9px] text-muted-foreground">
-        <div className="flex items-center gap-1.5 sm:gap-1">
-          <div className="w-3 sm:w-2 h-1 sm:h-0.5 bg-amber-400 rounded-full" />
+      <div className="flex flex-wrap items-center gap-x-3 shell-desktop:gap-x-2 gap-y-1 mt-2 shell-desktop:mt-1 text-[11px] shell-desktop:text-[9px] text-muted-foreground">
+        <div className="flex items-center gap-1.5 shell-desktop:gap-1">
+          <div className="w-3 shell-desktop:w-2 h-1 shell-desktop:h-0.5 bg-amber-400 rounded-full" />
           <span>{t('chart.now')}</span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-1">
-          <div className="w-3 sm:w-2 h-1 sm:h-0.5 bg-purple-400 rounded-full" />
+        <div className="flex items-center gap-1.5 shell-desktop:gap-1">
+          <div className="w-3 shell-desktop:w-2 h-1 shell-desktop:h-0.5 bg-purple-400 rounded-full" />
           <span>{t('time.transit')}</span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-1">
-          <div className="w-3 sm:w-2 h-1 sm:h-0.5 bg-green-500 rounded-full" />
+        <div className="flex items-center gap-1.5 shell-desktop:gap-1">
+          <div className="w-3 shell-desktop:w-2 h-1 shell-desktop:h-0.5 bg-green-500 rounded-full" />
           <span>{t('time.rise')}</span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-1">
-          <div className="w-3 sm:w-2 h-1 sm:h-0.5 bg-red-500 rounded-full" />
+        <div className="flex items-center gap-1.5 shell-desktop:gap-1">
+          <div className="w-3 shell-desktop:w-2 h-1 shell-desktop:h-0.5 bg-red-500 rounded-full" />
           <span>{t('time.set')}</span>
         </div>
       </div>
       
       {/* Dark imaging info */}
       {chartData.darkImagingHours > 0 && (
-        <div className="mt-2 sm:mt-1 text-[11px] sm:text-[9px] text-green-400 font-medium">
+        <div className="mt-2 shell-desktop:mt-1 text-[11px] shell-desktop:text-[9px] text-green-400 font-medium">
           <Check className="inline h-3 w-3 mr-0.5" /> {t('chart.darkImagingWindow', { hours: chartData.darkImagingHours.toFixed(1) })}
+        </div>
+      )}
+
+      {/* Snapshot caveat for comets/asteroids (no local ephemeris) */}
+      {isSnapshot && (
+        <div className="mt-1 text-[10px] shell-desktop:text-[9px] text-amber-400/80" data-testid="altitude-chart-snapshot-note">
+          {t('objectDetail.positionSnapshot')}
         </div>
       )}
       
       {/* Mobile hint */}
-      <div className="sm:hidden text-[10px] text-muted-foreground/60 mt-1 text-center">
+      <div className="shell-desktop:hidden text-[10px] text-muted-foreground/60 mt-1 text-center">
         {t('chart.mobileHint')}
       </div>
     </div>

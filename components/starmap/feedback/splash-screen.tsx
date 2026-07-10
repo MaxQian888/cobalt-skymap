@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
-import { SkyMapLogo } from '@/components/icons';
+import { CobaltSkymapLogo } from '@/components/icons';
 import { usePrefersReducedMotion } from '@/lib/hooks/use-prefers-reduced-motion';
 import { SPLASH_STARS, SPLASH_SHOOTING_STARS } from '@/lib/constants';
 import type { SplashScreenProps } from '@/types';
@@ -274,7 +274,7 @@ export function SplashScreen({
           {/* Center star icon with glow */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative">
-              <SkyMapLogo 
+              <CobaltSkymapLogo 
                 className="w-12 h-12 sm:w-14 sm:h-14 text-primary splash-star-spin"
                 strokeWidth={1.5}
               />

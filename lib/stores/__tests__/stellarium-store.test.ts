@@ -40,6 +40,7 @@ const createMockSettings = (overrides?: Partial<StellariumSettings>): Stellarium
   surveyEnabled: true,
   surveyId: 'DSS',
   skyCulture: 'western',
+  satellitesVisible: false,
   nightMode: false,
   sensorControl: false,
   sensorAbsolutePreferred: true,
@@ -540,6 +541,49 @@ describe('useStellariumStore', () => {
       expect(mockCore.hips.url).toBe('https://hips.example/dss/');
       expect(mockCore.landscapes.visible).toBe(false);
       expect(mockCore.landscapes.fog_visible).toBe(false);
+    });
+
+    it('registers landscape/survey data sources once per engine, not on every sync', () => {
+      const { result } = renderHook(() => useStellariumStore());
+      const landscapeAdd = jest.fn();
+      const hipsAdd = jest.fn();
+      const mockCore = {
+        // No `url` property → applySurvey falls back to addDataSource.
+        hips: { visible: false, addDataSource: hipsAdd },
+        landscapes: { addDataSource: landscapeAdd, visible: false, fog_visible: false },
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mockStel = { core: mockCore } as any;
+
+      const settings = createMockSettings({
+        surveyEnabled: true,
+        surveyId: 'DSS',
+        landscapesVisible: true,
+        fogVisible: true,
+      });
+
+      act(() => {
+        result.current.setStel(mockStel);
+        result.current.setBaseUrl('https://example.com/');
+        // Settings sync re-applies everything on any change — three syncs
+        // must not register the same data sources three times.
+        result.current.updateStellariumCore(settings);
+        result.current.updateStellariumCore(settings);
+        result.current.updateStellariumCore(settings);
+      });
+
+      expect(landscapeAdd).toHaveBeenCalledTimes(1);
+      expect(hipsAdd).toHaveBeenCalledTimes(1);
+
+      // Switching landscape (visible → hidden swaps guereins → gray) must
+      // still register the new source.
+      act(() => {
+        result.current.updateStellariumCore({ ...settings, landscapesVisible: false });
+      });
+      expect(landscapeAdd).toHaveBeenCalledTimes(2);
+      expect(landscapeAdd).toHaveBeenLastCalledWith(
+        expect.objectContaining({ key: 'gray' })
+      );
     });
   });
 

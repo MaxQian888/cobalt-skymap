@@ -17,7 +17,7 @@ jest.mock('@/lib/offline/unified-cache', () => ({
 }));
 
 jest.mock('../constants', () => ({
-  DAILY_KNOWLEDGE_USER_AGENT: 'SkyMap/test',
+  DAILY_KNOWLEDGE_USER_AGENT: 'CobaltSkymap/test',
   DAILY_KNOWLEDGE_WIKI_BASE_URLS: {
     en: 'https://en.wikipedia.org',
     zh: 'https://zh.wikipedia.org',

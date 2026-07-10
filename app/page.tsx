@@ -14,7 +14,7 @@ const Footer = dynamic(() => import('@/components/landing/footer').then(m => ({ 
 const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
-  name: 'SkyMap',
+  name: 'Cobalt Skymap',
   applicationCategory: 'EducationalApplication',
   operatingSystem: 'Windows, macOS, Linux',
   description:

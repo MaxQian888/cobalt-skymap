@@ -78,6 +78,24 @@ function clearStellariumScriptTags(): void {
     .forEach((script) => script.remove());
 }
 
+/**
+ * Stop an engine instance's render loop (checked each frame by the patched
+ * glue in stellarium-web-engine.js). The WASM runtime has no real teardown, so
+ * flagging is the only way to neutralize a stale instance. Without this, every
+ * superseded instance keeps calling _core_update/_core_render forever: leaked
+ * instances pile up across remounts/retries (jank), and a dataless instance
+ * sharing the visible canvas renders an empty sky over the live one (black
+ * star map on first load until a full page reload).
+ */
+function destroyEngineInstance(stel: StellariumEngine | null | undefined): void {
+  if (!stel) return;
+  try {
+    stel.__skymapDestroyed = true;
+  } catch {
+    // Best-effort: the instance may already be torn down.
+  }
+}
+
 type AssetPathMode = 'absolute' | 'dot' | 'dotdot';
 
 function stripLeadingSlash(path: string): string {
@@ -175,6 +193,10 @@ export function useStellariumLoader({
   const mountedRef = useRef(true);
   const overallDeadlineRef = useRef<number>(0);
   const assetPathModeRef = useRef<AssetPathMode>('absolute');
+  // Every engine instance this loader ever booted. Instances survive React
+  // unmounts (their render loop is engine-owned), so each one must be
+  // explicitly destroyed when superseded or on unmount.
+  const createdEnginesRef = useRef<Set<StellariumEngine>>(new Set());
   
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStartTime, setLoadingStartTime] = useState<number | null>(null);
@@ -225,21 +247,39 @@ export function useStellariumLoader({
   const onFovChangeRef = useRef(onFovChange);
   useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
   useEffect(() => { onFovChangeRef.current = onFovChange; }, [onFovChange]);
-  useEffect(() => () => {
-    mountedRef.current = false;
-    abortControllerRef.current?.abort();
-    retryObserverRef.current?.disconnect();
-    retryObserverRef.current = null;
-    if (retryTimeoutRef.current !== null) {
-      window.clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-    if (overallTimeoutRef.current !== null) {
-      window.clearTimeout(overallTimeoutRef.current);
-      overallTimeoutRef.current = null;
-    }
-    overallDeadlineRef.current = 0;
-    initializingRef.current = false;
+  useEffect(() => {
+    // Restore the mounted flag on (re)mount. `useRef` values persist across the
+    // effect re-runs that React performs in dev (Fast Refresh, and StrictMode's
+    // mount→unmount→mount probe), so without this assignment the cleanup below
+    // would latch `mountedRef` to `false` permanently — `startLoading` then
+    // early-returns forever and the loader hangs on the loading overlay until a
+    // full page reload (Ctrl+R). Production export never re-runs this effect on a
+    // preserved instance, which is why the hang was dev-only.
+    mountedRef.current = true;
+    const createdEngines = createdEnginesRef.current;
+    return () => {
+      mountedRef.current = false;
+      // Stop all engine render loops owned by this loader (engine switch /
+      // page navigation) — otherwise they keep rendering a detached canvas
+      // every frame for the rest of the app's lifetime.
+      for (const engine of createdEngines) {
+        destroyEngineInstance(engine);
+      }
+      createdEngines.clear();
+      abortControllerRef.current?.abort();
+      retryObserverRef.current?.disconnect();
+      retryObserverRef.current = null;
+      if (retryTimeoutRef.current !== null) {
+        window.clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      if (overallTimeoutRef.current !== null) {
+        window.clearTimeout(overallTimeoutRef.current);
+        overallTimeoutRef.current = null;
+      }
+      overallDeadlineRef.current = 0;
+      initializingRef.current = false;
+    };
   }, []);
   
   // Initialize Stellarium engine with all data sources
@@ -250,6 +290,9 @@ export function useStellariumLoader({
 
     logger.info('Stellarium is ready!');
     (stelRef as React.MutableRefObject<StellariumEngine | null>).current = stel;
+    // The glue's render loop reads this every frame; without it the loop uses
+    // the raw devicePixelRatio and ignores the render-quality cap.
+    stel.__skymapDpr = getEffectiveDpr(getRenderQuality());
     setStel(stel);
 
     // Set observer location from profile (read latest from store, subsequent syncs handled by useObserverSync)
@@ -329,12 +372,12 @@ export function useStellariumLoader({
 
     // Safe wrapper: isolate each data source load so one failure doesn't block others
     const safeAdd = (
-      module: { addDataSource?: (opts: { url: string; key?: string }) => void },
+      module: { addDataSource?: (opts: { url: string; key?: string }) => void } | undefined,
       options: { url: string; key?: string },
       label: string
     ) => {
       try {
-        module.addDataSource?.(options);
+        module?.addDataSource?.(options);
       } catch (error) {
         logger.warn(`Failed to load data source: ${label}`, error);
       }
@@ -381,6 +424,12 @@ export function useStellariumLoader({
       ]);
       safeAdd(core.minor_planets, { url: asteroidUrl, key: 'mpc_asteroids' }, 'minor_planets');
       safeAdd(core.comets, { url: cometUrl, key: 'mpc_comets' }, 'comets');
+      // Satellites from bundled TLE data (engine requires key 'jsonl/sat').
+      safeAdd(
+        core.satellites,
+        { url: baseUrl + 'tle_satellite.jsonl.gz', key: 'jsonl/sat' },
+        'satellites'
+      );
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/io', key: 'io' }, 'io');
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/europa', key: 'europa' }, 'europa');
       safeAdd(core.planets, { url: baseUrl + 'surveys/sso/ganymede', key: 'ganymede' }, 'ganymede');
@@ -407,6 +456,13 @@ export function useStellariumLoader({
 
     // Watch for selection changes (guard against callback firing after unmount)
     stel.change((_obj: unknown, attr: string) => {
+      // Continuous FOV reporting: covers zoomTo animations and mobile pinch,
+      // which never went through the app-side zoom handlers before.
+      if (attr === 'fov') {
+        if (!stelRef.current) return;
+        onFovChangeRef.current?.(rad2deg(core.fov));
+        return;
+      }
       if (attr === 'selection') {
         if (!stelRef.current) return;
 
@@ -448,6 +504,7 @@ export function useStellariumLoader({
     setBaseUrl,
     setHelpers,
     recordBootstrapStage,
+    getRenderQuality,
   ]);
 
   // Load the Stellarium engine script with timeout and cancellation support.
@@ -610,7 +667,15 @@ export function useStellariumLoader({
           canvasElement: canvasRef.current!,
           translateFn,
           onReady: (stel: StellariumEngine) => {
-            if (resolved || signal.aborted || !mountedRef.current) return;
+            createdEnginesRef.current.add(stel);
+            if (resolved || signal.aborted || !mountedRef.current) {
+              // This attempt was superseded (retry/unmount) but the engine
+              // booted anyway — WASM init cannot be cancelled. Stop it now:
+              // a dataless instance on the shared canvas renders an empty sky
+              // over the live instance and corrupts shared GL state.
+              destroyEngineInstance(stel);
+              return;
+            }
             try {
               initStellarium(stel, sessionId);
               resolved = true;
@@ -670,6 +735,15 @@ export function useStellariumLoader({
     abortControllerRef.current?.abort();
     const loadAbortController = new AbortController();
     abortControllerRef.current = loadAbortController;
+
+    // Any instance from a previous attempt is superseded. Stop it before
+    // booting a new one — two live instances on the same canvas share one GL
+    // context and fight over it (black/corrupted map that only a full page
+    // reload used to fix).
+    for (const engine of createdEnginesRef.current) {
+      destroyEngineInstance(engine);
+    }
+    createdEnginesRef.current.clear();
 
     const bootstrapStore = useStarmapBootstrapStore.getState();
     const bootstrapSessionId = bootstrapStore.beginSession();

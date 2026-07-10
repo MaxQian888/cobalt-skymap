@@ -13,9 +13,15 @@ interface UseStellariumEventsOptions {
   containerRef: RefObject<HTMLDivElement | null>;
   getClickCoordinates: (clientX: number, clientY: number) => ClickCoordinates | null;
   onContextMenu?: (e: React.MouseEvent, coords: ClickCoordinates | null) => void;
+  /**
+   * Long-press progress feedback: called with the container-relative touch
+   * point when the long-press timer starts, and with null when it is
+   * cancelled (movement/touch-end) or fires.
+   */
+  onLongPressStateChange?: (state: { x: number; y: number } | null) => void;
 }
 
-const UI_CONTROL_SELECTOR = [
+export const UI_CONTROL_SELECTOR = [
   '[data-starmap-ui-control="true"]',
   '[data-starmap-scroll-surface="true"]',
   'button',
@@ -29,6 +35,14 @@ const UI_CONTROL_SELECTOR = [
   '[data-slot="drawer-content"]',
 ].join(', ');
 
+/** True when the event target sits inside interactive starmap UI (panels, buttons…). */
+export function isUiControlElement(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return target.closest(UI_CONTROL_SELECTOR) !== null;
+}
+
 /**
  * Hook for handling right-click context menu and mobile long press events
  */
@@ -36,13 +50,9 @@ export function useStellariumEvents({
   containerRef,
   getClickCoordinates,
   onContextMenu,
+  onLongPressStateChange,
 }: UseStellariumEventsOptions) {
-  const isUiControlTarget = useCallback((target: EventTarget | null) => {
-    if (!(target instanceof Element)) {
-      return false;
-    }
-    return target.closest(UI_CONTROL_SELECTOR) !== null;
-  }, []);
+  const isUiControlTarget = useCallback((target: EventTarget | null) => isUiControlElement(target), []);
 
   // Long press handling for mobile devices
   const longPressTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -140,11 +150,28 @@ export function useStellariumEvents({
       
       const touch = e.touches[0];
       touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-      
+
+      // Progress-ring feedback at the (container-relative) touch point.
+      const containerRect = container.getBoundingClientRect();
+      onLongPressStateChange?.({
+        x: touch.clientX - containerRect.left,
+        y: touch.clientY - containerRect.top,
+      });
+
       // Start long press timer
       longPressTimeoutRef.current = setTimeout(() => {
         if (!touchStartPosRef.current) return;
-        
+
+        onLongPressStateChange?.(null);
+        // Haptic acknowledgement on platforms that support it.
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          try {
+            navigator.vibrate(50);
+          } catch {
+            // Best-effort feedback only.
+          }
+        }
+
         // Call callback directly for long press (no need for synthetic event)
         if (onContextMenu) {
           const coords = getClickCoordinates(touchStartPosRef.current.x, touchStartPosRef.current.y);
@@ -156,7 +183,7 @@ export function useStellariumEvents({
           } as unknown as React.MouseEvent;
           onContextMenu(syntheticEvent, coords);
         }
-        
+
         touchStartPosRef.current = null;
       }, LONG_PRESS_DURATION);
     };
@@ -168,11 +195,11 @@ export function useStellariumEvents({
       if (e.cancelable) {
         e.preventDefault();
       }
-      
+
       const touch = e.touches[0];
       const dx = touch.clientX - touchStartPosRef.current.x;
       const dy = touch.clientY - touchStartPosRef.current.y;
-      
+
       // Cancel long press if moved too far
       if (Math.sqrt(dx * dx + dy * dy) > TOUCH_MOVE_THRESHOLD) {
         if (longPressTimeoutRef.current) {
@@ -180,6 +207,7 @@ export function useStellariumEvents({
           longPressTimeoutRef.current = null;
         }
         touchStartPosRef.current = null;
+        onLongPressStateChange?.(null);
       }
     };
 
@@ -190,6 +218,7 @@ export function useStellariumEvents({
       }
       touchStartPosRef.current = null;
       touchStartedOnUiControlRef.current = false;
+      onLongPressStateChange?.(null);
     };
 
     // Mouse event listeners for right-click detection
@@ -215,5 +244,5 @@ export function useStellariumEvents({
         clearTimeout(longPressTimeoutRef.current);
       }
     };
-  }, [containerRef, getClickCoordinates, isUiControlTarget, onContextMenu]);
+  }, [containerRef, getClickCoordinates, isUiControlTarget, onContextMenu, onLongPressStateChange]);
 }

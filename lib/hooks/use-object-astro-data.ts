@@ -19,6 +19,9 @@ import {
 } from '@/lib/astronomy/astro-utils';
 import { transformCoordinate } from '@/lib/astronomy/pipeline';
 import { buildTimeScaleContext } from '@/lib/astronomy/time-scales';
+import { calculateSolarSystemVisibility } from '@/lib/astronomy/visibility/solar-system';
+import { createTargetPositionModel } from '@/lib/astronomy/position-provider';
+import type { PositionProvider, TargetKind, TargetPositionModel } from '@/lib/astronomy/position-provider';
 import type { SelectedObjectData } from '@/lib/core/types';
 import type { TargetVisibility, ImagingFeasibility, TwilightTimes } from '@/lib/core/types';
 import type { AstronomicalFrame, CoordinateQualityFlag, EopFreshness, TimeScale } from '@/lib/core/types';
@@ -49,8 +52,18 @@ export interface TargetAstroData {
   altitude: number;
   azimuth: number;
   moonDistance: number;
-  visibility: TargetVisibility;
-  feasibility: ImagingFeasibility;
+  /** Null for artificial satellites — a fixed-RA/Dec rise/set forecast would be meaningless. */
+  visibility: TargetVisibility | null;
+  /** Null for artificial satellites (see visibility). */
+  feasibility: ImagingFeasibility | null;
+  /** How the object's position evolves over time (fixed star vs planet vs satellite). */
+  targetKind: TargetKind;
+  /** True when positions are the selection-time snapshot (comets/asteroids, satellites). */
+  positionIsSnapshot: boolean;
+  /** NORAD catalog id when the selection is a satellite with a known id. */
+  noradId: number | null;
+  /** Stable per-selection provider: RA/Dec (ICRF degrees) at an arbitrary time. */
+  positionAt: PositionProvider;
   frame: AstronomicalFrame;
   timeScale: TimeScale;
   qualityFlag: CoordinateQualityFlag;
@@ -118,8 +131,31 @@ export function useAstroEnvironment(
 }
 
 /**
+ * Build the per-selection position model (how RA/Dec evolves over time).
+ *
+ * Deliberately NOT keyed on currentTime: the returned `positionAt` function
+ * must keep a stable identity across the 1 Hz refresh so chart/component
+ * memos keyed on it don't recompute every second.
+ */
+export function useTargetPositionModel(
+  selectedObject: SelectedObjectData | null,
+  latitude: number,
+  longitude: number,
+  typeCategory?: string | null,
+): TargetPositionModel | null {
+  return useMemo(() => {
+    if (!selectedObject) return null;
+    return createTargetPositionModel(selectedObject, { latitude, longitude }, typeCategory);
+  }, [selectedObject, latitude, longitude, typeCategory]);
+}
+
+/**
  * Compute target-specific astronomical data (altitude, azimuth, moon distance,
  * visibility window, imaging feasibility).
+ *
+ * Positions branch by target kind: solar-system bodies are recomputed for the
+ * current time (and per time point downstream), satellites get no rise/set or
+ * feasibility forecast at all, comets/asteroids keep the selection snapshot.
  *
  * @param selectedObject - The currently selected celestial object (or null)
  * @param latitude - Observer latitude in degrees
@@ -127,6 +163,8 @@ export function useAstroEnvironment(
  * @param moonRa - Current moon RA (from useAstroEnvironment)
  * @param moonDec - Current moon Dec (from useAstroEnvironment)
  * @param currentTime - Current Date used as cache-buster for periodic refresh
+ * @param typeCategory - Optional objectInfo.typeCategory as a secondary
+ *   detection signal (comet/asteroid/artificial)
  */
 export function useTargetAstroData(
   selectedObject: SelectedObjectData | null,
@@ -135,12 +173,26 @@ export function useTargetAstroData(
   moonRa: number,
   moonDec: number,
   currentTime: Date,
+  typeCategory?: string | null,
 ): TargetAstroData | null {
-  return useMemo(() => {
-    if (!selectedObject) return null;
+  const positionModel = useTargetPositionModel(selectedObject, latitude, longitude, typeCategory);
 
-    const ra = selectedObject.raDeg;
-    const dec = selectedObject.decDeg;
+  // Solar-system rise/transit/set searches are much heavier than the fixed
+  // hour-angle math, and their result only drifts by seconds within a minute —
+  // bucket to 60s instead of the 1s cadence of the main memo.
+  const solarSystemVisibility = useMemo(() => {
+    if (!positionModel || positionModel.kind !== 'solar_system' || !positionModel.body) return null;
+    return calculateSolarSystemVisibility(positionModel.body, latitude, longitude, 30, currentTime);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positionModel, latitude, longitude, Math.floor(currentTime.getTime() / 60000)]);
+
+  return useMemo(() => {
+    if (!selectedObject || !positionModel) return null;
+
+    // Live position: for moving bodies this fixes the stale selection-time
+    // coordinates (the Moon drifts ~13°/day); for fixed targets it is the
+    // snapshot and behaves exactly as before.
+    const { raDeg: ra, decDeg: dec } = positionModel.positionAt(currentTime);
 
     const transformed = transformCoordinate(
       { raDeg: ra, decDeg: dec },
@@ -151,13 +203,21 @@ export function useTargetAstroData(
       azimuth: transformed.azimuthDeg,
     };
     const moonDistance = angularSeparation(ra, dec, moonRa, moonDec);
-    const visibility = calculateTargetVisibility(ra, dec, latitude, longitude, 30, currentTime);
-    const feasibility = calculateImagingFeasibility(ra, dec, latitude, longitude, 30, currentTime);
+
+    let visibility: TargetVisibility | null = null;
+    let feasibility: ImagingFeasibility | null = null;
+    if (positionModel.kind === 'solar_system' && solarSystemVisibility) {
+      visibility = solarSystemVisibility;
+      feasibility = calculateImagingFeasibility(ra, dec, latitude, longitude, 30, currentTime, visibility);
+    } else if (positionModel.kind !== 'satellite') {
+      visibility = calculateTargetVisibility(ra, dec, latitude, longitude, 30, currentTime);
+      feasibility = calculateImagingFeasibility(ra, dec, latitude, longitude, 30, currentTime);
+    }
 
     const riskHints: string[] = [];
-    if (visibility.neverRises) riskHints.push('never-rises');
-    if (moonDistance < 25) riskHints.push('moon-interference');
-    if (feasibility.score < 45) riskHints.push('low-feasibility');
+    if (visibility?.neverRises) riskHints.push('never-rises');
+    if (moonDistance < 25 && positionModel.body !== 'Moon') riskHints.push('moon-interference');
+    if (feasibility && feasibility.score < 45) riskHints.push('low-feasibility');
 
     return {
       altitude: altAz.altitude,
@@ -165,6 +225,10 @@ export function useTargetAstroData(
       moonDistance,
       visibility,
       feasibility,
+      targetKind: positionModel.kind,
+      positionIsSnapshot: positionModel.isSnapshot,
+      noradId: positionModel.noradId,
+      positionAt: positionModel.positionAt,
       frame: transformed.metadata.frame,
       timeScale: transformed.metadata.timeScale,
       qualityFlag: transformed.metadata.qualityFlag,
@@ -177,5 +241,5 @@ export function useTargetAstroData(
       riskHints,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedObject, latitude, longitude, moonRa, moonDec, Math.floor(currentTime.getTime() / 1000)]);
+  }, [selectedObject, positionModel, solarSystemVisibility, latitude, longitude, moonRa, moonDec, Math.floor(currentTime.getTime() / 1000)]);
 }

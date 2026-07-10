@@ -64,7 +64,7 @@ describe('feedback-utils', () => {
         diagnostics: {
           generatedAt: new Date('2026-02-20T00:00:00.000Z').toISOString(),
           app: {
-            name: 'SkyMap',
+            name: 'Cobalt Skymap',
             version: '0.1.0',
             buildDate: '2026-02-20',
             environment: 'web',
@@ -94,7 +94,7 @@ describe('feedback-utils', () => {
         diagnostics: {
           generatedAt: new Date('2026-03-11T00:00:00.000Z').toISOString(),
           app: {
-            name: 'SkyMap',
+            name: 'Cobalt Skymap',
             version: '0.1.0',
             buildDate: '2026-03-11',
             environment: 'tauri',

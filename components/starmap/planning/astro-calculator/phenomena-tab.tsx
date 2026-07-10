@@ -119,9 +119,9 @@ export function PhenomenaTab({ latitude, longitude, observerContext }: Phenomena
   }, [dateRange.endDate, dateRange.startDate, latitude, longitude, observerContext?.contextKey, showMinor, t]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-4">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-3 shrink-0">
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
           <div className="space-y-1.5">
             <Label className="text-xs">{t('astroCalc.daysAhead')}</Label>
             <Select value={daysAhead.toString()} onValueChange={(value) => setDaysAhead(Number.parseInt(value, 10))}>
@@ -138,13 +138,13 @@ export function PhenomenaTab({ latitude, longitude, observerContext }: Phenomena
             </Select>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pb-1.5">
             <Switch id="showMinor" checked={showMinor} onCheckedChange={setShowMinor} />
             <Label htmlFor="showMinor" className="text-xs">{t('astroCalc.showMinorEvents')}</Label>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 pb-1.5">
           {metaSummary && (
             <Badge variant="secondary" className="text-[10px]" data-testid="phenomena-meta">
               {`src:${metaSummary.sourceCounts.tauri > 0 ? 'tauri' : 'fallback'} cache:${metaSummary.cacheHits}/${metaSummary.total}`}
@@ -156,13 +156,13 @@ export function PhenomenaTab({ latitude, longitude, observerContext }: Phenomena
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+        <div className="shrink-0 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="h-3.5 w-3.5" />
           {error}
         </div>
       )}
 
-      <ScrollArea className="h-[390px] border rounded-lg">
+      <ScrollArea className="min-h-0 flex-1 border rounded-lg">
         {events.length === 0 && !isLoading ? (
           <div className="flex flex-col items-center justify-center h-full py-16 text-muted-foreground">
             <Sparkles className="h-10 w-10 mb-3 opacity-40" />
@@ -201,7 +201,7 @@ export function PhenomenaTab({ latitude, longitude, observerContext }: Phenomena
         )}
       </ScrollArea>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="shrink-0 flex flex-wrap items-center gap-2 border-t pt-3">
         <Badge variant="outline" className="text-[10px] gap-1 font-normal">☌ {t('astroCalc.conjunction')}</Badge>
         <Badge variant="outline" className="text-[10px] gap-1 font-normal">☍ {t('astroCalc.opposition')}</Badge>
         <Badge variant="outline" className="text-[10px] gap-1 font-normal">◐ {t('astroCalc.elongation')}</Badge>

@@ -4,6 +4,7 @@ import { I18nProvider } from "@/components/providers/i18n-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ThemeCustomizationSyncProvider } from "@/components/providers/theme-customization-sync";
 import { SettingsSyncProvider } from "@/components/providers/settings-sync-provider";
+import { ColorBlindFilters } from "@/components/providers/color-blind-filters";
 import { SettingsToaster } from "@/components/providers/settings-toaster";
 import { CliLaunchProvider } from "@/components/providers/cli-launch-provider";
 import { GlobalShortcutProvider } from "@/components/providers/global-shortcut-provider";
@@ -23,8 +24,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "SkyMap - Interactive Star Map & Astronomy Planner",
-    template: "%s | SkyMap",
+    default: "Cobalt Skymap - Interactive Star Map & Astronomy Planner",
+    template: "%s | Cobalt Skymap",
   },
   description:
     "A powerful astronomy application for stargazing, observation planning, and astrophotography. Explore celestial objects with real-time sky rendering powered by Stellarium Web Engine.",
@@ -44,18 +45,18 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    siteName: "SkyMap",
-    title: "SkyMap - Interactive Star Map & Astronomy Planner",
+    siteName: "Cobalt Skymap",
+    title: "Cobalt Skymap - Interactive Star Map & Astronomy Planner",
     description:
       "A powerful astronomy application for stargazing, observation planning, and astrophotography. Powered by Stellarium Web Engine.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "SkyMap - Interactive Star Map & Astronomy Planner",
+    title: "Cobalt Skymap - Interactive Star Map & Astronomy Planner",
     description:
       "Explore the universe with real-time sky rendering, observation planning, and astrophotography tools.",
   },
-  applicationName: "SkyMap",
+  applicationName: "Cobalt Skymap",
   category: "Science & Education",
 };
 
@@ -76,6 +77,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <ColorBlindFilters />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

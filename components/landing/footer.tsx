@@ -13,7 +13,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Star, Heart, ExternalLink, Map, BookOpen, ArrowUp, Mail } from 'lucide-react';
-import { GitHubIcon, SkyMapLogo, StellariumIcon } from '@/components/icons';
+import { GitHubIcon, CobaltSkymapLogo, StellariumIcon } from '@/components/icons';
 
 interface FooterLinkProps {
   href: string;
@@ -72,9 +72,9 @@ export function Footer() {
           {/* Brand */}
           <div>
             <Link href="/" className="flex items-center gap-2 mb-4 group">
-              <SkyMapLogo className="h-6 w-6 text-primary group-hover:text-secondary transition-colors" />
+              <CobaltSkymapLogo className="h-6 w-6 text-primary group-hover:text-secondary transition-colors" />
               <span className="font-serif text-xl font-bold text-foreground">
-                SkyMap
+                Cobalt Skymap
               </span>
             </Link>
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -130,7 +130,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © {currentYear} SkyMap. {t('allRightsReserved')}
+            © {currentYear} Cobalt Skymap. {t('allRightsReserved')}
           </p>
           <div className="flex items-center gap-4">
             <p className="text-sm text-muted-foreground flex items-center gap-1">

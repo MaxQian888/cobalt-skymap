@@ -31,6 +31,47 @@ function calculateHourAngle(dec: number, lat: number, altThreshold: number): num
 }
 
 // ============================================================================
+// Dark-Window Intersection
+// ============================================================================
+
+export interface DarkImagingWindow {
+  darkImagingStart: Date | null;
+  darkImagingEnd: Date | null;
+  darkImagingHours: number;
+}
+
+/**
+ * Intersect an imaging window (target above the altitude threshold) with the
+ * astronomical night at the observer's location. Shared by the fixed-target
+ * and solar-system visibility calculators.
+ */
+export function intersectDarkWindow(
+  imagingWindowStart: Date | null,
+  imagingWindowEnd: Date | null,
+  latitude: number,
+  longitude: number,
+  date: Date,
+): DarkImagingWindow {
+  const twilight = calculateTwilightTimes(latitude, longitude, date);
+
+  if (twilight.astronomicalDusk && twilight.astronomicalDawn &&
+      imagingWindowStart && imagingWindowEnd) {
+    const overlapStart = Math.max(twilight.astronomicalDusk.getTime(), imagingWindowStart.getTime());
+    const overlapEnd = Math.min(twilight.astronomicalDawn.getTime(), imagingWindowEnd.getTime());
+
+    if (overlapEnd > overlapStart) {
+      return {
+        darkImagingStart: new Date(overlapStart),
+        darkImagingEnd: new Date(overlapEnd),
+        darkImagingHours: (overlapEnd - overlapStart) / 3600000,
+      };
+    }
+  }
+
+  return { darkImagingStart: null, darkImagingEnd: null, darkImagingHours: 0 };
+}
+
+// ============================================================================
 // Target Visibility Calculation
 // ============================================================================
 
@@ -112,28 +153,14 @@ export function calculateTargetVisibility(
     : circumpolar ? 24 : 0;
   
   // Calculate dark imaging window (intersection with astronomical night)
-  const twilight = calculateTwilightTimes(latitude, longitude, date);
-  let darkImagingStart: Date | null = null;
-  let darkImagingEnd: Date | null = null;
-  let darkImagingHours = 0;
-  
-  if (twilight.astronomicalDusk && twilight.astronomicalDawn && 
-      imagingWindowStart && imagingWindowEnd) {
-    const nightStart = twilight.astronomicalDusk.getTime();
-    const nightEnd = twilight.astronomicalDawn.getTime();
-    const imgStart = imagingWindowStart.getTime();
-    const imgEnd = imagingWindowEnd.getTime();
-    
-    const overlapStart = Math.max(nightStart, imgStart);
-    const overlapEnd = Math.min(nightEnd, imgEnd);
-    
-    if (overlapEnd > overlapStart) {
-      darkImagingStart = new Date(overlapStart);
-      darkImagingEnd = new Date(overlapEnd);
-      darkImagingHours = (overlapEnd - overlapStart) / 3600000;
-    }
-  }
-  
+  const { darkImagingStart, darkImagingEnd, darkImagingHours } = intersectDarkWindow(
+    imagingWindowStart,
+    imagingWindowEnd,
+    latitude,
+    longitude,
+    date,
+  );
+
   return {
     riseTime,
     setTime,

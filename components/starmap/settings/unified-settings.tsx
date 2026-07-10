@@ -12,6 +12,7 @@ import {
   Sliders,
   HardDrive,
   Info,
+  MoreVertical,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -39,7 +46,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import {
   useEquipmentStore,
@@ -71,12 +77,20 @@ import {
   useSettingsDraftStatus,
 } from '@/lib/hooks/use-settings-draft';
 
+// Radix ScrollArea wraps content in a `display:table` element that sizes to
+// max-content, so a wide child (e.g. a data table) would stretch the whole
+// drawer. Forcing that wrapper to `block` clamps content to the viewport width;
+// individually-scrollable children (tables) then scroll within their own bounds.
+const SCROLL_VIEWPORT_CLAMP =
+  'h-full [&_[data-slot=scroll-area-viewport]>div]:!block';
+
 export function UnifiedSettings() {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('display');
   const [mapRefreshToken, setMapRefreshToken] = useState(0);
   const [resetCurrentTabOpen, setResetCurrentTabOpen] = useState(false);
+  const [resetAllOpen, setResetAllOpen] = useState(false);
   const [pendingGlobalReset, setPendingGlobalReset] = useState(false);
   const openSettingsDrawerRequestId = useOnboardingBridgeStore((state) => state.openSettingsDrawerRequestId);
   const closeTransientPanelsRequestId = useOnboardingBridgeStore((state) => state.closeTransientPanelsRequestId);
@@ -250,53 +264,87 @@ export function UnifiedSettings() {
         data-testid="settings-panel"
         aria-label={t('settings.allSettings')}
         className="w-[90vw] max-w-[340px] sm:max-w-[420px] md:max-w-[480px] h-full flex flex-col drawer-content"
+        onOpenAutoFocus={(e) => {
+          // Land initial focus on the labeled dialog container so assistive tech
+          // announces the settings panel first; focus is still trapped within and
+          // restored to the trigger on close (vaul/Radix default).
+          e.preventDefault();
+          (e.currentTarget as HTMLElement | null)?.focus();
+        }}
       >
         <DrawerHeader className="border-b shrink-0 pb-2">
-          <div className="flex items-center justify-between">
-            <DrawerTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5" />
-              {t('settings.allSettings')}
+          <div className="flex items-center justify-between gap-2">
+            <DrawerTitle className="flex items-center gap-2 min-w-0">
+              <Settings className="h-5 w-5 shrink-0" />
+              <span className="truncate">{t('settings.allSettings')}</span>
             </DrawerTitle>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <Button
                 data-testid="settings-cancel-button"
                 variant="ghost"
                 size="sm"
                 disabled={!(hasDirty || pendingGlobalReset)}
-                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                aria-label={t('common.cancel')}
+                title={t('common.cancel')}
+                className="h-7 text-xs text-muted-foreground hover:text-foreground px-2"
                 onClick={handleCancelChanges}
               >
-                <Undo2 className="h-3 w-3 mr-1" />
-                {t('common.cancel')}
+                <Undo2 className="h-3 w-3 sm:mr-1" />
+                <span className="hidden sm:inline">{t('common.cancel')}</span>
               </Button>
               <Button
                 data-testid="settings-save-button"
                 variant="ghost"
                 size="sm"
                 disabled={!(canApply || pendingGlobalReset)}
-                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                aria-label={t('common.save')}
+                title={t('common.save')}
+                className="h-7 text-xs text-muted-foreground hover:text-foreground px-2"
                 onClick={handleApplyChanges}
               >
-                <Save className="h-3 w-3 mr-1" />
-                {t('common.save')}
+                <Save className="h-3 w-3 sm:mr-1" />
+                <span className="hidden sm:inline">{t('common.save')}</span>
               </Button>
-              <AlertDialog open={resetCurrentTabOpen} onOpenChange={setResetCurrentTabOpen}>
-                <AlertDialogTrigger asChild>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="sm"
-                    disabled={!canResetCurrentTab}
-                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    size="icon"
+                    aria-label={t('settings.moreActions')}
+                    title={t('settings.moreActions')}
+                    className="h-7 w-7 text-muted-foreground hover:text-foreground"
                   >
-                    <RotateCcw className="h-3 w-3 mr-1" />
-                    {t('common.reset')}
+                    <MoreVertical className="h-4 w-4" />
                   </Button>
-                </AlertDialogTrigger>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    disabled={!canResetCurrentTab}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setResetCurrentTabOpen(true);
+                    }}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-2" />
+                    {t('settings.resetCurrentTab')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setResetAllOpen(true);
+                    }}
+                  >
+                    <RotateCcw className="h-3.5 w-3.5 mr-2" />
+                    {t('settings.resetAll')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <AlertDialog open={resetCurrentTabOpen} onOpenChange={setResetCurrentTabOpen}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>{t('common.reset')}</AlertDialogTitle>
+                    <AlertDialogTitle>{t('settings.resetCurrentTab')}</AlertDialogTitle>
                     <AlertDialogDescription>
-                      {t('settings.resetAllDescription')}
+                      {t('settings.resetCurrentTabDescription')}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -307,20 +355,10 @@ export function UnifiedSettings() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    <RotateCcw className="h-3 w-3 mr-1" />
-                    {t('settings.resetAll')}
-                  </Button>
-                </AlertDialogTrigger>
+              <AlertDialog open={resetAllOpen} onOpenChange={setResetAllOpen}>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>{t('common.reset')}</AlertDialogTitle>
+                    <AlertDialogTitle>{t('settings.resetAll')}</AlertDialogTitle>
                     <AlertDialogDescription>
                       {t('settings.resetAllDescription')}
                     </AlertDialogDescription>
@@ -352,7 +390,8 @@ export function UnifiedSettings() {
         </DrawerHeader>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-5 shrink-0 mx-2 sm:mx-4 mt-2 h-auto" style={{ width: 'calc(100% - 1rem)' }}>
+          <div className="shrink-0 px-2 sm:px-4 mt-2">
+          <TabsList className="grid w-full grid-cols-5 h-auto">
             <TabsTrigger value="display" className="text-[10px] sm:text-xs px-0.5 sm:px-1 py-1.5 flex-col sm:flex-row gap-0.5 sm:gap-1 h-auto">
               <Eye className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               <span className="hidden sm:inline truncate">{t('settings.displayTab')}</span>
@@ -379,15 +418,16 @@ export function UnifiedSettings() {
               <span className="sm:hidden truncate">{t('settingsNew.tabs.aboutShort')}</span>
             </TabsTrigger>
           </TabsList>
+          </div>
 
           {/* Display Settings Tab — includes stellarium display, connection, location */}
           <TabsContent value="display" className="flex-1 mt-0 overflow-hidden">
-            <ScrollArea className="h-full">
+            <ScrollArea className={SCROLL_VIEWPORT_CLAMP}>
               <DisplaySettings />
-              <Separator className="mx-4" />
-              <div className="px-4 pb-4">
+              <div className="px-4 pb-4 space-y-4">
+                <Separator />
                 <ConnectionSettings />
-                <Separator className="my-4" />
+                <Separator />
                 <LocationSettings />
               </div>
             </ScrollArea>
@@ -395,7 +435,7 @@ export function UnifiedSettings() {
 
           {/* Equipment Tab — includes equipment, FOV, exposure */}
           <TabsContent value="equipment" className="flex-1 mt-0 overflow-hidden">
-            <ScrollArea className="h-full">
+            <ScrollArea className={SCROLL_VIEWPORT_CLAMP}>
               <div className="p-4 space-y-4">
                 <DeviceWorkspace />
                 <Separator />
@@ -415,7 +455,7 @@ export function UnifiedSettings() {
 
           {/* Data Management Tab */}
           <TabsContent value="data" className="flex-1 mt-0 overflow-hidden">
-            <ScrollArea className="h-full">
+            <ScrollArea className={SCROLL_VIEWPORT_CLAMP}>
               <div className="p-4 space-y-4">
                 <MapHealthMonitor className="mb-4" refreshToken={mapRefreshToken} />
                 <MapProviderSettings onSettingsChange={handleMapSettingsUpdated} />
@@ -521,7 +561,7 @@ export function UnifiedSettings() {
 
           {/* About Tab */}
           <TabsContent value="about" className="flex-1 mt-0 overflow-hidden">
-            <ScrollArea className="h-full">
+            <ScrollArea className={SCROLL_VIEWPORT_CLAMP}>
               <div className="p-4">
                 <AboutSettings />
               </div>

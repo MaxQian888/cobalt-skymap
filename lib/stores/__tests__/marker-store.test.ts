@@ -851,6 +851,55 @@ describe('marker-store Tauri paths', () => {
     jest.clearAllMocks();
   });
 
+  it('does not persist the session-only move state but persists the indicator toggle', () => {
+    act(() => {
+      useMarkerStore.getState().setMovingMarker('m-123');
+      useMarkerStore.getState().setShowOffscreenIndicators(true);
+    });
+
+    expect(useMarkerStore.getState().movingMarkerId).toBe('m-123');
+    expect(useMarkerStore.getState().showOffscreenIndicators).toBe(true);
+
+    const persistOptions = (useMarkerStore as unknown as {
+      persist: { getOptions: () => { partialize?: (s: unknown) => Record<string, unknown> } };
+    }).persist.getOptions();
+    const persisted = persistOptions.partialize!(useMarkerStore.getState());
+    expect(persisted).not.toHaveProperty('movingMarkerId');
+    expect(persisted).toHaveProperty('showOffscreenIndicators', true);
+
+    act(() => {
+      useMarkerStore.getState().setMovingMarker(null);
+      useMarkerStore.getState().setShowOffscreenIndicators(false);
+    });
+  });
+
+  it('keeps markers visible when a fresh backend snapshot merges at a tie timestamp', async () => {
+    // Fresh-install handshake: both sides at showMarkersUpdatedAt 0. The merge
+    // lets the remote snapshot win ties, so the backend default must be
+    // show_markers: true (markers.rs) or this flips markers off on first sync.
+    act(() => {
+      useMarkerStore.setState({ showMarkers: true, showMarkersUpdatedAt: 0, _tauriInitialized: false });
+    });
+    (isTauri as jest.Mock).mockReturnValue(true);
+    markersApi.load.mockResolvedValue({
+      markers: [],
+      groups: ['Default'],
+      show_markers: true,
+      show_markers_updated_at: 0,
+    });
+    markersApi.save.mockResolvedValue(undefined);
+
+    await act(async () => { await useMarkerStore.getState().syncWithTauri(); });
+
+    expect(useMarkerStore.getState().showMarkers).toBe(true);
+    expect(markersApi.save).toHaveBeenCalledWith(
+      expect.objectContaining({ show_markers: true })
+    );
+
+    useMarkerStore.setState({ _tauriInitialized: false });
+    (isTauri as jest.Mock).mockReturnValue(false);
+  });
+
   it('should call Tauri addMarker when isTauri is true', () => {
     (isTauri as jest.Mock).mockReturnValue(true);
     markersApi.addMarker.mockResolvedValue({

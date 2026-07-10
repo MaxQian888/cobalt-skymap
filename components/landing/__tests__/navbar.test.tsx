@@ -29,7 +29,7 @@ describe('Navbar', () => {
     render(<Navbar />);
 
     expect(screen.getByRole('navigation')).toHaveAttribute('aria-label', 'Main navigation');
-    expect(screen.getByText('SkyMap')).toBeInTheDocument();
+    expect(screen.getByText('Cobalt Skymap')).toBeInTheDocument();
     expect(screen.getByTestId('language-switcher')).toBeInTheDocument();
     expect(screen.getByTestId('theme-toggle')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'nav.github' })[0]).toHaveAttribute('href', EXTERNAL_LINKS.repository);

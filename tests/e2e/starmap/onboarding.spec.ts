@@ -214,7 +214,7 @@ test.describe('Onboarding Tour', () => {
     await page.waitForTimeout(3000);
     
     // Welcome dialog should not appear
-    const welcomeDialog = page.locator('text=Welcome to SkyMap').or(page.locator('text=欢迎使用 SkyMap'));
+    const welcomeDialog = page.locator('text=Welcome to Cobalt Skymap').or(page.locator('text=欢迎使用 Cobalt Skymap'));
     await expect(welcomeDialog).not.toBeVisible({ timeout: 3000 });
   });
 
@@ -264,7 +264,7 @@ test.describe('Onboarding Tour', () => {
     await page.reload();
     await page.waitForTimeout(3000);
 
-    const welcomeDialog = page.locator('text=Welcome to SkyMap').or(page.locator('text=欢迎使用 SkyMap'));
+    const welcomeDialog = page.locator('text=Welcome to Cobalt Skymap').or(page.locator('text=欢迎使用 Cobalt Skymap'));
     const tooltip = page.locator('.fixed.z-\\[9999\\]');
 
     await expect(welcomeDialog).not.toBeVisible({ timeout: 3000 });

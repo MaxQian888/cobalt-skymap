@@ -11,7 +11,7 @@ const configuredWorkers = process.env.PLAYWRIGHT_WORKERS
       : undefined;
 
 /**
- * Playwright configuration for SkyMap E2E tests
+ * Playwright configuration for Cobalt Skymap E2E tests
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({

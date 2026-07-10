@@ -28,6 +28,11 @@ export interface ScreenPosition {
   x: number;
   y: number;
   visible: boolean;
+  /**
+   * Screen-space direction toward the object when it is NOT visible
+   * (Stellarium only). Used for off-screen edge indicators.
+   */
+  dir?: import('@/lib/core/offscreen-indicator').OffscreenDirection;
 }
 
 export interface CelestialCoordinate {
@@ -40,6 +45,32 @@ export interface ProjectedItem<T> {
   x: number;
   y: number;
   visible: boolean;
+  /** Direction info for off-screen items (only with includeOffscreen). */
+  dir?: import('@/lib/core/offscreen-indicator').OffscreenDirection;
+}
+
+/**
+ * Structural equality for two projected-position arrays. Used to skip redundant
+ * `setState` (and the re-render it triggers) when the projection is unchanged
+ * frame-to-frame, e.g. while the sky view is static.
+ */
+function samePositions<T>(a: ProjectedItem<T>[], b: ProjectedItem<T>[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const p = a[i];
+    const q = b[i];
+    if (
+      p.item !== q.item ||
+      p.x !== q.x ||
+      p.y !== q.y ||
+      p.visible !== q.visible ||
+      p.dir !== q.dir
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export interface UseCoordinateProjectionOptions {
@@ -79,11 +110,41 @@ export interface UseBatchProjectionOptions<T> {
   visibilityMargin?: number;
   /** Animation loop ID for global loop subscription */
   loopId?: string;
+  /**
+   * Adaptive mode (Stellarium only): run a cheap per-frame probe (FOV + view
+   * center) and reproject only when the view actually changed. Overlays then
+   * track fast pans at full frame rate with near-zero idle cost. NOT suitable
+   * for items whose RA/Dec change on their own (satellites) — those need the
+   * periodic interval. Falls back to interval throttling on Aladin.
+   */
+  adaptive?: boolean;
+  /**
+   * Also return off-screen items (visible: false) with their screen direction
+   * (`dir`) so consumers can render edge indicators. Default: filtered out.
+   */
+  includeOffscreen?: boolean;
 }
 
 // ============================================================================
 // Core Projection Functions
 // ============================================================================
+
+/**
+ * Screen-space direction toward an off-screen point from its VIEW vector.
+ * View x maps to screen x; view y is up, screen y is down. Returns undefined
+ * for the degenerate straight-behind case.
+ */
+function offscreenDirectionFromViewVec(viewVec: number[]): ScreenPosition['dir'] {
+  const [vx, vy, vz] = viewVec;
+  const planar = Math.hypot(vx, vy);
+  if (!Number.isFinite(planar) || planar < 1e-9) return undefined;
+  const length = Math.hypot(vx, vy, vz);
+  return {
+    dx: vx / planar,
+    dy: -vy / planar,
+    angDist: Math.acos(Math.max(-1, Math.min(1, -vz / length))),
+  };
+}
 
 /** Creates a Stellarium-specific coordinate projector using the active core projection. */
 function createStellariumProjector(
@@ -99,7 +160,7 @@ function createStellariumProjector(
       const icrfVec = stel.s2c(raRad, decRad);
       const viewVec = stel.convertFrame(stel.observer, 'ICRF', 'VIEW', icrfVec);
       if (Array.isArray(viewVec) && viewVec.length >= 3 && viewVec[2] >= 0) {
-        return { x: 0, y: 0, visible: false };
+        return { x: 0, y: 0, visible: false, dir: offscreenDirectionFromViewVec(viewVec) };
       }
       const ndc = viewVectorToNdc(viewVec, {
         projection: stel.core.projection,
@@ -107,13 +168,13 @@ function createStellariumProjector(
         aspect: containerWidth / containerHeight,
       });
       if (!ndc) {
-        return { x: 0, y: 0, visible: false };
+        return { x: 0, y: 0, visible: false, dir: offscreenDirectionFromViewVec(viewVec) };
       }
       const ndcX = ndc.x;
       const ndcY = ndc.y;
 
       if (Math.abs(ndcX) > visibilityMargin || Math.abs(ndcY) > visibilityMargin) {
-        return { x: 0, y: 0, visible: false };
+        return { x: 0, y: 0, visible: false, dir: offscreenDirectionFromViewVec(viewVec) };
       }
 
       const screenX = (ndcX + 1) * 0.5 * containerWidth;
@@ -262,6 +323,8 @@ export function useBatchProjection<T>({
   intervalMs = 33, // ~30fps
   visibilityMargin = 1.1,
   loopId = 'batch-projection',
+  adaptive = false,
+  includeOffscreen = false,
 }: UseBatchProjectionOptions<T>): ProjectedItem<T>[] {
   const stel = useStellariumStore((state) => state.stel);
   const aladin = useStellariumStore((state) => state.aladin);
@@ -269,15 +332,31 @@ export function useBatchProjection<T>({
   // activeEngine (set in useEffect, one tick behind) to avoid desync.
   const skyEngine = useSettingsStore((state) => state.skyEngine);
   const [positions, setPositions] = useState<ProjectedItem<T>[]>([]);
-  
+
+  // Last committed positions. Kept in lockstep with `positions` so the animation
+  // loop can bail out of `setPositions` when nothing changed.
+  const committedRef = useRef<ProjectedItem<T>[]>(positions);
+
   // Store items in ref to avoid stale closures
   const itemsRef = useRef(items);
+  const itemsVersionRef = useRef(0);
   useEffect(() => {
     itemsRef.current = items;
+    itemsVersionRef.current += 1;
   }, [items]);
 
   // Throttle timestamp tracking
   const lastUpdateRef = useRef<number>(0);
+
+  // Adaptive-mode probe: last observed view state. Null forces a recompute.
+  const probeRef = useRef<{
+    fov: number;
+    vx: number;
+    vy: number;
+    vz: number;
+    itemsVersion: number;
+    projector: unknown;
+  } | null>(null);
 
   const engineReady = skyEngine === 'aladin' ? !!aladin : !!stel;
 
@@ -292,7 +371,10 @@ export function useBatchProjection<T>({
   // Memoize the update callback
   const updatePositions = useCallback(() => {
     if (!projector || !enabled) {
-      setPositions([]);
+      if (committedRef.current.length !== 0) {
+        committedRef.current = [];
+        setPositions(committedRef.current);
+      }
       return;
     }
 
@@ -311,11 +393,14 @@ export function useBatchProjection<T>({
             x: screenPos.x,
             y: screenPos.y,
             visible: screenPos.visible,
+            dir: screenPos.dir,
           });
         }
       }
     }
 
+    if (samePositions(committedRef.current, newPositions)) return;
+    committedRef.current = newPositions;
     setPositions(newPositions);
   }, [projector, enabled, getRa, getDec]);
 
@@ -324,19 +409,46 @@ export function useBatchProjection<T>({
     loopId,
     useCallback(
       (_deltaTime: number, timestamp: number) => {
+        // Adaptive path (Stellarium only): probe the view state each frame
+        // (2 cheap engine reads, independent of item count) and skip the whole
+        // O(n) reprojection + React commit when nothing changed.
+        if (adaptive && skyEngine !== 'aladin' && stel) {
+          try {
+            const fov = stel.core.fov;
+            const center = stel.convertFrame(stel.observer, 'VIEW', 'ICRF', [0, 0, -1]);
+            const [vx, vy, vz] = Array.isArray(center) ? center : [0, 0, 0];
+            const prev = probeRef.current;
+            const unchanged =
+              prev !== null &&
+              prev.projector === projector &&
+              prev.itemsVersion === itemsVersionRef.current &&
+              Math.abs(prev.fov - fov) < 1e-9 &&
+              Math.abs(prev.vx - vx) < 1e-9 &&
+              Math.abs(prev.vy - vy) < 1e-9 &&
+              Math.abs(prev.vz - vz) < 1e-9;
+            if (unchanged) return;
+            probeRef.current = { fov, vx, vy, vz, itemsVersion: itemsVersionRef.current, projector };
+          } catch {
+            // Probe failure — fall through to an unconditional update.
+            probeRef.current = null;
+          }
+          updatePositions();
+          return;
+        }
+
         if (timestamp - lastUpdateRef.current >= intervalMs) {
           lastUpdateRef.current = timestamp;
           updatePositions();
         }
       },
-      [updatePositions, intervalMs]
+      [updatePositions, intervalMs, adaptive, skyEngine, stel, projector]
     ),
     enabled && engineReady
   );
 
-  // Return only visible items
+  // Return only visible items unless the consumer wants off-screen ones too.
   return useMemo(
-    () => positions.filter((p) => p.visible),
-    [positions]
+    () => (includeOffscreen ? positions : positions.filter((p) => p.visible)),
+    [positions, includeOffscreen]
   );
 }

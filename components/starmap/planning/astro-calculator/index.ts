@@ -16,6 +16,7 @@ export {
   ASTRO_CALCULATOR_CAPABILITY_MATRIX,
   ASTRO_CALCULATOR_TAB_ORDER,
 } from './capability-matrix';
+export type { AstroCalculatorTabId } from './capability-matrix';
 export {
   runCalculatorAlmanac,
   runCalculatorCoordinates,

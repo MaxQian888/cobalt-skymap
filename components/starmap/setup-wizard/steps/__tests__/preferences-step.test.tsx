@@ -34,6 +34,7 @@ describe('PreferencesStep', () => {
         surveyId: 'dss',
         surveyUrl: undefined,
         skyCulture: 'western',
+        satellitesVisible: false,
         skyCultureLanguage: 'native',
         nightMode: false,
         sensorControl: false,

@@ -284,7 +284,7 @@ function exportAsNinaXml(plan: SessionPlan, options: PlanExportOptions): string 
 
   const lines: string[] = [
     '<?xml version="1.0" encoding="utf-8"?>',
-    `<!-- Exported from SkyMap Session Planner - ${options.planDate.toLocaleDateString()} (${exportedAt}) -->`,
+    `<!-- Exported from Cobalt Skymap Session Planner - ${options.planDate.toLocaleDateString()} (${exportedAt}) -->`,
     ...(options.sourcePlanName ? [`<!-- Source Plan: ${escXml(options.sourcePlanName)} -->`] : []),
     '<ArrayOfCaptureSequenceList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">',
   ];

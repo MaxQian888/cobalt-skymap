@@ -965,7 +965,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       return result.map((v) => v.trim());
     };
 
-    const parseSkyMapCsv = (): ParsedImportResult | null => {
+    const parseCobaltSkymapCsv = (): ParsedImportResult | null => {
       const lines = content.split(/\r?\n/).filter((line) => line.trim().length > 0);
       if (lines.length < 2) return null;
       const header = parseCsvLine(lines[0]);
@@ -1097,7 +1097,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
 
     const ninaResult = parseNinaXml();
     if (ninaResult) return ninaResult;
-    const csvResult = parseSkyMapCsv();
+    const csvResult = parseCobaltSkymapCsv();
     if (csvResult) return csvResult;
 
     try {

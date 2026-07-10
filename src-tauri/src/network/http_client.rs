@@ -615,7 +615,7 @@ impl Default for HttpClientConfig {
             max_retries: 3,
             retry_base_delay_ms: 1000,
             retry_max_delay_ms: 30000,
-            user_agent: format!("SkyMap/{}", env!("CARGO_PKG_VERSION")),
+            user_agent: format!("CobaltSkymap/{}", env!("CARGO_PKG_VERSION")),
             proxy_mode: ProxyMode::Auto,
             manual_proxy_url: None,
             fallback_to_direct_on_failure: true,
@@ -1166,7 +1166,7 @@ mod tests {
         assert!(config.enable_compression);
         assert!(config.follow_redirects);
         assert_eq!(config.max_redirects, 10);
-        assert!(config.user_agent.contains("SkyMap"));
+        assert!(config.user_agent.contains("CobaltSkymap"));
     }
 
     #[test]

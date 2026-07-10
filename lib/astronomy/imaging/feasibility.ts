@@ -7,9 +7,10 @@ import { getMoonIllumination, getMoonPhase } from '../celestial/moon';
 import { calculateTargetVisibility } from '../visibility/target';
 import { calculateTwilightTimes } from '../twilight/calculator';
 import { dateToJulianDate } from '../time/julian';
-import type { 
-  ImagingFeasibility, 
+import type {
+  ImagingFeasibility,
   FeasibilityRecommendation,
+  TargetVisibility,
 } from '@/lib/core/types/astronomy';
 
 // ============================================================================
@@ -24,6 +25,9 @@ import type {
  * @param longitude - Observer longitude
  * @param minAltitude - Minimum altitude for imaging
  * @param date - Date for calculation
+ * @param visibilityOverride - Pre-computed visibility (e.g. from
+ *   calculateSolarSystemVisibility for moving bodies); skips the fixed-target
+ *   visibility calculation when provided
  * @returns Feasibility assessment
  */
 export function calculateImagingFeasibility(
@@ -32,13 +36,15 @@ export function calculateImagingFeasibility(
   latitude: number,
   longitude: number,
   minAltitude: number = 30,
-  date: Date = new Date()
+  date: Date = new Date(),
+  visibilityOverride?: TargetVisibility
 ): ImagingFeasibility {
   const warnings: string[] = [];
   const tips: string[] = [];
-  
+
   // Get visibility data
-  const visibility = calculateTargetVisibility(ra, dec, latitude, longitude, minAltitude, date);
+  const visibility = visibilityOverride
+    ?? calculateTargetVisibility(ra, dec, latitude, longitude, minAltitude, date);
   
   // Get moon data
   const julianDate = dateToJulianDate(date);

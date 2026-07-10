@@ -171,7 +171,11 @@
     "invalidCoordinates": "Invalid coordinates format",
     "goTo": "Go To",
     "goToDescription": "Enter RA and Dec to navigate the view to specific celestial coordinates",
-    "qualityMetadata": "Frame: {frame} / Time Scale: {timeScale} / Quality: {quality} / Freshness: {freshness}"
+    "qualityMetadata": "Frame: {frame} / Time Scale: {timeScale} / Quality: {quality} / Freshness: {freshness}",
+    "copyAs": "Copy as",
+    "formatHms": "Sexagesimal (HMS/DMS)",
+    "formatDegrees": "Decimal degrees",
+    "formatDecimalPair": "Decimal pair (RA Dec)"
   },
   "objects": {
     "comet": "Comet",
@@ -514,7 +518,7 @@
     "dataTab": "Data",
     "dataTabShort": "Data",
     "help": "Help & Tutorial",
-    "restartTourDescription": "Review the interactive guide to learn about SkyMap features",
+    "restartTourDescription": "Review the interactive guide to learn about Cobalt Skymap features",
     "nightMode": "Night Mode",
     "nightModeDescription": "Red filter to preserve dark adaptation",
     "sensorControl": "Sensor Control",
@@ -604,11 +608,15 @@
     "autoSaveHint": "Changes in this tab are saved automatically",
     "resetAll": "Reset All",
     "resetAllDescription": "This will reset all settings (display, equipment, preferences, theme) to their default values. This action cannot be undone.",
+    "resetCurrentTab": "Reset this tab",
+    "resetCurrentTabDescription": "This will reset the settings in the current tab to their default values. This action cannot be undone.",
+    "moreActions": "More actions",
     "instantEffectHint": "Changes take effect immediately",
     "locationInstantHint": "Location changes take effect immediately",
     "currentSiteSyncHint": "Saving these coordinates updates the active observation site: {name}.",
     "createFirstSiteHint": "Saving these coordinates will create your first saved observation site.",
     "milkyWay": "Milky Way",
+    "satellites": "Satellites",
     "fog": "Fog",
     "rendering": "Rendering",
     "bortleIndex": "Light Pollution (Bortle)",
@@ -760,6 +768,7 @@
   },
   "chart": {
     "now": "Now",
+    "nowAltitude": "Now",
     "transit": "Transit",
     "rise": "Rise",
     "set": "Set",
@@ -1506,6 +1515,10 @@
     "groupPlaceholder": "Enter or select group",
     "allGroups": "All",
     "goTo": "Go to marker",
+    "moveMarker": "Move marker",
+    "movingHint": "Drag or tap to place the marker. Press Esc to cancel.",
+    "markerMoved": "Marker moved",
+    "offscreenIndicators": "Off-screen direction arrows",
     "show": "Show",
     "hide": "Hide",
     "hideGroup": "Hide group",
@@ -2072,6 +2085,14 @@
       "images": "Images",
       "observation": "Observation",
     "viewDetails": "View Details",
+    "positionRecomputed": "Positions recomputed for each time point",
+    "positionSnapshot": "Position from selection time; comets and asteroids drift over hours",
+    "satelliteNoForecast": "Rise/set and altitude forecasts do not apply to artificial satellites; their positions change within minutes",
+    "loadError": "Couldn't load object details",
+    "infoLoading": "Loading object information…",
+    "imagesLoading": "Loading images…",
+    "drawerDescription": "Detailed information and observation data for {name}",
+    "imageGalleryLabel": "Image gallery for {name}, use arrow keys to browse",
     "properties": "Properties",
     "morphology": "Morphology",
     "spectralType": "Spectral Type",
@@ -2235,7 +2256,7 @@
       "skipTour": "Explore on my own"
     },
     "welcome": {
-      "title": "Welcome to SkyMap",
+      "title": "Welcome to Cobalt Skymap",
       "subtitle": "Your personal window to the universe. Let us show you around!",
       "startTour": "Start Tour",
       "startSetup": "Start Setup",
@@ -2458,8 +2479,8 @@
     "steps": {
       "welcome": {
         "title": "Welcome",
-        "subtitle": "Let's set up your SkyMap",
-        "description": "Complete a few quick steps to customize SkyMap for your needs. You can always change these settings later.",
+        "subtitle": "Let's set up your Cobalt Skymap",
+        "description": "Complete a few quick steps to customize Cobalt Skymap for your needs. You can always change these settings later.",
         "whatWellConfigure": "What we'll configure:",
         "timeEstimate": "Estimated time: ~2 minutes",
         "features": {
@@ -2961,6 +2982,11 @@
       "showSplashDesc": "Display the loading animation on startup",
       "autoConnect": "Auto-connect Backend",
       "autoConnectDesc": "Automatically connect to the backend service on startup",
+      "launchOnStartup": "Launch on Startup",
+      "launchOnStartupDesc": "Open Cobalt Skymap automatically when you sign in to your computer",
+      "launchOnStartupEnabled": "Cobalt Skymap will open automatically when you sign in",
+      "launchOnStartupChecking": "Checking startup setting…",
+      "launchOnStartupError": "Couldn't update the startup setting: {message}",
       "behavior": "Behavior",
       "skipCloseConfirmation": "Skip Close Confirmation",
       "skipCloseConfirmationDesc": "Close the app without asking for confirmation",
@@ -2993,6 +3019,7 @@
       "enableAnimationsDesc": "Enable smooth transitions and animations throughout the app"
     },
     "performance": {
+      "title": "Performance",
       "renderQuality": "Render Quality",
       "qualityLow": "Low",
       "qualityMedium": "Medium",
@@ -3017,20 +3044,74 @@
       "reducedMotionDesc": "Minimize non-essential animations"
     },
     "accessibility": {
+      "title": "Accessibility",
       "visual": "Visual",
       "highContrast": "High Contrast",
       "highContrastDesc": "Increase contrast for better visibility",
       "reduceTransparency": "Reduce Transparency",
       "reduceTransparencyDesc": "Make backgrounds more opaque",
       "text": "Text",
-      "largeText": "Large Text",
-      "largeTextDesc": "Increase text size throughout the app",
+      "fontScale": "Text Size",
+      "fontScaleDesc": "Scale the interface text size from 90% to 200%",
+      "colorVision": "Color Vision",
+      "colorBlindMode": "Color Blind Mode",
+      "colorBlindModeDesc": "Recolor the entire interface — including the star map — to simulate or compensate for color vision deficiency",
+      "colorBlind_none": "Off",
+      "colorBlind_protanopia": "Protanopia (red-blind)",
+      "colorBlind_deuteranopia": "Deuteranopia (green-blind)",
+      "colorBlind_tritanopia": "Tritanopia (blue-blind)",
+      "colorBlind_achromatopsia": "Achromatopsia (monochrome)",
       "navigation": "Navigation",
       "focusIndicators": "Focus Indicators",
       "focusIndicatorsDesc": "Show clear focus indicators for keyboard navigation",
       "screenReader": "Screen Reader",
       "screenReaderOptimized": "Screen Reader Optimized",
-      "screenReaderOptimizedDesc": "Optimize interface for screen readers"
+      "screenReaderOptimizedDesc": "Enforce always-visible focus outlines and clearer semantics for assistive technology"
+    },
+    "advanced": {
+      "title": "Advanced",
+      "observationProfile": "Observation Profile",
+      "observationProfileDesc": "Bias for target recommendations and planning calculations",
+      "observationProfile_imaging": "Imaging",
+      "observationProfile_visual": "Visual",
+      "observationProfile_hybrid": "Hybrid",
+      "precisionMode": "Precision Mode",
+      "precisionModeDesc": "Trade calculation accuracy against real-time responsiveness",
+      "precisionMode_core_high_precision": "High Precision",
+      "precisionMode_realtime_lightweight": "Realtime (Lightweight)",
+      "eopUpdatePolicy": "Earth Orientation Data",
+      "eopUpdatePolicyDesc": "How Earth orientation parameters (used for precise coordinates) are updated",
+      "eopUpdatePolicy_auto_with_offline_fallback": "Auto (offline fallback)",
+      "eopUpdatePolicy_embedded_only": "Embedded only",
+      "eopUpdatePolicy_strict_offline": "Strict offline"
+    },
+    "globalShortcuts": {
+      "title": "Global Shortcuts",
+      "description": "System-wide shortcuts that work even when the app is not focused.",
+      "mappingTitle": "Shortcut Mapping",
+      "enabled": "Enabled",
+      "disabledHint": "Global shortcuts are currently disabled. Enable them to record and use shortcuts.",
+      "recording": "Press keys…",
+      "resetAll": "Reset All",
+      "resetAllDesc": "Reset all global shortcuts to their defaults",
+      "resetToDefault": "Reset to default",
+      "actions": {
+        "focusMainWindow": "Focus Main Window",
+        "toggleSearch": "Toggle Search",
+        "toggleSessionPanel": "Toggle Session Panel",
+        "mountAbortSlew": "Abort Mount Slew"
+      },
+      "descriptions": {
+        "focusMainWindow": "Bring the app window to the foreground",
+        "toggleSearch": "Open or close the object search",
+        "toggleSessionPanel": "Open or close the observation session panel",
+        "mountAbortSlew": "Immediately stop any mount slew (safety)"
+      },
+      "errors": {
+        "invalidShortcut": "Invalid shortcut. Use at least one modifier (e.g. Ctrl, Alt).",
+        "localConflict": "Conflicts with in-app shortcut: {action}",
+        "globalConflict": "Conflicts with global shortcut: {action}"
+      }
     },
     "notifications": {
       "title": "Notifications",
@@ -3719,6 +3800,17 @@
   },
   "astroCalc": {
     "title": "Astronomical Calculator",
+    "tabShort": {
+      "wut": "Tonight",
+      "positions": "Positions",
+      "rts": "Rise-Set",
+      "ephemeris": "Ephemeris",
+      "almanac": "Almanac",
+      "phenomena": "Phenomena",
+      "coordinate": "Coords",
+      "time": "Time",
+      "solarSystem": "Planets"
+    },
     "wut": "What's Up Tonight",
     "positions": "Positions",
     "rts": "Rise/Set",
@@ -3761,6 +3853,7 @@
     "minorObjectPlaceholder": "1P/Halley, (433), C/2023 A3...",
     "copyResults": "Copy Results",
     "exportResults": "Export Results",
+    "addToList": "Add to List",
     "openPlanner": "Open Planner",
     "actions": "Actions",
     "copySuccess": "Copied to clipboard.",
@@ -3779,6 +3872,7 @@
     "moon": "Moon",
     "sunrise": "Sunrise",
     "sunset": "Sunset",
+    "twilight": "Twilight",
     "civilDusk": "Civil Dusk",
     "nauticalDusk": "Nautical Dusk",
     "astroDusk": "Astro Dusk",
@@ -4141,7 +4235,7 @@
       "subtitle": "Three simple steps to begin your astronomical journey",
       "launch": {
         "title": "Launch the App",
-        "description": "Open SkyMap in your browser or download the desktop app for Windows, macOS, or Linux."
+        "description": "Open Cobalt Skymap in your browser or download the desktop app for Windows, macOS, or Linux."
       },
       "setup": {
         "title": "Set Your Location",
@@ -4191,11 +4285,11 @@
     },
     "testimonials": {
       "title": "Loved by Astronomers",
-      "subtitle": "See what our community has to say about SkyMap",
+      "subtitle": "See what our community has to say about Cobalt Skymap",
       "astronomer": {
         "name": "Alex Chen",
         "role": "Amateur Astronomer",
-        "quote": "SkyMap has completely transformed my observation sessions. The planning tools and real-time sky rendering make it so easy to find and track objects."
+        "quote": "Cobalt Skymap has completely transformed my observation sessions. The planning tools and real-time sky rendering make it so easy to find and track objects."
       },
       "photographer": {
         "name": "Sarah Mitchell",
@@ -4205,12 +4299,12 @@
       "beginner": {
         "name": "David Park",
         "role": "Stargazing Enthusiast",
-        "quote": "As a beginner, SkyMap made astronomy accessible. The tonight's picks feature always gives me something amazing to look at."
+        "quote": "As a beginner, Cobalt Skymap made astronomy accessible. The tonight's picks feature always gives me something amazing to look at."
       }
     },
     "cta": {
       "title": "Start Your Astronomical Journey",
-      "description": "Whether you're a beginner or an experienced astronomer, SkyMap has everything you need to explore the night sky.",
+      "description": "Whether you're a beginner or an experienced astronomer, Cobalt Skymap has everything you need to explore the night sky.",
       "launchButton": "Launch Star Map",
       "downloadButton": "Download Desktop",
       "githubButton": "View on GitHub"

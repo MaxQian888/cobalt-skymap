@@ -78,6 +78,6 @@ describe('daily-knowledge/constants', () => {
       'advanced',
     ]);
     expect(DAILY_KNOWLEDGE_USER_AGENT).toContain('daily-knowledge');
-    expect(DAILY_KNOWLEDGE_USER_AGENT).toContain('SkyMap/0.1.0');
+    expect(DAILY_KNOWLEDGE_USER_AGENT).toContain('CobaltSkymap/0.1.0');
   });
 });

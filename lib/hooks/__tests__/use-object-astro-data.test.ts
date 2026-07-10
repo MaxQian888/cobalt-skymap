@@ -60,4 +60,75 @@ describe('useTargetAstroData', () => {
     expect(typeof result.current!.azimuth).toBe('number');
     expect(typeof result.current!.moonDistance).toBe('number');
   });
+
+  it('classifies fixed targets and keeps forecasts', () => {
+    const now = new Date();
+    const { result } = renderHook(() =>
+      useTargetAstroData(mockObject, 40, -74, 10, 30, now)
+    );
+    expect(result.current!.targetKind).toBe('fixed');
+    expect(result.current!.positionIsSnapshot).toBe(false);
+    expect(result.current!.visibility).not.toBeNull();
+    expect(result.current!.feasibility).not.toBeNull();
+    expect(result.current!.positionAt(now)).toEqual({ raDeg: 10.68, decDeg: 41.27 });
+  });
+
+  it('nulls visibility/feasibility for satellites and reports the NORAD id', () => {
+    const now = new Date();
+    const satellite = {
+      ...mockObject,
+      names: ['NORAD 25544', 'NAME ISS (ZARYA)'],
+      type: undefined,
+    } as unknown as SelectedObjectData;
+
+    const { result } = renderHook(() =>
+      useTargetAstroData(satellite, 40, -74, 10, 30, now)
+    );
+
+    expect(result.current!.targetKind).toBe('satellite');
+    expect(result.current!.noradId).toBe(25544);
+    expect(result.current!.positionIsSnapshot).toBe(true);
+    expect(result.current!.visibility).toBeNull();
+    expect(result.current!.feasibility).toBeNull();
+    expect(result.current!.riskHints).not.toContain('never-rises');
+  });
+
+  it('computes live positions from the ephemeris for solar-system bodies', () => {
+    const now = new Date();
+    const moon = {
+      ...mockObject,
+      names: ['NAME Moon'],
+      raDeg: 0,
+      decDeg: 0,
+      type: undefined,
+    } as unknown as SelectedObjectData;
+
+    const { result } = renderHook(() =>
+      useTargetAstroData(moon, 40, -74, 10, 30, now)
+    );
+
+    expect(result.current!.targetKind).toBe('solar_system');
+    expect(result.current!.visibility).not.toBeNull();
+    expect(result.current!.feasibility).not.toBeNull();
+    // The live position comes from the ephemeris, not the stale snapshot (0,0).
+    const live = result.current!.positionAt(now);
+    expect(live.raDeg !== 0 || live.decDeg !== 0).toBe(true);
+  });
+
+  it('honors the typeCategory detection signal for comets', () => {
+    const now = new Date();
+    const comet = {
+      ...mockObject,
+      names: ['Weird Designation 42X'],
+      type: undefined,
+    } as unknown as SelectedObjectData;
+
+    const { result } = renderHook(() =>
+      useTargetAstroData(comet, 40, -74, 10, 30, now, 'comet')
+    );
+
+    expect(result.current!.targetKind).toBe('minor_body');
+    expect(result.current!.positionIsSnapshot).toBe(true);
+    expect(result.current!.visibility).not.toBeNull();
+  });
 });

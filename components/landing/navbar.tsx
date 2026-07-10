@@ -13,7 +13,7 @@ import {
 import { LanguageSwitcher } from '@/components/common/language-switcher';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { Menu } from 'lucide-react';
-import { GitHubIcon, SkyMapLogo } from '@/components/icons';
+import { GitHubIcon, CobaltSkymapLogo } from '@/components/icons';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { EXTERNAL_LINKS } from '@/lib/constants/external-links';
@@ -162,9 +162,9 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <SkyMapLogo className="h-6 w-6 text-primary group-hover:text-secondary transition-colors" />
+            <CobaltSkymapLogo className="h-6 w-6 text-primary group-hover:text-secondary transition-colors" />
             <span className="font-serif text-xl font-bold text-foreground">
-              SkyMap
+              Cobalt Skymap
             </span>
           </Link>
 
@@ -202,8 +202,8 @@ export function Navbar() {
               <SheetContent side="right" className="w-72">
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-2">
-                    <SkyMapLogo className="h-5 w-5 text-primary" />
-                    SkyMap
+                    <CobaltSkymapLogo className="h-5 w-5 text-primary" />
+                    Cobalt Skymap
                   </SheetTitle>
                 </SheetHeader>
                 <div className="flex flex-col gap-2 mt-4">

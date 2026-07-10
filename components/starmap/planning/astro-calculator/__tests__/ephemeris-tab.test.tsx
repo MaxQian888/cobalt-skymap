@@ -68,6 +68,7 @@ jest.mock('@/components/ui/label', () => ({
 
 jest.mock('@/components/ui/scroll-area', () => ({
   ScrollArea: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  ScrollBar: () => null,
 }));
 
 jest.mock('@/components/ui/badge', () => ({

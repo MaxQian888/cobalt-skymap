@@ -118,7 +118,7 @@ describe('FeedbackDialog', () => {
     mockCollectDiagnostics.mockResolvedValue({
       generatedAt: '2026-02-20T00:00:00.000Z',
       app: {
-        name: 'SkyMap',
+        name: 'Cobalt Skymap',
         version: '0.1.0',
         buildDate: '2026-02-20',
         environment: 'web',
@@ -150,7 +150,7 @@ describe('FeedbackDialog', () => {
     mockCollectDiagnostics.mockResolvedValue({
       generatedAt: '2026-02-20T00:00:00.000Z',
       app: {
-        name: 'SkyMap',
+        name: 'Cobalt Skymap',
         version: '0.1.0',
         buildDate: '2026-02-20',
         environment: 'web',

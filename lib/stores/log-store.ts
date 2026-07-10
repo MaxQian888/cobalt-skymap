@@ -96,13 +96,24 @@ const initialFilter: LogFilter = {
 export const useLogStore = create<LogStore>((set, get) => {
   // Subscribe to log changes
   let unsubscribe: (() => void) | null = null;
-  
+  let lastNotifySignature = '';
+
   const setupSubscription = () => {
     if (unsubscribe) {
       unsubscribe();
     }
-    
-    unsubscribe = onLogsChanged(() => {
+
+    unsubscribe = onLogsChanged((logs) => {
+      // Skip redundant refreshes when a throttled notification carries no new
+      // information (same count, same trailing entry). Guards against feedback
+      // loops where a refresh-driven re-render emits an identical log. Explicit
+      // refresh() callers (filters, panel open) bypass this and always apply.
+      const last = logs[logs.length - 1];
+      const signature = last
+        ? `${logs.length}:${(last.lastTimestamp ?? last.timestamp).getTime()}:${last.occurrenceCount ?? 1}`
+        : `${logs.length}`;
+      if (signature === lastNotifySignature) return;
+      lastNotifySignature = signature;
       get().refresh();
     });
   };

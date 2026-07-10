@@ -105,8 +105,8 @@ export function TimeTab({
   }, [dateTimeInput, jdInput, longitudeInput, mjdInput, mode, raInput, t]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-3">
+    <div className="flex flex-1 min-h-0 flex-col gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 shrink-0">
         <div className="space-y-1.5">
           <Label className="text-xs">{t('astroCalc.timeInputMode')}</Label>
           <select
@@ -157,20 +157,20 @@ export function TimeTab({
       </div>
 
       {computed.error && (
-        <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+        <div className="shrink-0 flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
           <AlertTriangle className="h-3.5 w-3.5" />
           {computed.error}
         </div>
       )}
 
       {!computed.error && computed.date && (
-        <>
-          <div className="flex items-center gap-2">
+        <div className="min-h-0 flex-1 overflow-y-auto space-y-4 pr-1">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{t('astroCalc.utc')}: {computed.date.toISOString()}</Badge>
             <Badge variant="secondary">{t('astroCalc.local')}: {computed.date.toLocaleString()}</Badge>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-lg border p-3 bg-card">
               <div className="flex items-center gap-2 mb-2">
                 <Clock3 className="h-4 w-4 text-primary" />
@@ -192,7 +192,7 @@ export function TimeTab({
               </div>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

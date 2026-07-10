@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -19,6 +20,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import { MarkerIconDisplay } from '@/lib/constants/marker-icons';
+import { parseRACoordinate, parseDecCoordinate } from '@/lib/astronomy/coordinates/conversions';
+import { degreesToHMS, degreesToDMS } from '@/lib/astronomy/starmap-utils';
 import {
   type SkyMarker,
   type MarkerIcon,
@@ -48,6 +51,44 @@ export function MarkerEditDialog({
   onSave,
   t,
 }: MarkerEditDialogProps) {
+  // Editable coordinate text (create AND edit). Accepts decimal degrees and
+  // sexagesimal ("00h42m44s" / "+41°16'09\"") via the shared parsers; the
+  // numeric ra/dec plus canonical strings propagate into formData when valid.
+  const [raText, setRaText] = useState('');
+  const [decText, setDecText] = useState('');
+  const [raValid, setRaValid] = useState(true);
+  const [decValid, setDecValid] = useState(true);
+
+  useEffect(() => {
+    if (!open) return;
+    setRaText(formData.raString || degreesToHMS(formData.ra));
+    setDecText(formData.decString || degreesToDMS(formData.dec));
+    setRaValid(true);
+    setDecValid(true);
+  // Re-seed only when the dialog opens (formData itself changes on every keystroke).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const handleRaChange = (value: string) => {
+    setRaText(value);
+    const parsed = parseRACoordinate(value);
+    setRaValid(parsed !== null);
+    if (parsed !== null) {
+      onFormDataChange({ ...formData, ra: parsed, raString: degreesToHMS(parsed) });
+    }
+  };
+
+  const handleDecChange = (value: string) => {
+    setDecText(value);
+    const parsed = parseDecCoordinate(value);
+    setDecValid(parsed !== null);
+    if (parsed !== null) {
+      onFormDataChange({ ...formData, dec: parsed, decString: degreesToDMS(parsed) });
+    }
+  };
+
+  const coordinatesValid = raValid && decValid;
+
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange} tier="standard-form">
       <ResponsiveDialogContent className="sm:max-w-md max-h-[92vh] max-h-[92dvh] overflow-hidden flex flex-col">
@@ -78,14 +119,37 @@ export function MarkerEditDialog({
             />
           </div>
 
-          {!editingMarker && formData.raString && (
+          <div className="grid grid-cols-2 gap-2">
             <div className="grid gap-2">
-              <Label>{t('coordinates.coordinates')}</Label>
-              <div className="text-sm font-mono bg-muted p-2 rounded">
-                RA: {formData.raString} / Dec: {formData.decString}
-              </div>
+              <Label htmlFor="marker-ra">{t('coordinates.ra')}</Label>
+              <Input
+                id="marker-ra"
+                value={raText}
+                onChange={(e) => handleRaChange(e.target.value)}
+                placeholder="00h 42m 44s"
+                autoComplete="off"
+                className="font-mono"
+                aria-invalid={!raValid}
+              />
             </div>
-          )}
+            <div className="grid gap-2">
+              <Label htmlFor="marker-dec">{t('coordinates.dec')}</Label>
+              <Input
+                id="marker-dec"
+                value={decText}
+                onChange={(e) => handleDecChange(e.target.value)}
+                placeholder={'+41° 16\' 09"'}
+                autoComplete="off"
+                className="font-mono"
+                aria-invalid={!decValid}
+              />
+            </div>
+            {!coordinatesValid && (
+              <p className="col-span-2 text-xs text-destructive" data-testid="marker-coords-error">
+                {t('coordinates.invalidCoordinates')}
+              </p>
+            )}
+          </div>
 
           <div className="grid gap-2">
             <Label>{t('markers.icon')}</Label>
@@ -174,7 +238,7 @@ export function MarkerEditDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
-          <Button onClick={onSave} disabled={!formData.name.trim()}>
+          <Button onClick={onSave} disabled={!formData.name.trim() || !coordinatesValid}>
             {t('common.save')}
           </Button>
         </ResponsiveDialogFooter>

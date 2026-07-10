@@ -112,4 +112,87 @@ describe('useStellariumEvents', () => {
 
     expect(callback).not.toHaveBeenCalled();
   });
+
+  describe('long-press progress feedback', () => {
+    function makeTouchEvent(type: string, touches: Array<{ clientX: number; clientY: number }>) {
+      const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
+      Object.defineProperty(event, 'touches', { value: touches, configurable: true });
+      return event;
+    }
+
+    function setup() {
+      const container = document.createElement('div');
+      container.getBoundingClientRect = jest.fn(() => ({
+        left: 10, top: 20, width: 800, height: 600, right: 810, bottom: 620, x: 10, y: 20, toJSON: () => ({}),
+      })) as never;
+      const onContextMenu = jest.fn();
+      const onLongPressStateChange = jest.fn();
+
+      renderHook(() => {
+        const containerRef = useRef<HTMLDivElement | null>(container);
+        useStellariumEvents({
+          containerRef,
+          getClickCoordinates: () => ({ ra: 1, dec: 2, raStr: '00h', decStr: '+00d' }),
+          onContextMenu,
+          onLongPressStateChange,
+        });
+      });
+
+      return { container, onContextMenu, onLongPressStateChange };
+    }
+
+    afterEach(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (navigator as any).vibrate;
+    });
+
+    it('reports the container-relative press point, then null when the press fires', () => {
+      const { container, onContextMenu, onLongPressStateChange } = setup();
+
+      container.dispatchEvent(makeTouchEvent('touchstart', [{ clientX: 110, clientY: 220 }]));
+      expect(onLongPressStateChange).toHaveBeenCalledWith({ x: 100, y: 200 });
+
+      jest.advanceTimersByTime(600);
+      expect(onLongPressStateChange).toHaveBeenLastCalledWith(null);
+      expect(onContextMenu).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the indicator when the touch moves too far (press cancelled)', () => {
+      const { container, onContextMenu, onLongPressStateChange } = setup();
+
+      container.dispatchEvent(makeTouchEvent('touchstart', [{ clientX: 110, clientY: 220 }]));
+      container.dispatchEvent(makeTouchEvent('touchmove', [{ clientX: 140, clientY: 220 }]));
+
+      expect(onLongPressStateChange).toHaveBeenLastCalledWith(null);
+      jest.advanceTimersByTime(1000);
+      expect(onContextMenu).not.toHaveBeenCalled();
+    });
+
+    it('clears the indicator on touch end before the timer', () => {
+      const { container, onLongPressStateChange } = setup();
+
+      container.dispatchEvent(makeTouchEvent('touchstart', [{ clientX: 110, clientY: 220 }]));
+      container.dispatchEvent(makeTouchEvent('touchend', []));
+
+      expect(onLongPressStateChange).toHaveBeenLastCalledWith(null);
+    });
+
+    it('vibrates when the long press fires and the API exists', () => {
+      const vibrate = jest.fn();
+      Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+      const { container } = setup();
+
+      container.dispatchEvent(makeTouchEvent('touchstart', [{ clientX: 110, clientY: 220 }]));
+      jest.advanceTimersByTime(600);
+
+      expect(vibrate).toHaveBeenCalledWith(50);
+    });
+
+    it('does not crash when the vibrate API is absent', () => {
+      const { container, onContextMenu } = setup();
+      container.dispatchEvent(makeTouchEvent('touchstart', [{ clientX: 110, clientY: 220 }]));
+      expect(() => jest.advanceTimersByTime(600)).not.toThrow();
+      expect(onContextMenu).toHaveBeenCalled();
+    });
+  });
 });

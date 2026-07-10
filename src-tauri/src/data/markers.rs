@@ -82,13 +82,33 @@ pub struct MarkerUpdateInput {
 }
 
 /// Markers data container
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarkersData {
     pub markers: Vec<SkyMarker>,
     pub groups: Vec<String>,
+    /// Markers are shown by default — must stay in sync with the frontend
+    /// default (`showMarkers: true` in lib/stores/marker-store.ts). The merge
+    /// tie-break there lets a remote snapshot win at equal timestamps, so a
+    /// `false` default here would silently switch markers off on first sync.
+    #[serde(default = "default_show_markers")]
     pub show_markers: bool,
     #[serde(default)]
     pub show_markers_updated_at: i64,
+}
+
+fn default_show_markers() -> bool {
+    true
+}
+
+impl Default for MarkersData {
+    fn default() -> Self {
+        Self {
+            markers: Vec::new(),
+            groups: Vec::new(),
+            show_markers: true,
+            show_markers_updated_at: 0,
+        }
+    }
 }
 
 fn get_markers_path(app: &AppHandle) -> Result<PathBuf, StorageError> {
@@ -506,7 +526,21 @@ mod tests {
         let data = MarkersData::default();
         assert!(data.markers.is_empty());
         assert!(data.groups.is_empty());
-        assert!(!data.show_markers); // Default is false
+        assert!(data.show_markers); // Matches the frontend default (markers visible)
+        assert_eq!(data.show_markers_updated_at, 0);
+    }
+
+    #[test]
+    fn test_markers_data_deserialization_without_show_markers() {
+        // Legacy markers.json written before show_markers existed must still
+        // deserialize (and default to visible) instead of failing the whole load.
+        let json = r##"{
+            "markers": [],
+            "groups": ["Default"]
+        }"##;
+
+        let data: MarkersData = serde_json::from_str(json).unwrap();
+        assert!(data.show_markers);
         assert_eq!(data.show_markers_updated_at, 0);
     }
 

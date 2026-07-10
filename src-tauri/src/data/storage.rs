@@ -1,4 +1,4 @@
-//! Storage module for SkyMap application
+//! Storage module for Cobalt Skymap application
 //! Provides file-based persistent storage for the desktop application
 
 use chrono::{DateTime, Utc};

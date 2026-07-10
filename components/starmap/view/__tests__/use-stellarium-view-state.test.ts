@@ -21,7 +21,7 @@ const mockUpdateViewDirection = jest.fn();
 const mockSetViewDirectionRaw = jest.fn();
 
 let mockViewDirection = { ra: Math.PI, dec: Math.PI / 6 };
-let mockStel: { ready: boolean } | null = { ready: true };
+let mockStel: { ready: boolean; core?: { selection: unknown } } | null = { ready: true };
 let mockMountConnected = false;
 let mockSkyEngine = 'stellarium';
 let mockSkipCloseConfirmation = false;
@@ -56,19 +56,24 @@ jest.mock('next-intl', () => ({
 }));
 
 jest.mock('@/lib/stores', () => ({
-  useStellariumStore: jest.fn(
-    (selector: (state: {
-      stel: typeof mockStel;
-      setViewDirection: typeof mockSetViewDirectionRaw;
-      viewDirection: typeof mockViewDirection;
-      updateViewDirection: typeof mockUpdateViewDirection;
-    }) => unknown) =>
-      selector({
-        stel: mockStel,
-        setViewDirection: mockSetViewDirectionRaw,
-        viewDirection: mockViewDirection,
-        updateViewDirection: mockUpdateViewDirection,
-      }),
+  useStellariumStore: Object.assign(
+    jest.fn(
+      (selector: (state: {
+        stel: typeof mockStel;
+        setViewDirection: typeof mockSetViewDirectionRaw;
+        viewDirection: typeof mockViewDirection;
+        updateViewDirection: typeof mockUpdateViewDirection;
+      }) => unknown) =>
+        selector({
+          stel: mockStel,
+          setViewDirection: mockSetViewDirectionRaw,
+          viewDirection: mockViewDirection,
+          updateViewDirection: mockUpdateViewDirection,
+        }),
+    ),
+    {
+      getState: jest.fn(() => ({ stel: mockStel })),
+    },
   ),
   useFramingStore: jest.fn(
     (selector: (state: {
@@ -150,6 +155,13 @@ jest.mock('@/lib/hooks', () => ({
     selector({
       push: mockNavigationPush,
     })),
+}));
+
+// The anchor hook subscribes to the global animation loop, which recurses
+// forever under this file's synchronous requestAnimationFrame stub — it has
+// its own dedicated test (use-selection-anchor.test.ts).
+jest.mock('../use-selection-anchor', () => ({
+  useSelectionAnchor: jest.fn(() => undefined),
 }));
 
 import {
@@ -328,6 +340,62 @@ describe('useStellariumViewState', () => {
       Dec: 56.78,
     });
     expect(mockSetShowFramingModal).toHaveBeenCalledWith(true);
+  });
+
+  it('handleDeselectObject clears the engine selection, target context, and local state', () => {
+    mockStel = { ready: true, core: { selection: { designations: () => ['M42'] } } };
+    const { result } = renderHook(() => useStellariumViewState());
+    const selectedObject = createSelectedObject();
+
+    act(() => {
+      result.current.handleSelectionChange(selectedObject as never);
+    });
+
+    expect(result.current.selectedObject).toEqual(selectedObject);
+    expect(useMapInteractionStore.getState().targetContext).not.toBeNull();
+
+    act(() => {
+      result.current.handleDeselectObject();
+    });
+
+    expect(mockStel?.core?.selection).toBeNull();
+    expect(useMapInteractionStore.getState().targetContext).toBeNull();
+    expect(result.current.selectedObject).toBeNull();
+  });
+
+  it('handleDeselectObject clears local state without an engine (Aladin path)', () => {
+    mockStel = null;
+    const { result } = renderHook(() => useStellariumViewState());
+    const selectedObject = createSelectedObject();
+
+    act(() => {
+      result.current.handleSelectionChange(selectedObject as never);
+    });
+
+    act(() => {
+      result.current.handleDeselectObject();
+    });
+
+    expect(useMapInteractionStore.getState().targetContext).toBeNull();
+    expect(result.current.selectedObject).toBeNull();
+  });
+
+  it('opening search clears the engine selection along with the local one', () => {
+    mockStel = { ready: true, core: { selection: { designations: () => ['M42'] } } };
+    const { result } = renderHook(() => useStellariumViewState());
+    const selectedObject = createSelectedObject();
+
+    act(() => {
+      result.current.handleSelectionChange(selectedObject as never);
+    });
+
+    act(() => {
+      result.current.toggleSearch();
+    });
+
+    expect(result.current.isSearchOpen).toBe(true);
+    expect(mockStel?.core?.selection).toBeNull();
+    expect(result.current.selectedObject).toBeNull();
   });
 
   it('drives canvas, navigation, and context-menu handlers', () => {

@@ -16,7 +16,7 @@ describe('HeroSection', () => {
   it('renders the hero copy, launch link and platform badges', () => {
     render(<HeroSection />);
 
-    expect(screen.getByText('SkyMap')).toBeInTheDocument();
+    expect(screen.getByText('Cobalt Skymap')).toBeInTheDocument();
     expect(screen.getByText('hero.badge')).toBeInTheDocument();
     expect(screen.getByText('hero.tagline')).toBeInTheDocument();
     expect(screen.getByText('hero.description')).toBeInTheDocument();

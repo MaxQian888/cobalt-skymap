@@ -62,6 +62,7 @@ import {
   EyeOff,
   Trash,
   Tag,
+  Compass,
   Download,
   Upload,
   Pencil,
@@ -109,7 +110,7 @@ export function MarkerManager({ initialCoords, onNavigateToMarker }: MarkerManag
   // Subscribe only to reactive state values (triggers re-render on change)
   const {
     markers, groups, groupVisibility, activeMarkerId, showMarkers, showLabels, globalMarkerSize, sortBy,
-    pendingCoords, editingMarkerId,
+    pendingCoords, editingMarkerId, showOffscreenIndicators,
   } = useMarkerStore(useShallow((state) => ({
     markers: state.markers,
     groups: state.groups,
@@ -121,6 +122,7 @@ export function MarkerManager({ initialCoords, onNavigateToMarker }: MarkerManag
     sortBy: state.sortBy,
     pendingCoords: state.pendingCoords,
     editingMarkerId: state.editingMarkerId,
+    showOffscreenIndicators: state.showOffscreenIndicators,
   })));
 
   // Actions are referentially stable — access via getState() to avoid re-render overhead
@@ -130,6 +132,7 @@ export function MarkerManager({ initialCoords, onNavigateToMarker }: MarkerManag
     clearAllMarkers, setPendingCoords, setEditingMarkerId,
     renameGroup, removeGroup, exportMarkers, importMarkers,
     setGroupVisibility, selectMarkerForNavigation, setActiveMarker,
+    setShowOffscreenIndicators,
   } = useMarkerStore.getState();
   const setViewDirection = useStellariumStore((state) => state.setViewDirection);
 
@@ -256,6 +259,11 @@ export function MarkerManager({ initialCoords, onNavigateToMarker }: MarkerManag
         color: formData.color,
         icon: formData.icon,
         group: formData.group,
+        // Coordinates are editable in the dialog now — persist them too.
+        ra: formData.ra,
+        dec: formData.dec,
+        raString: formData.raString,
+        decString: formData.decString,
       });
     } else {
       const id = addMarker({
@@ -418,6 +426,20 @@ export function MarkerManager({ initialCoords, onNavigateToMarker }: MarkerManag
                   <TooltipContent>
                     {showLabels ? t('markers.hideLabels') : t('markers.showLabels')}
                   </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      data-testid="marker-offscreen-toggle"
+                      className={cn('h-8 w-8', showOffscreenIndicators && 'bg-accent')}
+                      onClick={() => setShowOffscreenIndicators(!showOffscreenIndicators)}
+                    >
+                      <Compass className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('markers.offscreenIndicators')}</TooltipContent>
                 </Tooltip>
                 <Button
                   variant="ghost"

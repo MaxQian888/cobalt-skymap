@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, memo, createElement } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, createElement } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   X,
@@ -20,6 +20,8 @@ import {
   ArrowUp,
   Copy,
   Check,
+  AlertTriangle,
+  RotateCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,16 +39,28 @@ import {
   DrawerDescription,
   DrawerFooter,
 } from '@/components/ui/drawer';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useMobileShell } from '../view/use-mobile-shell';
+import { formatRA, formatDec } from '@/lib/astronomy/coordinates/formats';
 
 import { ObjectImageGallery } from './object-image-gallery';
 import { RiseTransitSetGrid } from './rise-transit-set-grid';
+import { SatelliteInfoNotice } from './satellite-info-notice';
 import { FeasibilityBadge } from '../planning/feasibility-badge';
 import { AltitudeChartCompact } from './altitude-chart-compact';
 import { SlewConfirmDialog } from '../mount/slew-confirm-dialog';
 import { openExternalUrl } from '@/lib/tauri/app-control-api';
 import { useMountStore } from '@/lib/stores';
 import { useMapInteractionStore } from '@/lib/stores/map-interaction-store';
-import { useCelestialName, useAstroEnvironment, useTargetAstroData, useObjectActions } from '@/lib/hooks';
+import { useCelestialName, useAstroEnvironment, useTargetAstroData, useObjectActions, useHorizonsEphemeris } from '@/lib/hooks';
+import { findHorizonsBody } from '@/lib/services/horizons/service';
 import {
   getCachedObjectInfo,
   enhanceObjectInfo,
@@ -70,6 +84,13 @@ import { clipboardService } from '@/lib/services/clipboard-service';
 
 const logger = createLogger('object-detail-drawer');
 
+/**
+ * Mobile bottom-sheet detents: open at a half-screen peek (header + key facts,
+ * sky still visible and interactive above), drag up for the full sheet.
+ * Module-level constant so vaul sees a stable array identity.
+ */
+const MOBILE_SNAP_POINTS: (number | string)[] = [0.45, 1];
+
 /** Object type icon display component using shared utilities */
 const ObjectTypeIconDisplay = memo(function ObjectTypeIconDisplay({ category }: { category?: string }) {
   const Icon = getObjectTypeIcon(category);
@@ -87,8 +108,23 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
   const [objectInfo, setObjectInfo] = useState<ObjectDetailedInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const [copied, setCopied] = useState(false);
+
+  // Desktop docks the drawer to the right edge (keeps the sky map visible);
+  // the mobile shell keeps the bottom sheet. Single source of truth = 900px
+  // shell decision (useMobileShell), matching the rest of the starmap layout.
+  const { isMobileShell } = useMobileShell();
+  const drawerDirection = isMobileShell ? 'bottom' : 'right';
+
+  // Mobile snap state — reopen always starts at the peek detent.
+  const [activeSnap, setActiveSnap] = useState<number | string | null>(MOBILE_SNAP_POINTS[0]);
+  useEffect(() => {
+    if (open) setActiveSnap(MOBILE_SNAP_POINTS[0]);
+  }, [open]);
+  const isPeeking = isMobileShell && activeSnap !== 1;
 
   const profileInfo = useMountStore((state) => state.profileInfo);
   const siteContext = useMapInteractionStore((state) => state.siteContext);
@@ -132,6 +168,7 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
 
     async function loadInfo() {
       setIsLoading(true);
+      setLoadError(false);
       try {
         const info = await getCachedObjectInfo(
           selectedObject!.names,
@@ -163,6 +200,7 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
       } catch (error) {
         if (controller.signal.aborted) return;
         logger.error('Failed to load object info', error);
+        setLoadError(true);
         setIsLoading(false);
         setIsEnhancing(false);
       }
@@ -176,8 +214,9 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
       setObjectInfo(null);
       setIsLoading(false);
       setIsEnhancing(false);
+      setLoadError(false);
     };
-  }, [open, selectedObject]);
+  }, [open, selectedObject, retryToken]);
 
   // Update time periodically
   useEffect(() => {
@@ -194,18 +233,48 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
   // state and is advanced only by the 30s interval, so an unrelated re-render no
   // longer mints a fresh Date and force-recomputes the astro hooks every render.
   const astroEnv = useAstroEnvironment(latitude, longitude, currentTime);
-  const astroData = useTargetAstroData(selectedObject, latitude, longitude, astroEnv.moonRa, astroEnv.moonDec, currentTime);
+  const astroData = useTargetAstroData(
+    selectedObject,
+    latitude,
+    longitude,
+    astroEnv.moonRa,
+    astroEnv.moonDec,
+    currentTime,
+    objectInfo?.typeCategory,
+  );
+  const isSatellite = astroData?.targetKind === 'satellite';
 
-  const handleCopyCoordinates = useCallback(async () => {
-    if (!selectedObject) return;
-    const coords = `RA: ${selectedObject.ra}\nDec: ${selectedObject.dec}`;
+  // High-precision JPL Horizons reference position for major solar-system
+  // bodies (parity with the compact InfoPanel).
+  const horizonsBody = selectedObject ? findHorizonsBody(selectedObject.names) : null;
+  const horizons = useHorizonsEphemeris(horizonsBody, open && Boolean(horizonsBody));
+
+  const copyCoordinates = useCallback(async (text: string) => {
     try {
-      await clipboardService.writeText(coords);
+      await clipboardService.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       logger.warn('Failed to copy coordinates', error);
     }
+  }, []);
+
+  // Multiple copy formats derived from the precise degree values
+  // (selectedObject.ra/dec are pre-formatted strings; raDeg/decDeg are exact).
+  const coordinateFormats = useMemo(() => {
+    if (!selectedObject) return null;
+    const { raDeg, decDeg } = selectedObject;
+    const hmsRa = formatRA(raDeg);
+    const hmsDec = formatDec(decDeg);
+    const degRa = `${raDeg.toFixed(5)}°`;
+    const degDec = `${decDeg.toFixed(5)}°`;
+    return {
+      hms: { ra: hmsRa, dec: hmsDec, combined: `RA: ${hmsRa}\nDec: ${hmsDec}` },
+      degrees: { ra: degRa, dec: degDec, combined: `RA: ${degRa}\nDec: ${degDec}` },
+      // Bare space-separated decimal pair — convenient for plate-solving /
+      // planetarium input fields.
+      decimalPair: `${raDeg.toFixed(6)} ${decDeg.toFixed(6)}`,
+    };
   }, [selectedObject]);
 
 
@@ -230,13 +299,47 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
   const degradedDiagnostics = objectInfo?.diagnostics.filter((diagnostic) => diagnostic.status === 'error' || diagnostic.status === 'empty') ?? [];
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer
+      // Clean remount if the 900px shell boundary is crossed while open —
+      // vaul cannot swap direction/snap configuration on a live drawer.
+      key={drawerDirection}
+      open={open}
+      onOpenChange={onOpenChange}
+      direction={drawerDirection}
+      {...(isMobileShell
+        ? {
+            snapPoints: MOBILE_SNAP_POINTS,
+            activeSnapPoint: activeSnap,
+            setActiveSnapPoint: setActiveSnap,
+            // Keep the sky interactive above the peek detent; vaul disables
+            // the overlay automatically in non-modal mode.
+            modal: false,
+            // A hard fling from full lands on peek instead of dismissing.
+            snapToSequentialPoint: true,
+          }
+        : {})}
+    >
       <DrawerContent
         data-starmap-ui-control="true"
-        className="w-full min-h-0 max-h-[calc(100dvh-var(--safe-area-top)-0.5rem)] bg-background/95 backdrop-blur-md"
+        // Re-expose the shell decision on the portaled drawer root so the
+        // shell-desktop:/shell-mobile: variants inside resolve correctly (vaul
+        // portals this outside the [data-shell] view root).
+        data-shell={isMobileShell ? 'mobile' : 'desktop'}
+        data-peeking={isPeeking ? 'true' : undefined}
+        className={cn(
+          'flex flex-col bg-background/95 backdrop-blur-md',
+          drawerDirection === 'bottom'
+            // With snap points vaul positions the sheet via transform, so the
+            // content must be full-height; the visible fraction is the snap.
+            ? 'h-full w-full min-h-0 max-h-[calc(100dvh-var(--safe-area-top)-0.5rem)]'
+            // Right-docked side panel on desktop: full height, comfortable width.
+            : 'h-full w-full sm:max-w-md',
+        )}
       >
-        {/* Handle */}
-        <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-muted" />
+        {/* Drag handle — only the bottom sheet needs the pull affordance */}
+        {drawerDirection === 'bottom' && (
+          <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-muted" />
+        )}
 
         <DrawerHeader className="mx-auto w-full max-w-2xl pb-2">
           <div className="flex items-start justify-between">
@@ -246,7 +349,7 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
                 {displayName}
               </DrawerTitle>
               <DrawerDescription className="sr-only">
-                {t('objectDetail.observation')}
+                {t('objectDetail.drawerDescription', { name: displayName })}
               </DrawerDescription>
               {selectedObject && selectedObject.names.length > 1 && (
                 <p className="text-sm text-muted-foreground mt-0.5 truncate">
@@ -298,8 +401,41 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
           </div>
         </DrawerHeader>
 
-        <ScrollArea className="min-h-0 flex-1 overscroll-contain px-4 pb-3">
+        <ScrollArea
+          className={cn(
+            'min-h-0 flex-1 overscroll-contain px-4 pb-3',
+            // vaul's scroll-inside-snap pattern: while peeking, inner scroll is
+            // locked so a drag on the content moves the sheet between detents;
+            // scrolling unlocks at the full detent.
+            isPeeking && '[&_[data-slot=scroll-area-viewport]]:!overflow-hidden',
+          )}
+        >
           <div className="mx-auto w-full max-w-2xl">
+          {/* Load failure banner — the astro sections below still work from
+              the selection itself, so the drawer degrades instead of going
+              silently blank. */}
+          {loadError && (
+            <Card
+              data-testid="object-drawer-load-error"
+              className="mb-3 border-destructive/40 bg-destructive/10 py-2 shadow-none"
+            >
+              <CardContent className="flex items-center justify-between gap-2 px-3 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-destructive" />
+                  {t('objectDetail.loadError')}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 shrink-0 text-xs"
+                  onClick={() => setRetryToken((n) => n + 1)}
+                >
+                  <RotateCw className="mr-1 h-3 w-3" />
+                  {t('common.retry')}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-9 w-full rounded-lg" />
@@ -369,18 +505,41 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       {t('coordinates.title')}
                     </CardTitle>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs touch-target"
-                      onClick={handleCopyCoordinates}
-                    >
-                      {copied ? (
-                        <><Check className="h-3 w-3 mr-1 text-green-400" />{t('common.copied')}</>
-                      ) : (
-                        <><Copy className="h-3 w-3 mr-1" />{t('common.copy')}</>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs touch-target"
+                          disabled={!coordinateFormats}
+                          aria-label={t('coordinates.copyAs')}
+                        >
+                          {copied ? (
+                            <><Check className="h-3 w-3 mr-1 text-green-400" />{t('common.copied')}</>
+                          ) : (
+                            <><Copy className="h-3 w-3 mr-1" />{t('common.copy')}</>
+                          )}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      {coordinateFormats && (
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuLabel>{t('coordinates.copyAs')}</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => copyCoordinates(coordinateFormats.hms.combined)}>
+                            <span className="flex-1">{t('coordinates.formatHms')}</span>
+                            <span className="ml-2 font-mono text-[10px] text-muted-foreground">{coordinateFormats.hms.ra}</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => copyCoordinates(coordinateFormats.degrees.combined)}>
+                            <span className="flex-1">{t('coordinates.formatDegrees')}</span>
+                            <span className="ml-2 font-mono text-[10px] text-muted-foreground">{coordinateFormats.degrees.ra}</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => copyCoordinates(coordinateFormats.decimalPair)}>
+                            <span className="flex-1">{t('coordinates.formatDecimalPair')}</span>
+                            <span className="ml-2 font-mono text-[10px] text-muted-foreground">{coordinateFormats.decimalPair}</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
                       )}
-                    </Button>
+                    </DropdownMenu>
                   </CardHeader>
                   <CardContent className="space-y-2 px-3">
                     <div className="grid grid-cols-2 gap-3">
@@ -399,6 +558,30 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
                         <p className="font-mono text-sm">{identitySection?.coordinates.dec ?? selectedObject?.dec}</p>
                       </div>
                     </div>
+                    {/* JPL Horizons high-precision reference position */}
+                    {horizons.row && (
+                      <div className="flex items-center gap-1.5 text-xs" data-testid="object-drawer-horizons-position">
+                        <Badge variant="outline" className="text-[10px] shrink-0">
+                          {t('coordinates.jplHorizons')}
+                        </Badge>
+                        <span className="font-mono text-muted-foreground">
+                          {horizons.row.raDeg.toFixed(4)}°, {horizons.row.decDeg.toFixed(4)}°
+                        </span>
+                      </div>
+                    )}
+
+                    {/* How positions evolve for this object */}
+                    {astroData?.targetKind === 'solar_system' && (
+                      <p className="text-[11px] text-muted-foreground/80" data-testid="object-drawer-position-recomputed">
+                        {t('objectDetail.positionRecomputed')}
+                      </p>
+                    )}
+                    {astroData?.targetKind === 'minor_body' && (
+                      <p className="text-[11px] text-amber-400/80" data-testid="object-drawer-position-snapshot">
+                        {t('objectDetail.positionSnapshot')}
+                      </p>
+                    )}
+
                     {selectionMetadataSection && (
                       <div className="flex flex-wrap gap-2">
                         <Badge variant="outline" className="text-xs">
@@ -412,8 +595,18 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
                   </CardContent>
                 </Card>
 
+                {/* Satellites: fixed-RA/Dec forecasts are meaningless — replace
+                    the position/planning cards with pass predictions. */}
+                {isSatellite && astroData && (
+                  <SatelliteInfoNotice
+                    noradId={astroData.noradId}
+                    latitude={latitude}
+                    longitude={longitude}
+                  />
+                )}
+
                 {/* Current Position */}
-                {liveStatusSection && (
+                {liveStatusSection && !isSatellite && (
                   <Card className="gap-3 border-border/70 bg-muted/20 py-3 shadow-none" data-testid="object-drawer-section-live-status">
                     <CardHeader className="px-3 py-0">
                       <CardTitle className="text-sm font-medium flex items-center gap-1.5">
@@ -655,18 +848,43 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
                 </Card>
               </TabsContent>
 
-              {/* Images Tab */}
+              {/* Images Tab — three-state: gallery / error / loading */}
               <TabsContent value="images" className="mt-0">
-                {objectInfo && (
+                {objectInfo ? (
                   <ObjectImageGallery
                     images={objectInfo.images}
                     objectName={displayName}
                   />
+                ) : loadError ? (
+                  <div
+                    data-testid="object-drawer-images-error"
+                    className="flex flex-col items-center gap-2 rounded-lg border border-border/60 bg-muted/20 py-8 text-xs text-muted-foreground"
+                  >
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    <span>{t('objectDetail.loadError')}</span>
+                    <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setRetryToken((n) => n + 1)}>
+                      <RotateCw className="mr-1 h-3 w-3" />
+                      {t('common.retry')}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2" aria-busy="true" data-testid="object-drawer-images-skeleton">
+                    <span className="sr-only">{t('objectDetail.imagesLoading')}</span>
+                    <Skeleton className="h-48 w-full rounded-lg shell-desktop:h-64" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                  </div>
                 )}
               </TabsContent>
 
               {/* Observation Tab */}
               <TabsContent value="observation" className="space-y-3 mt-0" data-testid="object-drawer-observation-tab">
+                {isSatellite && currentAstro && (
+                  <SatelliteInfoNotice
+                    noradId={currentAstro.noradId}
+                    latitude={latitude}
+                    longitude={longitude}
+                  />
+                )}
                 {currentAstro && planningSection && (
                   <>
                     {/* Rise/Transit/Set */}
@@ -757,6 +975,9 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
                             <AltitudeChartCompact
                               ra={selectedObject.raDeg}
                               dec={selectedObject.decDeg}
+                              positionAt={currentAstro.targetKind === 'solar_system' ? currentAstro.positionAt : undefined}
+                              visibility={currentAstro.targetKind === 'solar_system' ? currentAstro.visibility : undefined}
+                              isSnapshot={currentAstro.positionIsSnapshot}
                             />
                           </div>
                         </CardContent>
@@ -772,11 +993,11 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
 
         {/* Action Buttons - with safe area for mobile */}
         <DrawerFooter className="sticky bottom-0 border-t bg-background/95 p-4 pt-2 pb-[calc(var(--safe-area-bottom)+0.75rem)] backdrop-blur supports-backdrop-filter:bg-background/80">
-          <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 sm:flex-row">
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 shell-desktop:flex-row">
             {mountConnected && (
               <Button
                 variant="outline"
-                className="h-11 w-full border-primary text-primary hover:bg-primary/20 touch-target sm:h-10 sm:flex-1"
+                className="h-11 w-full border-primary text-primary hover:bg-primary/20 touch-target shell-desktop:h-10 shell-desktop:flex-1"
                 onClick={handleSlew}
               >
                 <Crosshair className="h-4 w-4 mr-2" />
@@ -785,7 +1006,7 @@ export const ObjectDetailDrawer = memo(function ObjectDetailDrawer({
             )}
             <Button
               variant="outline"
-              className="h-11 w-full touch-target sm:h-10 sm:flex-1"
+              className="h-11 w-full touch-target shell-desktop:h-10 shell-desktop:flex-1"
               onClick={handleAddToList}
             >
               <Plus className="h-4 w-4 mr-2" />

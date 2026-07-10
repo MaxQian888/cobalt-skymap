@@ -1,7 +1,7 @@
 /**
  * Logger Module
  * 
- * Unified logging system for SkyMap application.
+ * Unified logging system for Cobalt Skymap application.
  * 
  * @example
  * ```typescript

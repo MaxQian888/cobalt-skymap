@@ -1,17 +1,17 @@
 /**
- * SkyMap brand logo icon
+ * Cobalt Skymap brand logo icon
  * A stylized star with compass ring — representing astronomy + navigation
  */
 
 import { cn } from '@/lib/utils';
 
-interface SkyMapLogoProps {
+interface CobaltSkymapLogoProps {
   className?: string;
   style?: React.CSSProperties;
   strokeWidth?: number;
 }
 
-export function SkyMapLogo({ className, style, strokeWidth = 1.5 }: SkyMapLogoProps) {
+export function CobaltSkymapLogo({ className, style, strokeWidth = 1.5 }: CobaltSkymapLogoProps) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"

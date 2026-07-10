@@ -10,7 +10,7 @@ import {
   Heart,
   MessageCircleWarning,
 } from 'lucide-react';
-import { GitHubIcon, SkyMapLogo } from '@/components/icons';
+import { GitHubIcon, CobaltSkymapLogo } from '@/components/icons';
 import {
   Accordion,
   AccordionContent,
@@ -229,7 +229,7 @@ export function AboutDialog() {
         <DialogContent data-testid="about-dialog" className="flex max-h-[85vh] max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]">
           <DialogHeader className="shrink-0 p-6 pb-0">
             <DialogTitle className="flex items-center gap-2">
-              <SkyMapLogo className="h-5 w-5 text-primary" />
+              <CobaltSkymapLogo className="h-5 w-5 text-primary" />
               {t('about.title')}
             </DialogTitle>
             <DialogDescription className="sr-only">
@@ -260,7 +260,7 @@ export function AboutDialog() {
                     <CardHeader className="px-4 pb-0">
                       <div className="flex flex-col items-center gap-4 sm:flex-row">
                         <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/20">
-                          <SkyMapLogo className="h-8 w-8 text-primary" />
+                          <CobaltSkymapLogo className="h-8 w-8 text-primary" />
                         </div>
                         <div className="text-center sm:text-left">
                           <CardTitle>{APP_INFO.name}</CardTitle>
