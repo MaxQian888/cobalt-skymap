@@ -1,6 +1,6 @@
 # 安装指南
 
-本文档详细说明如何在不同操作系统上安装和配置 SkyMap。
+本文档详细说明如何在不同操作系统上安装和配置 Cobalt Skymap。
 
 ## 系统要求
 
@@ -39,7 +39,7 @@
 1. 访问 [Releases 页面](https://github.com/ElementAstro/cobalt-skymap/releases)
 2. 下载 `.dmg` 文件
 3. 打开 DMG 文件
-4. 将 SkyMap 拖拽到 Applications 文件夹
+4. 将 Cobalt Skymap 拖拽到 Applications 文件夹
 
 #### Linux
 
@@ -48,13 +48,13 @@
 3. 添加执行权限：
 
 ```bash
-chmod +x SkyMap-*.AppImage
+chmod +x Cobalt Skymap-*.AppImage
 ```
 
 4. 运行：
 
 ```bash
-./SkyMap-*.AppImage
+./Cobalt Skymap-*.AppImage
 ```
 
 ### 方式二：从源代码构建
@@ -74,7 +74,7 @@ chmod +x SkyMap-*.AppImage
 
 ### 首次启动
 
-首次启动 SkyMap 时，应用会引导您完成初始配置：
+首次启动 Cobalt Skymap 时，应用会引导您完成初始配置：
 
 1. **设置观测位置**
    - 输入您的经纬度坐标
@@ -108,13 +108,13 @@ chmod +x SkyMap-*.AppImage
 ### Windows
 
 1. 打开「控制面板」>「程序和功能」
-2. 找到 SkyMap
+2. 找到 Cobalt Skymap
 3. 右键点击 >「卸载」
 
 ### macOS
 
 1. 打开 Applications 文件夹
-2. 将 SkyMap 拖到废纸篓
+2. 将 Cobalt Skymap 拖到废纸篓
 3. 清空废纸篓
 
 ### Linux
@@ -122,7 +122,7 @@ chmod +x SkyMap-*.AppImage
 删除 AppImage 文件即可，如需清理配置数据：
 
 ```bash
-rm -rf ~/.config/SkyMapTest
+rm -rf ~/.config/Cobalt SkymapTest
 ```
 
 ## 常见安装问题

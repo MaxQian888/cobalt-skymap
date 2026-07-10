@@ -14,16 +14,16 @@
 4. 查看错误日志
 
 日志路径：
-- Windows: `%APPDATA%\SkyMapTest\logs\`
-- macOS: `~/Library/Logs/SkyMapTest/`
-- Linux: `~/.local/share/SkyMapTest/logs/`
+- Windows: `%APPDATA%\Cobalt SkymapTest\logs\`
+- macOS: `~/Library/Logs/Cobalt SkymapTest/`
+- Linux: `~/.local/share/Cobalt SkymapTest/logs/`
 
 ### Q: 如何卸载应用？
 
 **A**:
 - **Windows**: 控制面板 > 程序和功能
 - **macOS**: 删除 Applications 文件夹中的应用
-- **Linux**: 删除 AppImage 文件，并清理 `~/.config/SkyMapTest`
+- **Linux**: 删除 AppImage 文件，并清理 `~/.config/Cobalt SkymapTest`
 
 ## 使用问题
 
@@ -127,7 +127,7 @@
 3. 填写望远镜参数（焦距、口径、类型）
 4. 保存配置
 
-SkyMap 内置常见望远镜预设，可直接选择品牌型号自动填充参数。
+Cobalt Skymap 内置常见望远镜预设，可直接选择品牌型号自动填充参数。
 
 ### Q: 视野计算不准确？
 
@@ -199,7 +199,7 @@ SkyMap 内置常见望远镜预设，可直接选择品牌型号自动填充参�
 
 ### Q: 应用数据是否安全？
 
-**A**: SkyMap 采用多层安全防护：
+**A**: Cobalt Skymap 采用多层安全防护：
 
 1. **数据存储** — 所有数据以 JSON 格式存储在应用专用目录中
 2. **路径沙箱** — 文件操作限制在应用数据目录内
@@ -209,7 +209,7 @@ SkyMap 内置常见望远镜预设，可直接选择品牌型号自动填充参�
 
 ### Q: 网络请求是否安全？
 
-**A**: 是的，SkyMap 实现了以下保护：
+**A**: 是的，Cobalt Skymap 实现了以下保护：
 
 1. **HTTPS 强制** — 所有网络请求默认使用 HTTPS
 2. **URL 验证** — 阻止访问私有 IP 和内部网络
@@ -223,13 +223,13 @@ SkyMap 内置常见望远镜预设，可直接选择品牌型号自动填充参�
 3. 确认操作
 
 或手动删除数据目录：
-- Windows: `%APPDATA%\SkyMapTest\`
-- macOS: `~/Library/Application Support/SkyMapTest/`
-- Linux: `~/.local/share/SkyMapTest/`
+- Windows: `%APPDATA%\Cobalt SkymapTest\`
+- macOS: `~/Library/Application Support/Cobalt SkymapTest/`
+- Linux: `~/.local/share/Cobalt SkymapTest/`
 
 ### Q: 应用会收集用户数据吗？
 
-**A**: 不会。SkyMap 是本地优先应用，所有数据存储在本地，不会向任何服务器发送用户数据。网络请求仅限于获取星图瓦片、天文数据和自动更新检查。
+**A**: 不会。Cobalt Skymap 是本地优先应用，所有数据存储在本地，不会向任何服务器发送用户数据。网络请求仅限于获取星图瓦片、天文数据和自动更新检查。
 
 ## 开发问题
 

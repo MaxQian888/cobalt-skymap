@@ -366,7 +366,7 @@ All jobs upload artifacts that are retained for 7-30 days:
 
 ### GitHub Actions Dashboard
 
-View workflow runs at: `https://github.com/YOUR_ORG/YOUR_REPO/actions`
+View workflow runs at: `https://github.com/ElementAstro/cobalt-skymap/actions`
 
 ### Email Notifications
 

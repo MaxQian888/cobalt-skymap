@@ -1,23 +1,23 @@
 # CrabNebula DevTools
 
-This guide explains how to debug the SkyMap desktop shell with the official CrabNebula DevTools workflow.
+This guide explains how to debug the Cobalt Skymap desktop shell with the official CrabNebula DevTools workflow.
 
 ## Scope
 
 - DevTools support is enabled for desktop debug sessions started with `pnpm tauri dev`.
 - DevTools support is not shipped in production desktop builds.
-- In desktop debug mode, SkyMap enables `tauri-plugin-devtools` and intentionally skips `tauri-plugin-log` because the two plugins conflict.
-- In desktop release mode, SkyMap keeps the existing persistent `tauri-plugin-log` pipeline.
+- In desktop debug mode, Cobalt Skymap enables `tauri-plugin-devtools` and intentionally skips `tauri-plugin-log` because the two plugins conflict.
+- In desktop release mode, Cobalt Skymap keeps the existing persistent `tauri-plugin-log` pipeline.
 
 ## Prerequisites
 
-1. Install the normal SkyMap desktop development prerequisites from the development environment guide.
+1. Install the normal Cobalt Skymap desktop development prerequisites from the development environment guide.
 2. Download and install the CrabNebula DevTools desktop application from CrabNebula.
 3. Keep your local Rust and Tauri toolchain up to date before testing desktop changes.
 
 ## Start a Debug Session
 
-Run SkyMap in desktop development mode:
+Run Cobalt Skymap in desktop development mode:
 
 ```bash
 pnpm tauri dev
@@ -28,11 +28,11 @@ This starts the Next.js frontend, launches the Tauri desktop shell, and register
 ## Attach CrabNebula DevTools
 
 1. Open the CrabNebula DevTools desktop application.
-2. Wait for the running SkyMap desktop process to appear.
-3. Attach to the SkyMap app from the DevTools UI.
+2. Wait for the running Cobalt Skymap desktop process to appear.
+3. Attach to the Cobalt Skymap app from the DevTools UI.
 4. Use the inspector to review windows, commands, events, and runtime logs for the active debug session.
 
-SkyMap currently uses the standalone DevTools workflow. This change does not embed a DevTools panel inside the main application window.
+Cobalt Skymap currently uses the standalone DevTools workflow. This change does not embed a DevTools panel inside the main application window.
 
 ## Expected Logging Behavior
 
@@ -42,11 +42,11 @@ SkyMap currently uses the standalone DevTools workflow. This change does not emb
 
 ## Troubleshooting
 
-### DevTools cannot see the SkyMap app
+### DevTools cannot see the Cobalt Skymap app
 
-- Confirm you started SkyMap with `pnpm tauri dev` instead of a release build.
+- Confirm you started Cobalt Skymap with `pnpm tauri dev` instead of a release build.
 - Confirm the CrabNebula DevTools desktop app is installed and running.
-- Restart both SkyMap and CrabNebula DevTools after dependency or Rust bootstrap changes.
+- Restart both Cobalt Skymap and CrabNebula DevTools after dependency or Rust bootstrap changes.
 
 ### Desktop debug startup fails with logger initialization errors
 
@@ -62,6 +62,6 @@ SkyMap currently uses the standalone DevTools workflow. This change does not emb
 ## Validation Checklist
 
 - Launch `pnpm tauri dev` successfully.
-- Verify the SkyMap desktop process appears in CrabNebula DevTools.
+- Verify the Cobalt Skymap desktop process appears in CrabNebula DevTools.
 - Confirm desktop debug mode does not rely on persisted Rust log files.
 - Confirm release verification still exercises the persistent Tauri log path.

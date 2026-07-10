@@ -1,6 +1,6 @@
 # Windows 打包指南
 
-本文档介绍如何为 Windows 平台构建和打包 SkyMap。
+本文档介绍如何为 Windows 平台构建和打包 Cobalt Skymap。
 
 ## 环境要求
 
@@ -40,9 +40,9 @@ pnpm tauri build
 ```
 src-tauri/target/release/bundle/
 ├── msi/
-│   └── SkyMap_1.0.0_x64_en-US.msi
+│   └── Cobalt Skymap_1.0.0_x64_en-US.msi
 └── nsis/
-    └── SkyMap_1.0.0_x64-setup.exe
+    └── Cobalt Skymap_1.0.0_x64-setup.exe
 ```
 
 ## 安装包类型
@@ -55,7 +55,7 @@ src-tauri/target/release/bundle/
 
 ```powershell
 # 静默安装
-msiexec /i "SkyMap_1.0.0_x64_en-US.msi" /quiet
+msiexec /i "Cobalt Skymap_1.0.0_x64_en-US.msi" /quiet
 ```
 
 ### NSIS 安装包
@@ -102,8 +102,8 @@ pnpm tauri build
 Windows 自动更新依赖 GitHub Releases 中的以下文件：
 
 - `latest.json`
-- `SkyMap_*.zip`
-- `SkyMap_*.zip.sig`
+- `Cobalt Skymap_*.zip`
+- `Cobalt Skymap_*.zip.sig`
 
 当前 updater endpoint：
 
@@ -144,7 +144,7 @@ pnpm tauri signer generate -w
 创建无需安装的便携版：
 
 1. 构建应用
-2. 复制 `src-tauri/target/release/SkyMap.exe`
+2. 复制 `src-tauri/target/release/Cobalt Skymap.exe`
 3. 创建 `portable` 标记文件
 4. 打包为 ZIP
 

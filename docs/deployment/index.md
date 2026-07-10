@@ -1,10 +1,10 @@
 # 部署指南
 
-本指南介绍如何构建和部署 SkyMap 应用程序。
+本指南介绍如何构建和部署 Cobalt Skymap 应用程序。
 
 ## 部署选项
 
-SkyMap 支持多种部署方式：
+Cobalt Skymap 支持多种部署方式：
 
 ### 桌面应用部署
 
@@ -213,10 +213,10 @@ signtool sign /f certificate.pfx /p password /t timestamp_url cobalt-skymap.msi
 # 签名应用
 codesign --sign "Developer ID Application: Your Name" \
     --force --deep \
-    src-tauri/target/release/bundle/macos/SkyMap.app
+    src-tauri/target/release/bundle/macos/Cobalt Skymap.app
 
 # 公证应用（需要 Apple Developer 账号）
-xcrun notarytool submit SkyMap.dmg \
+xcrun notarytool submit Cobalt Skymap.dmg \
     --apple-id "your@email.com" \
     --password "app-specific-password" \
     --team-id "team-id" \
@@ -293,7 +293,7 @@ jobs:
 
 ### 内置更新
 
-SkyMap 桌面端内置自动更新机制：
+Cobalt Skymap 桌面端内置自动更新机制：
 
 - 自动检查更新
 - 下载更新包

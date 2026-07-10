@@ -4,7 +4,7 @@
 
 ## API 概览
 
-SkyMap 后端使用 Rust + Tauri 提供100+命令，按以下模块组织：
+Cobalt Skymap 后端使用 Rust + Tauri 提供100+命令，按以下模块组织：
 
 ```mermaid
 graph TD
@@ -507,9 +507,9 @@ app.handle().plugin(
 
 ### 查看日志
 
-**Windows**: `%APPDATA%\SkyMapTest\logs\`
-**macOS**: `~/Library/Logs/SkyMapTest/`
-**Linux**: `~/.local/state/SkyMapTest/logs/`
+**Windows**: `%APPDATA%\Cobalt SkymapTest\logs\`
+**macOS**: `~/Library/Logs/Cobalt SkymapTest/`
+**Linux**: `~/.local/state/Cobalt SkymapTest/logs/`
 
 ## 安全考虑
 

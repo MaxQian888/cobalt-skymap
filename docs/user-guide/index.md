@@ -1,6 +1,6 @@
 # 用户指南
 
-欢迎使用 SkyMap 用户指南！本章节详细介绍应用的所有功能。
+欢迎使用 Cobalt Skymap 用户指南！本章节详细介绍应用的所有功能。
 
 ## 章节内容
 
@@ -61,7 +61,7 @@
 
 ### 新手入门
 
-如果您是第一次使用 SkyMap：
+如果您是第一次使用 Cobalt Skymap：
 
 1. 阅读[快速开始](../getting-started/index.md)
 2. 了解[基本概念](../getting-started/basic-concepts.md)

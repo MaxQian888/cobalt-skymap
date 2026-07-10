@@ -1,6 +1,6 @@
 # 前端 API 概览
 
-SkyMap 前端 API 分为两大体系：Zustand Stores 与 React Hooks。
+Cobalt Skymap 前端 API 分为两大体系：Zustand Stores 与 React Hooks。
 
 ## Zustand Stores
 
@@ -52,7 +52,7 @@ SkyMap 前端 API 分为两大体系：Zustand Stores 与 React Hooks。
 
 ## React Hooks
 
-SkyMap 提供 37+ 个自定义 React Hooks，按功能域组织。
+Cobalt Skymap 提供 37+ 个自定义 React Hooks，按功能域组织。
 
 ### 设备与环境
 

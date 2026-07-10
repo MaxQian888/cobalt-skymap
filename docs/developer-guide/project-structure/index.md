@@ -1,10 +1,10 @@
 # 项目结构概览
 
-本文档介绍 SkyMap 项目的整体结构和组织方式。
+本文档介绍 Cobalt Skymap 项目的整体结构和组织方式。
 
 ## 项目概览
 
-SkyMap 是一个全栈桌面应用，结合了现代 Web 技术和 Rust 性能优势。
+Cobalt Skymap 是一个全栈桌面应用，结合了现代 Web 技术和 Rust 性能优势。
 
 ```mermaid
 graph TB
@@ -118,7 +118,7 @@ cobalt-skymap/
 **子模块**:
 - `ui/`: 基础组件（button, dialog 等）
 - `common/`: 共享组件（主题切换、语言选择、日志查看器）
-- `icons/`: 品牌图标和 SkyMap logo
+- `icons/`: 品牌图标和 Cobalt Skymap logo
 - `starmap/`: 星图功能组件（详见目录结构）
 
 ### 3. 工具库 (lib/)

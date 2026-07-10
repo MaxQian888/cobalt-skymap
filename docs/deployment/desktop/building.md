@@ -1,6 +1,6 @@
 # 桌面应用构建指南
 
-本文档介绍如何构建 SkyMap 桌面应用。
+本文档介绍如何构建 Cobalt Skymap 桌面应用。
 
 ## 构建前准备
 
@@ -83,7 +83,7 @@ pnpm tauri build
 
 ```json
 {
-  "productName": "SkyMap",
+  "productName": "Cobalt Skymap",
   "version": "1.0.0",
   "identifier": "com.skymap.test"
 }

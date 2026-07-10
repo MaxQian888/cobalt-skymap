@@ -1,6 +1,6 @@
 # 后端架构
 
-本文档详细介绍 SkyMap 的 Tauri/Rust 后端架构设计。
+本文档详细介绍 Cobalt Skymap 的 Tauri/Rust 后端架构设计。
 
 ## 技术栈
 
@@ -259,7 +259,7 @@ pub async fn some_command() -> Result<Data, String> {
 
 ## 安全考虑
 
-SkyMap 后端实现了多层安全防护：
+Cobalt Skymap 后端实现了多层安全防护：
 
 ### 速率限制
 

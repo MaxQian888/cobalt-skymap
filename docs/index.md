@@ -1,8 +1,8 @@
-# SkyMap
+# Cobalt Skymap
 
 ## 项目简介
 
-SkyMap 是一款面向天文爱好者与业余天文学家的现代化桌面星图与观测规划软件。它集成了 Stellarium Web Engine 实现专业级星空渲染，同时提供完备的天文计算、设备管理与观测规划能力，覆盖从「找星」到「出摊」的完整 workflow。
+Cobalt Skymap 是一款面向天文爱好者与业余天文学家的现代化桌面星图与观测规划软件。它集成了 Stellarium Web Engine 实现专业级星空渲染，同时提供完备的天文计算、设备管理与观测规划能力，覆盖从「找星」到「出摊」的完整 workflow。
 
 ## 核心特性
 

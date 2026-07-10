@@ -1,6 +1,6 @@
 # API 参考文档
 
-SkyMap 的 API 参考文档，包括前端和后端接口说明。
+Cobalt Skymap 的 API 参考文档，包括前端和后端接口说明。
 
 ## 文档结构
 

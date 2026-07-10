@@ -1,10 +1,10 @@
 # 桌面应用部署
 
-本章节介绍如何构建和部署 SkyMap 桌面应用。
+本章节介绍如何构建和部署 Cobalt Skymap 桌面应用。
 
 ## 概览
 
-SkyMap 使用 Tauri 2.9 框架构建跨平台桌面应用，支持 Windows、macOS 和 Linux。
+Cobalt Skymap 使用 Tauri 2.9 框架构建跨平台桌面应用，支持 Windows、macOS 和 Linux。
 
 ## 支持平台
 

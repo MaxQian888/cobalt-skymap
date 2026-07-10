@@ -1,4 +1,4 @@
-# SkyMap
+# Cobalt Skymap
 
 A modern desktop star map and astronomy planning application built with **Next.js 16**, **React 19**, and **Tauri 2.9**. It integrates the Stellarium Web Engine for real-time sky visualization and provides a comprehensive toolkit for observation planning, equipment management, and astronomical calculations.
 
@@ -166,7 +166,7 @@ skymap/
 │   │   ├── plate-solving/ # Image capture and online plate solving
 │   │   └── map/           # Leaflet-based location picker
 │   ├── common/            # Shared components (theme, language, log viewer)
-│   ├── icons/             # Brand icons and SkyMap logo
+│   ├── icons/             # Brand icons and Cobalt Skymap logo
 │   └── ui/                # shadcn/ui components
 ├── lib/                    # Core logic
 │   ├── astronomy/         # Astronomical calculations
@@ -241,7 +241,7 @@ cargo test security_tests
 
 ## Security
 
-SkyMap includes defense-in-depth security measures:
+Cobalt Skymap includes defense-in-depth security measures:
 
 - **Rate Limiting** - Sliding-window algorithm prevents API abuse
 - **Input Validation** - Size limits on JSON, CSV, and tile data

@@ -1,10 +1,10 @@
 # 核心模块
 
-本章节介绍 SkyMap 的核心模块架构和实现细节。
+本章节介绍 Cobalt Skymap 的核心模块架构和实现细节。
 
 ## 模块概览
 
-SkyMap 的核心业务逻辑位于 `lib/` 和 `src-tauri/src/` 目录，采用模块化架构设计：
+Cobalt Skymap 的核心业务逻辑位于 `lib/` 和 `src-tauri/src/` 目录，采用模块化架构设计：
 
 ```mermaid
 graph TD

@@ -1,6 +1,6 @@
 # 功能导览
 
-本文档快速介绍 SkyMap 的主要功能。
+本文档快速介绍 Cobalt Skymap 的主要功能。
 
 ## 入门引导流程
 
@@ -24,7 +24,7 @@
 
 ```mermaid
 mindmap
-  root((SkyMap))
+  root((Cobalt Skymap))
     星图显示
       Stellarium 实时渲染
       Aladin Lite 巡天

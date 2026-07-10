@@ -1,6 +1,6 @@
 # 显示设置
 
-本文档说明当前 SkyMap 星图界面的真实可用显示项（Stellarium 模式）。
+本文档说明当前 Cobalt Skymap 星图界面的真实可用显示项（Stellarium 模式）。
 
 ## 入口
 

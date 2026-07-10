@@ -1,10 +1,10 @@
 # 首次运行配置
 
-本文档将指导您完成首次运行 SkyMap 时的初始配置。
+本文档将指导您完成首次运行 Cobalt Skymap 时的初始配置。
 
 ## 配置向导
 
-首次启动 SkyMap 时，应用会自动启动配置向导，引导您完成基本设置。
+首次启动 Cobalt Skymap 时，应用会自动启动配置向导，引导您完成基本设置。
 
 ### 步骤 1：设置观测位置
 
@@ -77,9 +77,9 @@
 
 数据会下载到：
 
-- **Windows**: `C:\Users\<用户名>\AppData\Local\SkyMapTest\cache\`
-- **macOS**: `~/Library/Application Support/SkyMapTest/cache/`
-- **Linux**: `~/.local/share/SkyMapTest/cache/`
+- **Windows**: `C:\Users\<用户名>\AppData\Local\Cobalt SkymapTest\cache\`
+- **macOS**: `~/Library/Application Support/Cobalt SkymapTest/cache/`
+- **Linux**: `~/.local/share/Cobalt SkymapTest/cache/`
 
 ## 基本界面介绍
 
@@ -169,9 +169,9 @@ graph TD
 
 配置文件保存在：
 
-- **Windows**: `C:\Users\<用户名>\AppData\Roaming\SkyMapTest\`
-- **macOS**: `~/Library/Application Support/SkyMapTest/`
-- **Linux**: `~/.config/SkyMapTest/`
+- **Windows**: `C:\Users\<用户名>\AppData\Roaming\Cobalt SkymapTest\`
+- **macOS**: `~/Library/Application Support/Cobalt SkymapTest/`
+- **Linux**: `~/.config/Cobalt SkymapTest/`
 
 ## 下一步
 

@@ -1,6 +1,6 @@
 # 存储 API
 
-本文档介绍 SkyMap 后端的数据存储 API。
+本文档介绍 Cobalt Skymap 后端的数据存储 API。
 
 ## 概览
 

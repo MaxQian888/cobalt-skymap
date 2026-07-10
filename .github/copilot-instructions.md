@@ -1,4 +1,4 @@
-# Copilot Instructions for SkyMap
+# Copilot Instructions for Cobalt Skymap
 
 ## Project Overview
 
@@ -56,7 +56,7 @@ React Component → Zustand Store → lib/tauri/*-api.ts → Tauri invoke() → 
 - `lib/logger/` - Structured logging system with multiple transports
 - `lib/storage/` - Storage abstraction layer (Tauri/Web adapters, Zustand bridge)
 - `components/starmap/` - Star map UI components (canvas, view, search, settings, controls, time, overlays, planning, objects, management, knowledge, mount, onboarding, map)
-- `components/icons/` - Brand icons, SkyMap logo
+- `components/icons/` - Brand icons, Cobalt Skymap logo
 - `src-tauri/src/` - Rust backend modules (astronomy, data, cache, network, platform, mount)
 - `i18n/messages/` - Translation files (en.json, zh.json)
 

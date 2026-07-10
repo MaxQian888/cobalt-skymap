@@ -231,12 +231,12 @@ it('builds a static updater manifest for GitHub Releases', () => {
     assets: [
       {
         platform: 'windows-x86_64',
-        fileName: 'SkyMap_0.2.0_x64_en-US.zip',
+        fileName: 'Cobalt Skymap_0.2.0_x64_en-US.zip',
         signature: 'windows-signature',
       },
       {
         platform: 'darwin-aarch64',
-        fileName: 'SkyMap.app.tar.gz',
+        fileName: 'Cobalt Skymap.app.tar.gz',
         signature: 'mac-signature',
       },
     ],

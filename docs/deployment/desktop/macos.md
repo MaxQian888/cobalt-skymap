@@ -1,6 +1,6 @@
 # macOS 打包指南
 
-本文档介绍如何为 macOS 平台构建和打包 SkyMap。
+本文档介绍如何为 macOS 平台构建和打包 Cobalt Skymap。
 
 ## 环境要求
 
@@ -36,9 +36,9 @@ pnpm tauri build
 ```
 src-tauri/target/release/bundle/
 ├── macos/
-│   └── SkyMap.app
+│   └── Cobalt Skymap.app
 └── dmg/
-    └── SkyMap_1.0.0_x64.dmg
+    └── Cobalt Skymap_1.0.0_x64.dmg
 ```
 
 ## 应用签名

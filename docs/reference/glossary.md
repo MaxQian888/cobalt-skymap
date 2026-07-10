@@ -22,7 +22,7 @@
 
 **Circumpolar（拱极星）** — 对于特定观测者纬度永不落下（或永不升起）的天体。
 
-**Coordinate System（坐标系）** — 用于描述天体位置的数学系统。SkyMap 支持地平、赤道、银河、黄道四种坐标系。
+**Coordinate System（坐标系）** — 用于描述天体位置的数学系统。Cobalt Skymap 支持地平、赤道、银河、黄道四种坐标系。
 
 ### D
 
@@ -30,7 +30,7 @@
 
 **Deep Sky Object（深空天体）** — 除太阳系天体和恒星外的天体，如星云、星团、星系等。
 
-**DSS（Digitized Sky Survey）** — 数字化巡天，SkyMap 支持的星图 survey 之一。
+**DSS（Digitized Sky Survey）** — 数字化巡天，Cobalt Skymap 支持的星图 survey 之一。
 
 ### E
 
@@ -50,7 +50,7 @@
 
 **FITS（Flexible Image Transport System）** — 天文学标准图像格式，包含图像数据和头信息。
 
-**Frame（参考架）** — 描述天体位置的坐标框架。SkyMap 使用 ICRF（国际天球参考架）、CIRS（天球中间参考系）和 OBSERVED（观测参考架）三级管线。
+**Frame（参考架）** — 描述天体位置的坐标框架。Cobalt Skymap 使用 ICRF（国际天球参考架）、CIRS（天球中间参考系）和 OBSERVED（观测参考架）三级管线。
 
 ### H
 
@@ -134,23 +134,23 @@
 
 **Component（组件）** — React 中的可复用 UI 单元。
 
-**Hook（钩子）** — React 特性，允许在函数组件中使用状态和其他 React 功能。SkyMap 拥有 37+ 自定义 hooks。
+**Hook（钩子）** — React 特性，允许在函数组件中使用状态和其他 React 功能。Cobalt Skymap 拥有 37+ 自定义 hooks。
 
-**Store（存储）** — Zustand 中的状态管理单元。SkyMap 拥有 26+ stores。
+**Store（存储）** — Zustand 中的状态管理单元。Cobalt Skymap 拥有 26+ stores。
 
-**shadcn/ui** — 基于 Radix UI 的高质量无障碍组件库，SkyMap 的 UI 基础。
+**shadcn/ui** — 基于 Radix UI 的高质量无障碍组件库，Cobalt Skymap 的 UI 基础。
 
 ### 后端
 
 **IPC Command（IPC 命令）** — 前端通过 Tauri IPC 调用的后端 Rust 函数。
 
-**Tauri** — 使用 Web 技术构建轻量级桌面应用的框架，SkyMap 的桌面运行时。
+**Tauri** — 使用 Web 技术构建轻量级桌面应用的框架，Cobalt Skymap 的桌面运行时。
 
 ### 安全
 
 **Rate Limiting（速率限制）** — 限制单位时间内请求次数的安全机制，防止 API 滥用和资源耗尽。
 
-**SSRF（Server-Side Request Forgery，服务端请求伪造）** — 攻击者诱使服务器向内部资源发起请求的安全漏洞。SkyMap 通过 URL 验证防止此类攻击。
+**SSRF（Server-Side Request Forgery，服务端请求伪造）** — 攻击者诱使服务器向内部资源发起请求的安全漏洞。Cobalt Skymap 通过 URL 验证防止此类攻击。
 
 **Secret Vault（密钥保险箱）** — 通过系统钥匙串安全存储 API 密钥等敏感凭证的机制。
 

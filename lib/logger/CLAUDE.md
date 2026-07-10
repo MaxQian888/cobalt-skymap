@@ -9,7 +9,7 @@
 
 ## Module Responsibility
 
-The `lib/logger` module provides a unified logging system for the SkyMap application. It replaces scattered `console.*` calls with a structured, configurable logging framework that supports:
+The `lib/logger` module provides a unified logging system for the Cobalt Skymap application. It replaces scattered `console.*` calls with a structured, configurable logging framework that supports:
 
 - **Multiple log levels**: DEBUG, INFO, WARN, ERROR
 - **Module-based loggers**: Each module gets its own named logger

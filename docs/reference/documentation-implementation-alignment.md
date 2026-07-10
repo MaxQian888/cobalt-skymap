@@ -6,7 +6,7 @@
 
 在本次对齐前，仓库文档中存在以下高频过时标识：
 
-- 产品名占位：`SkyMap {legacy-test-name}`
+- 产品名占位：`Cobalt Skymap {legacy-test-name}`
 - 仓库名占位：`{legacy-repo-name}`
 - 组织/用户名占位：`{legacy-username-placeholder}`（含大小写变体）
 
@@ -43,6 +43,6 @@
 - 文档新增“能力说明”时，必须至少引用一个实现入口文件。
 - 文档新增“可用性/回退/降级”描述时，必须补充对应验证入口。
 - 发布前执行关键关键词扫描，确保无占位标识残留：
-  - `SkyMap {legacy-test-name}`
+  - `Cobalt Skymap {legacy-test-name}`
   - `{legacy-repo-name}`
   - `{legacy-username-placeholder}`

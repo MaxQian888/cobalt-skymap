@@ -58,7 +58,7 @@ React Component → Zustand Store → lib/tauri/*-api.ts → Tauri invoke() → 
 - `lib/logger/` - Structured logging system with transports
 - `lib/storage/` - Storage abstraction layer (Tauri/Web adapters, Zustand bridge)
 - `components/starmap/` - Star map UI (canvas, view, search, settings, controls, time, overlays, planning, objects, management, knowledge, mount, onboarding, map)
-- `components/icons/` - Brand icons, SkyMap logo, Stellarium/Zustand icons
+- `components/icons/` - Brand icons, Cobalt Skymap logo, Stellarium/Zustand icons
 - `src-tauri/src/` - Rust backend modules (astronomy, data, cache, network, platform, mount)
 - `i18n/messages/` - Translation files (en.json, zh.json)
 

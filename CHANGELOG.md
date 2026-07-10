@@ -1,6 +1,6 @@
 # Changelog
 
-本文件记录 SkyMap 项目的所有重要变更。
+本文件记录 Cobalt Skymap 项目的所有重要变更。
 
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。

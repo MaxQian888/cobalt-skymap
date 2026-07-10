@@ -18,7 +18,7 @@ A desktop star map and astronomy planning application built with Next.js 16 + Ta
 - `components/ui/` Reusable UI components (shadcn patterns).
 - `components/starmap/` Star map feature components (canvas, controls, overlays, planning, objects, management, settings, search, knowledge, mount, map, onboarding).
 - `components/common/` Shared components (theme, language, log viewer, system status).
-- `components/icons/` Brand icons, SkyMap logo, Stellarium/Zustand icons.
+- `components/icons/` Brand icons, Cobalt Skymap logo, Stellarium/Zustand icons.
 - `lib/astronomy/` Pure astronomical calculations (coordinates, time, celestial, visibility, twilight, imaging, engine, horizon, object-resolver, mount-safety).
 - `lib/stores/` Zustand state management (settings, equipment, target-list, markers, stellarium, onboarding, theme, aladin, daily-knowledge, feedback, session-plan, etc.).
 - `lib/tauri/` TypeScript wrappers for Tauri IPC calls (storage, astronomy, events, mount, cache, updater, etc.).

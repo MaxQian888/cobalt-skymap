@@ -1,6 +1,6 @@
-# SkyMap 文档
+# Cobalt Skymap 文档
 
-这是 SkyMap 天文观测桌面应用的完整文档，使用 MkDocs 构建。
+这是 Cobalt Skymap 天文观测桌面应用的完整文档，使用 MkDocs 构建。
 
 ## 文档结构
 

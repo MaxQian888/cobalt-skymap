@@ -1,6 +1,6 @@
 # React Hooks API
 
-SkyMap 提供了一系列自定义 React Hooks，封装常用的业务逻辑。
+Cobalt Skymap 提供了一系列自定义 React Hooks，封装常用的业务逻辑。
 
 ## Hooks 概览
 

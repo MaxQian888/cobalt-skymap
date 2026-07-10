@@ -1,6 +1,6 @@
 # React 组件开发
 
-本文档介绍如何开发 SkyMap 的 React 组件。
+本文档介绍如何开发 Cobalt Skymap 的 React 组件。
 
 ## 组件架构
 

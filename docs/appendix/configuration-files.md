@@ -1,13 +1,13 @@
 # 配置文件说明
 
-本文档说明 SkyMap 使用的配置文件格式和位置。
+本文档说明 Cobalt Skymap 使用的配置文件格式和位置。
 
 ## 配置文件位置
 
 ### Windows
 
 ```
-C:\Users\<用户名>\AppData\Roaming\SkyMapTest\
+C:\Users\<用户名>\AppData\Roaming\Cobalt SkymapTest\
 ├── config.json           # 主配置文件
 ├── equipment.json        # 设备配置
 ├── locations.json        # 位置数据
@@ -17,7 +17,7 @@ C:\Users\<用户名>\AppData\Roaming\SkyMapTest\
 ### macOS
 
 ```
-~/Library/Application Support/SkyMapTest/
+~/Library/Application Support/Cobalt SkymapTest/
 ├── config.json
 ├── equipment.json
 ├── locations.json
@@ -27,7 +27,7 @@ C:\Users\<用户名>\AppData\Roaming\SkyMapTest\
 ### Linux
 
 ```
-~/.config/SkyMapTest/
+~/.config/Cobalt SkymapTest/
 ├── config.json
 ├── equipment.json
 ├── locations.json
@@ -189,19 +189,19 @@ C:\Users\<用户名>\AppData\Roaming\SkyMapTest\
 ### Windows
 
 ```
-C:\Users\<用户名>\AppData\Local\SkyMapTest\cache\
+C:\Users\<用户名>\AppData\Local\Cobalt SkymapTest\cache\
 ```
 
 ### macOS
 
 ```
-~/Library/Caches/SkyMapTest/
+~/Library/Caches/Cobalt SkymapTest/
 ```
 
 ### Linux
 
 ```
-~/.cache/SkyMapTest/
+~/.cache/Cobalt SkymapTest/
 ```
 
 ## 日志文件位置
@@ -209,19 +209,19 @@ C:\Users\<用户名>\AppData\Local\SkyMapTest\cache\
 ### Windows
 
 ```
-C:\Users\<用户名>\AppData\Roaming\SkyMapTest\logs\
+C:\Users\<用户名>\AppData\Roaming\Cobalt SkymapTest\logs\
 ```
 
 ### macOS
 
 ```
-~/Library/Logs/SkyMapTest/
+~/Library/Logs/Cobalt SkymapTest/
 ```
 
 ### Linux
 
 ```
-~/.local/state/SkyMapTest/logs/
+~/.local/state/Cobalt SkymapTest/logs/
 ```
 
 ## 配置文件备份
@@ -238,10 +238,10 @@ C:\Users\<用户名>\AppData\Roaming\SkyMapTest\logs\
 
 ```bash
 # Windows
-copy C:\Users\<用户名>\AppData\Roaming\SkyMapTest D:\Backup
+copy C:\Users\<用户名>\AppData\Roaming\Cobalt SkymapTest D:\Backup
 
 # macOS/Linux
-cp -r ~/Library/Application\ Support/SkyMapTest ~/Backup
+cp -r ~/Library/Application\ Support/Cobalt SkymapTest ~/Backup
 ```
 
 ### 导入配置

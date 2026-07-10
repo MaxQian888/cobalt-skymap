@@ -1,6 +1,6 @@
 # 开发环境概览
 
-本文档介绍 SkyMap 的开发环境配置。
+本文档介绍 Cobalt Skymap 的开发环境配置。
 
 ## 环境要求
 
@@ -120,7 +120,7 @@ Cargo 编译
 
 ```bash
 # .env.local
-NEXT_PUBLIC_APP_NAME=SkyMap
+NEXT_PUBLIC_APP_NAME=Cobalt Skymap
 NODE_ENV=development
 ```
 
@@ -129,7 +129,7 @@ NODE_ENV=development
 ```bash
 # .env.production
 NODE_ENV=production
-NEXT_PUBLIC_APP_NAME=SkyMap
+NEXT_PUBLIC_APP_NAME=Cobalt Skymap
 ```
 
 ## IDE 集成

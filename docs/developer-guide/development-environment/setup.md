@@ -1,6 +1,6 @@
 # 开发环境搭建
 
-本文档详细介绍如何搭建 SkyMap 的开发环境。
+本文档详细介绍如何搭建 Cobalt Skymap 的开发环境。
 
 ## 前置要求
 
@@ -175,7 +175,7 @@ cp .env.example .env.local
 
 ```env
 # 应用配置
-NEXT_PUBLIC_APP_NAME=SkyMap
+NEXT_PUBLIC_APP_NAME=Cobalt Skymap
 NEXT_PUBLIC_APP_VERSION=0.1.0
 
 # API 配置（如果需要）

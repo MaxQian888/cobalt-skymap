@@ -1,6 +1,6 @@
 # Data Module Architecture
 
-本文档介绍 SkyMap 后端的数据管理模块架构。
+本文档介绍 Cobalt Skymap 后端的数据管理模块架构。
 
 ## 模块概览
 

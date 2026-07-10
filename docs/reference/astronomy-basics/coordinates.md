@@ -156,7 +156,7 @@ cos(Az) = (sin(Dec) - sin(Alt) × sin(φ)) / (cos(Alt) × cos(φ))
 
 地球自转轴的短期摆动，周期约 18.6 年。
 
-## 在 SkyMap 中的应用
+## 在 Cobalt Skymap 中的应用
 
 ### 坐标显示
 

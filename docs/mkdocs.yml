@@ -1,8 +1,8 @@
 # MkDocs配置文件
-site_name: SkyMap 文档
-site_description: SkyMap 天文观测桌面应用完整文档
-site_author: SkyMap Team
-copyright: Copyright &copy; 2024 SkyMap Team
+site_name: Cobalt Skymap 文档
+site_description: Cobalt Skymap 天文观测桌面应用完整文档
+site_author: Cobalt Skymap Team
+copyright: Copyright &copy; 2024 Cobalt Skymap Team
 
 # 仓库信息
 repo_name: cobalt-skymap

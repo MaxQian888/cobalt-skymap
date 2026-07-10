@@ -1,6 +1,6 @@
 # 天文学基础
 
-本章节提供天文学基础知识参考，帮助您更好地使用 SkyMap。
+本章节提供天文学基础知识参考，帮助您更好地使用 Cobalt Skymap。
 
 ## 章节内容
 
@@ -54,7 +54,7 @@
 
 ## 坐标参考架
 
-SkyMap 的坐标系统基于现代天球参考架，支持多帧转换：
+Cobalt Skymap 的坐标系统基于现代天球参考架，支持多帧转换：
 
 ### ICRF（国际天球参考架）
 
@@ -75,7 +75,7 @@ SkyMap 的坐标系统基于现代天球参考架，支持多帧转换：
 
 ### 转换管线
 
-SkyMap 使用统一的坐标转换管线（`lib/astronomy/frames.ts` 和 `pipeline.ts`）：
+Cobalt Skymap 使用统一的坐标转换管线（`lib/astronomy/frames.ts` 和 `pipeline.ts`）：
 
 ```
 ICRF (J2000)
@@ -153,7 +153,7 @@ EOP（地球定向参数）基线数据确保离线环境下仍有高精度。
 - **翻转后** - 望远镜位于三脚架西侧（通常目视在右侧）
 - **最佳翻转时机** - 尽量接近中天时进行，以减少目标重新捕获时间
 
-SkyMap 的 **赤道仪安全模拟器**（`lib/astronomy/mount-safety.ts`）可提前计算最佳翻转窗口并检测潜在的支架碰撞。
+Cobalt Skymap 的 **赤道仪安全模拟器**（`lib/astronomy/mount-safety.ts`）可提前计算最佳翻转窗口并检测潜在的支架碰撞。
 
 ## 相关文档
 

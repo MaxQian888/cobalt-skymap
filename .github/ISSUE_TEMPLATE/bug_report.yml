@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem in SkyMap Test.
+description: Report a reproducible problem in Cobalt Skymap.
 title: "[Bug]: "
 labels: ["bug"]
 assignees: []
@@ -50,7 +50,7 @@ body:
   - type: input
     id: app_version
     attributes:
-      label: SkyMap version
+      label: Cobalt Skymap version
       placeholder: e.g. 0.1.0
     validations:
       required: true

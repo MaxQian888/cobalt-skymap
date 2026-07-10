@@ -1,7 +1,7 @@
 # CLAUDE.md
 
-> **Last Updated:** 2026-02-28
-> **Documentation Version:** 1.4.0
+> **Last Updated:** 2026-07-10
+> **Documentation Version:** 1.5.0
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2026-07-10 | 1.5.0 | Rebrand to **Cobalt Skymap**: updated display name across UI/docs/metadata, renamed `SkyMapLogo`→`CobaltSkymapLogo`, aligned repo references to ElementAstro/cobalt-skymap; storage keys/paths and bundle identifier (`com.skymap.desktop`) intentionally preserved for data compatibility |
 | 2026-02-28 | 1.4.0 | Comprehensive sync: added Rust mount module, knowledge UI, icons component, 7 new stores, 19+ new hooks, astronomy engine/horizon/object-resolver subdirs, services daily-knowledge/map-providers/search subdirs, tauri mount/geolocation/map-keys APIs; fixed port references; removed stale llmdoc reference |
 | 2026-02-13 | 1.3.0 | Major update: added mount-safety/simulator modules, event-sources-store, updater-store, use-object-actions/use-in-view hooks; removed titlebar/window-controls; updated module descriptions |
 | 2026-02-11 | 1.2.0 | Added llmdoc/index.md with comprehensive documentation links; updated scan coverage to 98%; added logger module documentation |
@@ -35,7 +36,7 @@ A desktop star map and astronomy planning application built with **Next.js 16** 
 
 ```mermaid
 graph TD
-    A["(root) skymap-test"] --> B["components"];
+    A["(root) cobalt-skymap"] --> B["components"];
     A --> C["lib"];
     A --> D["src-tauri"];
     A --> E["i18n"];
@@ -120,7 +121,7 @@ graph TD
 | **plate-solving** | `lib/plate-solving/` | TS | Astrometry API and FITS parser | — |
 | **security** | `lib/security/` | TS | Frontend security utilities | — |
 | **utils** | `lib/utils/` | TS | Map utilities, observer location, scroll animation | — |
-| **icons** | `components/icons/` | TSX | Brand icons, SkyMap logo, Stellarium/Zustand icons | — |
+| **icons** | `components/icons/` | TSX | Brand icons, Cobalt Skymap logo, Stellarium/Zustand icons | — |
 | **internationalization** | `i18n/` | JSON | English/Chinese translations | [CLAUDE.md](./i18n/CLAUDE.md) |
 | **e2e-tests** | `tests/e2e/` | TS | Playwright end-to-end tests | [CLAUDE.md](./tests/e2e/CLAUDE.md) |
 
