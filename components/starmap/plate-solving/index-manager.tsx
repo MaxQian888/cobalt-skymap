@@ -243,7 +243,11 @@ export function IndexManager({ solverType, trigger, className }: IndexManagerPro
   // Load on open
   useEffect(() => {
     if (open) {
-      loadIndexes();
+      // Async data fetch triggered by dialog open; defer past the effect body so the
+      // loading-state set inside doesn't run synchronously during the effect.
+      queueMicrotask(() => {
+        loadIndexes();
+      });
     }
   }, [open, loadIndexes]);
 

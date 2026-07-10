@@ -168,17 +168,25 @@ export function FOVSimulator({
     [fovSetups, selectedFovSetupId]
   );
 
-  useEffect(() => {
+  // Adjust local echo state when the controlling prop changes externally
+  // (see https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  const [prevPixelSize, setPrevPixelSize] = useState(pixelSize);
+  if (pixelSize !== prevPixelSize) {
+    setPrevPixelSize(pixelSize);
     setLocalPixelSize(pixelSize);
-  }, [pixelSize]);
+  }
 
-  useEffect(() => {
+  const [prevRotationAngle, setPrevRotationAngle] = useState(rotationAngle);
+  if (rotationAngle !== prevRotationAngle) {
+    setPrevRotationAngle(rotationAngle);
     setLocalRotation(rotationAngle);
-  }, [rotationAngle]);
+  }
 
-  useEffect(() => {
+  const [prevSelectedSetup, setPrevSelectedSetup] = useState(selectedSetup);
+  if (selectedSetup !== prevSelectedSetup) {
+    setPrevSelectedSetup(selectedSetup);
     setSetupNameInput(selectedSetup?.name ?? '');
-  }, [selectedSetup]);
+  }
 
   // Calculations — delegated to pure utility functions
   const { width: fovWidth, height: fovHeight } = useMemo(() =>

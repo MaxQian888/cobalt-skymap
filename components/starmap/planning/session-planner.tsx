@@ -540,7 +540,6 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const plannerWorkspaceOpen = usePlanningUiStore((state) => state.plannerWorkspaceOpen);
   const plannerWorkspaceFilter = usePlanningUiStore((state) => state.plannerWorkspaceFilter);
   const selectedPlannerWorkspaceEntryId = usePlanningUiStore((state) => state.selectedPlannerWorkspaceEntryId);
-  const recoveryPromptVisible = usePlanningUiStore((state) => state.recoveryPromptVisible);
   const setPlannerWorkspaceOpen = usePlanningUiStore((state) => state.setPlannerWorkspaceOpen);
   const setPlannerWorkspaceFilter = usePlanningUiStore((state) => state.setPlannerWorkspaceFilter);
   const setSelectedPlannerWorkspaceEntry = usePlanningUiStore((state) => state.setSelectedPlannerWorkspaceEntry);
@@ -573,11 +572,25 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const [remoteTemplates, setRemoteTemplates] = useState<SavedSessionTemplate[]>([]);
   const [guideContext, setGuideContext] = useState<SessionDraftV2['guideContext']>(undefined);
   const [workspaceOpen, setWorkspaceOpen] = useState(plannerWorkspaceOpen);
+  const [prevPlannerWorkspaceOpen, setPrevPlannerWorkspaceOpen] = useState(plannerWorkspaceOpen);
+  if (plannerWorkspaceOpen !== prevPlannerWorkspaceOpen) {
+    setPrevPlannerWorkspaceOpen(plannerWorkspaceOpen);
+    setWorkspaceOpen(plannerWorkspaceOpen);
+  }
   const [workspaceFilter, setWorkspaceFilterLocal] = useState<PlannerWorkspaceFilter>(plannerWorkspaceFilter);
+  const [prevPlannerWorkspaceFilter, setPrevPlannerWorkspaceFilter] = useState(plannerWorkspaceFilter);
+  if (plannerWorkspaceFilter !== prevPlannerWorkspaceFilter) {
+    setPrevPlannerWorkspaceFilter(plannerWorkspaceFilter);
+    setWorkspaceFilterLocal(plannerWorkspaceFilter);
+  }
   const [workspaceQuery, setWorkspaceQuery] = useState('');
   const [workspaceSelectedEntryId, setWorkspaceSelectedEntryId] = useState<string | null>(selectedPlannerWorkspaceEntryId);
-  const [workspaceRecoveryPromptVisible, setWorkspaceRecoveryPromptVisible] = useState(recoveryPromptVisible);
-  
+  const [prevSelectedPlannerWorkspaceEntryId, setPrevSelectedPlannerWorkspaceEntryId] = useState(selectedPlannerWorkspaceEntryId);
+  if (selectedPlannerWorkspaceEntryId !== prevSelectedPlannerWorkspaceEntryId) {
+    setPrevSelectedPlannerWorkspaceEntryId(selectedPlannerWorkspaceEntryId);
+    setWorkspaceSelectedEntryId(selectedPlannerWorkspaceEntryId);
+  }
+
   const profileInfo = useMountStore((state) => state.profileInfo);
   const mountConnected = useMountStore((state) => state.mountInfo.Connected ?? false);
   const mountConnectionConfig = useMountStore((state) => state.connectionConfig);
@@ -620,6 +633,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const archiveExecution = useSessionPlanStore((state) => state.archiveExecution);
   const handledPlannerSeedRef = useRef(0);
   const lastSyncedGuideOrderRef = useRef('');
+  const [manualOrderSignature, setManualOrderSignature] = useState<string | null>(null);
   
   // Equipment profile
   const focalLength = useEquipmentStore((state) => state.focalLength);
@@ -683,22 +697,6 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     }
   }, [activeExecutionId, setActiveSessionProfileIds]);
 
-  useEffect(() => {
-    setWorkspaceOpen(plannerWorkspaceOpen);
-  }, [plannerWorkspaceOpen]);
-
-  useEffect(() => {
-    setWorkspaceFilterLocal(plannerWorkspaceFilter);
-  }, [plannerWorkspaceFilter]);
-
-  useEffect(() => {
-    setWorkspaceSelectedEntryId(selectedPlannerWorkspaceEntryId);
-  }, [selectedPlannerWorkspaceEntryId]);
-
-  useEffect(() => {
-    setWorkspaceRecoveryPromptVisible(recoveryPromptVisible);
-  }, [recoveryPromptVisible]);
-  
   // Calculate FOV
   const fovWidth = sensorWidth && focalLength ? (sensorWidth / focalLength) * 57.3 : 0;
   const fovHeight = sensorHeight && focalLength ? (sensorHeight / focalLength) * 57.3 : 0;
@@ -763,13 +761,16 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     + workspaceModel.counts.imports
     + workspaceModel.counts.recovery;
 
-  useEffect(() => {
-    if (workspaceModel.entries.length === 0) {
+  // Auto-correct the selected workspace entry when the entry list changes.
+  // This is idempotent (each branch only fires while the selection is
+  // actually invalid), so it is safe to run directly during render instead
+  // of in an effect.
+  if (workspaceModel.entries.length === 0) {
+    if (workspaceSelectedEntryId !== null) {
       setWorkspaceSelectedEntryId(null);
       setSelectedPlannerWorkspaceEntry(null);
-      return;
     }
-
+  } else {
     const hasSelectedEntry = workspaceSelectedEntryId
       ? workspaceModel.entries.some((entry) => entry.id === workspaceSelectedEntryId)
       : false;
@@ -779,7 +780,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       setWorkspaceSelectedEntryId(nextId);
       setSelectedPlannerWorkspaceEntry(nextId);
     }
-  }, [setSelectedPlannerWorkspaceEntry, workspaceModel.entries, workspaceSelectedEntryId]);
+  }
 
   const constraints = useMemo<SessionConstraintSet>(() => ({
     minAltitude,
@@ -1191,8 +1192,12 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
 
   useEffect(() => {
     if (!open) return;
-    void refreshWeatherAndSafety();
-    void loadTauriTemplates();
+    // Defer to a microtask so this effect body never directly triggers the
+    // setState calls inside these async loaders (avoids a cascading render).
+    queueMicrotask(() => {
+      void refreshWeatherAndSafety();
+      void loadTauriTemplates();
+    });
   }, [loadTauriTemplates, open, refreshWeatherAndSafety]);
   
   const knownTargetIds = useMemo(
@@ -1289,14 +1294,17 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     weatherSnapshot,
   ]);
 
-  useEffect(() => {
-    setManualOrder((previous) => {
-      const targetIds = plan.targets.map((target) => target.target.id);
-      const kept = previous.filter((id) => targetIds.includes(id));
-      const added = targetIds.filter((id) => !kept.includes(id));
-      return [...kept, ...added];
-    });
-  }, [plan.targets]);
+  // Keep manualOrder in sync with plan.targets without an effect: adjust the
+  // state directly during render (React's documented pattern for deriving
+  // state from a changing value) so this never triggers a cascading render.
+  const planTargetIds = useMemo(() => plan.targets.map((target) => target.target.id), [plan.targets]);
+  const planTargetIdsSignature = planTargetIds.join('|');
+  if (manualOrderSignature !== planTargetIdsSignature) {
+    setManualOrderSignature(planTargetIdsSignature);
+    const kept = manualOrder.filter((id) => planTargetIds.includes(id));
+    const added = planTargetIds.filter((id) => !kept.includes(id));
+    setManualOrder([...kept, ...added]);
+  }
 
   const orderedTargets = useMemo(() => {
     if (manualOrder.length === 0) return plan.targets;
@@ -1334,20 +1342,11 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     useMessierMarathonStore.getState().rewriteRemainingOrder(catalogOrder);
   }, [displayedPlan.targets, guideContext]);
 
+  const recoveryVisible = open && Boolean(draftRecovery);
+
   useEffect(() => {
-    if (!open) {
-      setWorkspaceRecoveryPromptVisible(false);
-      setRecoveryPromptVisible(false);
-      return;
-    }
-    if (draftRecovery) {
-      setWorkspaceRecoveryPromptVisible(true);
-      setRecoveryPromptVisible(true);
-      return;
-    }
-    setWorkspaceRecoveryPromptVisible(false);
-    setRecoveryPromptVisible(false);
-  }, [draftRecovery, open, setRecoveryPromptVisible]);
+    setRecoveryPromptVisible(recoveryVisible);
+  }, [recoveryVisible, setRecoveryPromptVisible]);
 
   const relatedSavedPlan = useMemo(
     () => savedPlans.find((saved) => (
@@ -1512,7 +1511,6 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       guideContext: nextGuideContext,
     });
     clearDraftRecovery();
-    setWorkspaceRecoveryPromptVisible(false);
     setRecoveryPromptVisible(false);
     toast.success(t('sessionPlanner.planSaved'));
     return savedPlanId;
@@ -1952,7 +1950,6 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     }
     applyDraft(entry.recovery.draft);
     clearDraftRecovery();
-    setWorkspaceRecoveryPromptVisible(false);
     setRecoveryPromptVisible(false);
     handleWorkspaceClose();
   }, [
@@ -2019,7 +2016,6 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     if (entry.type !== 'recovery') return;
     applyDraft(entry.recovery.draft);
     clearDraftRecovery();
-    setWorkspaceRecoveryPromptVisible(false);
     setRecoveryPromptVisible(false);
     handleWorkspaceClose();
   }, [applyDraft, clearDraftRecovery, handleWorkspaceClose, setRecoveryPromptVisible]);
@@ -2031,7 +2027,6 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     }
     if (entry.type === 'recovery') {
       clearDraftRecovery();
-      setWorkspaceRecoveryPromptVisible(false);
       setRecoveryPromptVisible(false);
     }
   }, [clearDraftRecovery, dismissImportRecord, setRecoveryPromptVisible]);
@@ -2047,7 +2042,6 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
           dirtyFingerprint: currentDraftFingerprint,
         });
       }
-      setWorkspaceRecoveryPromptVisible(false);
       setRecoveryPromptVisible(false);
     }
 
@@ -2158,7 +2152,6 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
       });
       applyDraft(draft);
       clearDraftRecovery();
-      setWorkspaceRecoveryPromptVisible(false);
       setRecoveryPromptVisible(false);
       const details: string[] = [];
       if (diagnostics.unmatchedTargets.length > 0) {
@@ -2201,32 +2194,36 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     }
 
     handledCliImportRef.current = cliImportRequestId;
-    const parsed = parseImportedDraft(cliImportContent);
 
-    if (!parsed) {
-      toast.error(t('cli.notifications.importSessionPlanFailed'), {
-        description: cliImportSourcePath ?? undefined,
+    // Defer the state updates to a microtask so this effect body never calls
+    // setState synchronously (avoids a cascading render).
+    queueMicrotask(() => {
+      const parsed = parseImportedDraft(cliImportContent);
+
+      if (!parsed) {
+        toast.error(t('cli.notifications.importSessionPlanFailed'), {
+          description: cliImportSourcePath ?? undefined,
+        });
+        return;
+      }
+
+      const linkedPlanId = importPlanV2(parsed.draft);
+      const linkedPlan = getSavedPlanById(linkedPlanId);
+      addImportRecord({
+        source: 'cli',
+        sourcePath: cliImportSourcePath ?? undefined,
+        linkedPlanId,
+        linkedPlanName: linkedPlan?.name,
+        draft: parsed.draft,
+        diagnostics: parsed.diagnostics,
       });
-      return;
-    }
+      applyDraft(parsed.draft);
+      clearDraftRecovery();
+      setRecoveryPromptVisible(false);
 
-    const linkedPlanId = importPlanV2(parsed.draft);
-    const linkedPlan = getSavedPlanById(linkedPlanId);
-    addImportRecord({
-      source: 'cli',
-      sourcePath: cliImportSourcePath ?? undefined,
-      linkedPlanId,
-      linkedPlanName: linkedPlan?.name,
-      draft: parsed.draft,
-      diagnostics: parsed.diagnostics,
+      setOpen(true);
+      toast.success(t('cli.notifications.importSessionPlanReady'));
     });
-    applyDraft(parsed.draft);
-    clearDraftRecovery();
-    setWorkspaceRecoveryPromptVisible(false);
-    setRecoveryPromptVisible(false);
-
-    setOpen(true);
-    toast.success(t('cli.notifications.importSessionPlanReady'));
   }, [
     addImportRecord,
     applyDraft,
@@ -2687,17 +2684,15 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
 
         <PlannerDraftRecoveryPrompt
           recovery={draftRecovery}
-          visible={workspaceRecoveryPromptVisible}
+          visible={recoveryVisible}
           onRestore={() => {
             if (!draftRecovery) return;
             applyDraft(draftRecovery.draft);
             clearDraftRecovery();
-            setWorkspaceRecoveryPromptVisible(false);
             setRecoveryPromptVisible(false);
           }}
           onDiscard={() => {
             clearDraftRecovery();
-            setWorkspaceRecoveryPromptVisible(false);
             setRecoveryPromptVisible(false);
           }}
         />

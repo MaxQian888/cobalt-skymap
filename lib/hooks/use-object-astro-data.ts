@@ -91,6 +91,7 @@ export function useAstroEnvironment(
   longitude: number,
   currentTime: Date,
 ): AstroEnvironmentData {
+  const timeBucketSec = Math.floor(currentTime.getTime() / 1000);
   return useMemo(() => {
     const context = buildTimeScaleContext(currentTime);
     const jd = getJulianDateFromDate(currentTime);
@@ -127,7 +128,7 @@ export function useAstroEnvironment(
       twilight,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latitude, longitude, Math.floor(currentTime.getTime() / 1000)]);
+  }, [latitude, longitude, timeBucketSec]);
 }
 
 /**
@@ -180,12 +181,14 @@ export function useTargetAstroData(
   // Solar-system rise/transit/set searches are much heavier than the fixed
   // hour-angle math, and their result only drifts by seconds within a minute —
   // bucket to 60s instead of the 1s cadence of the main memo.
+  const timeBucketMin = Math.floor(currentTime.getTime() / 60000);
   const solarSystemVisibility = useMemo(() => {
     if (!positionModel || positionModel.kind !== 'solar_system' || !positionModel.body) return null;
     return calculateSolarSystemVisibility(positionModel.body, latitude, longitude, 30, currentTime);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positionModel, latitude, longitude, Math.floor(currentTime.getTime() / 60000)]);
+  }, [positionModel, latitude, longitude, timeBucketMin]);
 
+  const timeBucketSec = Math.floor(currentTime.getTime() / 1000);
   return useMemo(() => {
     if (!selectedObject || !positionModel) return null;
 
@@ -241,5 +244,5 @@ export function useTargetAstroData(
       riskHints,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedObject, positionModel, solarSystemVisibility, latitude, longitude, moonRa, moonDec, Math.floor(currentTime.getTime() / 1000)]);
+  }, [selectedObject, positionModel, solarSystemVisibility, latitude, longitude, moonRa, moonDec, timeBucketSec]);
 }

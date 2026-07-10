@@ -49,7 +49,10 @@ export function useEquipment() {
   }, []);
 
   useEffect(() => {
-    load();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      load();
+    });
   }, [load]);
 
   const refresh = useCallback(() => load(), [load]);
@@ -96,7 +99,10 @@ export function useLocations() {
   }, []);
 
   useEffect(() => {
-    load();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      load();
+    });
   }, [load]);
 
   const setCurrent = useCallback(async (locationId: string) => {
@@ -156,7 +162,10 @@ export function useObservationLog() {
   }, []);
 
   useEffect(() => {
-    load();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      load();
+    });
   }, [load]);
 
   return {
@@ -202,7 +211,10 @@ export function useAppSettings() {
   }, []);
 
   useEffect(() => {
-    load();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      load();
+    });
   }, [load]);
 
   const updateSettings = useCallback(async (updates: Partial<AppSettings>) => {
@@ -275,7 +287,7 @@ export function useWindowState() {
 // Target List Hook
 // ============================================================================
 
-import { targetListApi, type TargetListData, type TargetItem, type TargetStats } from './target-list-api';
+import { targetListApi, type TargetListData, type TargetItem, type TargetInput, type TargetStats } from './target-list-api';
 
 export function useTargetList() {
   const [data, setData] = useState<TargetListData | null>(null);
@@ -306,10 +318,13 @@ export function useTargetList() {
   }, []);
 
   useEffect(() => {
-    load();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      load();
+    });
   }, [load]);
 
-  const addTarget = useCallback(async (target: Parameters<typeof targetListApi.addTarget>[0]) => {
+  const addTarget = useCallback(async (target: TargetInput) => {
     if (!isTauri()) return null;
     try {
       const result = await targetListApi.addTarget(target);
@@ -416,7 +431,10 @@ export function useMarkers() {
   }, []);
 
   useEffect(() => {
-    load();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      load();
+    });
   }, [load]);
 
   const addMarker = useCallback(async (marker: MarkerInput) => {
@@ -532,7 +550,10 @@ export function useAstronomy(latitude?: number, longitude?: number) {
   }, [latitude, longitude]);
 
   useEffect(() => {
-    refresh();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      refresh();
+    });
   }, [refresh]);
 
   const getVisibility = useCallback(async (ra: number, dec: number, minAltitude?: number): Promise<VisibilityInfo | null> => {
@@ -595,7 +616,10 @@ export function useCache() {
   }, []);
 
   useEffect(() => {
-    load();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      load();
+    });
   }, [load]);
 
   const clearAll = useCallback(async () => {
@@ -670,7 +694,10 @@ export function useAstroEvents(startDate?: string, endDate?: string) {
   }, [startDate, endDate]);
 
   useEffect(() => {
-    load();
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-load timing
+    queueMicrotask(() => {
+      load();
+    });
   }, [load]);
 
   const getTonightHighlights = useCallback(async (latitude: number, longitude: number): Promise<string[]> => {

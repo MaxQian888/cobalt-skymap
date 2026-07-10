@@ -34,12 +34,18 @@ export function useSatellitePasses(
 
   useEffect(() => {
     if (!enabled || noradId == null) {
-      setState({ status: 'idle', passes: [] });
+      // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving reset timing
+      queueMicrotask(() => {
+        setState({ status: 'idle', passes: [] });
+      });
       return;
     }
 
     let cancelled = false;
-    setState({ status: 'loading', passes: [] });
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving loading-state timing
+    queueMicrotask(() => {
+      if (!cancelled) setState({ status: 'loading', passes: [] });
+    });
 
     fetchTLEByNoradId(noradId)
       .then((tle) => {

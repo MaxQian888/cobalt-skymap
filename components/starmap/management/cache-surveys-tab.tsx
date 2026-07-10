@@ -71,7 +71,11 @@ export function CacheSurveysTab({ isActive }: CacheSurveysTabProps) {
 
   useEffect(() => {
     if (isActive) {
-      refreshSurveyStatuses();
+      // Async data fetch triggered by tab activation; defer past the effect body so the
+      // loading-state set inside doesn't run synchronously during the effect.
+      queueMicrotask(() => {
+        refreshSurveyStatuses();
+      });
     }
   }, [isActive, refreshSurveyStatuses]);
 

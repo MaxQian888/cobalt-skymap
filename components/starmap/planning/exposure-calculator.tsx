@@ -179,7 +179,6 @@ export function ExposureCalculator({
   const storePixelSize = useEquipmentStore((s) => s.pixelSize);
   const sensorWidth = useEquipmentStore((s) => s.sensorWidth);
   const sensorHeight = useEquipmentStore((s) => s.sensorHeight);
-  const getResolution = useEquipmentStore((s) => s.getResolution);
 
   // Equipment settings - prefer props, fallback to store
   const [focalLength, setFocalLength] = useState(propFocalLength ?? storeFocalLength);
@@ -332,9 +331,10 @@ export function ExposureCalculator({
     return estimateSessionTime(exposureTime, frameCount, ditherEnabled, ditherEvery);
   }, [exposureTime, frameCount, ditherEnabled, ditherEvery]);
   
-  const sensorResolution = useMemo(() => {
-    return getResolution();
-  }, [getResolution, sensorWidth, sensorHeight]);
+  const sensorResolution = useMemo(() => ({
+    width: Math.round((sensorWidth * 1000) / storePixelSize),
+    height: Math.round((sensorHeight * 1000) / storePixelSize),
+  }), [sensorWidth, sensorHeight, storePixelSize]);
 
   const fileSize = useMemo(() => {
     return estimateFileSize(binning, 16, sensorResolution.width, sensorResolution.height);

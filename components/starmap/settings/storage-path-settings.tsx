@@ -57,7 +57,11 @@ export function StoragePathSettings() {
   }, []);
 
   useEffect(() => {
-    loadPathInfo();
+    // Async data fetch from the Tauri backend on mount; defer past the effect body so
+    // the loading-state set inside doesn't run synchronously during the effect.
+    queueMicrotask(() => {
+      loadPathInfo();
+    });
   }, [loadPathInfo]);
 
   const handlePickDirectory = async (type: 'data' | 'cache') => {

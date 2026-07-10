@@ -81,6 +81,11 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
   // Reset local state to store values when dialog opens
   useEffect(() => {
     if (open && !connected) {
+      // Re-seed local editable form state from the store only when the dialog opens.
+      // Genuine false positive for set-state-in-effect: the seed must apply synchronously
+      // so the form shows the store values before paint (connectionProtocol/host/port/
+      // deviceId can change independently while the dialog is closed).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProtocol(connectionProtocol);
       setHost(connectionHost);
       setPort(String(connectionPort));

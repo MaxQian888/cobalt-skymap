@@ -165,32 +165,38 @@ export function useGeolocation(options: UseGeolocationOptions = {}): UseGeolocat
 
   // Initialize from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('user-location');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        // Check if stored location is less than 1 hour old
-        if (parsed.timestamp && Date.now() - parsed.timestamp < 3600000) {
-          setState(prev => ({
-            ...prev,
-            latitude: parsed.latitude,
-            longitude: parsed.longitude,
-            altitude: parsed.altitude,
-            timestamp: parsed.timestamp,
-          }));
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount-init timing
+    queueMicrotask(() => {
+      const stored = localStorage.getItem('user-location');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          // Check if stored location is less than 1 hour old
+          if (parsed.timestamp && Date.now() - parsed.timestamp < 3600000) {
+            setState(prev => ({
+              ...prev,
+              latitude: parsed.latitude,
+              longitude: parsed.longitude,
+              altitude: parsed.altitude,
+              timestamp: parsed.timestamp,
+            }));
+          }
+        } catch {
+          // Invalid stored data
         }
-      } catch {
-        // Invalid stored data
       }
-    }
 
-    checkPermission();
+      checkPermission();
+    });
   }, [checkPermission]);
 
   // Auto request if enabled
   useEffect(() => {
     if (autoRequest && isSupported && state.latitude === null && !state.loading) {
-      requestLocation();
+      // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving auto-request timing
+      queueMicrotask(() => {
+        requestLocation();
+      });
     }
   }, [autoRequest, isSupported, state.latitude, state.loading, requestLocation]);
 

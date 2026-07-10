@@ -46,13 +46,22 @@ export function useSelectionAnchor({
     ? `${selectedObject.names.join('|')}@${selectedObject.coordinateTimestamp ?? ''}`
     : null;
 
-  // Refs so the sampling callback never closes over stale values.
+  // Refs so the sampling callback never closes over stale values. Synced via
+  // effects (not during render) — these effects run in declaration order
+  // before the selection effect below, so the refs are current by the time
+  // it reads them.
   const selectedRef = useRef(selectedObject);
-  selectedRef.current = selectedObject;
+  useEffect(() => {
+    selectedRef.current = selectedObject;
+  }, [selectedObject]);
   const boundsRef = useRef(containerBounds);
-  boundsRef.current = containerBounds;
+  useEffect(() => {
+    boundsRef.current = containerBounds;
+  }, [containerBounds]);
   const clickPositionRef = useRef(clickPosition);
-  clickPositionRef.current = clickPosition;
+  useEffect(() => {
+    clickPositionRef.current = clickPosition;
+  }, [clickPosition]);
 
   const samplingStateRef = useRef<{ lastSample: { x: number; y: number } | null; startedAt: number } | null>(null);
   const lastTickRef = useRef(0);
@@ -60,8 +69,14 @@ export function useSelectionAnchor({
   useEffect(() => {
     if (!selectionKey) {
       samplingStateRef.current = null;
-      setSampling(false);
-      setAnchor(undefined);
+      // This effect drives an imperative sampling process (starts/stops the
+      // animation-loop sampler), not a pure derived value; the reset below is the
+      // terminal step of that process. Deferred past the effect body so it doesn't
+      // run synchronously during the effect.
+      queueMicrotask(() => {
+        setSampling(false);
+        setAnchor(undefined);
+      });
       return;
     }
 

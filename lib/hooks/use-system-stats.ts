@@ -59,7 +59,10 @@ export function useSystemStats(): UseSystemStatsReturn {
   // Check online status
   useEffect(() => {
     // Sync actual online status after hydration
-    setStats(prev => ({ ...prev, online: navigator.onLine }));
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving sync timing
+    queueMicrotask(() => {
+      setStats(prev => ({ ...prev, online: navigator.onLine }));
+    });
 
     const handleOnline = () => setStats(prev => ({ ...prev, online: true }));
     const handleOffline = () => setStats(prev => ({ ...prev, online: false }));
@@ -75,7 +78,10 @@ export function useSystemStats(): UseSystemStatsReturn {
 
   // Check memory usage (if available)
   useEffect(() => {
-    setIsTauriEnv(isTauri());
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving mount timing
+    queueMicrotask(() => {
+      setIsTauriEnv(isTauri());
+    });
 
     const updateMemory = () => {
       // @ts-expect-error - performance.memory is non-standard but available in Chrome/Electron

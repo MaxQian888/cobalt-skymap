@@ -61,6 +61,11 @@ export function MarkerEditDialog({
 
   useEffect(() => {
     if (!open) return;
+    // Re-seed local editable text state from formData only on open. This is a genuine
+    // false positive for set-state-in-effect: the seed must apply synchronously within
+    // the effect so the inputs show the values before paint, and it can't be computed
+    // during render (formData changes on every keystroke, which would clobber edits).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRaText(formData.raString || degreesToHMS(formData.ra));
     setDecText(formData.decString || degreesToDMS(formData.dec));
     setRaValid(true);

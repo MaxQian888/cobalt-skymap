@@ -185,7 +185,7 @@ describe('useBatchProjection adaptive mode', () => {
       observer: {},
       core: { fov: Math.PI / 3 },
       s2c: () => [0, 0, -1],
-      convertFrame: (_obs: unknown, from: string, to: string, vec: number[]) => {
+      convertFrame: (_obs: unknown, from: string, to: string, _vec: number[]) => {
         if (from === 'VIEW' && to === 'ICRF') calls.probe += 1;
         else calls.itemProjection += 1;
         return from === 'VIEW' ? [0.1, 0.2, -0.97] : [0, 0, -1];

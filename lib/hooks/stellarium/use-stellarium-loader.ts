@@ -197,6 +197,10 @@ export function useStellariumLoader({
   // unmounts (their render loop is engine-owned), so each one must be
   // explicitly destroyed when superseded or on unmount.
   const createdEnginesRef = useRef<Set<StellariumEngine>>(new Set());
+  // Holds the latest `startLoading` identity so its own async retry paths
+  // (ResizeObserver/timeout callbacks firing well after render) always call
+  // the current closure instead of the one captured at self-reference time.
+  const startLoadingRef = useRef<(() => Promise<void>) | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStartTime, setLoadingStartTime] = useState<number | null>(null);
@@ -208,6 +212,11 @@ export function useStellariumLoader({
   const [loadingPhase, setLoadingPhase] = useState<LoadingState['phase']>('preparing');
   const [loadingErrorCode, setLoadingErrorCode] = useState<LoadingState['errorCode']>(null);
   const [engineReady, setEngineReady] = useState(false);
+  // Mirrors retryCountRef.current for the returned loadingState — the ref
+  // itself stays the source of truth for internal retry-loop logic (reading
+  // it there doesn't need a re-render), but rendering its value requires
+  // state, not a raw ref read.
+  const [retryCount, setRetryCount] = useState(0);
   const bootstrapResources = useStarmapBootstrapStore((state) => state.resources);
   
   const setStel = useStellariumStore((state) => state.setStel);
@@ -905,6 +914,7 @@ export function useStellariumLoader({
             setLoadingPhase('ready');
           }
           retryCountRef.current = 0;
+          setRetryCount(0);
           overallDeadlineRef.current = 0;
           if (overallTimeoutRef.current !== null) {
             window.clearTimeout(overallTimeoutRef.current);
@@ -937,6 +947,7 @@ export function useStellariumLoader({
       const withinDeadline = Date.now() < overallDeadlineRef.current;
       if (retryCountRef.current < MAX_RETRY_COUNT && withinDeadline) {
         retryCountRef.current++;
+        setRetryCount(retryCountRef.current);
         setLoadingStatus(t('retrying', { current: retryCountRef.current, max: MAX_RETRY_COUNT }));
         setLoadingPhase('retrying');
         useStarmapBootstrapStore.getState().markResourceRetry(
@@ -1016,7 +1027,7 @@ export function useStellariumLoader({
               retryObserverRef.current = null;
             }
             if (mountedRef.current && !loadAbortController.signal.aborted) {
-              void startLoading();
+              void startLoadingRef.current?.();
             }
           }
         });
@@ -1030,14 +1041,14 @@ export function useStellariumLoader({
           }
           retryTimeoutRef.current = null;
           if (mountedRef.current && !loadAbortController.signal.aborted) {
-            void startLoading();
+            void startLoadingRef.current?.();
           }
         }, RETRY_DELAY_MS);
       } else {
         retryTimeoutRef.current = window.setTimeout(() => {
           retryTimeoutRef.current = null;
           if (mountedRef.current && !loadAbortController.signal.aborted) {
-            void startLoading();
+            void startLoadingRef.current?.();
           }
         }, RETRY_DELAY_MS);
       }
@@ -1052,6 +1063,10 @@ export function useStellariumLoader({
     getRenderQuality,
     recordBootstrapStage,
   ]);
+
+  useEffect(() => {
+    startLoadingRef.current = startLoading;
+  }, [startLoading]);
 
   // Retry loading (user-triggered)
   const handleRetry = useCallback(() => {
@@ -1069,6 +1084,7 @@ export function useStellariumLoader({
     }
     clearStellariumScriptTags();
     retryCountRef.current = 0;
+    setRetryCount(0);
     overallDeadlineRef.current = 0;
     initializingRef.current = false;
     assetPathModeRef.current = 'absolute';
@@ -1108,6 +1124,7 @@ export function useStellariumLoader({
     // Reset state
     setEngineReady(false);
     retryCountRef.current = 0;
+    setRetryCount(0);
     overallDeadlineRef.current = 0;
     initializingRef.current = false;
     assetPathModeRef.current = 'absolute';
@@ -1125,7 +1142,7 @@ export function useStellariumLoader({
       progress: loadingProgress,
       phase: loadingPhase,
       errorCode: loadingErrorCode,
-      retryCount: retryCountRef.current,
+      retryCount,
       tierReadiness,
     },
     engineReady,

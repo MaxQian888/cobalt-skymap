@@ -68,12 +68,20 @@ export function SkyMarkers({
     [markers, movingMarkerId],
   );
 
-  // Escape cancels move mode.
-  useEffect(() => {
+  // Clear the live preview during render when move mode ends, instead of
+  // mirroring it in an effect (see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
+  const [prevMovingMarkerId, setPrevMovingMarkerId] = useState(movingMarkerId);
+  if (movingMarkerId !== prevMovingMarkerId) {
+    setPrevMovingMarkerId(movingMarkerId);
     if (!movingMarkerId) {
       setMovePreview(null);
-      return;
     }
+  }
+
+  // Escape cancels move mode.
+  useEffect(() => {
+    if (!movingMarkerId) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setMovingMarker(null);

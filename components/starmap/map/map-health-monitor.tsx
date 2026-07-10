@@ -55,6 +55,11 @@ function MapHealthMonitorComponent({ className, compact = false, refreshToken = 
   }, []);
 
   useEffect(() => {
+    // Sync initial snapshot from the connectivityChecker external singleton before
+    // subscribing to further updates below. Genuine false positive for
+    // set-state-in-effect: the snapshot must apply synchronously so the panel shows
+    // provider health on first paint rather than a frame later.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadHealthData();
 
     const unsubscribe = connectivityChecker.addHealthListener((status) => {
@@ -74,6 +79,10 @@ function MapHealthMonitorComponent({ className, compact = false, refreshToken = 
   }, [loadHealthData]);
 
   useEffect(() => {
+    // Re-sync from the connectivityChecker external singleton whenever the parent
+    // requests a refresh via refreshToken (synchronous snapshot from an external store,
+    // mirroring the initial-sync effect above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadHealthData();
   }, [refreshToken, loadHealthData]);
 

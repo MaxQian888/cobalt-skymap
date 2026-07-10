@@ -30,12 +30,18 @@ export function SelectionPulse({ selectedObject, containerWidth, containerHeight
     ? `${selectedObject.names.join('|')}@${selectedObject.coordinateTimestamp ?? ''}`
     : null;
 
+  // Derive `active` from the selection identity during render (see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes)
+  // instead of mirroring it in an effect. prevPulseKey starts as null so a selection
+  // that is already present on mount (not just one that appears later) plays the pulse.
+  const [prevPulseKey, setPrevPulseKey] = useState<string | null>(null);
+  if (pulseKey !== prevPulseKey) {
+    setPrevPulseKey(pulseKey);
+    setActive(pulseKey !== null);
+  }
+
   useEffect(() => {
-    if (!pulseKey) {
-      setActive(false);
-      return;
-    }
-    setActive(true);
+    if (!pulseKey) return;
     // Light haptic acknowledgement on touch devices (guarded — iOS Safari has
     // no vibrate API).
     if (isMobileShell && typeof navigator !== 'undefined' && 'vibrate' in navigator) {

@@ -41,8 +41,8 @@ export function useObservingConditions(
 
   useEffect(() => {
     if (!enabled) return;
-    // Trigger initial calculation
-    setRefreshTick((prev) => prev + 1);
+    // Initial calculation already happens on first render via useMemo below;
+    // this interval only triggers periodic recalculation.
     const interval = setInterval(() => {
       setRefreshTick((prev) => prev + 1);
     }, refreshInterval);

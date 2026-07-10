@@ -177,6 +177,7 @@ export function PlateSolverUnified({
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the shared Zustand plate-solver store (setOnlineSession), an external system that must not be written during render.
       updateOnlineSession(createInitialOnlineSolveSessionState(isDesktop ? 'tauri' : 'web'));
     }
   }, [open, isDesktop, updateOnlineSession]);
@@ -412,8 +413,14 @@ export function PlateSolverUnified({
     }
   }, [solveMode, isDesktop, handleLocalSolve, handleOnlineSolve, config, raHint, decHint]);
 
-  // Keep ref in sync with latest handleImageCapture
-  handleImageCaptureRef.current = handleImageCapture;
+  // Keep ref in sync with latest handleImageCapture. Assigning during an
+  // effect (instead of the render body) avoids mutating a ref while
+  // rendering; every consumer of this ref only reads it from async
+  // callbacks/effects, never during the same render pass, so deferring the
+  // assignment to post-commit is behavior-preserving.
+  useEffect(() => {
+    handleImageCaptureRef.current = handleImageCapture;
+  });
 
   // Handle cancel solve
   const handleCancelSolve = useCallback(async () => {

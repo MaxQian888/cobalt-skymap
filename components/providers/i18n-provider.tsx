@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useSyncExternalStore, type ReactNode } from 'react';
 import { NextIntlClientProvider } from 'next-intl';
 import { useLocaleStore } from '@/lib/i18n/locale-store';
 import type { Locale } from '@/i18n/config';
@@ -18,14 +18,15 @@ interface I18nProviderProps {
   children: ReactNode;
 }
 
+// Hydration-safe "is this the client, post-mount" flag — returns the server
+// snapshot (false) during SSR/first render and true once hydrated, without
+// ever calling setState from an effect body.
+const noopSubscribe = () => () => {};
+
 export function I18nProvider({ children }: I18nProviderProps) {
   const locale = useLocaleStore((state) => state.locale);
   const safeLocale: Locale = locale === 'zh' ? 'zh' : 'en';
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   useEffect(() => {
     if (mounted) {

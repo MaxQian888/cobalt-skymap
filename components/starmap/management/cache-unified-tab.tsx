@@ -99,7 +99,6 @@ export function CacheUnifiedTab({ isActive }: CacheUnifiedTabProps) {
     providerDiagnostics.providerId,
     providerDiagnostics.supportsPersistent
   );
-
   const refreshUnifiedCache = useCallback(async () => {
     if (runtimeCacheMode === 'none') return;
 
@@ -187,11 +186,19 @@ export function CacheUnifiedTab({ isActive }: CacheUnifiedTabProps) {
       toast.error(t('cache.flushFailed'));
       logger.error('Failed to flush unified cache', error);
     }
+    // providerDiagnostics is a freshly computed plain object each render (not memoized
+    // upstream in lib/cache); the compiler can't prove .supportsFlush is stable, so it
+    // bails on preserving this memoization. Behavior is unaffected — deps are correct.
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [providerDiagnostics.supportsFlush, refreshUnifiedCache, runtimeCacheMode, t]);
 
   useEffect(() => {
     if (isActive && runtimeCacheMode !== 'none') {
-      refreshUnifiedCache();
+      // Async data fetch triggered by tab activation; defer past the effect body so the
+      // loading-state set inside doesn't run synchronously during the effect.
+      queueMicrotask(() => {
+        refreshUnifiedCache();
+      });
     }
   }, [isActive, refreshUnifiedCache, runtimeCacheMode]);
 

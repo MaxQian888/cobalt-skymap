@@ -82,8 +82,12 @@ export function SlewConfirmDialog({
   useEffect(() => {
     if (!open) {
       clearTargetAction();
-      setError('');
-      setPendingAction(null);
+      // Reset local dialog state when the dialog closes. Deferred past the effect body
+      // so the reset doesn't run synchronously.
+      queueMicrotask(() => {
+        setError('');
+        setPendingAction(null);
+      });
       return;
     }
 

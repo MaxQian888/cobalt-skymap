@@ -66,6 +66,22 @@ export function EquipmentManager({ trigger }: EquipmentManagerProps) {
   const [addingBarlow, setAddingBarlow] = useState(false);
   const [addingFilter, setAddingFilter] = useState(false);
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; type: 'telescope' | 'camera' | 'barlow' | 'filter' } | null>(null);
+
+  // Barlow form state
+  const [barlowForm, setBarlowForm] = useState({
+    name: '',
+    factor: '',
+  });
+
+  // Filter form state
+  const [filterForm, setFilterForm] = useState({
+    name: '',
+    filter_type: 'luminance' as string,
+    bandwidth: '',
+  });
+
   const handleOpenChange = useCallback((isOpen: boolean) => {
     setOpen(isOpen);
     if (!isOpen) {
@@ -76,7 +92,7 @@ export function EquipmentManager({ trigger }: EquipmentManagerProps) {
       setFilterForm({ name: '', filter_type: 'luminance', bandwidth: '' });
     }
   }, []);
-  
+
   // Web equipment store (only for delete in web mode)
   const {
     removeCustomCamera,
@@ -89,9 +105,6 @@ export function EquipmentManager({ trigger }: EquipmentManagerProps) {
     customTelescopes: state.customTelescopes,
     customCameras: state.customCameras,
   })));
-  
-  // Delete confirmation state
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; type: 'telescope' | 'camera' | 'barlow' | 'filter' } | null>(null);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return;
@@ -126,19 +139,6 @@ export function EquipmentManager({ trigger }: EquipmentManagerProps) {
     () => true,
     () => false
   );
-
-  // Barlow form state
-  const [barlowForm, setBarlowForm] = useState({
-    name: '',
-    factor: '',
-  });
-
-  // Filter form state  
-  const [filterForm, setFilterForm] = useState({
-    name: '',
-    filter_type: 'luminance' as string,
-    bandwidth: '',
-  });
 
   const handleAddBarlow = async () => {
     if (!barlowForm.name.trim()) {

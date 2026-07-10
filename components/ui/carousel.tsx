@@ -95,6 +95,7 @@ function Carousel({
 
   React.useEffect(() => {
     if (!api) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- vendored shadcn/ui component; syncs initial canScrollPrev/Next snapshot from the embla API on subscribe, matching upstream.
     onSelect(api)
     api.on("reInit", onSelect)
     api.on("select", onSelect)

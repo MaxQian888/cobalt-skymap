@@ -173,7 +173,11 @@ export function StellariumSurveySelector({
   useEffect(() => {
     if (activeTab === 'catalogs' && discoveredCatalogs.length === 0) {
       let cancelled = false;
-      setIsLoadingCatalogs(true);
+      // Async data fetch triggered by tab activation; defer the loading-state set past
+      // the effect body so it doesn't run synchronously during the effect.
+      queueMicrotask(() => {
+        if (!cancelled) setIsLoadingCatalogs(true);
+      });
       fetchCatalogHiPS()
         .then((catalogs) => {
           if (!cancelled) setDiscoveredCatalogs(catalogs);

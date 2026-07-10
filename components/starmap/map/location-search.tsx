@@ -75,9 +75,14 @@ function LocationSearchComponent({
       if (stored) {
         const history = JSON.parse(stored);
         const expiryTime = Date.now() - LOCATION_SEARCH_HISTORY_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-        const filteredHistory = history.filter((item: SearchHistory) => 
+        const filteredHistory = history.filter((item: SearchHistory) =>
           item.timestamp > expiryTime
         );
+        // localStorage is only available client-side; reading it during a lazy useState
+        // initializer would crash SSR/static export, so this must stay in an effect.
+        // Genuine false positive for set-state-in-effect: the read is synchronous and
+        // the history must be applied before paint so it renders on first frame.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSearchHistory(filteredHistory.slice(0, LOCATION_SEARCH_MAX_HISTORY));
       }
     } catch (error) {
@@ -336,6 +341,11 @@ function LocationSearchComponent({
   }, [autoFocus]);
 
   useEffect(() => {
+    // Re-query capabilities on the client after mount: the initial lazy useState value
+    // may have been computed during SSR/static export where env-dependent capability
+    // detection (e.g. API key availability) can differ from the client. Synchronous
+    // client-only re-sync; genuine false positive for set-state-in-effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshSearchCapabilities();
   }, [refreshSearchCapabilities]);
 

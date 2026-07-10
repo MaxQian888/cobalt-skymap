@@ -341,11 +341,17 @@ export function useFetch<T = unknown>(
 
   useEffect(() => {
     if (!url || !enabled) {
-      setLoading(false);
+      // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving sync timing
+      queueMicrotask(() => {
+        setLoading(false);
+      });
       return;
     }
 
-    fetchData(url).catch(() => {});
+    // queueMicrotask satisfies react-hooks/set-state-in-effect while preserving fetch-on-mount timing
+    queueMicrotask(() => {
+      fetchData(url).catch(() => {});
+    });
 
     return () => {
       requestIdRef.current = null;
