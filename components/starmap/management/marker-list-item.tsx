@@ -67,13 +67,13 @@ export function MarkerListItem({
           {marker.raString} / {marker.decString}
         </div>
       </div>
-      <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-0.5 shrink-0 shell-desktop:opacity-0 shell-desktop:group-hover:opacity-100 transition-opacity">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 shell-mobile:min-h-11 shell-mobile:min-w-11"
               onClick={(e) => {
                 e.stopPropagation();
                 onNavigate(marker);
@@ -89,7 +89,7 @@ export function MarkerListItem({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 shell-mobile:min-h-11 shell-mobile:min-w-11"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleVisibility(marker.id);
@@ -111,7 +111,7 @@ export function MarkerListItem({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 shell-mobile:min-h-11 shell-mobile:min-w-11"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit(marker);
@@ -127,7 +127,7 @@ export function MarkerListItem({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-destructive hover:text-destructive"
+              className="h-7 w-7 shell-mobile:min-h-11 shell-mobile:min-w-11 text-destructive hover:text-destructive"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(marker);

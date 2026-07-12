@@ -22,7 +22,7 @@ export const ZoomControls = memo(function ZoomControls({ fov, onZoomIn, onZoomOu
 
   return (
       <div className="flex flex-col items-center gap-1 sm:gap-1.5 bg-background/80 backdrop-blur-sm rounded-lg p-1 sm:p-1.5 border border-border" role="group" aria-label={t('zoom.zoomControls')}>
-        <ButtonGroup orientation="vertical" role="presentation" className="w-8 sm:w-8 [&>*]:w-8">
+        <ButtonGroup orientation="vertical" role="presentation" className="w-8 [&>*]:w-8 shell-mobile:w-11 shell-mobile:[&>*]:w-11">
           {/* Zoom In Button */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -43,14 +43,15 @@ export const ZoomControls = memo(function ZoomControls({ fov, onZoomIn, onZoomOu
           </Tooltip>
 
           {/* Vertical Slider */}
-          <div className="h-20 sm:h-28 flex items-center justify-center border-x bg-background/40">
+          <div className="h-20 sm:h-28 shell-mobile:h-32 flex items-center justify-center border-x bg-background/40">
             <Slider
               orientation="vertical"
               value={[100 - sliderValue]}
               onValueChange={([v]) => onFovChange(sliderToFovUtil(100 - v, MIN_FOV, MAX_FOV))}
               max={100}
               step={1}
-              className="h-full data-[orientation=vertical]:w-3"
+              // Track stays w-1.5; widening the root only enlarges the touch hit area.
+              className="h-full data-[orientation=vertical]:w-3 shell-mobile:data-[orientation=vertical]:w-10"
               aria-label={t('zoom.fovSlider')}
               aria-valuemin={MIN_FOV}
               aria-valuemax={MAX_FOV}

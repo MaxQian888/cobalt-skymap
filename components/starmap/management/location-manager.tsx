@@ -15,13 +15,13 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -806,25 +806,28 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
     : null;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="standard-form">
+      <ResponsiveDialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
             <MapPin className="h-4 w-4 mr-2" />
             {activeLocation?.name || t('locations.title') || 'Location'}
           </Button>
         )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md max-h-[85vh] max-h-[85dvh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent
+        className="sm:max-w-md"
+        desktopClassName="flex flex-col overflow-hidden"
+      >
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <MapPin className="h-5 w-5" />
             {t('locations.title') || 'Observation Locations'}
-          </DialogTitle>
-          <DialogDescription>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {t('locations.description') || 'Manage your observation sites'}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         {isTauriAvailable && loading ? (
           <div className="flex items-center justify-center py-8">
@@ -1191,7 +1194,7 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
             )}
           </div>
         )}
-      </DialogContent>
+      </ResponsiveDialogContent>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(isOpen) => !isOpen && setDeleteTarget(null)}>
@@ -1251,6 +1254,6 @@ export function LocationManager({ trigger, onLocationChange }: LocationManagerPr
         onOpenChange={setMapSettingsOpen}
         trigger={<button type="button" className="hidden" aria-hidden="true" tabIndex={-1} />}
       />
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

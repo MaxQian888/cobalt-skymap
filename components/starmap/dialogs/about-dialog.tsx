@@ -27,12 +27,12 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -214,7 +214,7 @@ export function AboutDialog() {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <ResponsiveDialog open={open} onOpenChange={setOpen} tier="complex-editor">
         <Button
           data-testid="about-button"
           variant="ghost"
@@ -226,16 +226,20 @@ export function AboutDialog() {
           <Info className="h-5 w-5" />
         </Button>
 
-        <DialogContent data-testid="about-dialog" className="flex max-h-[85vh] max-h-[85dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]">
-          <DialogHeader className="shrink-0 p-6 pb-0">
-            <DialogTitle className="flex items-center gap-2">
+        <ResponsiveDialogContent
+          data-testid="about-dialog"
+          className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-[680px]"
+          desktopClassName="max-h-[85vh] max-h-[85dvh]"
+        >
+          <ResponsiveDialogHeader className="shrink-0 p-6 pb-0">
+            <ResponsiveDialogTitle className="flex items-center gap-2">
               <CobaltSkymapLogo className="h-5 w-5 text-primary" />
               {t('about.title')}
-            </DialogTitle>
-            <DialogDescription className="sr-only">
+            </ResponsiveDialogTitle>
+            <ResponsiveDialogDescription className="sr-only">
               {t('about.appDescription')}
-            </DialogDescription>
-          </DialogHeader>
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
 
           <Tabs defaultValue="about" className="flex min-h-0 flex-1 flex-col">
             <TabsList className="mx-6 mt-4 grid shrink-0 grid-cols-3">
@@ -372,8 +376,8 @@ export function AboutDialog() {
               </ScrollArea>
             </TabsContent>
           </Tabs>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>

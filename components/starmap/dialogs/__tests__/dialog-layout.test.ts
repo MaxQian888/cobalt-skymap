@@ -6,7 +6,6 @@ import {
   STARMAP_DIALOG_DESKTOP_CONTENT_BASE_CLASS,
   STARMAP_DIALOG_ICON_TRIGGER_CLASS,
   STARMAP_DIALOG_MOBILE_CONTENT_CLASS_BY_TIER,
-  STARMAP_DIALOG_MOBILE_MEDIA_QUERY,
   STARMAP_DIALOG_MOBILE_STICKY_FOOTER_CLASS,
   STARMAP_DIALOG_SCROLL_BODY_CLASS,
   STARMAP_DIALOG_SCROLL_BODY_MOBILE_CLASS,
@@ -17,10 +16,6 @@ describe('dialog-layout constants', () => {
     expect(STARMAP_DIALOG_ICON_TRIGGER_CLASS).toContain('h-9');
     expect(STARMAP_DIALOG_ICON_TRIGGER_CLASS).toContain('w-9');
     expect(STARMAP_DIALOG_ICON_TRIGGER_CLASS).toContain('hover:bg-accent');
-  });
-
-  it('uses the expected mobile viewport media query', () => {
-    expect(STARMAP_DIALOG_MOBILE_MEDIA_QUERY).toBe('(max-width: 640px)');
   });
 
   it('defines shared scroll classes for desktop and mobile dialog bodies', () => {

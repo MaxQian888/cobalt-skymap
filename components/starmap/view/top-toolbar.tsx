@@ -412,12 +412,18 @@ export const TopToolbar = memo(function TopToolbar({
               iconOnly
               onClick={onResetView}
             />
-            <div data-tour-id="keyboard-shortcuts">
-              <KeyboardShortcutsDialog />
-            </div>
-            <div data-tour-id="about">
-              <AboutDialog />
-            </div>
+            {/* Shortcuts/About live in the MobileMenuDrawer on the mobile shell;
+                hiding the duplicates keeps the ≤360px top row from clipping. */}
+            {!isMobileShell && (
+              <>
+                <div data-tour-id="keyboard-shortcuts">
+                  <KeyboardShortcutsDialog />
+                </div>
+                <div data-tour-id="about">
+                  <AboutDialog />
+                </div>
+              </>
+            )}
           </ToolbarGroup>
 
           {/* Window Controls Group */}

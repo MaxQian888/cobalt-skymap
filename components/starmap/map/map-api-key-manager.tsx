@@ -30,14 +30,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   Table,
   TableBody,
@@ -233,25 +233,25 @@ export function MapApiKeyManager({ trigger, onKeysChange }: MapApiKeyManagerProp
 
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="complex-editor">
+      <ResponsiveDialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
             <Key className="h-4 w-4 mr-2" />
             {t('map.apiKeys') || 'API Keys'}
           </Button>
         )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] max-h-[85dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="sm:max-w-2xl" desktopClassName="overflow-y-auto">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Key className="h-5 w-5" />
             {t('map.apiKeyManager') || 'API Key Manager'}
-          </DialogTitle>
-          <DialogDescription>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {t('map.apiKeyManagerDescription') || 'Manage API keys for map providers. Desktop secrets are stored in the secure vault; web secrets stay in the current session only.'}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <div className="space-y-4 py-4">
           {/* Security Notice */}
@@ -402,20 +402,20 @@ export function MapApiKeyManager({ trigger, onKeysChange }: MapApiKeyManagerProp
           <Separator />
 
           {/* Add New Key Dialog */}
-          <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-            <DialogTrigger asChild>
+          <ResponsiveDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} tier="standard-form">
+            <ResponsiveDialogTrigger asChild>
               <Button className="w-full">
                 <Plus className="h-4 w-4 mr-2" />
                 {t('map.addApiKey') || 'Add API Key'}
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t('map.addApiKey') || 'Add API Key'}</DialogTitle>
-                <DialogDescription>
+            </ResponsiveDialogTrigger>
+            <ResponsiveDialogContent>
+              <ResponsiveDialogHeader>
+                <ResponsiveDialogTitle>{t('map.addApiKey') || 'Add API Key'}</ResponsiveDialogTitle>
+                <ResponsiveDialogDescription>
                   {t('map.addApiKeyDescription') || 'Add a new API key for a map provider.'}
-                </DialogDescription>
-              </DialogHeader>
+                </ResponsiveDialogDescription>
+              </ResponsiveDialogHeader>
 
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
@@ -487,18 +487,18 @@ export function MapApiKeyManager({ trigger, onKeysChange }: MapApiKeyManagerProp
                 </div>
               </div>
 
-              <DialogFooter>
+              <ResponsiveDialogFooter stickyOnMobile>
                 <Button variant="outline" onClick={() => setAddDialogOpen(false)}>
                   {t('common.cancel') || 'Cancel'}
                 </Button>
                 <Button onClick={handleAddKey}>
                   {t('map.addKey') || 'Add Key'}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </ResponsiveDialogFooter>
+            </ResponsiveDialogContent>
+          </ResponsiveDialog>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

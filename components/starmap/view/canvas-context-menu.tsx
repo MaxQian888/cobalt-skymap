@@ -40,6 +40,7 @@ import type { ClickCoords, SelectedObjectData } from '@/lib/core/types';
 import type { ContextMenuStellariumSettings } from '@/types/starmap/view';
 import { clipboardService } from '@/lib/services/clipboard-service';
 import { SlewConfirmDialog } from '@/components/starmap/mount/slew-confirm-dialog';
+import { useMobileShell } from '@/components/starmap/view/use-mobile-shell';
 
 interface CanvasContextMenuProps {
   open: boolean;
@@ -83,6 +84,9 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
   onResetView,
 }: CanvasContextMenuProps) {
   const t = useTranslations();
+  // The menu portals to <body>, escaping the [data-shell] scope, so shell
+  // adaptations (hide keyboard hints, 44px rows) must be applied inline.
+  const { isMobileShell } = useMobileShell();
   const [mountTargetAction, setMountTargetAction] = useState<{
     name: string;
     ra: number;
@@ -216,7 +220,12 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        className="w-64 bg-card border-border max-h-[calc(80vh-var(--safe-area-top)-var(--safe-area-bottom))] max-h-[calc(80dvh-var(--safe-area-top)-var(--safe-area-bottom))] overflow-y-auto"
+        className={
+          'w-64 bg-card border-border max-h-[calc(80vh-var(--safe-area-top)-var(--safe-area-bottom))] max-h-[calc(80dvh-var(--safe-area-top)-var(--safe-area-bottom))] overflow-y-auto' +
+          (isMobileShell
+            ? ' [&_[data-slot=dropdown-menu-item]]:min-h-11 [&_[data-slot=dropdown-menu-sub-trigger]]:min-h-11 [&_[data-slot=dropdown-menu-checkbox-item]]:min-h-11'
+            : '')
+        }
         align="start"
         collisionPadding={8}
       >
@@ -244,7 +253,7 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
             >
               <Copy className="h-4 w-4 mr-2" />
               {t('coordinates.copyObjectCoordinates')}
-              <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut>
+              {!isMobileShell && <DropdownMenuShortcut>Ctrl+C</DropdownMenuShortcut>}
             </DropdownMenuItem>
             {mountConnected && (
               <DropdownMenuItem
@@ -318,12 +327,12 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
             <DropdownMenuItem onClick={() => { onZoomIn(); onOpenChange(false); }} className="text-foreground">
               <ZoomIn className="h-4 w-4 mr-2" />
               {t('zoom.zoomIn')}
-              <DropdownMenuShortcut>+</DropdownMenuShortcut>
+              {!isMobileShell && <DropdownMenuShortcut>+</DropdownMenuShortcut>}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => { onZoomOut(); onOpenChange(false); }} className="text-foreground">
               <ZoomOut className="h-4 w-4 mr-2" />
               {t('zoom.zoomOut')}
-              <DropdownMenuShortcut>-</DropdownMenuShortcut>
+              {!isMobileShell && <DropdownMenuShortcut>-</DropdownMenuShortcut>}
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border" />
             <DropdownMenuItem onClick={() => { onSetFov(1); onOpenChange(false); }} className="text-foreground">
@@ -556,7 +565,7 @@ export const CanvasContextMenu = memo(function CanvasContextMenu({
         >
           <Search className="h-4 w-4 mr-2" />
           {t('starmap.searchObjects')}
-          <DropdownMenuShortcut>Ctrl+F</DropdownMenuShortcut>
+          {!isMobileShell && <DropdownMenuShortcut>Ctrl+F</DropdownMenuShortcut>}
         </DropdownMenuItem>
 
         {/* Reset View */}

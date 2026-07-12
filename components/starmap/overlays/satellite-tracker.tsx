@@ -3,12 +3,12 @@
 import { useState, useMemo, useCallback, useEffect, memo } from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -402,27 +402,30 @@ export function SatelliteTracker() {
   }, []);
   
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="standard-form">
       <Tooltip>
         <TooltipTrigger asChild>
-          <DialogTrigger asChild>
+          <ResponsiveDialogTrigger asChild>
             <Button variant="ghost" size="icon" aria-label={t('satellites.tracker')} className="h-9 w-9">
               <Satellite className="h-4 w-4" />
             </Button>
-          </DialogTrigger>
+          </ResponsiveDialogTrigger>
         </TooltipTrigger>
         <TooltipContent>
           <p>{t('satellites.tracker')}</p>
         </TooltipContent>
       </Tooltip>
       
-      <DialogContent className="sm:max-w-[550px] max-h-[85vh] max-h-[85dvh] overflow-hidden flex flex-col">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2">
+      <ResponsiveDialogContent
+        className="sm:max-w-[550px]"
+        desktopClassName="overflow-hidden flex flex-col"
+      >
+        <ResponsiveDialogHeader className="shrink-0">
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Satellite className="h-5 w-5 text-primary" />
             {t('satellites.satelliteTracker')}
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         
         {/* Satellite Display Toggle */}
         <div className="flex items-center justify-between py-2 px-1 bg-muted/50 rounded-lg mb-2">
@@ -628,8 +631,8 @@ export function SatelliteTracker() {
           </div>
           <span>{filteredSatellites.length} {t('satellites.satellitesFound')}</span>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

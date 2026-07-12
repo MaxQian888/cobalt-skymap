@@ -17,14 +17,14 @@ import {
   SelectLabel,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   useEquipmentStore,
   BUILTIN_CAMERA_PRESETS,
@@ -190,17 +190,17 @@ export function CameraSelector() {
             )}
           </SelectContent>
         </Select>
-        <Dialog open={addCameraOpen} onOpenChange={setAddCameraOpen}>
-          <DialogTrigger asChild>
+        <ResponsiveDialog open={addCameraOpen} onOpenChange={setAddCameraOpen} tier="standard-form">
+          <ResponsiveDialogTrigger asChild>
             <Button variant="outline" size="icon" className="shrink-0">
               <Plus className="h-4 w-4" />
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t('equipment.addCamera')}</DialogTitle>
-              <DialogDescription>{t('equipment.addCameraDescription')}</DialogDescription>
-            </DialogHeader>
+          </ResponsiveDialogTrigger>
+          <ResponsiveDialogContent>
+            <ResponsiveDialogHeader>
+              <ResponsiveDialogTitle>{t('equipment.addCamera')}</ResponsiveDialogTitle>
+              <ResponsiveDialogDescription>{t('equipment.addCameraDescription')}</ResponsiveDialogDescription>
+            </ResponsiveDialogHeader>
             <div className="space-y-3 py-4">
               <div className="space-y-2">
                 <Label>{t('equipment.name')}</Label>
@@ -243,16 +243,16 @@ export function CameraSelector() {
                 />
               </div>
             </div>
-            <DialogFooter>
+            <ResponsiveDialogFooter>
               <Button variant="outline" onClick={() => setAddCameraOpen(false)}>
                 {t('common.cancel')}
               </Button>
               <Button onClick={handleAddCamera} disabled={!newCameraName || !newCameraSensorWidth || !newCameraSensorHeight}>
                 {t('common.add')}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </ResponsiveDialogFooter>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
       </div>
 
       {/* Camera Manual Input */}

@@ -14,14 +14,14 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -234,29 +234,29 @@ export function DataManager({ trigger }: DataManagerProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={handleOpenChange} tier="standard-form">
+      <ResponsiveDialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
             <HardDrive className="h-4 w-4 mr-2" />
             {t('dataManager.title') || 'Data Manager'}
           </Button>
         )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <HardDrive className="h-5 w-5" />
             {t('dataManager.title') || 'Data Manager'}
-          </DialogTitle>
-          <DialogDescription>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {isDesktop
               ? t('dataManager.descriptionDesktop') ||
                 'Manage your locally stored data'
               : t('dataManager.descriptionWeb') ||
                 'Manage your browser stored data'}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <div className="space-y-4">
           {/* Storage Stats */}
@@ -425,7 +425,7 @@ export function DataManager({ trigger }: DataManagerProps) {
           </AlertDialog>
         </div>
 
-        <DialogFooter className="sm:justify-start">
+        <ResponsiveDialogFooter className="sm:justify-start">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {isDesktop ? (
               <>
@@ -439,8 +439,8 @@ export function DataManager({ trigger }: DataManagerProps) {
               </>
             )}
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

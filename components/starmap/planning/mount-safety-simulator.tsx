@@ -3,13 +3,13 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+  ResponsiveDialogFooter,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -710,13 +710,17 @@ export interface MountSafetySimulatorProps {
 }
 
 export function MountSafetySimulator({
-  planDate = new Date(),
+  planDate: planDateProp,
   strategy = 'balanced',
   minAltitude = 30,
   minImagingTime = 30,
 }: MountSafetySimulatorProps) {
   const t = useTranslations('mountSafety');
   const [open, setOpen] = useState(false);
+  // Stable fallback date — a `planDate = new Date()` default prop would be a
+  // new object every render and recompute the plan + simulation each time.
+  const [defaultPlanDate] = useState(() => new Date());
+  const planDate = planDateProp ?? defaultPlanDate;
 
   const profileInfo = useMountStore((state) => state.profileInfo);
   const safetyConfig = useMountStore((state) => state.safetyConfig);
@@ -725,8 +729,8 @@ export function MountSafetySimulator({
 
   const targets = useTargetListStore((state) => state.targets);
 
-  const latitude = profileInfo.AstrometrySettings.Latitude || 0;
-  const longitude = profileInfo.AstrometrySettings.Longitude || 0;
+  const latitude = profileInfo.AstrometrySettings.Latitude ?? 0;
+  const longitude = profileInfo.AstrometrySettings.Longitude ?? 0;
 
   // Active (non-archived, non-completed) targets
   const activeTargets = useMemo(
@@ -794,10 +798,10 @@ export function MountSafetySimulator({
   );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <ResponsiveDialog tier="complex-editor" open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <DialogTrigger asChild>
+          <ResponsiveDialogTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
@@ -818,20 +822,20 @@ export function MountSafetySimulator({
               )}
               {t('trigger')}
             </Button>
-          </DialogTrigger>
+          </ResponsiveDialogTrigger>
         </TooltipTrigger>
         <TooltipContent>
           <p>{t('triggerTooltip')}</p>
         </TooltipContent>
       </Tooltip>
 
-      <DialogContent className="max-w-2xl max-h-[90vh] max-h-[90dvh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <ResponsiveDialogContent desktopClassName="sm:max-w-2xl overflow-hidden flex flex-col">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <OverallStatusIcon result={simulationResult} />
             {t('title')}
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
 
         {/* Summary */}
         <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
@@ -902,12 +906,12 @@ export function MountSafetySimulator({
           </div>
         </ScrollArea>
 
-        <DialogFooter>
+        <ResponsiveDialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
             {t('close')}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

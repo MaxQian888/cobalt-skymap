@@ -15,13 +15,13 @@ import {
   CommandList,
 } from '@/components/ui/command';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { Kbd, KbdGroup } from '@/components/ui/kbd';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -334,15 +334,15 @@ export function KeyboardShortcutsDialog({ trigger }: KeyboardShortcutsDialogProp
   }, [handleGlobalShortcut]);
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <ResponsiveDialog open={open} onOpenChange={handleOpenChange} tier="standard-form">
       {trigger ? (
-        <DialogTrigger asChild>
+        <ResponsiveDialogTrigger asChild>
           {trigger}
-        </DialogTrigger>
+        </ResponsiveDialogTrigger>
       ) : (
         <Tooltip>
           <TooltipTrigger asChild>
-            <DialogTrigger asChild>
+            <ResponsiveDialogTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
@@ -351,20 +351,20 @@ export function KeyboardShortcutsDialog({ trigger }: KeyboardShortcutsDialogProp
               >
                 <Keyboard className="h-4 w-4" />
               </Button>
-            </DialogTrigger>
+            </ResponsiveDialogTrigger>
           </TooltipTrigger>
           <TooltipContent side="left">
             <p>{t('shortcuts.keyboardShortcuts')}</p>
           </TooltipContent>
         </Tooltip>
       )}
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        <ResponsiveDialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
+            <ResponsiveDialogTitle className="flex items-center gap-2">
               <Keyboard className="h-5 w-5" />
               {t('shortcuts.keyboardShortcuts')}
-            </DialogTitle>
+            </ResponsiveDialogTitle>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -381,10 +381,10 @@ export function KeyboardShortcutsDialog({ trigger }: KeyboardShortcutsDialogProp
               </TooltipContent>
             </Tooltip>
           </div>
-          <DialogDescription>
+          <ResponsiveDialogDescription>
             {editing ? t('shortcuts.editDescription') : t('shortcuts.description')}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <CommandRoot shouldFilter={false} className="rounded-lg border">
           <CommandInput
@@ -463,7 +463,7 @@ export function KeyboardShortcutsDialog({ trigger }: KeyboardShortcutsDialogProp
             </p>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

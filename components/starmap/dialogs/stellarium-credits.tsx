@@ -14,13 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import type { StellariumCreditsProps } from '@/types/stellarium-credits';
 import { STARMAP_DIALOG_SCROLL_BODY_CLASS } from './dialog-layout';
 
@@ -108,20 +108,20 @@ export function StellariumCredits({ trigger }: StellariumCreditsProps) {
   );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="standard-form">
+      <ResponsiveDialogTrigger asChild>
         {trigger || defaultTrigger}
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent desktopClassName="sm:max-w-lg">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <StellariumIcon className="h-5 w-5 text-primary" />
             {t('credits.dataCredits')}
-          </DialogTitle>
-          <DialogDescription className="sr-only">
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="sr-only">
             {t('credits.starsDescription')}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
         <ScrollArea className={`${STARMAP_DIALOG_SCROLL_BODY_CLASS} pr-4`}>
           <div className="space-y-4 pb-1">
             <Card className="gap-3 bg-muted/20 py-4">
@@ -171,7 +171,7 @@ export function StellariumCredits({ trigger }: StellariumCreditsProps) {
             </Accordion>
           </div>
         </ScrollArea>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

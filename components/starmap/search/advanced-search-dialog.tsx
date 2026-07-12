@@ -205,7 +205,7 @@ export function AdvancedSearchDialog({ open, onOpenChange, onSelect, searchHook 
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange} tier="complex-editor">
-      <ResponsiveDialogContent className="max-w-3xl max-h-[100vh] max-h-[100dvh] flex flex-col">
+      <ResponsiveDialogContent className="sm:max-w-3xl max-h-[100vh] max-h-[100dvh] flex flex-col">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="flex items-center gap-2">
             <SlidersHorizontal className="h-5 w-5" />

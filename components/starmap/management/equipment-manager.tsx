@@ -12,13 +12,13 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -202,31 +202,31 @@ export function EquipmentManager({ trigger }: EquipmentManagerProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <ResponsiveDialog open={open} onOpenChange={handleOpenChange} tier="standard-form">
       <Tooltip>
         <TooltipTrigger asChild>
-          <DialogTrigger asChild>
+          <ResponsiveDialogTrigger asChild>
             {trigger || (
               <Button variant="ghost" size="icon" className="h-9 w-9">
                 <Wrench className="h-4 w-4" />
               </Button>
             )}
-          </DialogTrigger>
+          </ResponsiveDialogTrigger>
         </TooltipTrigger>
         <TooltipContent>
           <p>{t('equipment.title') || 'Equipment Manager'}</p>
         </TooltipContent>
       </Tooltip>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <ResponsiveDialogContent className="sm:max-w-lg">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Wrench className="h-5 w-5" />
             {t('equipment.title') || 'Equipment Manager'}
-          </DialogTitle>
-          <DialogDescription>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {t('equipment.description') || 'Manage your telescopes, cameras, and accessories'}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         {isTauriAvailable && loading ? (
           <div className="flex items-center justify-center py-8">
@@ -440,7 +440,7 @@ export function EquipmentManager({ trigger }: EquipmentManagerProps) {
             </TabsContent>
           </Tabs>
         )}
-      </DialogContent>
+      </ResponsiveDialogContent>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
@@ -465,6 +465,6 @@ export function EquipmentManager({ trigger }: EquipmentManagerProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </ResponsiveDialog>
   );
 }

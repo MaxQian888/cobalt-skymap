@@ -17,14 +17,14 @@ import {
   SelectLabel,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   useEquipmentStore,
   BUILTIN_TELESCOPE_PRESETS,
@@ -172,17 +172,17 @@ export function TelescopeSelector() {
             )}
           </SelectContent>
         </Select>
-        <Dialog open={addTelescopeOpen} onOpenChange={setAddTelescopeOpen}>
-          <DialogTrigger asChild>
+        <ResponsiveDialog open={addTelescopeOpen} onOpenChange={setAddTelescopeOpen} tier="standard-form">
+          <ResponsiveDialogTrigger asChild>
             <Button variant="outline" size="icon" className="shrink-0">
               <Plus className="h-4 w-4" />
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t('equipment.addTelescope')}</DialogTitle>
-              <DialogDescription>{t('equipment.addTelescopeDescription')}</DialogDescription>
-            </DialogHeader>
+          </ResponsiveDialogTrigger>
+          <ResponsiveDialogContent>
+            <ResponsiveDialogHeader>
+              <ResponsiveDialogTitle>{t('equipment.addTelescope')}</ResponsiveDialogTitle>
+              <ResponsiveDialogDescription>{t('equipment.addTelescopeDescription')}</ResponsiveDialogDescription>
+            </ResponsiveDialogHeader>
             <div className="space-y-3 py-4">
               <div className="space-y-2">
                 <Label>{t('equipment.name')}</Label>
@@ -213,16 +213,16 @@ export function TelescopeSelector() {
                 </div>
               </div>
             </div>
-            <DialogFooter>
+            <ResponsiveDialogFooter>
               <Button variant="outline" onClick={() => setAddTelescopeOpen(false)}>
                 {t('common.cancel')}
               </Button>
               <Button onClick={handleAddTelescope} disabled={!newTelescopeName || !newTelescopeFocalLength}>
                 {t('common.add')}
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </ResponsiveDialogFooter>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
       </div>
 
       {/* Telescope Manual Input */}

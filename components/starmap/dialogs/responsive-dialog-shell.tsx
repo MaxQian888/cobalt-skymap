@@ -22,37 +22,23 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import { cn } from '@/lib/utils';
+import { useMobileShell } from '@/components/starmap/view/use-mobile-shell';
 import {
   STARMAP_DIALOG_DESKTOP_CONTENT_BASE_CLASS,
   STARMAP_DIALOG_MOBILE_CONTENT_CLASS_BY_TIER,
-  STARMAP_DIALOG_MOBILE_MEDIA_QUERY,
   STARMAP_DIALOG_MOBILE_STICKY_FOOTER_CLASS,
   STARMAP_DIALOG_SCROLL_BODY_MOBILE_CLASS,
   type StarmapDialogTier,
 } from './dialog-layout';
 
-function useMobileDialogViewport() {
-  const [isMobile, setIsMobile] = React.useState(false);
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return;
-    }
-
-    const query = window.matchMedia(STARMAP_DIALOG_MOBILE_MEDIA_QUERY);
-    const update = () => setIsMobile(query.matches);
-    update();
-
-    if (typeof query.addEventListener === 'function') {
-      query.addEventListener('change', update);
-      return () => query.removeEventListener('change', update);
-    }
-
-    query.addListener(update);
-    return () => query.removeListener(update);
-  }, []);
-
-  return isMobile;
+/**
+ * Dialogs follow the same 900px/landscape shell decision as the rest of the
+ * starmap UI (single source of truth in use-mobile-shell) — a separate 640px
+ * media query previously left a 641–900px dead zone where the app was in
+ * mobile shell but dialogs rendered as desktop dialogs.
+ */
+export function useMobileDialogViewport() {
+  return useMobileShell().isMobileShell;
 }
 
 interface ResponsiveDialogContextValue {
@@ -142,11 +128,15 @@ export function ResponsiveDialogContent({
   ...props
 }: ResponsiveDialogContentProps) {
   const { isMobile, tier } = useResponsiveDialogContext();
+  // Both branches portal to <body>, outside the [data-shell] view root —
+  // re-expose the shell decision so shell-mobile:/shell-desktop: variants
+  // inside the dialog resolve correctly.
   if (isMobile) {
     const mobileTier =
       tier === 'custom' ? STARMAP_DIALOG_MOBILE_CONTENT_CLASS_BY_TIER['standard-form'] : STARMAP_DIALOG_MOBILE_CONTENT_CLASS_BY_TIER[tier];
     return (
       <DrawerContent
+        data-shell="mobile"
         className={cn(mobileTier, STARMAP_DIALOG_SCROLL_BODY_MOBILE_CLASS, className, mobileClassName)}
         {...props}
       >
@@ -156,6 +146,7 @@ export function ResponsiveDialogContent({
   }
   return (
     <DialogContent
+      data-shell="desktop"
       showCloseButton={showCloseButton}
       className={cn(STARMAP_DIALOG_DESKTOP_CONTENT_BASE_CLASS, className, desktopClassName)}
       {...props}

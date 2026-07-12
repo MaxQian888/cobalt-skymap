@@ -33,12 +33,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -252,13 +252,13 @@ export const ViewBookmarks = memo(function ViewBookmarks({
                         </ItemContent>
                       </button>
 
-                      <ItemActions className="gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      <ItemActions className="gap-0.5 shell-desktop:opacity-0 transition-opacity shell-desktop:group-hover:opacity-100">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6"
+                              className="h-6 w-6 shell-mobile:min-h-11 shell-mobile:min-w-11"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <MoreHorizontal className="h-3 w-3" />
@@ -316,10 +316,10 @@ export const ViewBookmarks = memo(function ViewBookmarks({
       </Popover>
 
       {/* Edit/Add Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+      <ResponsiveDialog open={editDialogOpen} onOpenChange={setEditDialogOpen} tier="standard-form">
+        <ResponsiveDialogContent className="sm:max-w-md">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle className="flex items-center gap-2">
               {editingBookmark ? (
                 <>
                   <Edit className="h-5 w-5" />
@@ -331,8 +331,8 @@ export const ViewBookmarks = memo(function ViewBookmarks({
                   {t('bookmarks.saveCurrentView')}
                 </>
               )}
-            </DialogTitle>
-          </DialogHeader>
+            </ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
 
           <div className="space-y-4 py-2">
             <Field>
@@ -411,16 +411,16 @@ export const ViewBookmarks = memo(function ViewBookmarks({
             )}
           </div>
 
-          <DialogFooter>
+          <ResponsiveDialogFooter stickyOnMobile>
             <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
               {t('common.cancel')}
             </Button>
             <Button onClick={handleSaveBookmark} disabled={!form.name.trim()}>
               {editingBookmark ? t('common.save') : t('bookmarks.saveBookmark')}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>

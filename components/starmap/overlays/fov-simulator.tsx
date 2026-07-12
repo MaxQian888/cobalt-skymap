@@ -47,12 +47,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   Tooltip,
   TooltipContent,
@@ -349,10 +349,10 @@ export function FOVSimulator({
   ]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="complex-editor">
       <Tooltip>
         <TooltipTrigger asChild>
-          <DialogTrigger asChild>
+          <ResponsiveDialogTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
@@ -366,16 +366,19 @@ export function FOVSimulator({
             >
               <Camera className="h-5 w-5" />
             </Button>
-          </DialogTrigger>
+          </ResponsiveDialogTrigger>
         </TooltipTrigger>
         <TooltipContent side="left">
           <p>{t('fov.fovSimulator')}</p>
         </TooltipContent>
       </Tooltip>
 
-      <DialogContent className="w-[95vw] max-w-[640px] max-h-[85vh] max-h-[85dvh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
+      <ResponsiveDialogContent
+        className="p-4 sm:p-6"
+        desktopClassName="w-[95vw] max-w-[640px] overflow-y-auto"
+      >
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center justify-between">
             <span className="flex items-center gap-2">
               <Camera className="h-5 w-5 text-primary" />
               {t('fov.fovSimulator')}
@@ -391,8 +394,8 @@ export function FOVSimulator({
               </Button>
               <Switch checked={enabled} onCheckedChange={onEnabledChange} />
             </div>
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
 
         <div className="space-y-2 rounded-md border border-border/60 p-3">
           <div className="flex items-center justify-between gap-2">
@@ -1170,8 +1173,8 @@ export function FOVSimulator({
             {t('common.close')}
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

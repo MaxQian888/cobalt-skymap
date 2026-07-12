@@ -86,13 +86,13 @@ export const FavoriteObjectItem = memo(function FavoriteObjectItem({
       )}
 
       {showActions && (
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5 shell-desktop:opacity-0 shell-desktop:group-hover:opacity-100 transition-opacity">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="h-6 w-6 shell-mobile:min-h-11 shell-mobile:min-w-11"
                 onClick={(e) => {
                   e.stopPropagation();
                   onNavigate?.(object);
@@ -111,7 +111,7 @@ export const FavoriteObjectItem = memo(function FavoriteObjectItem({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="h-6 w-6 shell-mobile:min-h-11 shell-mobile:min-w-11"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-3 w-3" />

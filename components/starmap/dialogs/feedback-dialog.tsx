@@ -73,6 +73,7 @@ import {
 } from '@/lib/feedback/feedback-utils';
 import { openExternalUrl } from '@/lib/tauri/app-control-api';
 import { copyTextWithFeedback } from '@/lib/utils/clipboard-feedback';
+import { useMobileDialogViewport } from './responsive-dialog-shell';
 import type {
   FeedbackDiagnostics,
   FeedbackType,
@@ -91,31 +92,6 @@ const DESC_SOFT_MAX = 2000;
 const STEPS_SOFT_MAX = 1500;
 const EXPECTED_SOFT_MAX = 1500;
 const ADDITIONAL_SOFT_MAX = 1000;
-const MOBILE_FEEDBACK_QUERY = '(max-width: 640px)';
-
-function useIsMobileFeedbackViewport() {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return;
-    }
-
-    const mediaQueryList = window.matchMedia(MOBILE_FEEDBACK_QUERY);
-    const update = () => setIsMobile(mediaQueryList.matches);
-    update();
-
-    if (typeof mediaQueryList.addEventListener === 'function') {
-      mediaQueryList.addEventListener('change', update);
-      return () => mediaQueryList.removeEventListener('change', update);
-    }
-
-    mediaQueryList.addListener(update);
-    return () => mediaQueryList.removeListener(update);
-  }, []);
-
-  return isMobile;
-}
 
 function CharCounter({
   current,
@@ -194,7 +170,7 @@ export function FeedbackDialog({ trigger, open, onOpenChange }: FeedbackDialogPr
   const setScreenshot = useFeedbackStore((state) => state.setScreenshot);
   const resetDraft = useFeedbackStore((state) => state.resetDraft);
 
-  const isMobileViewport = useIsMobileFeedbackViewport();
+  const isMobileViewport = useMobileDialogViewport();
   const isControlled = typeof open === 'boolean';
   const dialogOpen = isControlled ? open : internalOpen;
   const isBusy = copying || submitting || exporting;

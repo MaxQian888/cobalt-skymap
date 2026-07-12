@@ -142,7 +142,10 @@ export function SlewConfirmDialog({
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange} tier="compact-confirmation">
-      <ResponsiveDialogContent className="sm:max-w-md max-h-[92vh] max-h-[92dvh] overflow-hidden flex flex-col">
+      <ResponsiveDialogContent
+        className="overflow-hidden flex flex-col"
+        desktopClassName="sm:max-w-md max-h-[92vh] max-h-[92dvh]"
+      >
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="flex items-center gap-2">
             <Crosshair className="h-4 w-4" />

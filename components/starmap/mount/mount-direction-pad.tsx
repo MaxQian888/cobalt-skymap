@@ -121,7 +121,9 @@ export const MountDirectionPad = memo(function MountDirectionPad() {
   }, []);
 
   const btnClass = cn(
-    'h-7 w-7 p-0',
+    // Press-and-hold slew buttons: keep desktop compact, but give touch a 44px
+    // target and suppress long-press text selection/callout mid-hold.
+    'h-7 w-7 p-0 select-none [touch-action:none] shell-mobile:h-11 shell-mobile:w-11',
     disabled && 'opacity-40 pointer-events-none'
   );
 

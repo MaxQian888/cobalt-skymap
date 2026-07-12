@@ -23,14 +23,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   Alert,
   AlertDescription,
@@ -268,25 +268,25 @@ export function MapProviderSettings({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="standard-form">
+      <ResponsiveDialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm">
             <Settings className="h-4 w-4 mr-2" />
             {t('map.providerSettings') || 'Map Settings'}
           </Button>
         )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] max-h-[85dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="sm:max-w-lg" desktopClassName="overflow-y-auto">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
             {t('map.providerSettings') || 'Map Provider Settings'}
-          </DialogTitle>
-          <DialogDescription>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {t('map.providerSettingsDescription') || 'Configure map providers, fallback strategies, and caching options.'}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <div className="space-y-6 py-4">
           {/* Providers Section */}
@@ -514,7 +514,7 @@ export function MapProviderSettings({
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <ResponsiveDialogFooter className="gap-2" stickyOnMobile>
           <Button variant="outline" onClick={handleReset} disabled={!hasChanges}>
             <RotateCcw className="h-4 w-4 mr-2" />
             {t('common.reset') || 'Reset'}
@@ -523,8 +523,8 @@ export function MapProviderSettings({
             <Save className="h-4 w-4 mr-2" />
             {t('common.save') || 'Save'}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

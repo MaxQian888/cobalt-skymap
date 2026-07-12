@@ -3,14 +3,14 @@
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogDescription,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogDescription,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+  ResponsiveDialogFooter,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -651,8 +651,8 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
   const getSessionReadiness = useDeviceStore((state) => state.getSessionReadiness);
   const setActiveSessionProfileIds = useDeviceStore((state) => state.setActiveSessionProfileIds);
   
-  const latitude = profileInfo.AstrometrySettings.Latitude || 0;
-  const longitude = profileInfo.AstrometrySettings.Longitude || 0;
+  const latitude = profileInfo.AstrometrySettings.Latitude ?? 0;
+  const longitude = profileInfo.AstrometrySettings.Longitude ?? 0;
 
   useEffect(() => {
     if (!open) return;
@@ -2246,15 +2246,15 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
     : t('sessionPlanner.weatherSourceNone');
   
   return (
-    <Dialog open={open} onOpenChange={handlePlannerOpenChange}>
+    <ResponsiveDialog tier="complex-editor" open={open} onOpenChange={handlePlannerOpenChange}>
       {showTrigger && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <DialogTrigger asChild>
+            <ResponsiveDialogTrigger asChild>
               <Button variant="ghost" size="icon" className="h-9 w-9">
                 <CalendarClock className="h-4 w-4" />
               </Button>
-            </DialogTrigger>
+            </ResponsiveDialogTrigger>
           </TooltipTrigger>
           <TooltipContent>
             <p>{t('sessionPlanner.title')}</p>
@@ -2262,14 +2262,14 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
         </Tooltip>
       )}
       
-      <DialogContent data-testid="session-planner-dialog" className="max-w-3xl max-h-[90vh] max-h-[90dvh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <ResponsiveDialogContent data-testid="session-planner-dialog" desktopClassName="sm:max-w-3xl overflow-hidden flex flex-col">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <CalendarClock className="h-5 w-5 text-primary" />
             {t('sessionPlanner.title')}
-          </DialogTitle>
-          <DialogDescription>{t('sessionPlanner.dialogDescription')}</DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>{t('sessionPlanner.dialogDescription')}</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         {relatedExecution && (
           <div className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
@@ -2922,7 +2922,7 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
           </ScrollArea>
         </div>
         
-        <DialogFooter className="flex justify-between">
+        <ResponsiveDialogFooter className="flex justify-between">
           <div className="flex gap-2">
             <MountSafetySimulator
               planDate={planDate}
@@ -3018,9 +3018,9 @@ export function SessionPlanner({ showTrigger = true }: SessionPlannerProps) {
           <Button data-testid="session-planner-close-button" variant="outline" onClick={() => handlePlannerOpenChange(false)}>
             {t('common.close')}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

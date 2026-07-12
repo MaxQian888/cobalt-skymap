@@ -21,19 +21,18 @@ import {
   STARMAP_DIALOG_SCROLL_BODY_MOBILE_CLASS,
 } from '../dialog-layout';
 
-function mockMatchMedia(matches: boolean) {
-  Object.defineProperty(window, 'matchMedia', {
+// Dialogs follow the 900px shell decision (use-mobile-shell), which reads
+// the viewport size directly rather than a media query.
+function mockMatchMedia(mobile: boolean) {
+  Object.defineProperty(window, 'innerWidth', {
     writable: true,
-    value: jest.fn().mockImplementation(() => ({
-      matches,
-      media: '(max-width: 640px)',
-      onchange: null,
-      addEventListener: jest.fn(),
-      removeEventListener: jest.fn(),
-      addListener: jest.fn(),
-      removeListener: jest.fn(),
-      dispatchEvent: jest.fn(),
-    })),
+    configurable: true,
+    value: mobile ? 500 : 1280,
+  });
+  Object.defineProperty(window, 'innerHeight', {
+    writable: true,
+    configurable: true,
+    value: 800,
   });
 }
 

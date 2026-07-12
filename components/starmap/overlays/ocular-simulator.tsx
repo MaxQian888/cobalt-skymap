@@ -14,12 +14,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -250,14 +250,14 @@ export function OcularSimulator({ onApplyFov, currentFov }: OcularSimulatorProps
   }, [displayBeforeApply, fovBeforeApply, onApplyFov, setOcularDisplay]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="complex-editor">
+      <ResponsiveDialogTrigger asChild>
         <Button variant="ghost" size="icon" aria-label={t('ocular.simulator')} className="h-9 w-9">
           <Eye className="h-4 w-4" />
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[680px] max-h-[90vh] max-h-[90dvh] overflow-hidden flex flex-col">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-primary" />{t('ocular.eyepieceSimulator')}</DialogTitle></DialogHeader>
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="sm:max-w-[680px]" desktopClassName="overflow-hidden flex flex-col">
+        <ResponsiveDialogHeader><ResponsiveDialogTitle className="flex items-center gap-2"><Eye className="h-5 w-5 text-primary" />{t('ocular.eyepieceSimulator')}</ResponsiveDialogTitle></ResponsiveDialogHeader>
         <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-3 pr-2">
             <OcularViewPreview tfov={simulation.viewData.tfov} magnification={simulation.viewData.magnification} exitPupil={simulation.viewData.exitPupil} isOverMagnified={simulation.viewData.isOverMagnified} isUnderMagnified={simulation.viewData.isUnderMagnified} />
@@ -310,7 +310,7 @@ export function OcularSimulator({ onApplyFov, currentFov }: OcularSimulatorProps
             </Collapsible>
           </div>
         </ScrollArea>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

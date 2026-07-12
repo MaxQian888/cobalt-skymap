@@ -4,13 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, CalendarDays, Flag, ListOrdered, MapPin, Telescope } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,7 +34,8 @@ function toDateInputValue(value: string): string {
 function toTimeInputValue(value: string): string {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '00:00';
-  return date.toISOString().slice(11, 16);
+  // Local HH:mm — the scheduler parses these strings as local time
+  return date.toTimeString().slice(0, 5);
 }
 
 function checkpointStatusFromExecution(status: string): 'completed' | 'skipped' | null {
@@ -240,17 +241,17 @@ export function MessierMarathonGuideDialog() {
     : t('messierMarathon.mode.best_effort');
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <ResponsiveDialog tier="complex-editor" open={open} onOpenChange={setOpen}>
+      <ResponsiveDialogContent className="sm:max-w-3xl">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Telescope className="h-5 w-5 text-primary" />
             {t('messierMarathon.title')}
-          </DialogTitle>
-          <DialogDescription>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {t('messierMarathon.description')}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-[1fr_auto_auto]">
@@ -369,7 +370,7 @@ export function MessierMarathonGuideDialog() {
           </ScrollArea>
         </div>
 
-        <DialogFooter className="flex items-center justify-between">
+        <ResponsiveDialogFooter className="flex items-center justify-between">
           <Button variant="ghost" onClick={resetGuide}>
             {t('messierMarathon.actions.resetGuide')}
           </Button>
@@ -385,8 +386,8 @@ export function MessierMarathonGuideDialog() {
               {t('messierMarathon.actions.openPlanner')}
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

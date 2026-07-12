@@ -6,12 +6,12 @@ import { Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   Tooltip,
   TooltipContent,
@@ -24,10 +24,10 @@ export function StellariumSettings() {
   const [open, setOpen] = useState(false);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="standard-form">
       <Tooltip>
         <TooltipTrigger asChild>
-          <DialogTrigger asChild>
+          <ResponsiveDialogTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
@@ -35,20 +35,20 @@ export function StellariumSettings() {
             >
               <Settings className="h-5 w-5" />
             </Button>
-          </DialogTrigger>
+          </ResponsiveDialogTrigger>
         </TooltipTrigger>
         <TooltipContent side="bottom">
           <p>{t('settings.displaySettings')}</p>
         </TooltipContent>
       </Tooltip>
-      <DialogContent className="max-w-md max-h-[85vh] max-h-[85dvh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>{t('settings.displaySettings')}</DialogTitle>
-        </DialogHeader>
+      <ResponsiveDialogContent desktopClassName="sm:max-w-md flex flex-col overflow-hidden">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>{t('settings.displaySettings')}</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <ScrollArea className="flex-1 -mx-2 px-2">
           <DisplaySettings />
         </ScrollArea>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

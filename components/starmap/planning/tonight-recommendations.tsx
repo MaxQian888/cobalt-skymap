@@ -3,12 +3,12 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
@@ -624,10 +624,10 @@ export function TonightRecommendations() {
   }, [filteredRecommendations, addTarget]);
   
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <ResponsiveDialog tier="standard-form" open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <DialogTrigger asChild>
+          <ResponsiveDialogTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
@@ -635,20 +635,20 @@ export function TonightRecommendations() {
             >
               <Sparkles className="h-4 w-4" />
             </Button>
-          </DialogTrigger>
+          </ResponsiveDialogTrigger>
         </TooltipTrigger>
         <TooltipContent>
           <p>{t('tonight.recommendations')}</p>
         </TooltipContent>
       </Tooltip>
       
-      <DialogContent className="sm:max-w-[560px] max-h-[90vh] max-h-[90dvh] overflow-hidden flex flex-col">
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="flex items-center gap-2">
+      <ResponsiveDialogContent className="sm:max-w-[560px]" desktopClassName="overflow-hidden flex flex-col">
+        <ResponsiveDialogHeader className="shrink-0">
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             {t('tonight.title')}
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         
         {/* Tonight's conditions with beautiful visualization */}
         {conditions && (
@@ -842,8 +842,8 @@ export function TonightRecommendations() {
             <span>40+ {t('tonight.fair')}</span>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

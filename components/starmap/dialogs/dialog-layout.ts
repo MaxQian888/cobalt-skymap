@@ -7,8 +7,6 @@ export type StarmapDialogTier =
   | 'complex-editor'
   | 'custom';
 
-export const STARMAP_DIALOG_MOBILE_MEDIA_QUERY = '(max-width: 640px)';
-
 export const STARMAP_DIALOG_SCROLL_BODY_CLASS =
   'max-h-[calc(85vh-13rem)] max-h-[calc(85dvh-13rem)]';
 

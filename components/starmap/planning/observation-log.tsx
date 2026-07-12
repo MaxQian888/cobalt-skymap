@@ -37,13 +37,13 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +76,7 @@ import {
 import { toast } from 'sonner';
 import { tauriApi } from '@/lib/tauri';
 import { isTauri } from '@/lib/storage/platform';
+import { useMobileShell } from '@/components/starmap/view/use-mobile-shell';
 import { usePlanningUiStore } from '@/lib/stores/planning-ui-store';
 import { useSessionPlanStore } from '@/lib/stores/session-plan-store';
 import {
@@ -99,6 +100,7 @@ const logger = createLogger('observation-log');
 
 export function ObservationLog({ currentSelection }: ObservationLogProps) {
   const t = useTranslations();
+  const { isMobileShell } = useMobileShell();
   const { locations } = useLocations();
   const { equipment } = useEquipment();
   const [open, setOpen] = useState(false);
@@ -647,7 +649,12 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
           </TooltipContent>
         </Tooltip>
 
-        <DrawerContent className="w-[85vw] max-w-[360px] sm:max-w-[420px] md:max-w-[480px] h-full bg-card border-border drawer-content">
+        <DrawerContent
+          // vaul portals outside the [data-shell] root — re-set it so
+          // shell-mobile:/shell-desktop: variants inside resolve correctly.
+          data-shell={isMobileShell ? 'mobile' : 'desktop'}
+          className="w-[85vw] max-w-[360px] sm:max-w-[420px] md:max-w-[480px] h-full bg-card border-border drawer-content"
+        >
           <DrawerHeader>
             <DrawerTitle className="text-foreground flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
@@ -975,7 +982,7 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
                                           <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-5 w-5 opacity-0 group-hover/obs:opacity-100"
+                                            className="h-5 w-5 shell-mobile:min-h-11 shell-mobile:min-w-11 shell-desktop:opacity-0 shell-desktop:group-hover/obs:opacity-100"
                                             data-testid={`observation-log-edit-observation-${obs.id}`}
                                             onClick={(e) => {
                                               e.stopPropagation();
@@ -988,7 +995,7 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
                                             <Button
                                               variant="ghost"
                                               size="icon"
-                                              className="h-5 w-5 opacity-0 group-hover/obs:opacity-100 text-red-400 hover:text-red-300"
+                                              className="h-5 w-5 shell-mobile:min-h-11 shell-mobile:min-w-11 shell-desktop:opacity-0 shell-desktop:group-hover/obs:opacity-100 text-red-400 hover:text-red-300"
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 setDeleteTarget({ type: 'observation', id: obs.id, sessionId: session.id });
@@ -1285,17 +1292,17 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
       </Drawer>
 
       {/* New/Edit Session Dialog */}
-      <Dialog open={showNewSession} onOpenChange={(open) => {
+      <ResponsiveDialog tier="standard-form" open={showNewSession} onOpenChange={(open) => {
         setShowNewSession(open);
         if (!open) setEditingSession(null);
       }}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>{editingSession ? t('observationLog.editSession') : t('observationLog.newSession')}</DialogTitle>
-            <DialogDescription>
+        <ResponsiveDialogContent className="sm:max-w-[400px]">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>{editingSession ? t('observationLog.editSession') : t('observationLog.newSession')}</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
               {editingSession ? t('observationLog.editSessionDesc') : t('observationLog.newSessionDesc')}
-            </DialogDescription>
-          </DialogHeader>
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>{t('observationLog.date')}</Label>
@@ -1423,19 +1430,20 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
               />
             </div>
           </div>
-          <DialogFooter>
+          <ResponsiveDialogFooter>
             <Button variant="outline" onClick={() => { setShowNewSession(false); setEditingSession(null); }}>
               {t('common.cancel')}
             </Button>
             <Button onClick={editingSession ? handleSaveEditSession : handleCreateSession}>
               {editingSession ? t('common.save') : t('observationLog.startSession')}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       {/* Add Observation Dialog */}
-      <Dialog
+      <ResponsiveDialog
+        tier="standard-form"
         open={showAddObservation}
         onOpenChange={(nextOpen) => {
           setShowAddObservation(nextOpen);
@@ -1444,13 +1452,13 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>{editingObservation ? t('observationLog.editObservation') : t('observationLog.addObservation')}</DialogTitle>
-            <DialogDescription>
+        <ResponsiveDialogContent className="sm:max-w-[400px]">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>{editingObservation ? t('observationLog.editObservation') : t('observationLog.addObservation')}</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
               {editingObservation ? t('observationLog.editObsDesc') : t('observationLog.addObsDesc')}
-            </DialogDescription>
-          </DialogHeader>
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>{t('observationLog.objectName')}</Label>
@@ -1551,16 +1559,16 @@ export function ObservationLog({ currentSelection }: ObservationLogProps) {
               />
             </div>
           </div>
-          <DialogFooter>
+          <ResponsiveDialogFooter>
             <Button variant="outline" onClick={() => { setShowAddObservation(false); resetObservationForm(); }}>
               {t('common.cancel')}
             </Button>
             <Button onClick={handleSubmitObservation}>
               {editingObservation ? t('common.save') : t('observationLog.addObservation')}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>

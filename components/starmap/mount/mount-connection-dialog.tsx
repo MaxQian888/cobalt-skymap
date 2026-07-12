@@ -272,7 +272,10 @@ export function MountConnectionDialog({ open, onOpenChange }: MountConnectionDia
 
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange} tier="standard-form">
-      <ResponsiveDialogContent className="sm:max-w-md max-h-[92vh] max-h-[92dvh] overflow-hidden flex flex-col">
+      <ResponsiveDialogContent
+        className="overflow-hidden flex flex-col"
+        desktopClassName="sm:max-w-md max-h-[92vh] max-h-[92dvh]"
+      >
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="flex items-center gap-2">
             {connected ? <Wifi className="h-4 w-4 text-green-500" /> : <WifiOff className="h-4 w-4 text-muted-foreground" />}

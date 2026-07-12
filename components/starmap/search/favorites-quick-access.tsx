@@ -26,11 +26,11 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import { FavoriteObjectItem } from './favorite-object-item';
 import { cn } from '@/lib/utils';
 import { 
@@ -249,11 +249,15 @@ export function FavoritesQuickAccess({
       </Tabs>
 
       {/* Tag Editor Dialog */}
-      <Dialog open={!!editingTags} onOpenChange={(open) => !open && setEditingTags(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{t('favorites.manageTags')}</DialogTitle>
-          </DialogHeader>
+      <ResponsiveDialog
+        open={!!editingTags}
+        onOpenChange={(open) => !open && setEditingTags(null)}
+        tier="compact-confirmation"
+      >
+        <ResponsiveDialogContent desktopClassName="sm:max-w-sm">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>{t('favorites.manageTags')}</ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
 
           <div className="space-y-4">
             {/* Current tags */}
@@ -314,8 +318,8 @@ export function FavoritesQuickAccess({
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </div>
   );
 }

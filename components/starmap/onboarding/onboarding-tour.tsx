@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useOnboardingStore } from '@/lib/stores/onboarding-store';
 import { useOnboardingBridgeStore, useSettingsStore, useStellariumStore } from '@/lib/stores';
 import { resolveTourSteps } from '@/lib/constants/onboarding-capabilities';
@@ -11,6 +11,7 @@ import type {
   TourStep,
 } from '@/types/starmap/onboarding';
 import { isTauri } from '@/lib/tauri/app-control-api';
+import { useMobileShell } from '@/components/starmap/view/use-mobile-shell';
 import { TourSpotlight } from './tour-spotlight';
 import { TourTooltip } from './tour-tooltip';
 
@@ -60,19 +61,13 @@ export function OnboardingTour({
   const skyEngine = useSettingsStore((state) => state.skyEngine);
   const stelAvailable = useStellariumStore((state) => Boolean(state.stel));
 
-  const [isMobile, setIsMobile] = useState(false);
+  // Follow the shell SSOT (900px + landscape rules) so tour steps match the
+  // layout actually rendered — between 640-900px the shell is already mobile.
+  const { isMobileShell: isMobile } = useMobileShell();
 
   const wasTourActiveRef = useRef(false);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const stepCleanupRef = useRef<(() => void) | null>(null);
-
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 639px)');
-    const update = () => setIsMobile(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
 
   useEffect(() => {
     if (!isTourActive || !activeTourId) return;

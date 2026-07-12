@@ -7,13 +7,13 @@ import {
   Library,
 } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   Popover,
   PopoverContent,
@@ -109,23 +109,23 @@ export const ObjectTypeLegend = memo(function ObjectTypeLegend({
 
   if (variant === 'dialog') {
     return (
-      <Dialog>
-        <DialogTrigger asChild>{triggerButton}</DialogTrigger>
-        <DialogContent className="max-w-md max-h-[80vh] max-h-[80dvh]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+      <ResponsiveDialog tier="standard-form">
+        <ResponsiveDialogTrigger asChild>{triggerButton}</ResponsiveDialogTrigger>
+        <ResponsiveDialogContent desktopClassName="sm:max-w-md max-h-[80vh] max-h-[80dvh]">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle className="flex items-center gap-2">
               <Star className="h-5 w-5 text-primary" />
               {t('objectTypesTitle')}
-            </DialogTitle>
-            <DialogDescription className="sr-only">
+            </ResponsiveDialogTitle>
+            <ResponsiveDialogDescription className="sr-only">
               {t('objectTypesTitle')}
-            </DialogDescription>
-          </DialogHeader>
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
           <ScrollArea className="max-h-[60vh] max-h-[60dvh] pr-4">
             <ObjectTypeLegendContent />
           </ScrollArea>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     );
   }
 

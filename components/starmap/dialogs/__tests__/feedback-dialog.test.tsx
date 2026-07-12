@@ -185,27 +185,21 @@ describe('FeedbackDialog', () => {
   });
 
   it('uses drawer container on narrow viewport', () => {
-    const originalMatchMedia = window.matchMedia;
-    Object.defineProperty(window, 'matchMedia', {
+    // Dialogs follow the 900px shell decision, which reads viewport size
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
-      value: jest.fn().mockImplementation((query: string) => ({
-        matches: query === '(max-width: 640px)',
-        media: query,
-        onchange: null,
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-        addListener: jest.fn(),
-        removeListener: jest.fn(),
-        dispatchEvent: jest.fn(),
-      })),
+      configurable: true,
+      value: 500,
     });
 
     render(<FeedbackDialog open onOpenChange={jest.fn()} />);
     expect(document.querySelector('[data-slot="drawer-content"]')).toBeInTheDocument();
 
-    Object.defineProperty(window, 'matchMedia', {
+    Object.defineProperty(window, 'innerWidth', {
       writable: true,
-      value: originalMatchMedia,
+      configurable: true,
+      value: originalWidth,
     });
   });
 
