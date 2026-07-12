@@ -7,6 +7,7 @@
 
 import { LogEntry, LogTransport, LogLevel } from '../types';
 import { serializeData } from '../utils';
+import { isTauri as isTauriRuntime } from '@/lib/storage/platform';
 
 export interface TauriTransportConfig {
   /** Whether the transport is enabled */
@@ -59,7 +60,7 @@ export class TauriTransport implements LogTransport {
   
   private async initTauri(): Promise<void> {
     try {
-      if (typeof window !== 'undefined' && '__TAURI__' in window) {
+      if (isTauriRuntime()) {
         const { debug, info, warn, error } = await import('@tauri-apps/plugin-log');
         this.logFns = {
           [LogLevel.DEBUG]: debug,

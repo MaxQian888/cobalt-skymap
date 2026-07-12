@@ -1,5 +1,19 @@
-import { invoke } from '@tauri-apps/api/core';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+import { isTauri } from '@/lib/storage/platform';
+
+// Lazy import to avoid errors in web environment
+async function getInvoke() {
+  if (!isTauri()) {
+    throw new Error('Tauri API is only available in desktop environment');
+  }
+  const { invoke } = await import('@tauri-apps/api/core');
+  return invoke;
+}
+
+async function invoke<T = unknown>(command: string, args?: Record<string, unknown>): Promise<T> {
+  const doInvoke = await getInvoke();
+  return args === undefined ? doInvoke<T>(command) : doInvoke<T>(command, args);
+}
 
 export interface UpdateInfo {
   version: string;
@@ -88,6 +102,10 @@ export async function hasPendingUpdate(): Promise<boolean> {
 export async function onUpdateProgress(
   callback: (status: UpdateStatus) => void
 ): Promise<UnlistenFn> {
+  if (!isTauri()) {
+    return () => {};
+  }
+  const { listen } = await import('@tauri-apps/api/event');
   return await listen<UpdateStatus>('update-progress', (event) => {
     callback(event.payload);
   });

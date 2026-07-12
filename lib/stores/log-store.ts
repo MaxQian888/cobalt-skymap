@@ -27,6 +27,7 @@ import {
   exportLogsAsText,
   exportLogsAsJson,
 } from '@/lib/logger';
+import { isTauri } from '@/lib/storage/platform';
 
 export interface LogStoreState {
   /** Current logs (may be filtered) */
@@ -217,7 +218,7 @@ export const useLogStore = create<LogStore>((set, get) => {
       const filename = `skymap-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
       
       // Use Tauri native save dialog when available
-      if (typeof window !== 'undefined' && '__TAURI__' in window) {
+      if (isTauri()) {
         try {
           const { save } = await import('@tauri-apps/plugin-dialog');
           const { writeTextFile } = await import('@tauri-apps/plugin-fs');

@@ -6,6 +6,7 @@
   "platforms": ["iOS", "android"],
   "permissions": [
     "core:default",
+    "log:default",
     "fs:default",
     "fs:allow-app-read",
     "fs:allow-app-write",

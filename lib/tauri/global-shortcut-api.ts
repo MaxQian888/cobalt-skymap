@@ -6,9 +6,14 @@
  */
 
 import { createLogger } from '@/lib/logger';
-import { isTauri } from '@/lib/storage/platform';
+import { isDesktop, isTauri } from '@/lib/storage/platform';
 
 const logger = createLogger('global-shortcut-api');
+
+// The global-shortcut plugin is only registered in the desktop Rust build.
+function isDesktopTauri(): boolean {
+  return isTauri() && isDesktop();
+}
 
 export interface GlobalShortcutEvent {
   shortcut: string;
@@ -21,7 +26,7 @@ export type GlobalShortcutHandler = (event: GlobalShortcutEvent) => void;
 type ShortcutPlugin = typeof import('@tauri-apps/plugin-global-shortcut');
 
 async function getShortcutPlugin(): Promise<ShortcutPlugin | null> {
-  if (!isTauri()) {
+  if (!isDesktopTauri()) {
     return null;
   }
   return await import('@tauri-apps/plugin-global-shortcut');
@@ -29,7 +34,7 @@ async function getShortcutPlugin(): Promise<ShortcutPlugin | null> {
 
 export const globalShortcutApi = {
   isAvailable(): boolean {
-    return isTauri();
+    return isDesktopTauri();
   },
 
   async register(shortcut: string, handler: GlobalShortcutHandler): Promise<boolean> {

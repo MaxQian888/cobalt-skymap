@@ -1,5 +1,10 @@
-import { isTauri } from '@/lib/storage/platform';
+import { isDesktop, isTauri } from '@/lib/storage/platform';
 import type { Image } from '@tauri-apps/api/image';
+
+// The clipboard-manager plugin is only registered in the desktop Rust build.
+function isDesktopTauri(): boolean {
+  return isTauri() && isDesktop();
+}
 
 export interface TauriClipboardImageData {
   rgba: Uint8Array;
@@ -10,7 +15,7 @@ export interface TauriClipboardImageData {
 export type TauriClipboardImageInput = string | Image | Uint8Array | ArrayBuffer | number[];
 
 async function getClipboardPlugin() {
-  if (!isTauri()) {
+  if (!isDesktopTauri()) {
     throw new Error('Tauri clipboard API is only available in desktop environment');
   }
   return import('@tauri-apps/plugin-clipboard-manager');
@@ -18,7 +23,7 @@ async function getClipboardPlugin() {
 
 export const clipboardApi = {
   isAvailable(): boolean {
-    return isTauri();
+    return isDesktopTauri();
   },
 
   async writeText(text: string): Promise<void> {

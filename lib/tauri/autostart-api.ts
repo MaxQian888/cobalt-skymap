@@ -6,14 +6,19 @@
  */
 
 import { createLogger } from '@/lib/logger';
-import { isTauri } from '@/lib/storage/platform';
+import { isDesktop, isTauri } from '@/lib/storage/platform';
 
 const logger = createLogger('autostart-api');
+
+// The autostart plugin is only registered in the desktop Rust build.
+function isDesktopTauri(): boolean {
+  return isTauri() && isDesktop();
+}
 
 type AutostartPlugin = typeof import('@tauri-apps/plugin-autostart');
 
 export let autostartPluginLoader = async (): Promise<AutostartPlugin | null> => {
-  if (!isTauri()) {
+  if (!isDesktopTauri()) {
     return null;
   }
 
@@ -26,7 +31,7 @@ async function getAutostartPlugin(): Promise<AutostartPlugin | null> {
 
 export const autostartApi = {
   isAvailable(): boolean {
-    return isTauri();
+    return isDesktopTauri();
   },
 
   async isEnabled(): Promise<boolean> {

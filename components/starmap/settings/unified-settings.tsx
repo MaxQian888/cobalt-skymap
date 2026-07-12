@@ -72,6 +72,7 @@ import { StoragePathSettings } from './storage-path-settings';
 import { UpdateSettings } from '../management/updater/update-settings';
 import { DeviceWorkspace } from '../management/device-workspace';
 import { isTauri } from '@/lib/tauri/app-control-api';
+import { isDesktop } from '@/lib/storage/platform';
 import {
   useSettingsDraftLifecycle,
   useSettingsDraftStatus,
@@ -477,7 +478,7 @@ export function UnifiedSettings() {
                     </Button>
                   } 
                 />
-                {isTauri() && (
+                {isTauri() && isDesktop() && (
                   <>
                     <Separator className="my-4" />
                     <StoragePathSettings />
@@ -485,7 +486,7 @@ export function UnifiedSettings() {
                 )}
                 <Separator className="my-4" />
                 <SettingsExportImport />
-                {isTauri() && (
+                {isTauri() && isDesktop() && (
                   <>
                     <Separator className="my-4" />
                     <UpdateSettings />

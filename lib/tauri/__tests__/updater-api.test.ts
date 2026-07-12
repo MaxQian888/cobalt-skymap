@@ -13,6 +13,10 @@ jest.mock('@tauri-apps/api/event', () => ({
   listen: (...args: unknown[]) => mockListen(...args),
 }));
 
+jest.mock('@/lib/storage/platform', () => ({
+  isTauri: () => true,
+}));
+
 import {
   checkForUpdate,
   downloadUpdate,

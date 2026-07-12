@@ -1,7 +1,13 @@
 import { createLogger } from '@/lib/logger';
-import { isTauri } from '@/lib/storage/platform';
+import { isDesktop, isTauri } from '@/lib/storage/platform';
 
 const logger = createLogger('secret-vault-api');
+
+// The stronghold plugin is only registered in the desktop Rust build;
+// mobile Tauri falls back to in-memory session secrets like web.
+function hasStronghold(): boolean {
+  return isTauri() && isDesktop();
+}
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -46,7 +52,7 @@ function eventSourceRef(sourceId: string): string {
 }
 
 async function getDesktopStore(): Promise<DesktopStoreHandle> {
-  if (!isTauri()) {
+  if (!hasStronghold()) {
     throw new Error('Stronghold is only available in desktop mode');
   }
 
@@ -79,7 +85,7 @@ async function getDesktopStore(): Promise<DesktopStoreHandle> {
 }
 
 async function getSecret(reference: string): Promise<string | null> {
-  if (!isTauri()) {
+  if (!hasStronghold()) {
     return sessionSecrets.get(reference) ?? null;
   }
 
@@ -93,7 +99,7 @@ async function getSecret(reference: string): Promise<string | null> {
 }
 
 async function setSecret(reference: string, value: string): Promise<void> {
-  if (!isTauri()) {
+  if (!hasStronghold()) {
     sessionSecrets.set(reference, value);
     return;
   }
@@ -104,7 +110,7 @@ async function setSecret(reference: string, value: string): Promise<void> {
 }
 
 async function deleteSecret(reference: string): Promise<void> {
-  if (!isTauri()) {
+  if (!hasStronghold()) {
     sessionSecrets.delete(reference);
     return;
   }
@@ -120,11 +126,11 @@ async function deleteSecret(reference: string): Promise<void> {
 
 export const secretVaultApi = {
   isAvailable(): boolean {
-    return isTauri();
+    return hasStronghold();
   },
 
   async getStatus(): Promise<SecretVaultStatus> {
-    if (!isTauri()) {
+    if (!hasStronghold()) {
       return {
         available: false,
         mode: 'web',

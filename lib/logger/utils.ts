@@ -364,7 +364,8 @@ export function formatLogJson(entry: LogEntry): string {
 
 function getRuntimeContext(): LogDiagnosticsBundle['runtime'] {
   const isBrowser = typeof window !== 'undefined';
-  const tauriRuntime = isBrowser && '__TAURI__' in window;
+  const tauriRuntime =
+    isBrowser && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
 
   return {
     environment: tauriRuntime ? 'tauri' : isBrowser ? 'web' : 'unknown',
