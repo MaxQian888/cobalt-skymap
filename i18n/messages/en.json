@@ -388,6 +388,7 @@
     "focalLengthPlaceholder": "1000"
   },
   "time": {
+    "aladinSystemTimeNote": "Aladin displays the sky for the current system time; time control is not available.",
     "timeControls": "Time Controls",
     "dateTime": "Date & Time",
     "date": "Date",
@@ -1918,21 +1919,21 @@
     "bortle4": "Rural/suburban transition",
     "bortle5": "Suburban sky",
     "bortle6": "Bright suburban sky",
-      "bortle7": "Suburban/urban transition",
-      "bortle8": "City sky",
-      "bortle9": "Inner city sky",
-      "metadataStatusTitle": "Draft metadata",
-      "metadataLoading": "Refreshing...",
-      "metadataManual": "Manual",
-      "metadataDerived": "Derived",
-      "metadataPersisted": "Saved",
-      "metadataUnresolved": "Unresolved",
-      "metadataNeedsAttention": "Some metadata could not be resolved. Review it or enter it manually.",
-      "validation": {
-        "latitudeRange": "Latitude must be between -90 and 90",
-        "longitudeRange": "Longitude must be between -180 and 180",
-        "altitudeRange": "Altitude must be between -500 and 9,000 m",
-        "bortleRange": "Bortle class must be between 1 and 9"
+    "bortle7": "Suburban/urban transition",
+    "bortle8": "City sky",
+    "bortle9": "Inner city sky",
+    "metadataStatusTitle": "Draft metadata",
+    "metadataLoading": "Refreshing...",
+    "metadataManual": "Manual",
+    "metadataDerived": "Derived",
+    "metadataPersisted": "Saved",
+    "metadataUnresolved": "Unresolved",
+    "metadataNeedsAttention": "Some metadata could not be resolved. Review it or enter it manually.",
+    "validation": {
+      "latitudeRange": "Latitude must be between -90 and 90",
+      "longitudeRange": "Longitude must be between -180 and 180",
+      "altitudeRange": "Altitude must be between -500 and 9,000 m",
+      "bortleRange": "Bortle class must be between 1 and 9"
     }
   },
   "map": {
@@ -2016,12 +2017,12 @@
     "healthyCount": "Healthy",
     "totalErrors": "Errors",
     "lastUpdated": "Last updated",
-      "healthyProviders": "Healthy providers",
-      "avgResponseTime": "Avg response time",
-      "metadataLoading": "Refreshing location metadata...",
-      "metadataNeedsAttention": "Some location metadata could not be resolved automatically.",
-      "metadataResolveFailed": "Location metadata refresh failed. You can retry or continue manually.",
-      "apiKeys": "API Keys",
+    "healthyProviders": "Healthy providers",
+    "avgResponseTime": "Avg response time",
+    "metadataLoading": "Refreshing location metadata...",
+    "metadataNeedsAttention": "Some location metadata could not be resolved automatically.",
+    "metadataResolveFailed": "Location metadata refresh failed. You can retry or continue manually.",
+    "apiKeys": "API Keys",
     "apiKeyManager": "API Key Manager",
     "apiKeyManagerDescription": "Manage API keys for map providers. Keys are stored securely in local storage.",
     "securityNotice": "Security Notice",
@@ -2080,10 +2081,10 @@
       "roundRobinDesc": "Rotate between providers"
     }
   },
-    "objectDetail": {
-      "overview": "Overview",
-      "images": "Images",
-      "observation": "Observation",
+  "objectDetail": {
+    "overview": "Overview",
+    "images": "Images",
+    "observation": "Observation",
     "viewDetails": "View Details",
     "positionRecomputed": "Positions recomputed for each time point",
     "positionSnapshot": "Position from selection time; comets and asteroids drift over hours",
@@ -2121,23 +2122,23 @@
     "sourceCatalog": "Source Catalog",
     "tonightSummary": "Tonight Summary",
     "timestamp": "Timestamp",
-      "riskHints": "Risk Hints",
-      "acceptedSource": "Accepted source",
-      "fallbackSource": "Fallback source",
-      "localFallback": "Local fallback",
-      "remoteUnavailable": "Remote enrichment unavailable",
-      "degradedSourceState": "Some sources are unavailable for this target",
-      "unsupportedSourceState": "This source does not support the current target",
-      "emptySourceState": "The source responded but returned no matching data",
-      "calculationState": {
-        "normal": "Normal",
-        "degraded": "Degraded"
-      },
-      "sourceAuthority": {
-        "authoritative": "Authoritative remote source",
-        "reference": "Reference source",
-        "fallback-local": "Local fallback source"
-      },
+    "riskHints": "Risk Hints",
+    "acceptedSource": "Accepted source",
+    "fallbackSource": "Fallback source",
+    "localFallback": "Local fallback",
+    "remoteUnavailable": "Remote enrichment unavailable",
+    "degradedSourceState": "Some sources are unavailable for this target",
+    "unsupportedSourceState": "This source does not support the current target",
+    "emptySourceState": "The source responded but returned no matching data",
+    "calculationState": {
+      "normal": "Normal",
+      "degraded": "Degraded"
+    },
+    "sourceAuthority": {
+      "authoritative": "Authoritative remote source",
+      "reference": "Reference source",
+      "fallback-local": "Local fallback source"
+    },
     "calculationSource": {
       "tauri": "Tauri",
       "fallback": "Fallback",
@@ -2171,9 +2172,9 @@
       "low-feasibility": "Low feasibility"
     }
   },
-    "sourceConfig": {
-      "title": "Information Sources",
-      "configDescription": "Configure image and data sources for celestial objects",
+  "sourceConfig": {
+    "title": "Information Sources",
+    "configDescription": "Configure image and data sources for celestial objects",
     "imageSources": "Image Sources",
     "dataSourcesLabel": "Data Sources",
     "globalSettings": "Global Settings",
@@ -2199,29 +2200,29 @@
     "sourceDescription": "Description",
     "descriptionPlaceholder": "Brief description of this source",
     "statusUnknown": "Status unknown",
-      "statusChecking": "Checking...",
-      "statusOnline": "Online",
-      "statusOffline": "Offline",
-      "statusError": "Error",
-      "statusUnsupported": "Unsupported",
-      "statusDegraded": "Degraded",
-      "statusEmpty": "No matching data",
-      "responseTime": "Response time",
-      "authorityLevel": "Authority level",
-      "healthStrategy": "Health strategy",
-      "targetSupport": "Target support",
-      "diagnostic": {
-        "authoritative": "Authoritative remote metadata",
-        "reference": "Reference or supplemental remote content",
-        "fallback-local": "Local curated fallback content",
-        "query": "Query-backed probe",
-        "lookup": "Lookup probe",
-        "cutout": "Generated cutout probe",
-        "none": "Passive health state",
-        "disabled": "Health probe disabled"
-      },
-      "autoSkipOffline": "Auto-skip Offline Sources",
-      "autoSkipOfflineDescription": "Automatically skip sources that are detected as offline",
+    "statusChecking": "Checking...",
+    "statusOnline": "Online",
+    "statusOffline": "Offline",
+    "statusError": "Error",
+    "statusUnsupported": "Unsupported",
+    "statusDegraded": "Degraded",
+    "statusEmpty": "No matching data",
+    "responseTime": "Response time",
+    "authorityLevel": "Authority level",
+    "healthStrategy": "Health strategy",
+    "targetSupport": "Target support",
+    "diagnostic": {
+      "authoritative": "Authoritative remote metadata",
+      "reference": "Reference or supplemental remote content",
+      "fallback-local": "Local curated fallback content",
+      "query": "Query-backed probe",
+      "lookup": "Lookup probe",
+      "cutout": "Generated cutout probe",
+      "none": "Passive health state",
+      "disabled": "Health probe disabled"
+    },
+    "autoSkipOffline": "Auto-skip Offline Sources",
+    "autoSkipOfflineDescription": "Automatically skip sources that are detected as offline",
     "imageTimeout": "Image Load Timeout",
     "apiTimeout": "API Request Timeout",
     "defaultImageSize": "Default Image Size (arcmin)",
@@ -2910,7 +2911,13 @@
     "sipDistortion": "SIP Distortion",
     "sipOrder": "SIP Order",
     "solveHistory": "Solve History",
-    "clearHistory": "Clear History"
+    "clearHistory": "Clear History",
+    "download": "Download",
+    "starDatabases": "Star Databases",
+    "downloadingDatabase": "Downloading database...",
+    "noDatabases": "No databases",
+    "mobileAstapHint": "Bundled ASTAP solver",
+    "mobileSolverNotReady": "Download at least one star database to solve locally."
   },
   "geolocation": {
     "title": "Device Location",
@@ -3748,7 +3755,9 @@
       "counterweightUp": "Counterweight-up condition — risk of equipment damage",
       "cableWrap": "Cumulative RA rotation {rotation}° — cable wrap risk",
       "pierCollision": "Telescope tube may collide with pier near meridian",
-      "slewThroughPole": "Slew from {from} to {to} passes near celestial pole"
+      "slewThroughPole": "Slew from {from} to {to} passes near celestial pole",
+      "pastMeridianLimit": "Tracking exceeds the {maxMinutes} min past-meridian limit without a flip",
+      "pauseBeforeMeridian": "Pause tracking at {pauseTimeStr} ({pauseMinutes} min before meridian)"
     },
     "suggestions": {
       "meridianFlip": "Ensure meridian flip is enabled in mount driver",
@@ -3759,7 +3768,9 @@
       "counterweightUp": "Enable meridian flip to avoid counterweight-up tracking",
       "cableWrap": "Consider reversing sequence direction or adding a park between targets",
       "pierCollision": "Use pause-before-meridian setting for long telescope tubes",
-      "slewThroughPole": "Consider reordering targets to avoid pole crossing"
+      "slewThroughPole": "Consider reordering targets to avoid pole crossing",
+      "pastMeridianLimit": "Enable meridian flip or shorten the imaging window",
+      "pauseBeforeMeridian": "Tracking resumes after the meridian flip completes"
     }
   },
   "planRec": {
@@ -4356,14 +4367,14 @@
     "categoryMission": "Mission",
     "categoryTechnique": "Technique",
     "categoryCulture": "Culture",
-      "sourceAll": "All sources",
-      "sourceCurated": "Curated",
-      "sourceApod": "NASA APOD",
-      "sourceWikimedia": "Wikimedia",
-      "sourceNasaImageLibrary": "NASA Image Library",
-      "sourceNasaPhotojournal": "NASA Photojournal",
-      "sourceEsaScience": "ESA Space Science",
-      "favorites": "Favorites",
+    "sourceAll": "All sources",
+    "sourceCurated": "Curated",
+    "sourceApod": "NASA APOD",
+    "sourceWikimedia": "Wikimedia",
+    "sourceNasaImageLibrary": "NASA Image Library",
+    "sourceNasaPhotojournal": "NASA Photojournal",
+    "sourceEsaScience": "ESA Space Science",
+    "favorites": "Favorites",
     "viewModePager": "Pager",
     "viewModeFeed": "Feed",
     "wheelPaging": "Wheel paging",
@@ -4400,60 +4411,60 @@
     "loadFailed": "Failed to load daily knowledge.",
     "videoEntry": "Video entry. Use Open Source to view the original video.",
     "eventOfToday": "Today in astronomy",
-      "factSources": "Fact sources",
-      "noFactSources": "No external fact source listed.",
-      "fallbackNotice": "This entry is shown in fallback language for accuracy.",
-      "curatedFallbackNotice": "Curated fallback is being shown because one or more online sources were unavailable or did not return a valid astronomy item.",
-      "sourceReference": "Source reference",
-      "languageStatus": {
-        "native": "Native language",
-        "fallback": "Fallback language"
+    "factSources": "Fact sources",
+    "noFactSources": "No external fact source listed.",
+    "fallbackNotice": "This entry is shown in fallback language for accuracy.",
+    "curatedFallbackNotice": "Curated fallback is being shown because one or more online sources were unavailable or did not return a valid astronomy item.",
+    "sourceReference": "Source reference",
+    "languageStatus": {
+      "native": "Native language",
+      "fallback": "Fallback language"
+    },
+    "sourceStatus": {
+      "nasa-apod": {
+        "empty": "NASA APOD did not return a usable astronomy item for today.",
+        "error": "NASA APOD is temporarily unavailable.",
+        "invalid": "NASA APOD returned data that could not be normalized.",
+        "offline": "NASA APOD was skipped because the app is offline.",
+        "disabled": "NASA APOD enhancement is turned off."
       },
-      "sourceStatus": {
-        "nasa-apod": {
-          "empty": "NASA APOD did not return a usable astronomy item for today.",
-          "error": "NASA APOD is temporarily unavailable.",
-          "invalid": "NASA APOD returned data that could not be normalized.",
-          "offline": "NASA APOD was skipped because the app is offline.",
-          "disabled": "NASA APOD enhancement is turned off."
-        },
-        "wikimedia": {
-          "empty": "Wikimedia enrichment did not find a usable match right now.",
-          "error": "Wikimedia enrichment is temporarily unavailable.",
-          "invalid": "Wikimedia enrichment returned data that could not be normalized.",
-          "offline": "Wikimedia enrichment was skipped because the app is offline.",
-          "disabled": "Wikimedia enhancement is turned off."
-        },
-        "nasa-image-library": {
-          "empty": "NASA Image Library returned no usable item right now.",
-          "error": "NASA Image Library returned no usable item right now.",
-          "invalid": "NASA Image Library returned data that could not be normalized.",
-          "offline": "NASA Image Library was skipped because the app is offline.",
-          "disabled": "NASA Image Library enhancement is turned off."
-        },
-        "nasa-photojournal": {
-          "empty": "NASA Photojournal feed did not return a usable astronomy item right now.",
-          "error": "NASA Photojournal feed is currently unavailable.",
-          "invalid": "NASA Photojournal returned data that could not be normalized.",
-          "offline": "NASA Photojournal was skipped because the app is offline.",
-          "disabled": "NASA Photojournal enhancement is turned off."
-        },
-        "esa-science": {
-          "empty": "ESA Space Science feed did not return a usable astronomy item right now.",
-          "error": "ESA Space Science feed is currently unavailable.",
-          "invalid": "ESA Space Science returned data that could not be normalized.",
-          "offline": "ESA Space Science was skipped because the app is offline.",
-          "disabled": "ESA Space Science enhancement is turned off."
-        }
+      "wikimedia": {
+        "empty": "Wikimedia enrichment did not find a usable match right now.",
+        "error": "Wikimedia enrichment is temporarily unavailable.",
+        "invalid": "Wikimedia enrichment returned data that could not be normalized.",
+        "offline": "Wikimedia enrichment was skipped because the app is offline.",
+        "disabled": "Wikimedia enhancement is turned off."
       },
-      "sourceBadge": {
-        "curated": "Curated",
-        "nasa-apod": "NASA APOD",
-        "wikimedia": "Wikimedia",
-        "nasa-image-library": "NASA Image Library",
-        "nasa-photojournal": "NASA Photojournal",
-        "esa-science": "ESA Space Science"
+      "nasa-image-library": {
+        "empty": "NASA Image Library returned no usable item right now.",
+        "error": "NASA Image Library returned no usable item right now.",
+        "invalid": "NASA Image Library returned data that could not be normalized.",
+        "offline": "NASA Image Library was skipped because the app is offline.",
+        "disabled": "NASA Image Library enhancement is turned off."
       },
+      "nasa-photojournal": {
+        "empty": "NASA Photojournal feed did not return a usable astronomy item right now.",
+        "error": "NASA Photojournal feed is currently unavailable.",
+        "invalid": "NASA Photojournal returned data that could not be normalized.",
+        "offline": "NASA Photojournal was skipped because the app is offline.",
+        "disabled": "NASA Photojournal enhancement is turned off."
+      },
+      "esa-science": {
+        "empty": "ESA Space Science feed did not return a usable astronomy item right now.",
+        "error": "ESA Space Science feed is currently unavailable.",
+        "invalid": "ESA Space Science returned data that could not be normalized.",
+        "offline": "ESA Space Science was skipped because the app is offline.",
+        "disabled": "ESA Space Science enhancement is turned off."
+      }
+    },
+    "sourceBadge": {
+      "curated": "Curated",
+      "nasa-apod": "NASA APOD",
+      "wikimedia": "Wikimedia",
+      "nasa-image-library": "NASA Image Library",
+      "nasa-photojournal": "NASA Photojournal",
+      "esa-science": "ESA Space Science"
+    },
     "categoryBadge": {
       "object": "Object",
       "event": "Event",

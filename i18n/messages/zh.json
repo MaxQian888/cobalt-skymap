@@ -388,6 +388,7 @@
     "focalLengthPlaceholder": "1000"
   },
   "time": {
+    "aladinSystemTimeNote": "Aladin 显示当前系统时间的星空，时间控制不可用。",
     "timeControls": "时间控制",
     "dateTime": "日期和时间",
     "date": "日期",
@@ -1918,21 +1919,21 @@
     "bortle4": "乡村/郊区过渡",
     "bortle5": "郊区天空",
     "bortle6": "明亮郊区天空",
-      "bortle7": "郊区/城区过渡",
-      "bortle8": "城市天空",
-      "bortle9": "市中心天空",
-      "metadataStatusTitle": "草稿元数据",
-      "metadataLoading": "刷新中...",
-      "metadataManual": "手动",
-      "metadataDerived": "自动补全",
-      "metadataPersisted": "已保存",
-      "metadataUnresolved": "未解析",
-      "metadataNeedsAttention": "部分元数据无法自动解析，请检查或手动补充。",
-      "validation": {
-        "latitudeRange": "纬度必须在 -90 至 90 之间",
-        "longitudeRange": "经度必须在 -180 至 180 之间",
-        "altitudeRange": "海拔必须在 -500 至 9,000 m 之间",
-        "bortleRange": "波特尔等级必须在 1 至 9 之间"
+    "bortle7": "郊区/城区过渡",
+    "bortle8": "城市天空",
+    "bortle9": "市中心天空",
+    "metadataStatusTitle": "草稿元数据",
+    "metadataLoading": "刷新中...",
+    "metadataManual": "手动",
+    "metadataDerived": "自动补全",
+    "metadataPersisted": "已保存",
+    "metadataUnresolved": "未解析",
+    "metadataNeedsAttention": "部分元数据无法自动解析，请检查或手动补充。",
+    "validation": {
+      "latitudeRange": "纬度必须在 -90 至 90 之间",
+      "longitudeRange": "经度必须在 -180 至 180 之间",
+      "altitudeRange": "海拔必须在 -500 至 9,000 m 之间",
+      "bortleRange": "波特尔等级必须在 1 至 9 之间"
     }
   },
   "map": {
@@ -2016,12 +2017,12 @@
     "healthyCount": "健康数",
     "totalErrors": "错误数",
     "lastUpdated": "最后更新",
-      "healthyProviders": "健康提供商",
-      "avgResponseTime": "平均响应时间",
-      "metadataLoading": "正在刷新位置元数据...",
-      "metadataNeedsAttention": "部分位置元数据无法自动解析。",
-      "metadataResolveFailed": "位置元数据刷新失败，您可以重试或继续手动填写。",
-      "apiKeys": "API 密钥",
+    "healthyProviders": "健康提供商",
+    "avgResponseTime": "平均响应时间",
+    "metadataLoading": "正在刷新位置元数据...",
+    "metadataNeedsAttention": "部分位置元数据无法自动解析。",
+    "metadataResolveFailed": "位置元数据刷新失败，您可以重试或继续手动填写。",
+    "apiKeys": "API 密钥",
     "apiKeyManager": "API 密钥管理器",
     "apiKeyManagerDescription": "管理地图提供商的 API 密钥。密钥安全存储在本地。",
     "securityNotice": "安全提示",
@@ -2080,10 +2081,10 @@
       "roundRobinDesc": "在提供商之间轮流切换"
     }
   },
-    "objectDetail": {
-      "overview": "概览",
-      "images": "图像",
-      "observation": "观测",
+  "objectDetail": {
+    "overview": "概览",
+    "images": "图像",
+    "observation": "观测",
     "viewDetails": "查看详情",
     "positionRecomputed": "位置已按每个时间点重新计算",
     "positionSnapshot": "位置为选中时刻的快照，彗星/小行星会随时间漂移",
@@ -2121,23 +2122,23 @@
     "sourceCatalog": "来源目录",
     "tonightSummary": "今夜摘要",
     "timestamp": "时间戳",
-      "riskHints": "风险提示",
-      "acceptedSource": "采用来源",
-      "fallbackSource": "回退来源",
-      "localFallback": "本地兜底",
-      "remoteUnavailable": "远程补全暂不可用",
-      "degradedSourceState": "部分来源当前无法为该目标提供数据",
-      "unsupportedSourceState": "该来源不支持当前目标",
-      "emptySourceState": "来源已响应，但没有返回匹配数据",
-      "calculationState": {
-        "normal": "正常",
-        "degraded": "降级"
-      },
-      "sourceAuthority": {
-        "authoritative": "权威远程来源",
-        "reference": "参考来源",
-        "fallback-local": "本地兜底来源"
-      },
+    "riskHints": "风险提示",
+    "acceptedSource": "采用来源",
+    "fallbackSource": "回退来源",
+    "localFallback": "本地兜底",
+    "remoteUnavailable": "远程补全暂不可用",
+    "degradedSourceState": "部分来源当前无法为该目标提供数据",
+    "unsupportedSourceState": "该来源不支持当前目标",
+    "emptySourceState": "来源已响应，但没有返回匹配数据",
+    "calculationState": {
+      "normal": "正常",
+      "degraded": "降级"
+    },
+    "sourceAuthority": {
+      "authoritative": "权威远程来源",
+      "reference": "参考来源",
+      "fallback-local": "本地兜底来源"
+    },
     "calculationSource": {
       "tauri": "Tauri",
       "fallback": "回退",
@@ -2171,9 +2172,9 @@
       "low-feasibility": "可行性低"
     }
   },
-    "sourceConfig": {
-      "title": "信息来源",
-      "configDescription": "配置天体图像和数据来源",
+  "sourceConfig": {
+    "title": "信息来源",
+    "configDescription": "配置天体图像和数据来源",
     "imageSources": "图像来源",
     "dataSourcesLabel": "数据来源",
     "globalSettings": "全局设置",
@@ -2199,29 +2200,29 @@
     "sourceDescription": "描述",
     "descriptionPlaceholder": "简短描述此来源",
     "statusUnknown": "状态未知",
-      "statusChecking": "检查中...",
-      "statusOnline": "在线",
-      "statusOffline": "离线",
-      "statusError": "错误",
-      "statusUnsupported": "不支持",
-      "statusDegraded": "降级",
-      "statusEmpty": "无匹配数据",
-      "responseTime": "响应时间",
-      "authorityLevel": "来源级别",
-      "healthStrategy": "探测策略",
-      "targetSupport": "支持目标",
-      "diagnostic": {
-        "authoritative": "权威远程元数据",
-        "reference": "参考或补充型远程内容",
-        "fallback-local": "本地整理的兜底内容",
-        "query": "查询式探测",
-        "lookup": "查找式探测",
-        "cutout": "切片生成探测",
-        "none": "被动健康状态",
-        "disabled": "健康探测已禁用"
-      },
-      "autoSkipOffline": "自动跳过离线来源",
-      "autoSkipOfflineDescription": "自动跳过检测为离线的来源",
+    "statusChecking": "检查中...",
+    "statusOnline": "在线",
+    "statusOffline": "离线",
+    "statusError": "错误",
+    "statusUnsupported": "不支持",
+    "statusDegraded": "降级",
+    "statusEmpty": "无匹配数据",
+    "responseTime": "响应时间",
+    "authorityLevel": "来源级别",
+    "healthStrategy": "探测策略",
+    "targetSupport": "支持目标",
+    "diagnostic": {
+      "authoritative": "权威远程元数据",
+      "reference": "参考或补充型远程内容",
+      "fallback-local": "本地整理的兜底内容",
+      "query": "查询式探测",
+      "lookup": "查找式探测",
+      "cutout": "切片生成探测",
+      "none": "被动健康状态",
+      "disabled": "健康探测已禁用"
+    },
+    "autoSkipOffline": "自动跳过离线来源",
+    "autoSkipOfflineDescription": "自动跳过检测为离线的来源",
     "imageTimeout": "图像加载超时",
     "apiTimeout": "API 请求超时",
     "defaultImageSize": "默认图像尺寸 (角分)",
@@ -2910,7 +2911,13 @@
     "sipDistortion": "SIP 畸变",
     "sipOrder": "SIP 阶数",
     "solveHistory": "解算历史",
-    "clearHistory": "清除历史"
+    "clearHistory": "清除历史",
+    "download": "下载",
+    "starDatabases": "星表数据库",
+    "downloadingDatabase": "正在下载数据库...",
+    "noDatabases": "无数据库",
+    "mobileAstapHint": "内置 ASTAP 解析器",
+    "mobileSolverNotReady": "请至少下载一个星表数据库后再进行本地解析。"
   },
   "geolocation": {
     "title": "设备定位",
@@ -3748,7 +3755,9 @@
       "counterweightUp": "配重朝上状态 — 存在设备损坏风险",
       "cableWrap": "累计 RA 旋转 {rotation}° — 存在线缆缠绕风险",
       "pierCollision": "望远镜镜筒在子午线附近可能碰撞三脚架",
-      "slewThroughPole": "从 {from} 到 {to} 的转向路径经过天极附近"
+      "slewThroughPole": "从 {from} 到 {to} 的转向路径经过天极附近",
+      "pastMeridianLimit": "未翻转的跟踪将超过过中天 {maxMinutes} 分钟的强制停止限制",
+      "pauseBeforeMeridian": "将于 {pauseTimeStr} 暂停跟踪（中天前 {pauseMinutes} 分钟）"
     },
     "suggestions": {
       "meridianFlip": "确保赤道仪驱动中已启用子午线翻转",
@@ -3759,7 +3768,9 @@
       "counterweightUp": "启用子午线翻转以避免配重朝上跟踪",
       "cableWrap": "考虑反转序列方向或在目标之间添加归位操作",
       "pierCollision": "使用子午线前暂停设置，适用于长焦镜筒",
-      "slewThroughPole": "考虑重新排列目标顺序以避免穿越天极"
+      "slewThroughPole": "考虑重新排列目标顺序以避免穿越天极",
+      "pastMeridianLimit": "启用子午线翻转或缩短拍摄时间窗口",
+      "pauseBeforeMeridian": "子午线翻转完成后将恢复跟踪"
     }
   },
   "planRec": {
@@ -4356,14 +4367,14 @@
     "categoryMission": "任务",
     "categoryTechnique": "技巧",
     "categoryCulture": "文化",
-      "sourceAll": "全部来源",
-      "sourceCurated": "本地策展",
-      "sourceApod": "NASA APOD",
-      "sourceWikimedia": "Wikimedia",
-      "sourceNasaImageLibrary": "NASA 图像库",
-      "sourceNasaPhotojournal": "NASA 图片日志",
-      "sourceEsaScience": "ESA 空间科学",
-      "favorites": "收藏",
+    "sourceAll": "全部来源",
+    "sourceCurated": "本地策展",
+    "sourceApod": "NASA APOD",
+    "sourceWikimedia": "Wikimedia",
+    "sourceNasaImageLibrary": "NASA 图像库",
+    "sourceNasaPhotojournal": "NASA 图片日志",
+    "sourceEsaScience": "ESA 空间科学",
+    "favorites": "收藏",
     "viewModePager": "翻页",
     "viewModeFeed": "列表流",
     "wheelPaging": "滚轮翻页",
@@ -4400,60 +4411,60 @@
     "loadFailed": "加载每日知识失败。",
     "videoEntry": "该条目为视频内容，可点击“打开来源”查看原视频。",
     "eventOfToday": "今日天文事件",
-      "factSources": "事实来源",
-      "noFactSources": "暂无外部事实来源链接。",
-      "fallbackNotice": "该条目因数据可用性以回退语言显示。",
-      "curatedFallbackNotice": "当前展示的是本地策展回退内容，因为部分在线来源暂时不可用或未返回有效天文条目。",
-      "sourceReference": "来源链接",
-      "languageStatus": {
-        "native": "本地语言",
-        "fallback": "回退语言"
+    "factSources": "事实来源",
+    "noFactSources": "暂无外部事实来源链接。",
+    "fallbackNotice": "该条目因数据可用性以回退语言显示。",
+    "curatedFallbackNotice": "当前展示的是本地策展回退内容，因为部分在线来源暂时不可用或未返回有效天文条目。",
+    "sourceReference": "来源链接",
+    "languageStatus": {
+      "native": "本地语言",
+      "fallback": "回退语言"
+    },
+    "sourceStatus": {
+      "nasa-apod": {
+        "empty": "NASA APOD 今天没有返回可用的天文条目。",
+        "error": "NASA APOD 当前暂不可用。",
+        "invalid": "NASA APOD 返回了无法规范化的数据。",
+        "offline": "当前处于离线状态，已跳过 NASA APOD。",
+        "disabled": "NASA APOD 在线增强已关闭。"
       },
-      "sourceStatus": {
-        "nasa-apod": {
-          "empty": "NASA APOD 今天没有返回可用的天文条目。",
-          "error": "NASA APOD 当前暂不可用。",
-          "invalid": "NASA APOD 返回了无法规范化的数据。",
-          "offline": "当前处于离线状态，已跳过 NASA APOD。",
-          "disabled": "NASA APOD 在线增强已关闭。"
-        },
-        "wikimedia": {
-          "empty": "Wikimedia 当前没有匹配到可用的增强内容。",
-          "error": "Wikimedia 增强内容当前暂不可用。",
-          "invalid": "Wikimedia 返回了无法规范化的数据。",
-          "offline": "当前处于离线状态，已跳过 Wikimedia 增强。",
-          "disabled": "Wikimedia 在线增强已关闭。"
-        },
-        "nasa-image-library": {
-          "empty": "NASA 图像库当前未返回可用条目。",
-          "error": "NASA 图像库当前未返回可用条目。",
-          "invalid": "NASA 图像库返回了无法规范化的数据。",
-          "offline": "当前处于离线状态，已跳过 NASA 图像库。",
-          "disabled": "NASA 图像库在线增强已关闭。"
-        },
-        "nasa-photojournal": {
-          "empty": "NASA 图片日志订阅当前没有返回可用的天文条目。",
-          "error": "NASA 图片日志订阅当前暂不可用。",
-          "invalid": "NASA 图片日志返回了无法规范化的数据。",
-          "offline": "当前处于离线状态，已跳过 NASA 图片日志。",
-          "disabled": "NASA 图片日志在线增强已关闭。"
-        },
-        "esa-science": {
-          "empty": "ESA 空间科学订阅当前没有返回可用的天文条目。",
-          "error": "ESA 空间科学订阅当前暂不可用。",
-          "invalid": "ESA 空间科学返回了无法规范化的数据。",
-          "offline": "当前处于离线状态，已跳过 ESA 空间科学。",
-          "disabled": "ESA 空间科学在线增强已关闭。"
-        }
+      "wikimedia": {
+        "empty": "Wikimedia 当前没有匹配到可用的增强内容。",
+        "error": "Wikimedia 增强内容当前暂不可用。",
+        "invalid": "Wikimedia 返回了无法规范化的数据。",
+        "offline": "当前处于离线状态，已跳过 Wikimedia 增强。",
+        "disabled": "Wikimedia 在线增强已关闭。"
       },
-      "sourceBadge": {
-        "curated": "本地策展",
-        "nasa-apod": "NASA APOD",
-        "wikimedia": "Wikimedia",
-        "nasa-image-library": "NASA 图像库",
-        "nasa-photojournal": "NASA 图片日志",
-        "esa-science": "ESA 空间科学"
+      "nasa-image-library": {
+        "empty": "NASA 图像库当前未返回可用条目。",
+        "error": "NASA 图像库当前未返回可用条目。",
+        "invalid": "NASA 图像库返回了无法规范化的数据。",
+        "offline": "当前处于离线状态，已跳过 NASA 图像库。",
+        "disabled": "NASA 图像库在线增强已关闭。"
       },
+      "nasa-photojournal": {
+        "empty": "NASA 图片日志订阅当前没有返回可用的天文条目。",
+        "error": "NASA 图片日志订阅当前暂不可用。",
+        "invalid": "NASA 图片日志返回了无法规范化的数据。",
+        "offline": "当前处于离线状态，已跳过 NASA 图片日志。",
+        "disabled": "NASA 图片日志在线增强已关闭。"
+      },
+      "esa-science": {
+        "empty": "ESA 空间科学订阅当前没有返回可用的天文条目。",
+        "error": "ESA 空间科学订阅当前暂不可用。",
+        "invalid": "ESA 空间科学返回了无法规范化的数据。",
+        "offline": "当前处于离线状态，已跳过 ESA 空间科学。",
+        "disabled": "ESA 空间科学在线增强已关闭。"
+      }
+    },
+    "sourceBadge": {
+      "curated": "本地策展",
+      "nasa-apod": "NASA APOD",
+      "wikimedia": "Wikimedia",
+      "nasa-image-library": "NASA 图像库",
+      "nasa-photojournal": "NASA 图片日志",
+      "esa-science": "ESA 空间科学"
+    },
     "categoryBadge": {
       "object": "天体",
       "event": "事件",
