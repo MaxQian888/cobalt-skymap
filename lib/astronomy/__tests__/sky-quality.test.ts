@@ -29,8 +29,24 @@ describe('estimateSkyQuality', () => {
     expect(estimateSkyQuality(-20, 40, 80)).toBe('fair');
   });
 
-  it('should return good when moderately bright moon is above horizon', () => {
-    expect(estimateSkyQuality(-20, 10, 75)).toBe('good');
+  it('should rate a low moon as low impact regardless of illumination', () => {
+    // 75% moon at only 10° altitude — heavily attenuated near the horizon
+    expect(estimateSkyQuality(-20, 10, 75)).toBe('excellent');
+  });
+
+  it('should return poor when a full moon is near zenith', () => {
+    expect(estimateSkyQuality(-20, 70, 100)).toBe('poor');
+  });
+
+  it('should never rate a brighter or higher moon better', () => {
+    const order = ['excellent', 'good', 'fair', 'poor'];
+    const rank = (q: string) => order.indexOf(q);
+    expect(rank(estimateSkyQuality(-20, 30, 90))).toBeGreaterThanOrEqual(
+      rank(estimateSkyQuality(-20, 30, 50))
+    );
+    expect(rank(estimateSkyQuality(-20, 60, 80))).toBeGreaterThanOrEqual(
+      rank(estimateSkyQuality(-20, 20, 80))
+    );
   });
 });
 

@@ -189,8 +189,8 @@ export function useTargetPlanner() {
   
   // Get location
   const location = useMemo(() => ({
-    latitude: profileInfo.AstrometrySettings.Latitude || 40,
-    longitude: profileInfo.AstrometrySettings.Longitude || -74,
+    latitude: profileInfo.AstrometrySettings.Latitude ?? 40,
+    longitude: profileInfo.AstrometrySettings.Longitude ?? -74,
   }), [profileInfo.AstrometrySettings.Latitude, profileInfo.AstrometrySettings.Longitude]);
   
   // Calculate nighttime data
@@ -218,10 +218,14 @@ export function useTargetPlanner() {
       const darkStart = nighttimeData.twilightRiseAndSet.set;
       const darkEnd = nighttimeData.twilightRiseAndSet.rise;
       let darkHours = 0;
-      
-      if (darkStart && darkEnd && altitudeData.riseTime && altitudeData.setTime) {
-        const overlapStart = Math.max(darkStart.getTime(), altitudeData.riseTime.getTime());
-        const overlapEnd = Math.min(darkEnd.getTime(), altitudeData.setTime.getTime());
+
+      if (darkStart && darkEnd) {
+        // Circumpolar targets have no rise/set — they are up for the whole
+        // dark window, so fall back to the window bounds.
+        const upStart = altitudeData.riseTime?.getTime() ?? darkStart.getTime();
+        const upEnd = altitudeData.setTime?.getTime() ?? darkEnd.getTime();
+        const overlapStart = Math.max(darkStart.getTime(), upStart);
+        const overlapEnd = Math.min(darkEnd.getTime(), upEnd);
         if (overlapEnd > overlapStart) {
           darkHours = (overlapEnd - overlapStart) / (1000 * 60 * 60);
         }
@@ -281,14 +285,24 @@ export function useTargetPlanner() {
       nighttimeData.referenceDate
     );
     
-    // Map scheduler conflicts to hook's SessionConflict format
-    const conflicts: SessionConflict[] = (schedulerResult.gaps ?? []).map((gap, idx) => ({
-      targetA: schedulerResult.targets[idx]?.target.id ?? '',
-      targetB: schedulerResult.targets[idx + 1]?.target.id ?? '',
-      overlapStart: gap.start,
-      overlapEnd: gap.end,
-      type: 'gap' as const,
-    }));
+    // Map scheduler gaps to the hook's SessionConflict format. Gaps and
+    // scheduled targets are different arrays, so find the targets actually
+    // adjacent to each gap by time.
+    const conflicts: SessionConflict[] = (schedulerResult.gaps ?? []).map((gap) => {
+      const before = schedulerResult.targets.findLast(
+        (s) => s.endTime.getTime() <= gap.start.getTime()
+      );
+      const after = schedulerResult.targets.find(
+        (s) => s.startTime.getTime() >= gap.end.getTime()
+      );
+      return {
+        targetA: before?.target.id ?? '',
+        targetB: after?.target.id ?? '',
+        overlapStart: gap.start,
+        overlapEnd: gap.end,
+        type: 'gap' as const,
+      };
+    });
     
     return {
       date: nighttimeData.referenceDate,

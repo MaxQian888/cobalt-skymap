@@ -19,6 +19,7 @@ import {
   checkSlewThroughPole,
   determinePierSide,
 } from './mount-safety';
+import { angularSeparation } from './celestial/separation';
 
 // ============================================================================
 // Types
@@ -87,22 +88,6 @@ const TYPICAL_SLEW_SPEED = 4;
 // ============================================================================
 
 /**
- * Calculate the angular separation between two sky positions.
- */
-function angularSep(
-  ra1: number, dec1: number,
-  ra2: number, dec2: number
-): number {
-  const toRad = Math.PI / 180;
-  const cosSep =
-    Math.sin(dec1 * toRad) * Math.sin(dec2 * toRad) +
-    Math.cos(dec1 * toRad) *
-      Math.cos(dec2 * toRad) *
-      Math.cos((ra1 - ra2) * toRad);
-  return Math.acos(Math.max(-1, Math.min(1, cosSep))) / toRad;
-}
-
-/**
  * Simulate a slew between two targets and check for safety issues.
  */
 function simulateSlew(
@@ -117,7 +102,7 @@ function simulateSlew(
 
   const raSlewAngle = calculateRASlew(from.ra, to.ra);
   const decSlewAngle = to.dec - from.dec;
-  const totalAngle = angularSep(from.ra, from.dec, to.ra, to.dec);
+  const totalAngle = angularSeparation(from.ra, from.dec, to.ra, to.dec);
   const estimatedDuration = totalAngle / TYPICAL_SLEW_SPEED;
 
   // Check if slew crosses the pole

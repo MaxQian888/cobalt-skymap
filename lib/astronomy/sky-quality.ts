@@ -29,8 +29,13 @@ export function estimateSkyQuality(
   if (sunAltitude > -6) return 'poor';
   if (sunAltitude > -12) return 'fair';
   if (sunAltitude > -18) return 'good';
-  if (moonAltitude > 30 && moonIllumination > 50) return 'fair';
-  if (moonAltitude > 0 && moonIllumination > 70) return 'good';
+  if (moonAltitude <= 0) return 'excellent';
+  // Moon impact grows monotonically with illumination and altitude, so a
+  // brighter/higher moon can never yield a better rating.
+  const moonImpact = moonIllumination * Math.sin((moonAltitude * Math.PI) / 180);
+  if (moonImpact > 60) return 'poor';
+  if (moonImpact > 35) return 'fair';
+  if (moonImpact > 15) return 'good';
   return 'excellent';
 }
 

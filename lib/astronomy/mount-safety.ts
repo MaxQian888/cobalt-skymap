@@ -12,6 +12,7 @@
  */
 
 import { deg2rad, rad2deg } from './starmap-utils';
+import { getLSTForDate, SIDEREAL_RATIO } from './time/sidereal';
 
 // ============================================================================
 // Types
@@ -127,14 +128,7 @@ export const DEFAULT_MOUNT_SAFETY_CONFIG: MountSafetyConfig = {
  * Returns LST in degrees (0-360).
  */
 export function getLSTAtTime(date: Date, longitude: number): number {
-  const jd = date.getTime() / 86400000 + 2440587.5;
-  const S = jd - 2451545.0;
-  const T = S / 36525.0;
-  const GST =
-    280.46061837 +
-    360.98564736629 * S +
-    T ** 2 * (0.000387933 - T / 38710000);
-  return ((GST + longitude) % 360 + 360) % 360;
+  return getLSTForDate(longitude, date);
 }
 
 /**
@@ -206,7 +200,8 @@ export function getMeridianCrossingTime(
   if (hoursUntil > 24) hoursUntil -= 24;
   // If very close to 0 or 24, the transit is essentially now
   if (hoursUntil < 0.001) hoursUntil += 24;
-  return new Date(afterTime.getTime() + hoursUntil * 3600000);
+  // hoursUntil is in sidereal hours; convert to solar (wall-clock) time
+  return new Date(afterTime.getTime() + (hoursUntil * 3600000) / SIDEREAL_RATIO);
 }
 
 /**
@@ -448,6 +443,68 @@ export function checkTargetSafety(
   let currentPierSide = pierSideAtStart;
   const flipTime = flipCheck.flipTime;
 
+  // Meridian crossing relative to this window (also needed when flip is
+  // disabled, where checkMeridianFlipNeeded reports nothing)
+  const crossingTime =
+    config.mountType === 'gem' && haAtStart < 0
+      ? getMeridianCrossingTime(raDeg, longitude, startTime)
+      : null;
+  const crossingInWindow =
+    crossingTime !== null && crossingTime.getTime() <= endTime.getTime();
+
+  // Forced-stop limit: tracking beyond crossing + maxMinutesAfterMeridian
+  // without having flipped is a hard stop on most GEM controllers.
+  if (
+    config.mountType === 'gem' &&
+    crossingInWindow &&
+    crossingTime !== null
+  ) {
+    const forcedStop = new Date(
+      crossingTime.getTime() + config.meridianFlip.maxMinutesAfterMeridian * 60000
+    );
+    const flipHappensInTime =
+      flipTime !== null && flipTime.getTime() <= forcedStop.getTime();
+    if (!flipHappensInTime && endTime.getTime() > forcedStop.getTime()) {
+      issues.push({
+        type: 'hour_angle_limit',
+        severity: 'danger',
+        targetId,
+        targetName,
+        time: forcedStop,
+        descriptionKey: 'mountSafety.issues.pastMeridianLimit',
+        descriptionParams: {
+          maxMinutes: config.meridianFlip.maxMinutesAfterMeridian,
+        },
+        suggestionKey: 'mountSafety.suggestions.pastMeridianLimit',
+      });
+    }
+
+    // Pause window before the meridian (long tubes)
+    if (config.meridianFlip.pauseBeforeMeridian > 0) {
+      const pauseStart = new Date(
+        crossingTime.getTime() - config.meridianFlip.pauseBeforeMeridian * 60000
+      );
+      if (pauseStart.getTime() >= startTime.getTime()) {
+        issues.push({
+          type: 'meridian_flip',
+          severity: 'info',
+          targetId,
+          targetName,
+          time: pauseStart,
+          descriptionKey: 'mountSafety.issues.pauseBeforeMeridian',
+          descriptionParams: {
+            pauseMinutes: config.meridianFlip.pauseBeforeMeridian,
+            pauseTimeStr: pauseStart.toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+          },
+          suggestionKey: 'mountSafety.suggestions.pauseBeforeMeridian',
+        });
+      }
+    }
+  }
+
   const duration = endTime.getTime() - startTime.getTime();
   const steps = Math.max(1, Math.ceil(duration / (sampleIntervalMinutes * 60000)));
 
@@ -517,11 +574,14 @@ export function checkTargetSafety(
       }
     }
 
-    // Check counterweight-up (only before flip)
+    // Check counterweight-up: target started east of meridian, has now
+    // crossed it (HA > 0), and the flip has not happened yet (either flip
+    // disabled, or this sample is before the scheduled flip time).
     if (
       config.mountType === 'gem' &&
-      !flipTime &&
-      checkCounterweightUp(ha, currentPierSide)
+      haAtStart < 0 &&
+      ha > 0 &&
+      (flipTime === null || t.getTime() < flipTime.getTime())
     ) {
       const existing = issues.find(
         (iss) => iss.type === 'counterweight_up' && iss.targetId === targetId

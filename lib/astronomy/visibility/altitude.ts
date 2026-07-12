@@ -3,7 +3,7 @@
  */
 
 import { deg2rad, rad2deg } from '../coordinates/conversions';
-import { dateToJulianDate } from '../time/julian';
+import { getLSTForDate, SIDEREAL_RATIO } from '../time/sidereal';
 
 // ============================================================================
 // Altitude Calculations
@@ -25,12 +25,8 @@ export function getAltitudeAtTime(
   longitude: number,
   date: Date
 ): number {
-  const jd = dateToJulianDate(date);
-  const S = jd - 2451545.0;
-  const T = S / 36525.0;
-  const GST = 280.46061837 + 360.98564736629 * S + T ** 2 * (0.000387933 - T / 38710000);
-  const LST = ((GST + longitude) % 360 + 360) % 360;
-  
+  const LST = getLSTForDate(longitude, date);
+
   const HA = deg2rad(LST - ra);
   const decRad = deg2rad(dec);
   const latRad = deg2rad(latitude);
@@ -77,11 +73,7 @@ export function getAltitudeOverTime(
     const sampleDec = samplePos ? samplePos.decDeg : dec;
 
     // Calculate LST at future time
-    const futureJD = futureTime.getTime() / 86400000 + 2440587.5;
-    const S = futureJD - 2451545.0;
-    const T = S / 36525.0;
-    const GST = 280.46061837 + 360.98564736629 * S + T ** 2 * (0.000387933 - T / 38710000);
-    const LST = (GST + longitude) % 360;
+    const LST = getLSTForDate(longitude, futureTime);
 
     // Calculate hour angle
     const HA = LST - sampleRa;
@@ -160,20 +152,16 @@ export function getTimeAtAltitude(
   const H = rad2deg(Math.acos(cosH));
   
   // Get current LST
-  const jd = dateToJulianDate(from);
-  const S = jd - 2451545.0;
-  const T = S / 36525.0;
-  const GST = 280.46061837 + 360.98564736629 * S + T ** 2 * (0.000387933 - T / 38710000);
-  const LST = ((GST + longitude) % 360 + 360) % 360;
-  
+  const LST = getLSTForDate(longitude, from);
+
   // Calculate target LST
   const targetLST = rising ? (ra - H + 360) % 360 : (ra + H) % 360;
-  
-  // Hours until target LST
+
+  // Hours until target LST (sidereal) → wall-clock milliseconds
   let hoursUntil = (targetLST - LST) / 15;
   if (hoursUntil < 0) hoursUntil += 24;
-  
-  return new Date(from.getTime() + hoursUntil * 3600000);
+
+  return new Date(from.getTime() + (hoursUntil * 3600000) / SIDEREAL_RATIO);
 }
 
 /**

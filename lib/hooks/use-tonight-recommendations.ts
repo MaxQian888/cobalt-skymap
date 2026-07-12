@@ -219,7 +219,7 @@ export function useTonightRecommendations(
       const profile = useMountStore.getState().profileInfo;
       const lat = profile.AstrometrySettings.Latitude;
       const lon = profile.AstrometrySettings.Longitude;
-      if (lat || lon) return { latitude: lat || 40, longitude: lon || -74 };
+      if (lat != null && lon != null) return { latitude: lat, longitude: lon };
     } catch { /* ignore */ }
     return { latitude: 40, longitude: -74 };
   }, [stel]);

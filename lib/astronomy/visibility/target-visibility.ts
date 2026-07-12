@@ -7,8 +7,15 @@
 
 import { deg2rad, rad2deg } from '../coordinates/conversions';
 import { CustomHorizon } from '../horizon/custom-horizon';
-import { getMoonPosition, getMoonIllumination, getMoonPhase } from '../celestial/moon';
+import {
+  getMoonPosition,
+  getMoonIllumination,
+  getMoonPhase,
+  getMoonPhaseName,
+  MOON_PHASE_NAMES,
+} from '../celestial/moon';
 import { angularSeparation } from '../celestial/separation';
+import { getLSTForDate, SIDEREAL_RATIO } from '../time/sidereal';
 
 // ============================================================================
 // Types
@@ -71,12 +78,11 @@ export function doubleToDate(value: number): Date {
  * Get Local Sidereal Time for a specific date
  */
 function getLSTForDateInternal(date: Date, longitude: number): number {
-  const jd = date.getTime() / 86400000 + 2440587.5;
-  const S = jd - 2451545.0;
-  const T = S / 36525.0;
-  const GST = 280.46061837 + 360.98564736629 * S + T ** 2 * (0.000387933 - T / 38710000);
-  return ((GST + longitude) % 360 + 360) % 360;
+  return getLSTForDate(longitude, date);
 }
+
+/** Milliseconds of wall-clock time per 0.1 sidereal hour chart step */
+const CHART_STEP_MS = (0.1 * 3600000) / SIDEREAL_RATIO;
 
 /**
  * Calculate altitude for a celestial object at a given hour angle
@@ -196,9 +202,9 @@ export function calculateTargetAltitudeData(
       horizon.push({ x: timeValue, y: horizonAlt });
     }
     
-    currentTime = new Date(currentTime.getTime() + 6 * 60 * 1000); // Add 6 minutes
+    currentTime = new Date(currentTime.getTime() + CHART_STEP_MS); // 0.1 sidereal hours
   }
-  
+
   // Find maximum altitude
   const maxAltitude = altitudes.reduce((max, point) => 
     point.y > max.y ? point : max, altitudes[0]
@@ -216,7 +222,8 @@ export function calculateTargetAltitudeData(
   let hoursToTransit = transitLST - currentLST;
   if (hoursToTransit < 0) hoursToTransit += 24;
   if (hoursToTransit > 24) hoursToTransit -= 24;
-  const transitTime = new Date(refDate.getTime() + hoursToTransit * 3600000);
+  // Sidereal hours → wall-clock milliseconds
+  const transitTime = new Date(refDate.getTime() + (hoursToTransit * 3600000) / SIDEREAL_RATIO);
   
   // Calculate rise and set times
   const { riseTime, setTime, isCircumpolar, neverRises } = calculateRiseSetTimes(
@@ -313,12 +320,15 @@ function calculateRiseSetTimes(
   if (hoursToTransit < 0) hoursToTransit += 24;
   if (hoursToTransit > 24) hoursToTransit -= 24;
   
-  const transitTime = new Date(referenceDate.getTime() + hoursToTransit * 3600000);
-  
+  // Sidereal hours → wall-clock milliseconds
+  const transitTime = new Date(
+    referenceDate.getTime() + (hoursToTransit * 3600000) / SIDEREAL_RATIO
+  );
+
   // Rise is hour angle before transit, set is hour angle after
-  const hourAngleHours = hourAngleDeg / 15;
-  const riseTime = new Date(transitTime.getTime() - hourAngleHours * 3600000);
-  const setTime = new Date(transitTime.getTime() + hourAngleHours * 3600000);
+  const hourAngleMs = (hourAngleDeg / 15) * 3600000 / SIDEREAL_RATIO;
+  const riseTime = new Date(transitTime.getTime() - hourAngleMs);
+  const setTime = new Date(transitTime.getTime() + hourAngleMs);
   
   return { riseTime, setTime, isCircumpolar: false, neverRises: false };
 }
@@ -346,7 +356,7 @@ function calculateMoonInfo(
   const illumination = getMoonIllumination(phase);
   
   // Get phase name
-  const phaseName = getMoonPhaseName(phase);
+  const phaseName = MOON_PHASE_NAMES[getMoonPhaseName(phase)];
   
   // Calculate moon altitude now
   const moonAltAz = calculateMoonAltAz(moonPos.ra, moonPos.dec, latitude, longitude, referenceDate);
@@ -404,20 +414,6 @@ function calculateMoonAltAz(
   const azimuth = calculateAzimuth(ha, altitude, latitude, moonDec);
   
   return { altitude, azimuth };
-}
-
-/**
- * Get moon phase name from phase value
- */
-function getMoonPhaseName(phase: number): string {
-  if (phase < 0.03 || phase > 0.97) return 'New Moon';
-  if (phase < 0.22) return 'Waxing Crescent';
-  if (phase < 0.28) return 'First Quarter';
-  if (phase < 0.47) return 'Waxing Gibbous';
-  if (phase < 0.53) return 'Full Moon';
-  if (phase < 0.72) return 'Waning Gibbous';
-  if (phase < 0.78) return 'Last Quarter';
-  return 'Waning Crescent';
 }
 
 /**
