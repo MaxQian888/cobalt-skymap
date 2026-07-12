@@ -34,6 +34,12 @@ jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(),
 }));
 
+// Plate-solver commands are desktop-gated; simulate the desktop environment
+jest.mock('@/lib/storage/platform', () => ({
+  isTauri: () => true,
+  isDesktop: () => true,
+}));
+
 describe('plate-solver-api', () => {
   describe('formatFileSize', () => {
     it('should format bytes correctly', () => {

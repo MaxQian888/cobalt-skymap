@@ -53,6 +53,12 @@ windows-sys = { version = "0.59", features = ["Win32_Storage_FileSystem"] }
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 tauri-plugin-geolocation = "2"
 
+# Android: resolve nativeLibraryDir (for the bundled libastap_cli.so) via JNI.
+# ndk-context is already initialized by Tauri's Android runtime.
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+ndk-context = "0.1"
+
 # Desktop plugins
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))'.dependencies]
 tauri-plugin-devtools = "2"

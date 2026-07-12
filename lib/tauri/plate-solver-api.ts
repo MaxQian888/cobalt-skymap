@@ -4,6 +4,41 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri, isDesktop, isMobile } from '@/lib/storage/platform';
+
+/**
+ * Most plate-solver commands are #[cfg(desktop)] in the Rust backend.
+ * On web or mobile Tauri they are not registered, so guard every invoke.
+ */
+export function isPlateSolverAvailable(): boolean {
+  return isTauri() && isDesktop();
+}
+
+/**
+ * The mobile ASTAP commands (`*_mobile`, `download_astap_database`) are
+ * #[cfg(mobile)] in the Rust backend — only available in mobile Tauri.
+ */
+export function isMobilePlateSolverAvailable(): boolean {
+  return isTauri() && isMobile();
+}
+
+function invokeSolver<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isPlateSolverAvailable()) {
+    return Promise.reject(
+      new Error(`Plate solver command '${command}' is only available in the desktop app`)
+    );
+  }
+  return args === undefined ? invoke<T>(command) : invoke<T>(command, args);
+}
+
+function invokeMobileSolver<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  if (!isMobilePlateSolverAvailable()) {
+    return Promise.reject(
+      new Error(`Plate solver command '${command}' is only available in the mobile app`)
+    );
+  }
+  return invoke<T>(command, args);
+}
 
 // ============================================================================
 // Types
@@ -319,7 +354,7 @@ export const DEFAULT_SOLVER_CONFIG: SolverConfig = {
  * Detect all installed plate solvers
  */
 export async function detectPlateSolvers(): Promise<SolverInfo[]> {
-  const solvers = await invoke<Array<Record<string, unknown>>>('detect_plate_solvers');
+  const solvers = await invokeSolver<Array<Record<string, unknown>>>('detect_plate_solvers');
   return solvers.map(normalizeSolverInfo);
 }
 
@@ -327,7 +362,7 @@ export async function detectPlateSolvers(): Promise<SolverInfo[]> {
  * Get info for a specific solver type
  */
 export async function getSolverInfo(solverType: SolverType): Promise<SolverInfo> {
-  const solver = await invoke<Record<string, unknown>>('get_solver_info', { solverType });
+  const solver = await invokeSolver<Record<string, unknown>>('get_solver_info', { solverType });
   return normalizeSolverInfo(solver);
 }
 
@@ -338,14 +373,14 @@ export async function validateSolverPath(
   solverType: SolverType,
   path: string
 ): Promise<boolean> {
-  return invoke<boolean>('validate_solver_path', { solverType, path });
+  return invokeSolver<boolean>('validate_solver_path', { solverType, path });
 }
 
 /**
  * Cancel an active local plate solve operation
  */
 export async function cancelPlateSolve(): Promise<void> {
-  return invoke<void>('cancel_plate_solve');
+  return invokeSolver<void>('cancel_plate_solve');
 }
 
 /**
@@ -355,7 +390,7 @@ export async function solveImageLocal(
   config: SolverConfig,
   params: SolveParameters
 ): Promise<SolveResult> {
-  return invoke<SolveResult>('solve_image_local', { config, params });
+  return invokeSolver<SolveResult>('solve_image_local', { config, params });
 }
 
 /**
@@ -364,7 +399,7 @@ export async function solveImageLocal(
 export async function getAvailableIndexes(
   solverType: SolverType
 ): Promise<DownloadableIndex[]> {
-  return invoke<DownloadableIndex[]>('get_available_indexes', { solverType });
+  return invokeSolver<DownloadableIndex[]>('get_available_indexes', { solverType });
 }
 
 /**
@@ -374,7 +409,7 @@ export async function getInstalledIndexes(
   solverType: SolverType,
   indexPath?: string
 ): Promise<IndexInfo[]> {
-  return invoke<IndexInfo[]>('get_installed_indexes', { 
+  return invokeSolver<IndexInfo[]>('get_installed_indexes', { 
     solverType, 
     indexPath: indexPath ?? null 
   });
@@ -384,7 +419,7 @@ export async function getInstalledIndexes(
  * Delete an index file or directory
  */
 export async function deleteIndex(path: string): Promise<void> {
-  return invoke<void>('delete_index', { path });
+  return invokeSolver<void>('delete_index', { path });
 }
 
 /**
@@ -394,7 +429,7 @@ export async function getRecommendedIndexes(
   solverType: SolverType,
   fovDegrees: number
 ): Promise<DownloadableIndex[]> {
-  return invoke<DownloadableIndex[]>('get_recommended_indexes', { 
+  return invokeSolver<DownloadableIndex[]>('get_recommended_indexes', { 
     solverType, 
     fovDegrees 
   });
@@ -406,21 +441,21 @@ export async function getRecommendedIndexes(
 export async function getDefaultIndexPath(
   solverType: SolverType
 ): Promise<string | null> {
-  return invoke<string | null>('get_default_index_path', { solverType });
+  return invokeSolver<string | null>('get_default_index_path', { solverType });
 }
 
 /**
  * Save solver configuration
  */
 export async function saveSolverConfig(config: SolverConfig): Promise<void> {
-  return invoke<void>('save_solver_config', { config });
+  return invokeSolver<void>('save_solver_config', { config });
 }
 
 /**
  * Load solver configuration
  */
 export async function loadSolverConfig(): Promise<SolverConfig> {
-  return invoke<SolverConfig>('load_solver_config');
+  return invokeSolver<SolverConfig>('load_solver_config');
 }
 
 // ============================================================================
@@ -431,7 +466,7 @@ export async function loadSolverConfig(): Promise<SolverConfig> {
  * Get all known ASTAP databases with installation status
  */
 export async function getAstapDatabases(): Promise<AstapDatabaseInfo[]> {
-  return invoke<AstapDatabaseInfo[]>('get_astap_databases');
+  return invokeSolver<AstapDatabaseInfo[]>('get_astap_databases');
 }
 
 /**
@@ -440,7 +475,7 @@ export async function getAstapDatabases(): Promise<AstapDatabaseInfo[]> {
 export async function recommendAstapDatabase(
   fovDegrees: number
 ): Promise<AstapDatabaseInfo[]> {
-  return invoke<AstapDatabaseInfo[]>('recommend_astap_database', { fovDegrees });
+  return invokeSolver<AstapDatabaseInfo[]>('recommend_astap_database', { fovDegrees });
 }
 
 /**
@@ -452,7 +487,57 @@ export async function downloadAstapDatabase(
   database: AstapDatabaseInfo,
   destDir: string
 ): Promise<void> {
-  return invoke<void>('download_astap_database', { database, destDir });
+  return invokeSolver<void>('download_astap_database', { database, destDir });
+}
+
+// ============================================================================
+// Mobile (Android) ASTAP API — commands are #[cfg(mobile)] in Rust
+// ============================================================================
+
+/**
+ * Solve an image locally on mobile using the bundled ASTAP CLI
+ * (libastap_cli.so executed from the APK's native library dir).
+ * Progress is emitted via the same 'solve-progress' event as desktop.
+ */
+export async function solveImageLocalMobile(
+  config: SolverConfig,
+  params: SolveParameters
+): Promise<SolveResult> {
+  return invokeMobileSolver<SolveResult>('solve_image_local_mobile', { config, params });
+}
+
+/**
+ * Cancel an active mobile local solve.
+ */
+export async function cancelPlateSolveMobile(): Promise<void> {
+  return invokeMobileSolver<void>('cancel_plate_solve_mobile');
+}
+
+/**
+ * ASTAP database catalog with install status, scanning <app_data_dir>/astap_data.
+ */
+export async function getAstapDatabasesMobile(): Promise<AstapDatabaseInfo[]> {
+  return invokeMobileSolver<AstapDatabaseInfo[]>('get_astap_databases_mobile');
+}
+
+/**
+ * Directory where mobile ASTAP databases are installed (download destination).
+ */
+export async function getAstapDataDirMobile(): Promise<string> {
+  return invokeMobileSolver<string>('get_astap_data_dir_mobile');
+}
+
+/**
+ * Download + install an ASTAP star database on mobile. Same Rust command as
+ * desktop (shared core), but guarded by the mobile availability check because
+ * this wrapper is only meant for the mobile UI path.
+ * Progress: 'index-download-progress' event (payload.index_name === database.name).
+ */
+export async function downloadAstapDatabaseMobile(
+  database: AstapDatabaseInfo,
+  destDir: string
+): Promise<void> {
+  return invokeMobileSolver<void>('download_astap_database', { database, destDir });
 }
 
 // ============================================================================
@@ -466,7 +551,7 @@ export async function analyseImage(
   imagePath: string,
   snrMinimum?: number
 ): Promise<ImageAnalysisResult> {
-  return invoke<ImageAnalysisResult>('analyse_image', {
+  return invokeSolver<ImageAnalysisResult>('analyse_image', {
     imagePath,
     snrMinimum: snrMinimum ?? null,
   });
@@ -480,7 +565,7 @@ export async function extractStars(
   snrMinimum?: number,
   includeCoordinates = false
 ): Promise<ImageAnalysisResult> {
-  return invoke<ImageAnalysisResult>('extract_stars', {
+  return invokeSolver<ImageAnalysisResult>('extract_stars', {
     imagePath,
     snrMinimum: snrMinimum ?? null,
     includeCoordinates,
@@ -498,7 +583,7 @@ export async function extractStars(
 export async function solveOnline(
   config: OnlineSolveConfig
 ): Promise<OnlineSolveResult> {
-  return invoke<OnlineSolveResult>('solve_online', { config });
+  return invokeSolver<OnlineSolveResult>('solve_online', { config });
 }
 
 /**
@@ -506,7 +591,7 @@ export async function solveOnline(
  * Returns true when a running solve was found and cancellation was signaled.
  */
 export async function cancelOnlineSolve(operationId?: string): Promise<boolean> {
-  return invoke<boolean>('cancel_online_solve', { operationId: operationId ?? null });
+  return invokeSolver<boolean>('cancel_online_solve', { operationId: operationId ?? null });
 }
 
 // ============================================================================
@@ -560,21 +645,21 @@ export interface LegacyDownloadableIndex {
  * Plate solve an image (legacy API)
  */
 export async function plateSolve(config: LegacyPlateSolverConfig): Promise<LegacyPlateSolveResult> {
-  return invoke<LegacyPlateSolveResult>('plate_solve', { config });
+  return invokeSolver<LegacyPlateSolveResult>('plate_solve', { config });
 }
 
 /**
  * Get installed indexes for a solver type (legacy API)
  */
 export async function getSolverIndexes(solverType: LegacySolverType): Promise<LegacyAstrometryIndex[]> {
-  return invoke<LegacyAstrometryIndex[]>('get_solver_indexes', { solverType });
+  return invokeSolver<LegacyAstrometryIndex[]>('get_solver_indexes', { solverType });
 }
 
 /**
  * Get list of downloadable indexes (legacy API)
  */
 export async function getDownloadableIndexes(): Promise<LegacyDownloadableIndex[]> {
-  return invoke<LegacyDownloadableIndex[]>('get_downloadable_indexes');
+  return invokeSolver<LegacyDownloadableIndex[]>('get_downloadable_indexes');
 }
 
 /**
@@ -584,7 +669,7 @@ export async function downloadIndex(
   index: LegacyDownloadableIndex,
   destPath: string
 ): Promise<void> {
-  return invoke<void>('download_index', { index, destPath });
+  return invokeSolver<void>('download_index', { index, destPath });
 }
 
 // ============================================================================
@@ -722,6 +807,12 @@ export const plateSolverApi = {
   // ASTAP Database API
   getAstapDatabases,
   recommendAstapDatabase,
+  // Mobile ASTAP API
+  solveImageLocalMobile,
+  cancelPlateSolveMobile,
+  getAstapDatabasesMobile,
+  getAstapDataDirMobile,
+  downloadAstapDatabaseMobile,
   // Image Analysis API
   analyseImage,
   extractStars,

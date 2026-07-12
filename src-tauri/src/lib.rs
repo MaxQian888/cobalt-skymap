@@ -14,10 +14,14 @@ pub mod data;
 pub mod external_data;
 pub mod mount;
 pub mod network;
+pub mod solver_core;
 pub mod utils;
 
 #[cfg(desktop)]
 pub mod platform;
+
+#[cfg(mobile)]
+pub mod mobile_solver;
 
 // Re-export for backward compatibility and ease of use
 #[cfg(not(test))]
@@ -661,6 +665,17 @@ pub fn run() {
             solve_online,
             #[cfg(desktop)]
             cancel_online_solve,
+            // Plate Solver (mobile: ASTAP via bundled libastap_cli.so)
+            #[cfg(mobile)]
+            mobile_solver::solve_image_local_mobile,
+            #[cfg(mobile)]
+            mobile_solver::cancel_plate_solve_mobile,
+            #[cfg(mobile)]
+            mobile_solver::get_astap_databases_mobile,
+            #[cfg(mobile)]
+            mobile_solver::get_astap_data_dir_mobile,
+            #[cfg(mobile)]
+            solver_core::astap::download_astap_database,
             // Path config (desktop only)
             #[cfg(desktop)]
             get_path_config,

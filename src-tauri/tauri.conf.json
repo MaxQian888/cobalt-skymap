@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "pnpm dev:tauri",
-    "beforeBuildCommand": "pnpm build"
+    "beforeDevCommand": "pnpm fetch:astap && pnpm dev:tauri",
+    "beforeBuildCommand": "pnpm fetch:astap && pnpm build"
   },
   "app": {
     "windows": [
@@ -36,6 +36,10 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": false,
+    "externalBin": ["binaries/astap_cli"],
+    "resources": {
+      "resources/astap_data": "astap_data"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

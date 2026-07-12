@@ -3,10 +3,30 @@
 This directory vendors the official **ASTAP command-line solver** binaries for Android and
 documents how to wire them into the Tauri Android build so plate solving works on mobile.
 
-> **Status:** Phase 2 (mobile ASTAP) — binaries vendored + verified; the Rust/Kotlin/Gradle
-> wiring and on-device verification below are **not yet applied** and require an Android
-> device/emulator + NDK (unavailable in the authoring environment). Phase 1 (desktop ASTAP
-> database download) is complete and shipped.
+> **Status (2026-07-11):** Phase 2 (mobile ASTAP) — binaries vendored + verified, and
+> sections **A–D below are implemented in the codebase**:
+>
+> - **A (Gradle)** — APPLIED: `sourceSets["main"].jniLibs.srcDir("../../../android-libs/jniLibs")`
+>   is present in `gen/android/app/build.gradle.kts` (inside `android { defaultConfig }`'s parent
+>   block). `gen/android` is git-ignored — **re-apply this one line after `tauri android init`**.
+> - **B (nativeLibraryDir)** — DONE, **without Kotlin**: pure-Rust JNI via `ndk-context` + `jni`
+>   (see `src/mobile_solver.rs::native_library_dir`). No Tauri mobile plugin project needed.
+> - **C (Rust)** — DONE: platform-agnostic core extracted to `src/solver_core/` (types, FITS/INI
+>   parsers, arg builder, `run_astap_solve`, database catalog + `download_astap_database`).
+>   `platform::plate_solver` re-uses it (desktop API unchanged). Mobile commands in
+>   `src/mobile_solver.rs`: `solve_image_local_mobile`, `cancel_plate_solve_mobile`,
+>   `get_astap_databases_mobile`, `get_astap_data_dir_mobile`; `download_astap_database` is
+>   registered on **both** desktop and mobile. Registered under `#[cfg(mobile)]` in `lib.rs`.
+> - **D (Frontend)** — DONE: `lib/tauri/plate-solver-api.ts` gains mobile-guarded wrappers
+>   (`solveImageLocalMobile`, `getAstapDatabasesMobile`, `downloadAstapDatabaseMobile`, ...);
+>   `plate-solver-unified.tsx` offers Local (ASTAP-only) + Online tabs on mobile Tauri, with a
+>   minimal database download UI (`mobile-astap-databases.tsx`). solve-field/astrometry options
+>   are not shown on mobile.
+> - **E (on-device verification)** — **STILL OPEN**: requires Android SDK/NDK + device/emulator
+>   (`cargo check --target aarch64-linux-android` is blocked locally by `ring` needing NDK clang).
+>   Follow section E below; the tracer-bullet (`libastap_cli.so -h`) is the first gate.
+>
+> Phase 1 (desktop ASTAP database download) is complete and shipped.
 
 ---
 

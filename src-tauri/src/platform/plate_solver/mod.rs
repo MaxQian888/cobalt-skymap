@@ -4,11 +4,13 @@
 pub mod astap;
 pub mod astrometry;
 pub mod config;
-pub mod fits;
 pub mod helpers;
 pub mod index;
 pub mod online;
-pub mod types;
+
+// Shared types + FITS parsing moved to the platform-agnostic core; module
+// re-exports keep every existing `super::types::` / `super::fits::` path valid.
+pub use crate::solver_core::{fits, types};
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -158,6 +160,16 @@ pub async fn solve_image_local(
         },
     );
 
+    // Per-call params take precedence over the persisted config; fov_hint
+    // (e.g. from FITS WCS auto-hints) feeds ASTAP's -fov / astrometry's scale
+    // only when no explicit scale is configured.
+    let mut config = config;
+    if let Some(fov) = params.fov_hint.filter(|v| v.is_finite() && *v > 0.0) {
+        if config.astrometry_scale_low.is_none() {
+            config.astrometry_scale_low = Some(fov);
+        }
+    }
+
     let solver_config = PlateSolverConfig {
         solver_type: match config.solver_type.as_str() {
             "astap" => PlateSolverType::Astap,
@@ -170,8 +182,8 @@ pub async fn solve_image_local(
         radius_hint: params.search_radius,
         scale_low: config.astrometry_scale_low,
         scale_high: config.astrometry_scale_high,
-        downsample: Some(config.downsample),
-        timeout_seconds: Some(config.timeout_seconds),
+        downsample: params.downsample.or(Some(config.downsample)),
+        timeout_seconds: params.timeout.or(Some(config.timeout_seconds)),
     };
 
     // Emit: solving

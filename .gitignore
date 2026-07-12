@@ -69,3 +69,7 @@ nul
 openspec
 .playwright-browsers
 .playwright-mcp/
+
+# Fetched ASTAP sidecar + bundled star database (run pnpm fetch:astap)
+/src-tauri/binaries/
+/src-tauri/resources/astap_data/

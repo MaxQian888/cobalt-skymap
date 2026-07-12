@@ -24,13 +24,13 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   Sheet,
   SheetContent,
@@ -75,6 +75,7 @@ import type { PlateSolveResult } from '@/lib/plate-solving';
 import type { PlateSolverUnifiedProps, SolveMode } from '@/types/starmap/plate-solving';
 import { SolveResultCard } from './solve-result-card';
 import { isTauri } from '@/lib/tauri/app-control-api';
+import { isDesktop as isDesktopDevice } from '@/lib/storage/platform';
 import type { SelectedObjectData } from '@/lib/core/types';
 import {
   usePlateSolverStore,
@@ -85,12 +86,15 @@ import { useMarkerStore } from '@/lib/stores';
 import { formatRA, formatDec } from '@/lib/astronomy/coordinates/formats';
 import {
   solveImageLocal,
+  solveImageLocalMobile,
   convertToLegacyResult,
   isLocalSolver,
   cancelPlateSolve,
+  cancelPlateSolveMobile,
   cancelOnlineSolve,
   DEFAULT_SOLVER_CONFIG,
 } from '@/lib/tauri/plate-solver-api';
+import { MobileAstapDatabases } from './mobile-astap-databases';
 
 // Re-export types for backward compatibility
 export type { PlateSolverUnifiedProps, SolveMode } from '@/types/starmap/plate-solving';
@@ -112,7 +116,13 @@ export function PlateSolverUnified({
   fovHint,
 }: PlateSolverUnifiedProps) {
   const t = useTranslations();
-  const isDesktop = isTauri();
+  // Desktop Tauri: full local solving (ASTAP / solve-field / online) via the
+  // #[cfg(desktop)] plate-solver commands.
+  const isDesktop = isTauri() && isDesktopDevice();
+  // Mobile Tauri (Android): ASTAP-only local solving via the bundled
+  // libastap_cli.so and the #[cfg(mobile)] solve_image_local_mobile command.
+  // solve-field and the astrometry.net local solver are not available here.
+  const isMobileTauri = isTauri() && !isDesktopDevice();
   
   // Store state
   const {
@@ -149,7 +159,10 @@ export function PlateSolverUnified({
 
   // Local state
   const [open, setOpen] = useState(false);
-  const [solveMode, setSolveMode] = useState<SolveMode>(isDesktop ? 'local' : 'online');
+  const [solveMode, setSolveMode] = useState<SolveMode>(
+    isDesktop || isMobileTauri ? 'local' : 'online'
+  );
+  const [mobileInstalledDbCount, setMobileInstalledDbCount] = useState(0);
   const [solving, setSolving] = useState(false);
   const [progress, setProgress] = useState<OnlineSolveSessionState | null>(null);
   const [localProgress, setLocalProgress] = useState<number>(0);
@@ -221,15 +234,16 @@ export function PlateSolverUnified({
 
   // Handle local solve
   const handleLocalSolve = useCallback(async (file: File, effectiveRaHint?: number, effectiveDecHint?: number) => {
-    if (!isDesktop) return;
-    if (config.solver_type === 'astrometry_net_online') {
+    if (!isDesktop && !isMobileTauri) return;
+    if (isDesktop && config.solver_type === 'astrometry_net_online') {
       setResult(createErrorResult(
         activeSolver?.name || t('plateSolving.localSolverFallback'),
         t('plateSolving.localSolverNotReady') || 'Local solver not ready.',
       ));
       return;
     }
-    if (!canSolveLocal) return;
+    if (isDesktop && !canSolveLocal) return;
+    if (isMobileTauri && mobileInstalledDbCount === 0) return;
 
     setSolving(true);
     setResult(null);
@@ -261,12 +275,14 @@ export function PlateSolverUnified({
       const persisted = await persistFileForLocalSolve(file);
       cleanup = persisted.cleanup;
       clearImageAnalysis();
-      analysisPromise = analyseImage(persisted.filePath).catch(() => undefined);
+      // Image analysis uses the desktop-only analyse_image command
+      analysisPromise = isDesktop ? analyseImage(persisted.filePath).catch(() => undefined) : null;
 
       setLocalProgress(10);
       setLocalMessage(t('plateSolving.solving') || 'Solving...');
 
-      const solveResult = await solveImageLocal(
+      const solveLocal = isMobileTauri ? solveImageLocalMobile : solveImageLocal;
+      const solveResult = await solveLocal(
         config,
         {
           image_path: persisted.filePath,
@@ -318,7 +334,7 @@ export function PlateSolverUnified({
       }
       setSolving(false);
     }
-  }, [isDesktop, canSolveLocal, config, raHint, decHint, fovHint, activeSolver, onSolveComplete, addToHistory, analyseImage, clearImageAnalysis, t]);
+  }, [isDesktop, isMobileTauri, mobileInstalledDbCount, canSolveLocal, config, raHint, decHint, fovHint, activeSolver, onSolveComplete, addToHistory, analyseImage, clearImageAnalysis, t]);
 
   // Handle online solve through the shared dispatcher for both runtimes
   const handleOnlineSolve = useCallback(async (file: File, effectiveRaHint?: number, effectiveDecHint?: number) => {
@@ -406,12 +422,12 @@ export function PlateSolverUnified({
       effectiveDecHint = wcs.referenceCoordinates.dec;
     }
 
-    if (solveMode === 'local' && isDesktop) {
+    if (solveMode === 'local' && (isDesktop || isMobileTauri)) {
       await handleLocalSolve(file, effectiveRaHint, effectiveDecHint);
     } else {
       await handleOnlineSolve(file, effectiveRaHint, effectiveDecHint);
     }
-  }, [solveMode, isDesktop, handleLocalSolve, handleOnlineSolve, config, raHint, decHint]);
+  }, [solveMode, isDesktop, isMobileTauri, handleLocalSolve, handleOnlineSolve, config, raHint, decHint]);
 
   // Keep ref in sync with latest handleImageCapture. Assigning during an
   // effect (instead of the render body) avoids mutating a ref while
@@ -424,8 +440,10 @@ export function PlateSolverUnified({
 
   // Handle cancel solve
   const handleCancelSolve = useCallback(async () => {
-    if (solveMode === 'local' && isDesktop) {
-      try { await cancelPlateSolve(); } catch { /* ignore */ }
+    if (solveMode === 'local' && (isDesktop || isMobileTauri)) {
+      try {
+        await (isMobileTauri ? cancelPlateSolveMobile() : cancelPlateSolve());
+      } catch { /* ignore */ }
     } else {
       if (isDesktop) {
         try {
@@ -452,7 +470,7 @@ export function PlateSolverUnified({
       solveMode === 'local' ? (activeSolver?.name || t('plateSolving.localSolverFallback')) : 'astrometry.net',
       t('plateSolving.cancelled') || 'Solve cancelled by user',
     ));
-  }, [solveMode, isDesktop, activeSolver, t, progress, updateOnlineSession]);
+  }, [solveMode, isDesktop, isMobileTauri, activeSolver, t, progress, updateOnlineSession]);
 
   // Handle go to coordinates
   const handleGoTo = useCallback(() => {
@@ -512,7 +530,9 @@ export function PlateSolverUnified({
   const progressPercent = getProgressPercent(solveMode, localProgress, progress);
 
   // Can solve check
-  const canSolve = solveMode === 'local' ? canSolveLocal : !!onlineApiKey;
+  const canSolve = solveMode === 'local'
+    ? (isMobileTauri ? mobileInstalledDbCount > 0 : canSolveLocal)
+    : !!onlineApiKey;
 
   // Get solver icon
   const getSolverIcon = () => {
@@ -541,28 +561,28 @@ export function PlateSolverUnified({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="standard-form">
+      <ResponsiveDialogTrigger asChild>
         {trigger || (
           <Button variant="ghost" size="icon" className={cn("h-9 w-9", className)}>
             <Crosshair className="h-4 w-4" />
           </Button>
         )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="sm:max-w-[550px]">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <Crosshair className="h-5 w-5" />
             {t('plateSolving.title') || 'Plate Solving'}
-          </DialogTitle>
-          <DialogDescription>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {t('plateSolving.description') || 'Upload an astronomical image to determine its sky coordinates'}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <div className="space-y-4">
-          {/* Mode Selection (Desktop only) */}
-          {isDesktop && (
+          {/* Mode Selection (desktop + mobile Tauri) */}
+          {(isDesktop || isMobileTauri) && (
             <Tabs value={solveMode} onValueChange={(v) => setSolveMode(v as SolveMode)}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="local" className="flex items-center gap-2">
@@ -576,8 +596,48 @@ export function PlateSolverUnified({
               </TabsList>
 
               <TabsContent value="local" className="space-y-4 mt-4">
-                {/* Active Solver Info */}
-                {activeSolver && (
+                {/* Mobile Tauri: ASTAP only (bundled libastap_cli.so) */}
+                {isMobileTauri && (
+                  <>
+                    <Card className="py-3 gap-0">
+                      <CardContent className="flex items-center justify-between px-4 py-0">
+                        <div className="flex items-center gap-2">
+                          <Cpu className="h-4 w-4" />
+                          <div>
+                            <div className="font-medium text-sm">ASTAP</div>
+                            <div className="text-xs text-muted-foreground">
+                              {t('plateSolving.mobileAstapHint') || 'Bundled ASTAP solver'}
+                            </div>
+                          </div>
+                        </div>
+                        {mobileInstalledDbCount > 0 ? (
+                          <Badge variant="default" className="bg-green-600 text-xs">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            {t('plateSolving.ready') || 'Ready'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            {t('plateSolving.noDatabases') || 'No databases'}
+                          </Badge>
+                        )}
+                      </CardContent>
+                    </Card>
+                    <MobileAstapDatabases onInstalledChange={setMobileInstalledDbCount} />
+                    {mobileInstalledDbCount === 0 && (
+                      <Alert>
+                        <XCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          {t('plateSolving.mobileSolverNotReady') ||
+                            'Download at least one star database to solve locally.'}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </>
+                )}
+
+                {/* Active Solver Info (desktop) */}
+                {isDesktop && activeSolver && (
                   <Card className="py-3 gap-0">
                     <CardContent className="flex items-center justify-between px-4 py-0">
                       <div className="flex items-center gap-2">
@@ -614,8 +674,8 @@ export function PlateSolverUnified({
                   </Card>
                 )}
 
-                {/* Index Status */}
-                {activeSolver && isLocalSolver(config.solver_type) && (
+                {/* Index Status (desktop) */}
+                {isDesktop && activeSolver && isLocalSolver(config.solver_type) && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-sm">
                       <Database className="h-4 w-4 text-muted-foreground" />
@@ -628,8 +688,8 @@ export function PlateSolverUnified({
                   </div>
                 )}
 
-                {/* Warning if not ready */}
-                {!canSolveLocal && (
+                {/* Warning if not ready (desktop) */}
+                {isDesktop && !canSolveLocal && (
                   <Alert>
                     <XCircle className="h-4 w-4" />
                     <AlertDescription>
@@ -647,7 +707,7 @@ export function PlateSolverUnified({
           )}
 
           {/* Online-only mode for web */}
-          {!isDesktop && renderApiKeyInput()}
+          {!isDesktop && !isMobileTauri && renderApiKeyInput()}
 
           {/* Advanced Options */}
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
@@ -863,8 +923,8 @@ export function PlateSolverUnified({
           )}
         </div>
 
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
 
     {/* Settings Sheet */}
     <Sheet open={showSettings} onOpenChange={setShowSettings}>

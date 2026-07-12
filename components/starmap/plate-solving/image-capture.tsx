@@ -54,6 +54,7 @@ import {
 import { formatFileSize } from '@/lib/tauri/plate-solver-api';
 import { useCamera } from '@/lib/hooks/use-camera';
 import { isMobile } from '@/lib/storage/platform';
+import { useMobileShell } from '@/components/starmap/view/use-mobile-shell';
 import { FitsMetadataPanel } from './fits-metadata-panel';
 import type { ImageMetadata, ImageCaptureProps } from '@/types/starmap/plate-solving';
 
@@ -115,7 +116,11 @@ export function ImageCapture({
   const nativeCaptureRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  const mobile = useMemo(() => isMobile(), []);
+  // Device capability (native capture input) is UA-based; layout follows the
+  // reactive shell breakpoint so resize/rotation re-evaluates it.
+  const mobileDevice = useMemo(() => isMobile(), []);
+  const { isMobileShell } = useMobileShell();
+  const mobile = mobileDevice || isMobileShell;
   const camera = useCamera({ facingMode: 'environment' });
 
   const maxFileSizeBytes = useMemo(() => maxFileSizeMB * 1024 * 1024, [maxFileSizeMB]);
@@ -348,13 +353,13 @@ export function ImageCapture({
   const switchToCamera = useCallback(() => {
     setMode('camera');
     resetState();
-    if (mobile && useNativeCapture) {
+    if (mobileDevice && useNativeCapture) {
       // For native capture, just trigger the input
       nativeCaptureRef.current?.click();
     } else {
       camera.start();
     }
-  }, [camera, resetState, mobile, useNativeCapture]);
+  }, [camera, resetState, mobileDevice, useNativeCapture]);
 
   const switchToUpload = useCallback(() => {
     setMode('upload');
@@ -397,7 +402,7 @@ export function ImageCapture({
           </Tabs>
 
           {/* Mobile: native vs browser camera toggle */}
-          {mobile && mode === 'camera' && !capturedImage && (
+          {mobileDevice && mode === 'camera' && !capturedImage && (
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {useNativeCapture ? (

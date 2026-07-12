@@ -22,13 +22,13 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogTrigger,
+} from '@/components/starmap/dialogs/responsive-dialog-shell';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,6 +65,7 @@ import {
   getDefaultIndexPath,
 } from '@/lib/tauri/plate-solver-api';
 import { isTauri } from '@/lib/tauri/app-control-api';
+import { isDesktop as isDesktopDevice } from '@/lib/storage/platform';
 
 // Re-export types for backward compatibility
 export type { IndexManagerProps, DownloadState } from '@/types/starmap/plate-solving';
@@ -98,7 +99,8 @@ export function IndexManager({ solverType, trigger, className }: IndexManagerPro
   const [deleteConfirm, setDeleteConfirm] = useState<IndexInfo | null>(null);
 
   const currentSolverType = solverType || config.solver_type;
-  const isDesktop = isTauri();
+  // Index/database management talks to #[cfg(desktop)] commands only.
+  const isDesktop = isTauri() && isDesktopDevice();
 
   // Load indexes
   const loadIndexes = useCallback(async () => {
@@ -568,26 +570,26 @@ export function IndexManager({ solverType, trigger, className }: IndexManagerPro
 
   return (
     <>
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+    <ResponsiveDialog open={open} onOpenChange={setOpen} tier="complex-editor">
+      <ResponsiveDialogTrigger asChild>
         {trigger || (
           <Button variant="outline" size="sm" className={className}>
             <Database className="h-4 w-4 mr-2" />
             {t('plateSolving.manageIndexes') || 'Manage Indexes'}
           </Button>
         )}
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] max-h-[80dvh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      </ResponsiveDialogTrigger>
+      <ResponsiveDialogContent className="sm:max-w-[600px]" desktopClassName="max-h-[80vh] max-h-[80dvh]">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="flex items-center gap-2">
             <HardDrive className="h-5 w-5" />
             {t('plateSolving.indexManager') || 'Index Manager'}
-          </DialogTitle>
-          <DialogDescription>
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {t('plateSolving.indexManagerDesc') ||
               `Manage star database index files for ${getSolverDisplayName(currentSolverType)}`}
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'installed' | 'available')}>
           <div className="flex items-center justify-between mb-4">
@@ -719,9 +721,9 @@ export function IndexManager({ solverType, trigger, className }: IndexManagerPro
             )}
           </TabsContent>
         </Tabs>
-      </DialogContent>
+      </ResponsiveDialogContent>
 
-    </Dialog>
+    </ResponsiveDialog>
 
     {/* Delete Confirmation AlertDialog */}
     <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
