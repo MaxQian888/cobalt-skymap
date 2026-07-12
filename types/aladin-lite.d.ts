@@ -202,6 +202,8 @@ declare module 'aladin-lite' {
       | HTMLCanvasElement
       | HTMLImageElement;
     limit?: number;
+    selectionColor?: string;
+    hoverColor?: string;
     onClick?: 'showTable' | 'showPopup' | ((source: AladinSource) => void);
     filter?: (source: AladinSource) => boolean;
     raField?: string;

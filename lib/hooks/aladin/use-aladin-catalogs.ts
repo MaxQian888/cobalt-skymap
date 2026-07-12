@@ -123,7 +123,8 @@ export function useAladinCatalogs({
       color: layer.color,
       sourceSize: 8,
       limit: layer.limit,
-      onClick: 'showPopup' as const,
+      // No onClick: Aladin would open its internal popup/table UI.
+      // Selection is handled by the app via the objectClicked callback.
     };
 
     if (layer.type === 'simbad') {
@@ -215,10 +216,14 @@ export function useAladinCatalogs({
         radius,
         {
           name: '_auto_simbad',
-          color: '#ffffff',
-          sourceSize: 0,
+          color: 'rgba(0, 0, 0, 0)',
+          sourceSize: 1,
           limit: AUTO_SIMBAD_LIMIT,
-          onClick: 'showPopup',
+          // Invisible hit-target catalog: keep the selection highlight
+          // transparent too, otherwise a click paints every nearby hidden
+          // source as a white square. Clicks surface via objectClicked.
+          selectionColor: 'rgba(0, 0, 0, 0)',
+          hoverColor: 'rgba(0, 0, 0, 0)',
         }
       );
 

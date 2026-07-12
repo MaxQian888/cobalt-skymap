@@ -23,6 +23,35 @@ function buildSelectionTimestamp(): string {
   return new Date().toISOString();
 }
 
+// Field names that may carry a display name in catalog source data, in
+// priority order. Different services use different conventions: SIMBAD
+// VOTables use `main_id`, Gaia HiPS uses `designation`/`source_id`,
+// VizieR tables vary. `name` covers app-generated catalogs.
+const SOURCE_NAME_FIELDS = [
+  'name',
+  'NAME',
+  'main_id',
+  'MAIN_ID',
+  'mainId',
+  'designation',
+  'DESIGNATION',
+  'identifier',
+  'IDENTIFIER',
+  'id',
+  'ID',
+  'source_id',
+  'SOURCE_ID',
+] as const;
+
+function resolveSourceName(data: Record<string, unknown>): string | null {
+  for (const field of SOURCE_NAME_FIELDS) {
+    const value = data[field];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
 function resolveCatalogLabel(object: Record<string, unknown>, data: Record<string, unknown>): string | null {
   const candidates = [
     data.catalog,
@@ -108,10 +137,89 @@ export function useAladinEvents({
     if (registeredAladinRef.current === aladin) return;
     registeredAladinRef.current = aladin;
 
-    // Object click → selection change
+    // Async SIMBAD lookup around a sky position to enrich the current
+    // selection with object name/type/magnitude. Shared by the empty-sky
+    // `click` path and catalog clicks whose source data carries no usable
+    // name (e.g. Gaia HiPS sources).
+    const enrichFromSimbad = (ra: number, dec: number) => {
+      // Cancel any in-flight SIMBAD query from a previous click
+      simbadAbortRef.current?.abort();
+      const abortController = new AbortController();
+      simbadAbortRef.current = abortController;
+
+      // Adaptive search radius based on FOV-to-pixel ratio.
+      // At any zoom, ~10 px click tolerance ≈ currentFov / viewWidth * 10.
+      // Clamp between 0.003° (~10 arcsec) and 0.15° (9 arcmin).
+      const currentFov = getFoVCompat(aladin) ?? 60;
+      const viewSize = typeof aladin.getSize === 'function'
+        ? aladin.getSize()
+        : [800, 600];
+      const viewWidth = Array.isArray(viewSize) ? (viewSize[0] as number) : 800;
+      const pixelScale = currentFov / viewWidth; // degrees per pixel
+      const clickTolerancePx = 12;
+      const searchRadius = Math.max(0.003, Math.min(0.15, pixelScale * clickTolerancePx));
+
+      searchOnlineByCoordinates(
+        { ra, dec, radius: searchRadius },
+        { sources: ['simbad'], limit: 3, timeout: 6000, signal: abortController.signal }
+      )
+        .then((response) => {
+          // Bail if this query was superseded
+          if (abortController.signal.aborted) return;
+
+          // Find the closest result that is within an acceptable angular
+          // distance from the click point.
+          const maxSep = Math.min(MAX_MATCH_SEPARATION_DEG, searchRadius * 2);
+          let best: (typeof response.results)[number] | undefined;
+          let bestDist = Infinity;
+          for (const r of response.results) {
+            const d = angularSeparation(ra, dec, r.ra, r.dec);
+            if (d < bestDist && d <= maxSep) {
+              bestDist = d;
+              best = r;
+            }
+          }
+
+          if (!best) return; // No close-enough object — keep current selection
+
+          const enriched: SelectedObjectData = {
+            names: best.alternateNames
+              ? [best.name, ...best.alternateNames]
+              : [best.name],
+            ra: best.raString ?? formatRaString(best.ra),
+            dec: best.decString ?? formatDecString(best.dec),
+            raDeg: best.ra,
+            decDeg: best.dec,
+            selectionSource: 'enriched',
+            selectionFallback: 'resolved',
+            sourceCatalog: 'SIMBAD',
+            selectionTimestamp: buildSelectionTimestamp(),
+            type: best.type !== 'Unknown' ? best.type : undefined,
+            magnitude: best.magnitude,
+          };
+
+          // Only update if the callback ref is still alive
+          onSelectionChangeRef.current?.(enriched);
+          logger.debug(
+            `Resolved click → ${best.name} (${best.type}, dist=${bestDist.toFixed(4)}°)`
+          );
+        })
+        .catch((err) => {
+          if ((err as Error).name === 'AbortError') return;
+          logger.debug('SIMBAD coordinate lookup failed (keeping coordinate selection)', err);
+        });
+    };
+
+    // Object click → selection change.
+    // NOTE: for a single physical click Aladin fires this once per source
+    // within the hit radius (possibly dozens in dense fields). The first
+    // callback of a burst wins; the rest are ignored via objectClickedRef.
     aladin.on('objectClicked', (object: unknown) => {
       const cb = onSelectionChangeRef.current;
       if (!cb) return;
+
+      // Later calls of the same click burst — keep the first (closest) hit.
+      if (objectClickedRef.current && object) return;
 
       // Cancel any pending SIMBAD lookup from a previous click — prevents
       // stale results from overwriting this catalog-based selection.
@@ -119,7 +227,8 @@ export function useAladinEvents({
       simbadAbortRef.current = null;
 
       // Set flag so the subsequent `click` event doesn't trigger a redundant
-      // SIMBAD lookup.  Use setTimeout with 100 ms window (not queueMicrotask)
+      // SIMBAD lookup, and so later objectClicked calls of this burst are
+      // ignored.  Use setTimeout with 100 ms window (not queueMicrotask)
       // to handle cases where events fire in separate microtask batches.
       objectClickedRef.current = true;
       if (objectClickedTimerRef.current) clearTimeout(objectClickedTimerRef.current);
@@ -138,16 +247,16 @@ export function useAladinEvents({
         const data = (obj.data ?? {}) as Record<string, unknown>;
         const ra = typeof obj.ra === 'number' ? obj.ra : 0;
         const dec = typeof obj.dec === 'number' ? obj.dec : 0;
-        const name = typeof data.name === 'string' ? data.name : 'Unknown';
+        const name = resolveSourceName(data);
 
         const selection: SelectedObjectData = {
-          names: [name],
+          names: [name ?? `${formatRaString(ra)} ${formatDecString(dec)}`],
           ra: formatRaString(ra),
           dec: formatDecString(dec),
           raDeg: ra,
           decDeg: dec,
           selectionSource: 'catalog',
-          selectionFallback: name === 'Unknown' ? 'catalog_partial' : 'resolved',
+          selectionFallback: name ? 'resolved' : 'catalog_partial',
           sourceCatalog: resolveCatalogLabel(obj, data),
           selectionTimestamp: buildSelectionTimestamp(),
           type: typeof data.type === 'string' ? data.type : undefined,
@@ -155,6 +264,12 @@ export function useAladinEvents({
         };
 
         cb(selection);
+
+        // Source data carried no usable display name — resolve one from
+        // SIMBAD at the source position so the panel shows a real object.
+        if (!name) {
+          enrichFromSimbad(ra, dec);
+        }
       } catch (error) {
         logger.warn('Failed to parse clicked object', error);
         cb(null);
@@ -210,73 +325,8 @@ export function useAladinEvents({
         selectionTimestamp: buildSelectionTimestamp(),
       });
 
-      // Cancel any in-flight SIMBAD query from a previous click
-      simbadAbortRef.current?.abort();
-      const abortController = new AbortController();
-      simbadAbortRef.current = abortController;
-
-      // Adaptive search radius based on FOV-to-pixel ratio.
-      // At any zoom, ~10 px click tolerance ≈ currentFov / viewWidth * 10.
-      // Clamp between 0.003° (~10 arcsec) and 0.15° (9 arcmin).
-      const currentFov = getFoVCompat(aladin) ?? 60;
-      const viewSize = typeof aladin.getSize === 'function'
-        ? aladin.getSize()
-        : [800, 600];
-      const viewWidth = Array.isArray(viewSize) ? (viewSize[0] as number) : 800;
-      const pixelScale = currentFov / viewWidth; // degrees per pixel
-      const clickTolerancePx = 12;
-      const searchRadius = Math.max(0.003, Math.min(0.15, pixelScale * clickTolerancePx));
-
       // Async SIMBAD lookup to enrich the selection with object name/type/mag
-      searchOnlineByCoordinates(
-        { ra, dec, radius: searchRadius },
-        { sources: ['simbad'], limit: 3, timeout: 6000, signal: abortController.signal }
-      )
-        .then((response) => {
-          // Bail if this query was superseded
-          if (abortController.signal.aborted) return;
-
-          // Find the closest result that is within an acceptable angular
-          // distance from the click point.
-          const maxSep = Math.min(MAX_MATCH_SEPARATION_DEG, searchRadius * 2);
-          let best: (typeof response.results)[number] | undefined;
-          let bestDist = Infinity;
-          for (const r of response.results) {
-            const d = angularSeparation(ra!, dec!, r.ra, r.dec);
-            if (d < bestDist && d <= maxSep) {
-              bestDist = d;
-              best = r;
-            }
-          }
-
-          if (!best) return; // No close-enough object — keep coordinate selection
-
-          const enriched: SelectedObjectData = {
-            names: best.alternateNames
-              ? [best.name, ...best.alternateNames]
-              : [best.name],
-            ra: best.raString ?? formatRaString(best.ra),
-            dec: best.decString ?? formatDecString(best.dec),
-            raDeg: best.ra,
-            decDeg: best.dec,
-            selectionSource: 'enriched',
-            selectionFallback: 'resolved',
-            sourceCatalog: 'SIMBAD',
-            selectionTimestamp: buildSelectionTimestamp(),
-            type: best.type !== 'Unknown' ? best.type : undefined,
-            magnitude: best.magnitude,
-          };
-
-          // Only update if the callback ref is still alive
-          onSelectionChangeRef.current?.(enriched);
-          logger.debug(
-            `Resolved click → ${best.name} (${best.type}, dist=${bestDist.toFixed(4)}°)`
-          );
-        })
-        .catch((err) => {
-          if ((err as Error).name === 'AbortError') return;
-          logger.debug('SIMBAD coordinate lookup failed (keeping coordinate selection)', err);
-        });
+      enrichFromSimbad(ra, dec);
     });
 
     // Position changed → update store view direction in real-time (replaces polling)

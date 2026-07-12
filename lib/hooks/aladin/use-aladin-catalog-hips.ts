@@ -70,7 +70,7 @@ export function useAladinCatalogHips({ aladinRef, engineReady }: UseAladinCatalo
     try {
       const catalog = AStatic.catalogHiPS(selected.catalogServiceUrl, {
         name: selected.name,
-        onClick: 'showPopup',
+        // No onClick: selection is handled by the app's objectClicked handler.
       });
       aladin.addCatalog(catalog);
       activeRef.current = { id: selected.id, catalog };

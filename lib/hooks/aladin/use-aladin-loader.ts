@@ -126,6 +126,15 @@ export function useAladinLoader({
 
       aladinRef.current = aladin;
 
+      // Aladin Lite always instantiates its built-in context menu even with
+      // showContextMenu: false (the option only skips attaching the default
+      // actions). Its mouseup handler shows that menu on right-click and its
+      // contextmenu handler calls stopPropagation() when the menu exists,
+      // which would swallow the event before the app's unified context menu
+      // listener sees it. Clearing the instance disables both paths — every
+      // internal access is `&&`-guarded.
+      (aladin as unknown as { contextMenu?: unknown }).contextMenu = undefined;
+
       // Register zoom change event
       if (onFovChange) {
         aladin.on('zoomChanged', (fov: unknown) => {
