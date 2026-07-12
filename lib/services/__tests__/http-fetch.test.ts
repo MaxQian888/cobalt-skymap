@@ -470,19 +470,13 @@ describe('DownloadProgress type', () => {
       request_id: 'test-123',
       downloaded: 1024,
       total: 2048,
-      percentage: 50,
-      speed_bps: 10240,
-      eta_seconds: 10,
-      is_complete: false,
+      percent: 50,
     };
 
     expect(progress.request_id).toBe('test-123');
     expect(progress.downloaded).toBe(1024);
     expect(progress.total).toBe(2048);
-    expect(progress.percentage).toBe(50);
-    expect(progress.speed_bps).toBe(10240);
-    expect(progress.eta_seconds).toBe(10);
-    expect(progress.is_complete).toBe(false);
+    expect(progress.percent).toBe(50);
   });
 
   it('should allow null values for optional fields', () => {
@@ -490,15 +484,10 @@ describe('DownloadProgress type', () => {
       request_id: 'test-456',
       downloaded: 512,
       total: null,
-      percentage: null,
-      speed_bps: null,
-      eta_seconds: null,
-      is_complete: false,
+      percent: null,
     };
 
     expect(progress.total).toBeNull();
-    expect(progress.percentage).toBeNull();
-    expect(progress.speed_bps).toBeNull();
-    expect(progress.eta_seconds).toBeNull();
+    expect(progress.percent).toBeNull();
   });
 });

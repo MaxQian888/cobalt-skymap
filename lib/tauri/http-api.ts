@@ -132,22 +132,12 @@ export interface HttpResponse {
 export interface DownloadProgress {
   /** Request ID */
   request_id: string;
-  /** URL being downloaded */
-  url: string;
   /** Bytes downloaded so far */
   downloaded: number;
   /** Total bytes (if known) */
   total: number | null;
-  /** Progress percentage (0-100) */
-  percentage: number | null;
-  /** Download speed in bytes per second */
-  speed_bps: number | null;
-  /** Estimated time remaining in seconds */
-  eta_seconds: number | null;
-  /** Is download complete */
-  is_complete: boolean;
-  /** Error message if failed */
-  error: string | null;
+  /** Progress percentage (0-100, if total is known) */
+  percent: number | null;
 }
 
 /**

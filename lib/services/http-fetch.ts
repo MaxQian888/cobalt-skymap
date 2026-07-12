@@ -53,10 +53,7 @@ export interface DownloadProgress {
   request_id: string;
   downloaded: number;
   total: number | null;
-  percentage: number | null;
-  speed_bps: number | null;
-  eta_seconds: number | null;
-  is_complete: boolean;
+  percent: number | null;
 }
 
 // Lazy load Tauri HTTP API to avoid import errors in web environment
