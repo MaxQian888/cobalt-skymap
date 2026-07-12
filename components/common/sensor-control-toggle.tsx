@@ -69,6 +69,9 @@ export function SensorControlToggle({ className, showStatusLabel = false }: Sens
     (state) => state.recoveryRequestVersion['calibrate-sensor']
   );
   const setRecoveryNoticeKey = useARRuntimeStore((state) => state.setRecoveryNoticeKey);
+  const arCameraFacingMode = useARRuntimeStore(
+    (state) => state.camera.effectiveProfile?.facingMode ?? null
+  );
   const [calibrationDialogOpen, setCalibrationDialogOpen] = useState(false);
   const handledPermissionRequestRef = useRef(0);
   const handledCalibrationRequestRef = useRef(0);
@@ -137,6 +140,9 @@ export function SensorControlToggle({ className, showStatusLabel = false }: Sens
     deadbandDeg: stellarium.sensorDeadbandDeg,
     absolutePreferred: stellarium.sensorAbsolutePreferred,
     useCompassHeading: stellarium.sensorUseCompassHeading,
+    // Front-facing AR camera looks out of the screen, so the attitude math must
+    // flip the assumed device-frame forward vector to keep the sky aligned.
+    cameraFacing: stellarium.arMode && arCameraFacingMode === 'user' ? 'user' : 'environment',
     calibration: currentCalibration,
     onCalibrationChange: handleCalibrationChange,
     onOrientationChange: handleOrientationChange,

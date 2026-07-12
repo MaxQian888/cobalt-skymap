@@ -6,6 +6,7 @@ import {
   deviceEulerToSkyDirection,
   normalizeAngle360,
   normalizeAngleSigned180,
+  type CameraFacing,
 } from '@/lib/astronomy/coordinates/device-attitude';
 
 export interface DeviceOrientation {
@@ -63,6 +64,8 @@ interface UseDeviceOrientationOptions {
   deadbandDeg?: number;
   absolutePreferred?: boolean;
   useCompassHeading?: boolean;
+  /** Facing of the active AR camera; 'user' flips the assumed forward vector. */
+  cameraFacing?: CameraFacing;
   calibration?: SensorCalibrationState;
   onCalibrationChange?: (state: SensorCalibrationState) => void;
   onOrientationChange?: (direction: SkyDirection) => void;
@@ -371,6 +374,7 @@ export function useDeviceOrientation(
     deadbandDeg = 0.35,
     absolutePreferred = true,
     useCompassHeading = true,
+    cameraFacing = 'environment',
     calibration,
     onCalibrationChange,
     onOrientationChange,
@@ -578,7 +582,8 @@ export function useDeviceOrientation(
           betaDeg: sample.beta,
           gammaDeg: sample.gamma,
         },
-        screenAngleRef.current
+        screenAngleRef.current,
+        cameraFacing
       );
       latestRawDirectionRef.current = direction;
       return direction;
@@ -613,7 +618,7 @@ export function useDeviceOrientation(
         : 'Calibration failed';
       setError(message);
     }
-  }, [updateCalibrationState]);
+  }, [cameraFacing, updateCalibrationState]);
 
   const resetCalibration = useCallback(() => {
     updateCalibrationState({
@@ -743,7 +748,8 @@ export function useDeviceOrientation(
           betaDeg: sample.beta,
           gammaDeg: sample.gamma,
         },
-        screenAngleRef.current
+        screenAngleRef.current,
+        cameraFacing
       );
       latestRawDirectionRef.current = rawDirection;
 
@@ -821,6 +827,7 @@ export function useDeviceOrientation(
     smoothingFactor,
     absolutePreferred,
     useCompassHeading,
+    cameraFacing,
     setDegradedReasonState,
     revalidatePermissionState,
   ]);

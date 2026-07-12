@@ -71,6 +71,31 @@ describe('device attitude conversions', () => {
     expect(direction.altitude).toBeLessThanOrEqual(90);
   });
 
+  it('flips the forward vector for a front-facing camera', () => {
+    const euler = { alphaDeg: 120, betaDeg: 45, gammaDeg: 20 };
+    const rear = deviceEulerToForwardVector(euler, 0, 'environment');
+    const front = deviceEulerToForwardVector(euler, 0, 'user');
+    expect(front.x).toBeCloseTo(-rear.x, 10);
+    expect(front.y).toBeCloseTo(-rear.y, 10);
+    expect(front.z).toBeCloseTo(-rear.z, 10);
+  });
+
+  it('points the front camera at the antipode of the rear camera', () => {
+    const euler = { alphaDeg: 275, betaDeg: 30, gammaDeg: -15 };
+    const rear = deviceEulerToSkyDirection(euler, 90, 'environment');
+    const front = deviceEulerToSkyDirection(euler, 90, 'user');
+    expect(front.azimuth).toBeCloseTo(normalizeAngle360(rear.azimuth + 180), 5);
+    expect(front.altitude).toBeCloseTo(-rear.altitude, 5);
+  });
+
+  it('defaults to the rear-camera forward vector', () => {
+    const euler = { alphaDeg: 42, betaDeg: 60, gammaDeg: 5 };
+    const implicit = deviceEulerToSkyDirection(euler, 0);
+    const explicit = deviceEulerToSkyDirection(euler, 0, 'environment');
+    expect(implicit.azimuth).toBeCloseTo(explicit.azimuth, 10);
+    expect(implicit.altitude).toBeCloseTo(explicit.altitude, 10);
+  });
+
   it('normalizes angular values correctly', () => {
     expect(normalizeAngle360(370)).toBe(10);
     expect(normalizeAngle360(-30)).toBe(330);

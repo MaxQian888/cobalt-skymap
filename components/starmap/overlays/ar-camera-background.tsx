@@ -72,6 +72,7 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
   const cameraControlLayout = getARSurfaceLayoutTokens('camera-controls', adaptation.cameraControlMode);
   const videoRef = useRef<HTMLVideoElement>(null);
   const handledRetryRequestRef = useRef(0);
+  const handledSwitchCameraRequestRef = useRef(0);
   const handledRevertProfileRequestRef = useRef(0);
   const recordedManualProfileSignatureRef = useRef<string | null>(null);
   const lastStartSignatureRef = useRef<string | null>(null);
@@ -295,7 +296,10 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
   useEffect(() => {
     if (!enabled || !cameraStream) return;
     void applyCameraProfileLayersRef.current(profileLayers);
-  }, [cameraStream, enabled, profileSignature, profileLayers]);
+    // `profileLayers` is stably memoized (all inputs are memoized/primitive), and
+    // `profileSignature` is derived from it via useMemo, so listing the signature
+    // here as well was redundant — the object dep alone gates re-applies.
+  }, [cameraStream, enabled, profileLayers]);
 
   useEffect(() => {
     if (!enabled) {
@@ -421,7 +425,8 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
   ]);
 
   useEffect(() => {
-    if (switchCameraRequestVersion === 0) return;
+    if (switchCameraRequestVersion === handledSwitchCameraRequestRef.current) return;
+    handledSwitchCameraRequestRef.current = switchCameraRequestVersion;
     if (!enabled) return;
     void switchCamera();
   }, [enabled, switchCameraRequestVersion, switchCamera]);
@@ -593,7 +598,7 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
               size="icon"
               className={cn(
                 'rounded-full bg-background/40 backdrop-blur-sm hover:bg-background/60',
-                adaptation.runtimeClass === 'browser-mobile' ? 'h-8 w-8' : 'h-9 w-9',
+                adaptation.runtimeClass === 'browser-mobile' ? 'h-11 w-11' : 'h-9 w-9',
               )}
               onClick={() => void switchCamera()}
               aria-label={t('common.switchCamera') ?? 'Switch camera'}
@@ -607,7 +612,7 @@ export function ARCameraBackground({ enabled, className }: ARCameraBackgroundPro
               size="icon"
               className={cn(
                 'rounded-full bg-background/40 backdrop-blur-sm hover:bg-background/60',
-                adaptation.runtimeClass === 'browser-mobile' ? 'h-8 w-8' : 'h-9 w-9',
+                adaptation.runtimeClass === 'browser-mobile' ? 'h-11 w-11' : 'h-9 w-9',
               )}
               onClick={() => void toggleTorch()}
               aria-label="Torch"

@@ -34,7 +34,12 @@ export interface SkyDirection {
   altitude: number;
 }
 
+export type CameraFacing = 'environment' | 'user';
+
+// Rear camera looks out of the back of the device (device-frame -Z);
+// front camera looks out of the screen (device-frame +Z).
 const DEVICE_CAMERA_FORWARD: Vector3 = { x: 0, y: 0, z: -1 };
+const DEVICE_FRONT_CAMERA_FORWARD: Vector3 = { x: 0, y: 0, z: 1 };
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -111,10 +116,14 @@ export function applyScreenOrientationCompensation(
 
 export function deviceEulerToForwardVector(
   euler: DeviceEulerAngles,
-  screenAngleDeg: number
+  screenAngleDeg: number,
+  cameraFacing: CameraFacing = 'environment'
 ): Vector3 {
   const orientation = createQuaternionFromEulerZXY(euler);
-  const forward = rotateVectorByQuaternion(DEVICE_CAMERA_FORWARD, orientation);
+  const deviceForward = cameraFacing === 'user'
+    ? DEVICE_FRONT_CAMERA_FORWARD
+    : DEVICE_CAMERA_FORWARD;
+  const forward = rotateVectorByQuaternion(deviceForward, orientation);
   return applyScreenOrientationCompensation(forward, screenAngleDeg);
 }
 
@@ -127,9 +136,10 @@ export function forwardVectorToSkyDirection(vector: Vector3): SkyDirection {
 
 export function deviceEulerToSkyDirection(
   euler: DeviceEulerAngles,
-  screenAngleDeg: number
+  screenAngleDeg: number,
+  cameraFacing: CameraFacing = 'environment'
 ): SkyDirection {
-  const vector = deviceEulerToForwardVector(euler, screenAngleDeg);
+  const vector = deviceEulerToForwardVector(euler, screenAngleDeg, cameraFacing);
   return forwardVectorToSkyDirection(vector);
 }
 
