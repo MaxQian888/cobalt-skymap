@@ -2997,6 +2997,8 @@
       "behavior": "Behavior",
       "skipCloseConfirmation": "Skip Close Confirmation",
       "skipCloseConfirmationDesc": "Close the app without asking for confirmation",
+      "closeToTray": "Minimize to Tray on Close",
+      "closeToTrayDesc": "Keep Cobalt Skymap running in the system tray instead of quitting when the window is closed",
       "dailyKnowledgeEnabled": "Enable Daily Knowledge",
       "dailyKnowledgeEnabledDesc": "Turn Daily Knowledge feature on or off.",
       "dailyKnowledgeAutoShow": "Auto show once per day",
@@ -3396,6 +3398,15 @@
     "quit": "Quit Application",
     "restart": "Restart Application",
     "reload": "Reload"
+  },
+  "tray": {
+    "show": "Show Cobalt Skymap",
+    "starmap": "Star Map",
+    "search": "Search…",
+    "settings": "Settings",
+    "sessionPlanner": "Session Planner",
+    "plateSolver": "Plate Solver",
+    "quit": "Quit Cobalt Skymap"
   },
   "appControl": {
     "appControls": "App Controls",

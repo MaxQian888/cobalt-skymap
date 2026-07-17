@@ -6,7 +6,9 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
+import type { Window as TauriWindow } from '@tauri-apps/api/window';
 import { createLogger } from '@/lib/logger';
+import { isDesktop, isTauri } from '@/lib/storage/platform';
 import type { SystemInfo } from './types';
 import { resolveDesktopShell, type DesktopShell } from './window-shell';
 
@@ -15,18 +17,23 @@ const logger = createLogger('app-control-api');
 export const TRAY_ACTIVATED_EVENT = 'skymap-tray-activated';
 let desktopShellCache: DesktopShell | null = null;
 
+// Historical import site — the canonical definition lives in storage/platform.
+export { isTauri } from '@/lib/storage/platform';
+
 /**
- * Check if running in Tauri environment
+ * True only on Tauri desktop. Commands that are #[cfg(desktop)] in Rust
+ * (restart/quit/reload, dev-mode, system-info, tray) must use this instead of
+ * isTauri(), which is also true on Tauri mobile.
  */
-export function isTauri(): boolean {
-  return typeof window !== 'undefined' && ('__TAURI__' in window || '__TAURI_INTERNALS__' in window);
+function isDesktopTauri(): boolean {
+  return isTauri() && isDesktop();
 }
 
 /**
  * Resolve the current desktop shell contract for the active runtime.
  */
 export async function getDesktopShell(forceRefresh: boolean = false): Promise<DesktopShell> {
-  if (!isTauri()) {
+  if (!isDesktopTauri()) {
     return resolveDesktopShell(undefined, false);
   }
 
@@ -52,8 +59,8 @@ export async function getDesktopShell(forceRefresh: boolean = false): Promise<De
  * window position and size across restarts.
  */
 export async function restartApp(): Promise<void> {
-  if (!isTauri()) {
-    logger.warn('restartApp is only available in Tauri environment');
+  if (!isDesktopTauri()) {
+    logger.warn('restartApp is only available in the Tauri desktop environment');
     return;
   }
   await invoke('restart_app');
@@ -67,8 +74,8 @@ export async function restartApp(): Promise<void> {
  * @param exitCode - Optional exit code (defaults to 0)
  */
 export async function quitApp(exitCode?: number): Promise<void> {
-  if (!isTauri()) {
-    logger.warn('quitApp is only available in Tauri environment');
+  if (!isDesktopTauri()) {
+    logger.warn('quitApp is only available in the Tauri desktop environment');
     return;
   }
   await invoke('quit_app', { exitCode });
@@ -80,8 +87,8 @@ export async function quitApp(exitCode?: number): Promise<void> {
  * This does not restart the Tauri backend, only reloads the webview.
  */
 export async function reloadWebview(): Promise<void> {
-  if (!isTauri()) {
-    // In browser, just reload the page
+  if (!isDesktopTauri()) {
+    // In browser (and Tauri mobile), just reload the page
     window.location.reload();
     return;
   }
@@ -92,8 +99,8 @@ export async function reloadWebview(): Promise<void> {
  * Check if running in development mode
  */
 export async function isDevMode(): Promise<boolean> {
-  if (!isTauri()) {
-    // In browser, assume development if localhost
+  if (!isDesktopTauri()) {
+    // In browser (and Tauri mobile), assume development if localhost
     return window.location.hostname === 'localhost';
   }
   return await invoke<boolean>('is_dev_mode');
@@ -247,7 +254,7 @@ export async function isWindowMinimized(): Promise<boolean> {
  * Check whether tray-relative positioning is ready for this runtime.
  */
 export async function isTrayPositioningReady(): Promise<boolean> {
-  if (!isTauri()) {
+  if (!isDesktopTauri()) {
     return false;
   }
 
@@ -256,6 +263,53 @@ export async function isTrayPositioningReady(): Promise<boolean> {
   } catch (error) {
     logger.warn('Failed to read tray positioning readiness', error);
     return false;
+  }
+}
+
+/**
+ * Localized labels for the tray context menu. Keys mirror the Rust
+ * `TrayMenuLabels` struct (camelCase over the IPC boundary).
+ */
+export interface TrayMenuLabels {
+  show: string;
+  starmap: string;
+  search: string;
+  settings: string;
+  sessionPlanner: string;
+  plateSolver: string;
+  quit: string;
+}
+
+/**
+ * Rebuild the native tray context menu with localized labels.
+ *
+ * No-op outside Tauri desktop; failures are logged but never thrown, since a
+ * stale (English) menu is preferable to breaking startup.
+ */
+export async function updateTrayMenu(labels: TrayMenuLabels): Promise<void> {
+  if (!isDesktopTauri()) {
+    return;
+  }
+  try {
+    await invoke('update_tray_menu', { labels });
+  } catch (error) {
+    logger.warn('Failed to update tray menu labels', error);
+  }
+}
+
+/**
+ * Set whether closing the window hides it to the tray instead of quitting.
+ *
+ * No-op outside Tauri desktop.
+ */
+export async function setCloseToTray(enabled: boolean): Promise<void> {
+  if (!isDesktopTauri()) {
+    return;
+  }
+  try {
+    await invoke('set_close_to_tray', { enabled });
+  } catch (error) {
+    logger.warn('Failed to update close-to-tray behavior', error);
   }
 }
 
@@ -289,6 +343,61 @@ export async function toggleMaximizeWindow(): Promise<void> {
 }
 
 /**
+ * Detect a Windows runtime from the WebView2 user agent, which always
+ * contains "Windows". Cheaper and more reliable than an IPC round-trip.
+ */
+function isWindowsRuntime(): boolean {
+  return typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows');
+}
+
+/**
+ * A cheap, invisible bounds nudge. The main window is borderless
+ * (`decorations: false`); when it leaves fullscreen, tao marks it
+ * non-fullscreen but the Windows shell can fall back to its fullscreen
+ * heuristics and keep the taskbar hidden. Changing the window bounds makes the
+ * shell re-evaluate. The net size/position is unchanged, so this is a visual
+ * no-op when the taskbar was already showing, and it resolves the common case.
+ */
+async function nudgeWindowBounds(appWindow: TauriWindow): Promise<void> {
+  if (await appWindow.isMaximized()) {
+    // setSize would clear the maximized state, so re-assert maximize instead.
+    await appWindow.unmaximize();
+    await appWindow.maximize();
+    return;
+  }
+
+  const { PhysicalSize } = await import('@tauri-apps/api/dpi');
+  const size = await appWindow.innerSize();
+  await appWindow.setSize(new PhysicalSize(size.width, Math.max(1, size.height - 1)));
+  await appWindow.setSize(new PhysicalSize(size.width, size.height));
+}
+
+/**
+ * Force the Windows taskbar to reappear after leaving fullscreen.
+ *
+ * Runs two tiers because the shell's fullscreen heuristic can be stubborn on
+ * some machines:
+ *   1. A bounds nudge — invisible, fixes the common case.
+ *   2. A strong fallback: minimize + unminimize forces a foreground/activation
+ *      change so the shell definitively re-evaluates its fullscreen state.
+ *      `unminimize` (SW_RESTORE) preserves the prior maximized/normal state, so
+ *      the only visible cost is a brief minimize animation.
+ */
+async function refreshTaskbarAfterFullscreenExit(appWindow: TauriWindow): Promise<void> {
+  if (!isWindowsRuntime()) return;
+
+  try {
+    await nudgeWindowBounds(appWindow);
+
+    await appWindow.minimize();
+    await appWindow.unminimize();
+    await appWindow.setFocus();
+  } catch (error) {
+    logger.warn('Failed to refresh taskbar after exiting fullscreen', error);
+  }
+}
+
+/**
  * Toggle fullscreen state of the current window
  */
 export async function toggleFullscreen(): Promise<void> {
@@ -302,8 +411,12 @@ export async function toggleFullscreen(): Promise<void> {
   }
   const { getCurrentWindow } = await import('@tauri-apps/api/window');
   const appWindow = getCurrentWindow();
-  const isFullscreen = await appWindow.isFullscreen();
-  await appWindow.setFullscreen(!isFullscreen);
+  const wasFullscreen = await appWindow.isFullscreen();
+  await appWindow.setFullscreen(!wasFullscreen);
+
+  if (wasFullscreen) {
+    await refreshTaskbarAfterFullscreenExit(appWindow);
+  }
 }
 
 /**

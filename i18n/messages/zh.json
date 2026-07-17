@@ -2997,6 +2997,8 @@
       "behavior": "行为",
       "skipCloseConfirmation": "跳过关闭确认",
       "skipCloseConfirmationDesc": "关闭应用时不弹出确认对话框",
+      "closeToTray": "关闭时最小化到托盘",
+      "closeToTrayDesc": "关闭窗口时让 Cobalt Skymap 保留在系统托盘中运行，而不是退出",
       "dailyKnowledgeEnabled": "启用每日知识",
       "dailyKnowledgeEnabledDesc": "开启或关闭每日知识功能。",
       "dailyKnowledgeAutoShow": "每天自动弹出一次",
@@ -3396,6 +3398,15 @@
     "quit": "退出应用",
     "restart": "重启应用",
     "reload": "刷新"
+  },
+  "tray": {
+    "show": "显示 Cobalt Skymap",
+    "starmap": "星图",
+    "search": "搜索…",
+    "settings": "设置",
+    "sessionPlanner": "观测计划",
+    "plateSolver": "板解析",
+    "quit": "退出 Cobalt Skymap"
   },
   "appControl": {
     "appControls": "应用控制",

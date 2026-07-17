@@ -37,6 +37,8 @@ export interface AppPreferences {
   distanceUnit: DistanceUnit;
   temperatureUnit: TemperatureUnit;
   skipCloseConfirmation: boolean;
+  /** Desktop: hide the window to the system tray on close instead of quitting. */
+  closeToTray: boolean;
   rightPanelCollapsed: boolean;
   startupView: StartupView;
   launchOnStartup: boolean;
@@ -214,6 +216,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   distanceUnit: 'metric',
   temperatureUnit: 'celsius',
   skipCloseConfirmation: false,
+  closeToTray: false,
   rightPanelCollapsed: false,
   startupView: 'last',
   launchOnStartup: false,
@@ -447,7 +450,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'starmap-settings',
       storage: getZustandStorage(),
-      version: 21, // v21: a11y fontScale + colorBlindMode (replaces largeText)
+      version: 22, // v22: add preferences.closeToTray (hide-to-tray on close)
       migrate: (persistedState, version) => {
         const state = persistedState as Partial<SettingsState>;
         
@@ -687,6 +690,17 @@ export const useSettingsStore = create<SettingsState>()(
               ...restAccessibility,
               fontScale: legacy.fontScale ?? (largeText ? 1.125 : 1.0),
               colorBlindMode: legacy.colorBlindMode ?? 'none',
+            },
+          };
+        }
+
+        // Migration from v21 to v22: add preferences.closeToTray
+        if (version < 22) {
+          return {
+            ...state,
+            preferences: {
+              ...DEFAULT_PREFERENCES,
+              ...state.preferences,
             },
           };
         }

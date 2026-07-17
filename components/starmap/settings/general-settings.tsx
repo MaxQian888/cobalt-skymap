@@ -10,6 +10,8 @@ import {
   Power,
   XCircle,
 } from 'lucide-react';
+import { isDesktop, isTauri } from '@/lib/storage/platform';
+import { useIsClient } from '@/lib/hooks/use-is-client';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -42,6 +44,11 @@ export function GeneralSettings() {
   const autostartLoading = useAutostartStore((state) => state.loading);
   const autostartActualEnabled = useAutostartStore((state) => state.actualEnabled);
   const autostartError = useAutostartStore((state) => state.error);
+
+  // Close-to-tray only applies to the desktop app. Gate on the client flag so
+  // the isTauri/isDesktop (window-reading) checks stay hydration-safe.
+  const isClient = useIsClient();
+  const isDesktopApp = isClient && isTauri() && isDesktop();
 
   const autostartDescription = autostartError
     ? t('settingsNew.general.launchOnStartupError', { message: autostartError })
@@ -310,13 +317,24 @@ export function GeneralSettings() {
         icon={<XCircle className="h-4 w-4" />}
         defaultOpen={false}
       >
-        <ToggleItem
-          id="skip-close-confirmation"
-          label={t('settingsNew.general.skipCloseConfirmation')}
-          description={t('settingsNew.general.skipCloseConfirmationDesc')}
-          checked={preferences.skipCloseConfirmation}
-          onCheckedChange={(checked) => setPreference('skipCloseConfirmation', checked)}
-        />
+        <div className="space-y-4">
+          <ToggleItem
+            id="skip-close-confirmation"
+            label={t('settingsNew.general.skipCloseConfirmation')}
+            description={t('settingsNew.general.skipCloseConfirmationDesc')}
+            checked={preferences.skipCloseConfirmation}
+            onCheckedChange={(checked) => setPreference('skipCloseConfirmation', checked)}
+          />
+          {isDesktopApp && (
+            <ToggleItem
+              id="close-to-tray"
+              label={t('settingsNew.general.closeToTray')}
+              description={t('settingsNew.general.closeToTrayDesc')}
+              checked={preferences.closeToTray}
+              onCheckedChange={(checked) => setPreference('closeToTray', checked)}
+            />
+          )}
+        </div>
       </SettingsSection>
     </div>
   );

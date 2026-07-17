@@ -25,7 +25,8 @@ pub use app_settings::{
 
 pub use app_control::{
     handle_tray_icon_event, initialize_tray, is_dev_mode, is_tray_positioning_ready, quit_app,
-    reload_webview, restart_app, TrayRuntimeState,
+    reload_webview, restart_app, set_close_to_tray, update_tray_menu, TrayMenuLabels,
+    TrayRuntimeState,
 };
 
 pub use cli::{

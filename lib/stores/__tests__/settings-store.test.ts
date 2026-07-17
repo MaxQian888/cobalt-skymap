@@ -79,6 +79,7 @@ const DEFAULT_PREFERENCES = {
   distanceUnit: 'metric' as const,
   temperatureUnit: 'celsius' as const,
   skipCloseConfirmation: false,
+  closeToTray: false,
   rightPanelCollapsed: false,
   startupView: 'last' as const,
   launchOnStartup: false,
@@ -433,6 +434,7 @@ describe('Settings Store', () => {
       expect(state.preferences.dailyKnowledgeAutoShow).toBe(true);
       expect(state.preferences.dailyKnowledgeOnlineEnhancement).toBe(true);
       expect(state.preferences.skipCloseConfirmation).toBe(false);
+      expect(state.preferences.closeToTray).toBe(false);
     });
 
     it('setPreference updates single preference', () => {

@@ -57,6 +57,9 @@ The `platform` module provides desktop-only features including app settings pers
 | `quit_app` | - | `()` | Quit app |
 | `reload_webview` | - | `()` | Reload webview |
 | `is_dev_mode` | - | `bool` | Check dev mode |
+| `is_tray_positioning_ready` | - | `bool` | Tray-relative positioning ready |
+| `update_tray_menu` | labels | `()` | Rebuild tray menu with localized labels |
+| `set_close_to_tray` | enabled | `()` | Hide window to tray on close vs. quit |
 
 ### Updater Commands
 

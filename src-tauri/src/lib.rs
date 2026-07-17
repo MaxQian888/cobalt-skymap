@@ -265,10 +265,12 @@ use platform::{
     save_solver_config,
     save_window_state,
     set_active_map_api_key,
+    set_close_to_tray,
     set_custom_cache_dir,
     set_custom_data_dir,
     solve_image_local,
     solve_online,
+    update_tray_menu,
     validate_directory,
     validate_solver_path,
     TrayRuntimeState,
@@ -302,6 +304,18 @@ pub fn run() {
     let builder = builder.on_tray_icon_event(|app, event| {
         tauri_plugin_positioner::on_tray_event(app, &event);
         handle_tray_icon_event(app, &event);
+    });
+
+    // Close-to-tray: when enabled (and the tray exists), a window-close request
+    // hides the window instead of exiting so the app keeps running in the tray.
+    #[cfg(desktop)]
+    let builder = builder.on_window_event(|window, event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            if window.state::<TrayRuntimeState>().should_hide_on_close() {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        }
     });
 
     #[cfg(not(desktop))]
@@ -604,6 +618,10 @@ pub fn run() {
             parse_cli_matches_from_args,
             #[cfg(desktop)]
             is_tray_positioning_ready,
+            #[cfg(desktop)]
+            update_tray_menu,
+            #[cfg(desktop)]
+            set_close_to_tray,
             // Secure Map API Keys (desktop only)
             #[cfg(desktop)]
             save_map_api_key,

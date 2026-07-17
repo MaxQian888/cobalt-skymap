@@ -9,6 +9,7 @@ import { SettingsToaster } from "@/components/providers/settings-toaster";
 import { CliLaunchProvider } from "@/components/providers/cli-launch-provider";
 import { GlobalShortcutProvider } from "@/components/providers/global-shortcut-provider";
 import { AutostartProvider } from "@/components/providers/autostart-provider";
+import { TrayProvider } from "@/components/providers/tray-provider";
 import { TauriSyncProvider } from "@/lib/tauri/TauriSyncProvider";
 import "./globals.css";
 
@@ -91,6 +92,7 @@ export default function RootLayout({
                   <CliLaunchProvider>
                     <GlobalShortcutProvider />
                     <AutostartProvider />
+                    <TrayProvider />
                     {children}
                   </CliLaunchProvider>
                 </TauriSyncProvider>
